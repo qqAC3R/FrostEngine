@@ -1,0 +1,63 @@
+#pragma once
+
+#include <vulkan/vulkan.hpp>
+#include <glm/glm.hpp>
+
+#include "Frost/Core/Layer.h"
+
+
+namespace Frost
+{
+	class Texture2D;
+	class Image2D;
+
+	class ImGuiLayer : public Layer
+	{
+	public:
+		ImGuiLayer();
+		~ImGuiLayer();
+
+		void OnInit(VkRenderPass renderPass);
+
+		virtual void OnAttach() override;
+		virtual void OnDetach() override;
+		virtual void OnImGuiRender() override;
+		virtual void OnResize() override;
+
+		virtual void OnEvent(Event& event) override;
+
+		void Begin();
+		void Render(VkCommandBuffer cmdBuf);
+
+		bool IsUsed() { return m_BlockEvents; }
+
+		static void* GetTextureIDFromVulkanTexture(Ref<Texture2D> texture);
+		static void* GetTextureIDFromVulkanTexture(Ref<Image2D> texture);
+
+	private:
+		void SetDarkThemeColors();
+
+	private:
+		bool m_BlockEvents = false;
+		float m_Time = 0.0f;
+
+		VkRenderPass m_ImGuiRenderPass;
+
+
+	};
+
+	class UI
+	{
+	public:
+		static void Begin(const std::string& title);
+		static void End();
+
+		static void ColorEdit(const std::string& name, glm::vec3& value);
+		static void ColorEdit(const std::string& name, glm::vec4& value);
+		static void Slider(const std::string& name, glm::vec3& value, float min, float max);
+		static void Slider(const std::string& name, float& value, float min, float max);
+		static void Slider(const std::string& name, int& value, int min, int max);
+	};
+
+
+}

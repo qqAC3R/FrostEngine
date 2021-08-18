@@ -1,0 +1,56 @@
+
+#pragma once
+
+#include <vulkan/vulkan.hpp>
+
+#include "Frost/Renderer/Framebuffer.h"
+ 
+#include "Frost/Core/Engine.h"
+
+namespace Frost
+{
+
+	class VulkanFramebuffer : public Framebuffer
+	{
+	public:
+		VulkanFramebuffer(void* renderPass, const FramebufferSpecification& spec);
+		virtual ~VulkanFramebuffer();
+
+		virtual void Resize(uint32_t width, uint32_t height) override;
+		virtual const FramebufferSpecification& GetSpecification() const override { return m_Specification; }
+
+		virtual void* GetRendererID() const override { return m_Framebuffer; }
+		virtual const Ref<Image2D>& GetColorAttachmentRendererID(uint32_t index = 0) const override {
+			if (index > (uint32_t)m_Attachments.size()) { FROST_ASSERT(false, ""); }
+			return m_Attachments[index];
+		}
+
+		virtual void Destroy() override;
+		
+	private:
+		void CreateAttachments();
+		void CreateFramebuffer(void* renderPass);
+
+	private:
+
+		VkFramebuffer m_Framebuffer;
+		std::vector<Ref<Image2D>> m_Attachments;
+
+		FramebufferSpecification m_Specification;
+
+		std::vector<FramebufferTextureSpecification> m_ColorAttachmentSpecifications;
+		FramebufferTextureSpecification m_DepthAttachmentSpecification = FramebufferTextureFormat::None;
+
+
+	public:
+		/* Function that are useless */
+		virtual void Bind(uint32_t slot = 0) const override {}
+		virtual void Unbind(uint32_t slot = 0) const override {}
+
+		virtual void ClearAttachment(uint32_t attachmentIndex, int value) override {};
+		virtual int ReadPixel(uint32_t attachmentIndex, int x, int y) override { return int(); }
+
+
+	};
+
+}

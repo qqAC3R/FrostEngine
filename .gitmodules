@@ -1,0 +1,18 @@
+[submodule "Frost/vendor/GLFW"]
+	path = Frost/vendor/GLFW
+	url = https://github.com/qqAC3R/glfw
+[submodule "Frost/vendor/ImGui"]
+	path = Frost/vendor/ImGui
+	url = https://github.com/qqAC3R/imgui
+[submodule "Frost/vendor/assimp/assimp"]
+	path = Frost/vendor/assimp/assimp
+	url = https://github.com/assimp/assimp
+[submodule "Frost/vendor/glm"]
+	path = Frost/vendor/glm
+	url = https://github.com/g-truc/glm
+[submodule "Frost/vendor/spdlog"]
+	path = Frost/vendor/spdlog
+	url = https://github.com/gabime/spdlog
+[submodule "Frost/vendor/VulkanMemoryAllocator"]
+	path = Frost/vendor/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator

@@ -1,0 +1,10 @@
+^D:\VISUAL STUDIO\VULKAN\VULKAN RAY TRACING\SHARED_SOURCES\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SD:/Visual Studio/Vulkan/Vulkan Ray Tracing/vk_raytracing_tutorial_KHR" "-BD:/Visual Studio/Vulkan/Vulkan Ray Tracing/build" --check-stamp-file "D:/Visual Studio/Vulkan/Vulkan Ray Tracing/build/shared_sources/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
