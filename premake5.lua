@@ -1,4 +1,4 @@
-workspace "VkFrost"
+workspace "Frost"
 	architecture "x64"
 	startproject "FrostEditor"		
 	
@@ -23,7 +23,8 @@ IncludeDir["GLFW"] = "Frost/vendor/GLFW/include"
 IncludeDir["glm"] = "Frost/vendor/glm"
 IncludeDir["stb_image"] = "Frost/vendor/stb_image"
 IncludeDir["spdlog"] = "Frost/vendor/spdlog/include"
-IncludeDir["assimp"] = "Frost/vendor/assimp"
+IncludeDir["assimp"] = "Frost/vendor/assimp/assimp/include"
+IncludeDir["assimpLib"] = "Frost/vendor/assimp/lib"
 IncludeDir["nvvk"] = "Frost/vendor/nvvk/shared_sources"
 IncludeDir["vma"] = "Frost/vendor/VulkanMemoryAllocator/include"
 IncludeDir["ImGui"] = "Frost/vendor/ImGui"
@@ -117,7 +118,6 @@ project "Frost"
 		"nvvk",
 		"assimp-vc142-mtd.lib",
 		"ImGui",
-
 		"vulkan-1.lib",
 	}
 
@@ -126,8 +126,7 @@ project "Frost"
 	libdirs
 	{
 		"%{VULKAN_SDK}/Lib",
-		"%{IncludeDir.assimp}/lib",
-		"%{IncludeDir.tinyobjloader}/tinyobjloader/lib",
+		"%{IncludeDir.assimpLib}",
 	}
 
 	filter "system:windows"
