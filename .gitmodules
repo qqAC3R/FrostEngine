@@ -13,3 +13,6 @@
 [submodule "Frost/vendor/VulkanMemoryAllocator"]
 	path = Frost/vendor/VulkanMemoryAllocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+[submodule "Frost/vendor/assimp/assimp"]
+	path = Frost/vendor/assimp/assimp
+	url = https://github.com/qqAC3R/assimp
