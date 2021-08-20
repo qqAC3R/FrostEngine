@@ -16,9 +16,14 @@
 **.csproj.user
 **.csproj.filters
 
-# Cache
+# Built by the project
 *.cache
 *.config
+bin/
+bin-int/
+FrostEditor/assets/cache/
+Frost/vendor/nvvk/shared_sources/bin/
+Frost/vendor/nvvk/shared_sources/bin-int/
 
 # CLion files
 .idea/
