@@ -16,6 +16,10 @@
 **.csproj.user
 **.csproj.filters
 
+# Cache
+*.cache
+*.config
+
 # CLion files
 .idea/
 
