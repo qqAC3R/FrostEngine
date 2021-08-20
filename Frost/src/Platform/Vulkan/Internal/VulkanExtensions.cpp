@@ -28,6 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "frostpch.h"
 #include <assert.h>
 #include "VulkanExtensions.h"
 

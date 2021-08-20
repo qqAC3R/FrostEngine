@@ -7,10 +7,6 @@
 
 #include "Frost/Utils/Timer.h"
 
-// TODO: TEMP
-#include <tinyobjloader/tiny_obj_loader.h>
-
-
 namespace Frost
 {
 	//static Ref<Texture2D> s_WhiteTexture = Texture2D::Create("assets/media/textures/white.jpg");
