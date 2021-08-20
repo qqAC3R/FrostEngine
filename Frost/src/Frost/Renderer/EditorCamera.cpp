@@ -128,7 +128,6 @@ namespace Frost
 
 		dispatcher.Dispatch<MouseButtonPressedEvent>(FROST_BIND_EVENT_FN(EditorCamera::OnMouseButtonPressed));
 		dispatcher.Dispatch<MouseButtonReleasedEvent>(FROST_BIND_EVENT_FN(EditorCamera::OnMouseButtonReleased));
-
 	}
 
 	bool EditorCamera::OnMouseScroll(MouseScrolledEvent& e)

@@ -7,39 +7,12 @@
 
 #include "imgui.h"
 
+#include "Frost/Events/KeyEvent.h"
+#include "Frost/InputCodes/KeyCodes.h"
+
 namespace Frost
 {
-	
-#if 0
-	class EditorLayer : public Layer
-	{
-	public:
-		EditorLayer();
 
-		virtual void OnAttach();
-		virtual void OnUpdate(Frost::Timestep ts);
-		virtual void OnDetach();
-
-		virtual void OnEvent(Frost::Event& event);
-		virtual void OnImGuiRender();
-		virtual void OnResize();
-
-	private:
-
-		EditorCamera m_Camera;
-
-		glm::vec3 m_CameraPos{ 1.0f, 1.0f, 1.0f };
-		glm::vec3 m_LightPos{ 1.0f, 1.0f, 1.0f };
-
-		glm::vec3 m_VikingMeshPosition{ 2.0f };
-
-		Ref<Mesh> m_PlaneMesh;
-		Ref<Mesh> m_VikingMesh;
-
-	};
-#endif
-
-#if 1
 	class EditorLayer : public Layer
 	{
 	public:
@@ -81,7 +54,7 @@ namespace Frost
 
 		}
 
-		virtual void OnEvent(Frost::Event& event)
+		virtual void OnEvent(Event& event)
 		{
 			m_Camera.OnEvent(event);
 		}
@@ -121,6 +94,7 @@ namespace Frost
 
 
 			ImGui::Begin("DockSpace", &dockSpaceOpen, window_flags);
+			
 			if (!opt_padding)
 				ImGui::PopStyleVar();
 
@@ -141,13 +115,10 @@ namespace Frost
 				if (ImGui::BeginMenu("File"))
 				{
 					if (ImGui::MenuItem("Exit"))
-					{
-						//Application::Get().Close();
-					}
+						Application::Get().Close();
 
 					ImGui::EndMenu();
 				}
-
 				ImGui::EndMenuBar();
 			}
 
@@ -164,6 +135,37 @@ namespace Frost
 		{
 
 		}
+
+	private:
+
+		EditorCamera m_Camera;
+
+		glm::vec3 m_CameraPos{ 1.0f, 1.0f, 1.0f };
+		glm::vec3 m_LightPos{ 1.0f, 1.0f, 1.0f };
+
+		glm::vec3 m_VikingMeshPosition{ 2.0f };
+
+		Ref<Mesh> m_PlaneMesh;
+		Ref<Mesh> m_VikingMesh;
+
+		bool m_ViewPortFocused;
+
+	};
+
+
+#if 0
+	class EditorLayer : public Layer
+	{
+	public:
+		EditorLayer();
+
+		virtual void OnAttach();
+		virtual void OnUpdate(Frost::Timestep ts);
+		virtual void OnDetach();
+
+		virtual void OnEvent(Frost::Event& event);
+		virtual void OnImGuiRender();
+		virtual void OnResize();
 
 	private:
 

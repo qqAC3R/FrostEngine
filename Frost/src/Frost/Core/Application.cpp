@@ -65,22 +65,6 @@ namespace Frost
 			{
 				layer->OnUpdate(timestep);
 			}
-			
-#if 0
-			// Check if the pipeline should be recreated
-			if (!VulkanRenderer::IsSwapChainValid())
-			{
-
-				VulkanRenderer::WaitFence();
-				for (Layer* layer : m_LayerStack)
-				{
-					layer->OnResize();
-				}
-
-				VulkanRenderer::RecreatePipeline();
-				
-			}
-#endif
 
 			// Poll Events
 			m_Window->OnUpdate();
@@ -101,9 +85,13 @@ namespace Frost
 
 		for (auto it = m_LayerStack.end(); it != m_LayerStack.begin(); )
 		{
-			(*--it)->OnEvent(e);
-			if (e.Handled)
-				break;
+			// Check if a layer is blocking the events
+			if ((*--it)->IsBlocking())
+			{
+				(*it)->OnEvent(e);
+				if (e.Handled)
+					break;
+			}
 		}
 
 	}

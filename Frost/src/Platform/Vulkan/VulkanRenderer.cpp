@@ -354,9 +354,12 @@ namespace Frost
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
 			ImGui::Begin("Viewport");
 
+			bool IsViewPortFocused = ImGui::IsWindowFocused();
+			Application::Get().GetImGuiLayer()->BlockEvents(false);
+
 			auto texture = s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[s_CurrentFrame];
 			ImVec2 viewPortSizePanel = ImGui::GetContentRegionAvail();
-			ImGui::Image(ImGuiLayer::GetTextureIDFromVulkanTexture(texture), ImVec2{ viewPortSizePanel.x, viewPortSizePanel.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+			ImGui::Image(ImGuiLayer::GetTextureIDFromVulkanTexture(texture), ImVec2{ viewPortSizePanel.x, viewPortSizePanel.y });
 
 			ImGui::End();
 			ImGui::PopStyleVar();
