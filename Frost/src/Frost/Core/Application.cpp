@@ -27,10 +27,10 @@ namespace Frost
 		m_Window = Scope<Window>(Window::Create({"Frost Engine", 1600, 900}));
 		m_Window->SetEventCallback(FROST_BIND_EVENT_FN(Application::OnEvent));
 
-		Renderer::Init();
-
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
+
+		Renderer::Init();
 	}
 
 
@@ -48,6 +48,13 @@ namespace Frost
 	{
 		while (m_Running)
 		{
+			if (m_Minimized)
+			{
+				m_Window->OnUpdate();
+				continue;
+			}
+			
+			
 			// Timestep
 			float time = (float)m_Window->GetTime(); // Platform::GetTime
 			Timestep timestep = time - m_LastFrameTime;
@@ -66,14 +73,16 @@ namespace Frost
 				layer->OnUpdate(timestep);
 			}
 
+			// Renderer update
+			Renderer::Update();
+
+
 			// Poll Events
 			m_Window->OnUpdate();
 
 		}
 
 		m_Window->GetGraphicsContext()->WaitDevice();
-		
-
 	}
 
 	void Application::OnEvent(Event& e)
@@ -110,6 +119,11 @@ namespace Frost
 			return false;
 		}
 		m_Minimized = false;
+		m_Window->Resize(e.GetWidth(), e.GetHeight());
+
+		Renderer::Resize(e.GetWidth(), e.GetHeight());
+		m_ImGuiLayer->OnResize(e.GetWidth(), e.GetHeight());
+
 		return false;
 	}
 

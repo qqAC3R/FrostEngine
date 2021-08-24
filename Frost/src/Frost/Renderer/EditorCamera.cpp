@@ -89,7 +89,7 @@ namespace Frost
 	{
 		if (m_CameraMode == CameraMode::ORBIT)
 		{
-			if (!Application::Get().GetImGuiLayer()->IsUsed())
+			if (!Application::Get().GetImGuiLayer()->IsBlocking())
 			{
 				const glm::vec2& mouse{ Input::GetMouseX(), Input::GetMouseY() };
 				glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.005f;
@@ -123,7 +123,6 @@ namespace Frost
 	{
 		EventDispatcher dispatcher(e);
 		dispatcher.Dispatch<MouseScrolledEvent>(FROST_BIND_EVENT_FN(EditorCamera::OnMouseScroll));
-		dispatcher.Dispatch<MouseMovedEvent>(FROST_BIND_EVENT_FN(EditorCamera::OnMouseMoved));
 		dispatcher.Dispatch<MouseMovedEvent>(FROST_BIND_EVENT_FN(EditorCamera::OnMouseMoved));
 
 		dispatcher.Dispatch<MouseButtonPressedEvent>(FROST_BIND_EVENT_FN(EditorCamera::OnMouseButtonPressed));

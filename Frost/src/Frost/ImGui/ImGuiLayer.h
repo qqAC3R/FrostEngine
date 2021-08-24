@@ -22,14 +22,12 @@ namespace Frost
 		virtual void OnAttach() override;
 		virtual void OnDetach() override;
 		virtual void OnImGuiRender() override;
-		virtual void OnResize() override;
+		virtual void OnResize(uint32_t width, uint32_t height) override;
 
 		virtual void OnEvent(Event& event) override;
 
 		void Begin();
 		void Render(VkCommandBuffer cmdBuf);
-
-		bool IsUsed() { return m_BlockEvents; }
 
 		static void* GetTextureIDFromVulkanTexture(Ref<Texture2D> texture);
 		static void* GetTextureIDFromVulkanTexture(Ref<Image2D> texture);
@@ -38,12 +36,10 @@ namespace Frost
 		void SetDarkThemeColors();
 
 	private:
-		bool m_BlockEvents = false;
 		float m_Time = 0.0f;
 
 		VkRenderPass m_ImGuiRenderPass;
-
-
+		VkDescriptorPool m_DescriptorPool;
 	};
 
 	class UI

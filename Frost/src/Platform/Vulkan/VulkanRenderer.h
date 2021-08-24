@@ -12,19 +12,18 @@ namespace Frost
 		virtual void Init() override;
 		virtual void ShutDown() override;
 
-		virtual void BeginRenderPass(const EditorCamera& camera) override;
-		virtual void EndRenderPass() override;
+		virtual void BeginScene(const EditorCamera& camera) override;
+		virtual void EndScene() override;
 
-		// VulkanPipeline
 		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform) override;
 		virtual void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform) override;
 
+		//void BeginVulkanRenderPass(Ref<RenderPass> renderPass);
+		//void EndVulkanRenderPass();
 
-		void BeginVulkanRenderPass(Ref<RenderPass> renderPass);
-		void EndVulkanRenderPass();
-
-		void Resize();
-
+	protected:
+		virtual void Update() override;
+		virtual void Resize(uint32_t width, uint32_t height) override;
 	};
 
 }

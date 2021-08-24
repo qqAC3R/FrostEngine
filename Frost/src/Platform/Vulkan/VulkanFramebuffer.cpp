@@ -33,9 +33,11 @@ namespace Frost
 		}
 	}
 
-	VulkanFramebuffer::VulkanFramebuffer(void* renderPass, const FramebufferSpecification& spec)
+	VulkanFramebuffer::VulkanFramebuffer(Ref<RenderPass> renderPass, const FramebufferSpecification& spec)
 		: m_Specification(spec)
 	{
+		FROST_ASSERT(m_Specification.Attachments.Attachments.size() == 0, "Framebuffer should have atleast 1 attachment");
+
 		CreateAttachments();
 		CreateFramebuffer(renderPass);
 	}
@@ -77,7 +79,7 @@ namespace Frost
 		for (uint32_t i = 0; i < m_Specification.Attachments.Attachments.size(); i++)
 		{
 			FramebufferTextureSpecification attachment = m_Specification.Attachments.Attachments[i];
-			if (!attachment.Components.Image)
+			if (attachment.TextureFormat != FramebufferTextureFormat::SWAPCHAIN)
 			{
 				TextureSpecs spec{};
 				spec.Width = m_Specification.Width;
@@ -92,28 +94,35 @@ namespace Frost
 				Ref<Image2D> texture = Image2D::Create(spec);
 				m_Attachments.push_back(texture);
 			}
+#if 0
 			else
 			{
-				TextureSpecs spec{};
-				spec.Width = m_Specification.Width;
-				spec.Height = m_Specification.Height;
-				spec.Usage = { TextureSpecs::UsageSpec::ColorAttachment };
-				spec.Format = TextureSpecs::FormatSpec::SWAPCHAIN;
+				uint32_t swapChainImageNr = VulkanContext::GetSwapChain()->GetSwapChainImages().size();
 
-				Ref<Image2D> texture = Image2D::Create(attachment.Components.Image, spec);
-				m_Attachments.push_back(texture);
+				for (uint32_t i = 0; i < swapChainImageNr; i++)
+				{
+					VkImage swapChainImage = VulkanContext::GetSwapChain()->GetSwapChainImages()[i];
+
+					TextureSpecs spec{};
+					spec.Width = m_Specification.Width;
+					spec.Height = m_Specification.Height;
+					spec.Usage = { TextureSpecs::UsageSpec::ColorAttachment };
+					spec.Format = TextureSpecs::FormatSpec::SWAPCHAIN;
+
+					Ref<Image2D> texture = Image2D::Create(swapChainImage, spec);
+					m_Attachments.push_back(texture);
+				}
 
 			}
+#endif
 
 		}
 
 	}
 
-	void VulkanFramebuffer::CreateFramebuffer(void* renderPass)
+	void VulkanFramebuffer::CreateFramebuffer(Ref<RenderPass> renderPass)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-
 
 		std::vector<VkImageView> attachments;
 		for (auto& attachment : m_Attachments)
@@ -121,10 +130,9 @@ namespace Frost
 			attachments.push_back(attachment->GetVulkanImageView());
 		}
 
-
 		VkFramebufferCreateInfo framebufferInfo{};
 		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		framebufferInfo.renderPass = (VkRenderPass)renderPass;
+		framebufferInfo.renderPass = renderPass->GetVulkanRenderPass();
 		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 		framebufferInfo.pAttachments = attachments.data();
 		framebufferInfo.width = m_Specification.Width;
@@ -137,8 +145,6 @@ namespace Frost
 		}
 
 		VulkanContext::SetStructDebugName("Framebuffer", VK_OBJECT_TYPE_FRAMEBUFFER, m_Framebuffer);
-
-
 	}
 
 }

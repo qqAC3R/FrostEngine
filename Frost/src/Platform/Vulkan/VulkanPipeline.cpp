@@ -36,8 +36,7 @@ namespace Frost
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
 		for (const auto& shader : shaders->m_ShaderModules)
 		{
-			VkPipelineShaderStageCreateInfo shaderStageInfo{};
-			shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			VkPipelineShaderStageCreateInfo shaderStageInfo{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
 
 			shaderStageInfo.stage = shader.first;;
 			shaderStageInfo.module = shader.second;
@@ -54,8 +53,7 @@ namespace Frost
 		auto bindingDescriptions = VulkanUtils::GetVertexBindingDescription(bufferLayout, VK_VERTEX_INPUT_RATE_VERTEX);
 		auto attributeDescriptions = VulkanUtils::GetVertexAttributeDescriptions(bufferLayout);
 
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 		vertexInputInfo.vertexBindingDescriptionCount = 1;
 		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
 		vertexInputInfo.pVertexBindingDescriptions = &bindingDescriptions;
@@ -66,8 +64,7 @@ namespace Frost
 
 
 		// Define how vulkan draws (triangles, lines, etc.)
-		VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-		inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		VkPipelineInputAssemblyStateCreateInfo inputAssembly{ VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
 		inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		inputAssembly.primitiveRestartEnable = VK_FALSE;
 
@@ -93,8 +90,7 @@ namespace Frost
 
 
 
-		VkPipelineRasterizationStateCreateInfo rasterizer{};
-		rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		VkPipelineRasterizationStateCreateInfo rasterizer{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
 		rasterizer.depthClampEnable = VK_FALSE;
 		rasterizer.rasterizerDiscardEnable = VK_FALSE;
 		rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
@@ -107,14 +103,12 @@ namespace Frost
 		rasterizer.depthBiasSlopeFactor = 0.0f;
 
 
-		VkPipelineMultisampleStateCreateInfo multisampling{};
-		multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		VkPipelineMultisampleStateCreateInfo multisampling{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
 		multisampling.sampleShadingEnable = VK_FALSE;
 		multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
 		// TODO: DepthStencil Option
-		VkPipelineDepthStencilStateCreateInfo depthStencil{};
-		depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		VkPipelineDepthStencilStateCreateInfo depthStencil{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
 		depthStencil.depthTestEnable = true;
 		depthStencil.depthWriteEnable = true;
 		depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
@@ -127,8 +121,7 @@ namespace Frost
 		colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 		colorBlendAttachment.blendEnable = VK_FALSE;
 
-		VkPipelineColorBlendStateCreateInfo colorBlending{};
-		colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		VkPipelineColorBlendStateCreateInfo colorBlending{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
 		colorBlending.logicOpEnable = VK_FALSE;
 		colorBlending.logicOp = VK_LOGIC_OP_COPY;
 		colorBlending.attachmentCount = 1;
@@ -141,8 +134,7 @@ namespace Frost
 		{
 			// Setting up the pipeline layout
 
-			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			VkPipelineLayoutCreateInfo pipelineLayoutInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 			pipelineLayoutInfo.setLayoutCount = (uint32_t)descriptorLayouts.size();
 			pipelineLayoutInfo.pSetLayouts = descriptorLayouts.data();
 			pipelineLayoutInfo.pushConstantRangeCount = createInfo.PushConstant.PushConstantRange > 0 ? 1 : 0;
@@ -178,20 +170,28 @@ namespace Frost
 
 		}
 
+		std::array<VkDynamicState, 2> dynamicStates;
+		dynamicStates[0] = VK_DYNAMIC_STATE_VIEWPORT;
+		dynamicStates[1] = VK_DYNAMIC_STATE_SCISSOR;
 
 
-		VkGraphicsPipelineCreateInfo pipelineInfo{};
-		pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		VkPipelineDynamicStateCreateInfo dynamicStatesCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
+		dynamicStatesCreateInfo.dynamicStateCount = 2;
+		dynamicStatesCreateInfo.pDynamicStates = dynamicStates.data();
+
+		VkGraphicsPipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
 		pipelineInfo.pDepthStencilState = &depthStencil;
 		pipelineInfo.stageCount = (uint32_t)shaderStages.size();
 		pipelineInfo.pStages = shaderStages.data();
 		pipelineInfo.pVertexInputState = &vertexInputInfo;
 		pipelineInfo.pInputAssemblyState = &inputAssembly;
 		pipelineInfo.pViewportState = &viewportState;
+		//pipelineInfo.pViewportState = nullptr;
 		pipelineInfo.pRasterizationState = &rasterizer;
 		pipelineInfo.pMultisampleState = &multisampling;
 		pipelineInfo.pColorBlendState = &colorBlending;
-		pipelineInfo.pDynamicState = nullptr;
+		//pipelineInfo.pDynamicState = nullptr;
+		pipelineInfo.pDynamicState = &dynamicStatesCreateInfo;
 		pipelineInfo.layout = m_PipelineLayout;
 
 		//auto renderPass = createInfo.PipelineRenderPass->GetVulkanRenderPass();

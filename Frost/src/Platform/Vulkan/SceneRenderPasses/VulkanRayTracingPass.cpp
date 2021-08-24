@@ -28,10 +28,9 @@ namespace Frost
 		{
 			m_Data.DisplayTexture[i] = Image2D::Create(imageSpec);
 
-
 			m_Data.Descriptor[i] = Material::Create(m_Data.Shader, "RayTracingDescriptor");
 			m_Data.Descriptor[i]->Set("image", m_Data.DisplayTexture[i]);
-
+			m_Data.Descriptor[i]->UpdateVulkanDescriptor();
 		}
 
 		
@@ -59,6 +58,8 @@ namespace Frost
 
 	void VulkanRayTracingPass::OnUpdate(const RenderQueue& renderQueue, void* cmdBuf, uint32_t swapChainIndex)
 	{
+		VkCommandBuffer vkCmdBuf = (VkCommandBuffer)cmdBuf;
+		VkExtent2D swapChainExtent = VulkanContext::GetSwapChain()->GetExtent();
 
 		Vector<std::pair<Ref<Mesh>, glm::mat4>> meshes;
 		for (auto& mesh : renderQueue.m_Data)
@@ -82,9 +83,6 @@ namespace Frost
 			s_UpdateTLAS[swapChainIndex] = false;
 		}
 
-
-
-		VkCommandBuffer vkCmdBuf = (VkCommandBuffer)cmdBuf;
 		
 		m_Data.Pipeline->Bind(vkCmdBuf);
 		m_Data.Pipeline->BindVulkanPushConstant(vkCmdBuf, &m_CameraInfo);
@@ -98,8 +96,7 @@ namespace Frost
 						  &strideAddresses[1],
 						  &strideAddresses[2],
 						  &strideAddresses[3],
-						  1600, 900, 1);
-
+						  swapChainExtent.width, swapChainExtent.height, 1);
 
 
 	}
@@ -118,6 +115,7 @@ namespace Frost
 			m_Data.DisplayTexture[i]->Destroy();
 			m_Data.DisplayTexture[i] = Image2D::Create(imageSpec);
 			m_Data.Descriptor[i]->Set("image", m_Data.DisplayTexture[i]);
+			m_Data.Descriptor[i]->UpdateVulkanDescriptor();
 		}
 	}
 
@@ -127,6 +125,7 @@ namespace Frost
 		{
 			m_Data.DisplayTexture[i]->Destroy();
 			m_Data.TopLevelAS[i]->Destroy();
+			m_Data.Descriptor[i]->Destroy();
 		}
 
 		m_Data.SBT->Destroy();

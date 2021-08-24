@@ -20,7 +20,6 @@ namespace Frost
 		virtual Ref<Framebuffer> GetFramebuffer() override { return nullptr; }
 
 	private:
-		//Ref<Framebuffer> m_Framebuffer;
 		VkRenderPass m_RenderPass;
 
 	public:

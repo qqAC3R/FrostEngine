@@ -13,7 +13,7 @@ namespace Frost
 	class VulkanFramebuffer : public Framebuffer
 	{
 	public:
-		VulkanFramebuffer(void* renderPass, const FramebufferSpecification& spec);
+		VulkanFramebuffer(Ref<RenderPass> renderPass, const FramebufferSpecification& spec);
 		virtual ~VulkanFramebuffer();
 
 		virtual void Resize(uint32_t width, uint32_t height) override;
@@ -24,21 +24,22 @@ namespace Frost
 			if (index > (uint32_t)m_Attachments.size()) { FROST_ASSERT(false, ""); }
 			return m_Attachments[index];
 		}
+		virtual Vector<Ref<Image2D>> GetColorAttachments() const override { return m_Attachments; }
 
 		virtual void Destroy() override;
 		
 	private:
 		void CreateAttachments();
-		void CreateFramebuffer(void* renderPass);
+		void CreateFramebuffer(Ref<RenderPass> renderPass);
 
 	private:
 
 		VkFramebuffer m_Framebuffer;
-		std::vector<Ref<Image2D>> m_Attachments;
+		Vector<Ref<Image2D>> m_Attachments;
 
 		FramebufferSpecification m_Specification;
 
-		std::vector<FramebufferTextureSpecification> m_ColorAttachmentSpecifications;
+		Vector<FramebufferTextureSpecification> m_ColorAttachmentSpecifications;
 		FramebufferTextureSpecification m_DepthAttachmentSpecification = FramebufferTextureFormat::None;
 
 

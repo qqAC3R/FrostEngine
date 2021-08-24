@@ -325,11 +325,12 @@ namespace Frost
 	VkInstance VulkanContext::m_Instance;
 	VkSurfaceKHR VulkanContext::m_Surface;
 	uint32_t VulkanContext::m_VulkanAPIVersion = VK_VERSION_1_2;
+
 	VkDebugUtilsMessengerEXT VulkanContext::m_DebugMessenger;
 
 	Scope<VulkanDevice> VulkanContext::m_Device;
 	Scope<VulkanSwapChain> VulkanContext::m_SwapChain;
-
+	Ref<RenderPass> VulkanContext::m_RenderPass;
 
 
 
@@ -343,61 +344,21 @@ namespace Frost
 	VulkanContext::~VulkanContext()
 	{
 		VulkanBufferAllocator::ShutDown();
+		m_RenderPass->Destroy();
 		m_SwapChain->Destroy();
-		m_Device->ShutDown();
+		vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
 
 #if 0
 		if (s_EnableValidationLayers)
 			VulkanUtils::DestroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessenger, nullptr);
 #endif
 
-		vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
+		m_Device->ShutDown();
 
 	}
 
 	void VulkanContext::Init()
 	{
-#if 0
-		VkApplicationInfo appInfo = {};
-		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		appInfo.pApplicationName = "Frost Engine";
-		appInfo.pEngineName = "Frost";
-		appInfo.engineVersion = VK_MAKE_VERSION(1, 2, 0);
-		appInfo.apiVersion = VK_VERSION_1_2;
-		
-		m_Settings.Validation = s_EnableValidationLayers;
-		//VulkanUtils::CreateInstance(appInfo, m_Settings, m_SupportedInstanceExtensions, m_Instance, m_DebugMessenger);
-
-		nvvk::ContextCreateInfo contextInfo;
-		contextInfo.setVersion(1, 2);
-		contextInfo.addInstanceLayer("VK_LAYER_LUNARG_monitor", true);
-		contextInfo.addInstanceExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, true);
-		contextInfo.addInstanceExtension(VK_EXT_DEBUG_REPORT_EXTENSION_NAME, true);
-		contextInfo.addInstanceExtension(VK_KHR_SURFACE_EXTENSION_NAME);
-		contextInfo.addInstanceExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-		contextInfo.addInstanceExtension(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-
-		s_Context.initInstance(contextInfo, "Yes", VulkanUtils::DebugCallback);
-		m_Instance = s_Context.getInstance();
-		m_DebugMessenger = s_Context.getDbMessenger();
-
-		VulkanUtils::CreateSurface(m_Instance, m_Window, m_Surface);
-
-
-
-		m_Device = CreateScope<VulkanDevice>();
-		m_Device->Init(m_Instance, m_DebugMessenger, s_Context);
-		//InitFunctionPointers();
-
-		
-		VulkanUtils::InitVulkanHpp(m_Instance, m_Device->GetVulkanDevice());
-
-		m_SwapChain = CreateScope<VulkanSwapChain>();
-
-
-		VulkanBufferAllocator::Init();
-#endif
-
 
 		m_Device = CreateScope<VulkanDevice>();
 
@@ -405,32 +366,39 @@ namespace Frost
 		VulkanUtils::CreateSurface(m_Instance, m_Window, m_Surface);
 
 		m_Device->SetQueues(m_Surface);
+		VulkanBufferAllocator::Init();
+
 
 		m_SwapChain = CreateScope<VulkanSwapChain>();
 
 
-		VulkanBufferAllocator::Init();
+		VkExtent2D extent = m_SwapChain->GetExtent();
+		FramebufferSpecification framebufferSpec{};
+		framebufferSpec.Width = extent.width;
+		framebufferSpec.Height = extent.height;
+		framebufferSpec.Attachments = { FramebufferTextureFormat::SWAPCHAIN};
+		m_RenderPass = RenderPass::Create(framebufferSpec);
 
+
+		m_SwapChain->CreateFramebuffer(m_RenderPass);
 	}
 
-	VkPipelineBindPoint VulkanContext::GetVulkanGraphicsType(GraphicsType type)
+	void VulkanContext::Resize(uint32_t width, uint32_t height)
 	{
-		switch (type)
-		{
-			case GraphicsType::Graphics:    return VK_PIPELINE_BIND_POINT_GRAPHICS;
-			case GraphicsType::Compute:     return VK_PIPELINE_BIND_POINT_COMPUTE;
-			case GraphicsType::Raytracing:  return VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
-		}
-
-		FROST_ASSERT(false, "GraphicsType not supported!");
-		return VkPipelineBindPoint();
+		ResetSwapChain();
 	}
 
+
+	// This is mainly useful to recreate the swapchain when the window is resized
 	void VulkanContext::ResetSwapChain()
 	{
+		VkDevice device = m_Device->GetVulkanDevice();
+		vkDeviceWaitIdle(device);
 
-		// This is mainly useful to recreate the swapchain when the window is resized
+		m_SwapChain->Destroy();
 		m_SwapChain->CreateSwapChain();
+		m_SwapChain->CreateFramebuffer(m_RenderPass);
+
 	}
 
 	std::tuple<VkResult, uint32_t> VulkanContext::AcquireNextSwapChainImage(VulkanSemaphore availableSemaphore)
@@ -452,6 +420,89 @@ namespace Frost
 	}
 
 
+	void VulkanContext::BeginFrame(VkCommandBuffer cmdBuf, uint32_t imageIndex)
+	{
+		VkRenderPass vkRenderPass = m_RenderPass->GetVulkanRenderPass();
+		VkImageView swapChainImageView = m_SwapChain->GetFramebufferAttachment(imageIndex)->GetVulkanImageView();
+		VkExtent2D extent = m_SwapChain->GetExtent();
+
+		VkRenderPassAttachmentBeginInfo attachmentInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO };
+		attachmentInfo.attachmentCount = 1;
+		attachmentInfo.pAttachments = &swapChainImageView;
+
+		VkRenderPassBeginInfo renderPassInfo{};
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassInfo.renderPass = vkRenderPass;
+		renderPassInfo.framebuffer = m_SwapChain->GetVulkanFramebuffer();
+		renderPassInfo.renderArea.offset = { 0, 0 };
+		renderPassInfo.renderArea.extent = { extent.width, extent.height };
+		renderPassInfo.pNext = &attachmentInfo; // Imageless framebuffer
+
+
+		std::array<VkClearValue, 2> vkClearValues;
+		vkClearValues[0].color = { 0.05f, 0.05f, 0.05f, 0.05f };
+		vkClearValues[1].depthStencil = { 1.0f, 0 };
+
+
+		renderPassInfo.clearValueCount = static_cast<uint32_t>(vkClearValues.size());
+		renderPassInfo.pClearValues = vkClearValues.data();
+
+
+		vkCmdBeginRenderPass(cmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+
+		VkViewport viewport{};
+		viewport.width = (float)extent.width;
+		viewport.height = (float)extent.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
+
+		VkRect2D scissor{};
+		scissor.extent = extent;
+		scissor.offset = { 0, 0 };
+		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
+
+
+
+	}
+
+	void VulkanContext::EndFrame(VkCommandBuffer cmdbuf)
+	{
+		vkCmdEndRenderPass(cmdbuf);
+	}
+
+	void VulkanContext::Present(VkSemaphore waitSemaphore, uint32_t imageIndex)
+	{
+		VkQueue presentQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().PresentFamily.Queue;
+
+		// Start Presenting
+		auto swapChain = VulkanContext::GetSwapChain()->GetVulkanSwapChain();
+		VkPresentInfoKHR presentInfo{};
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		presentInfo.waitSemaphoreCount = 1;
+		presentInfo.pWaitSemaphores = &waitSemaphore;
+		presentInfo.swapchainCount = 1;
+		presentInfo.pSwapchains = &swapChain;
+		presentInfo.pImageIndices = &imageIndex;
+
+		auto result = vkQueuePresentKHR(presentQueue, &presentInfo);
+
+		FROST_VKCHECK(result, "Failed to present swapchain image!");
+
+
+#if 0
+		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+		{
+			// TODO: window resizing
+		}
+		else if (result != VK_SUCCESS)
+		{
+			FROST_ASSERT(0, "Failed to present swap chain image!");
+		}
+#endif
+	}
+
 	void VulkanContext::WaitDevice()
 	{
 		vkDeviceWaitIdle(m_Device->GetVulkanDevice());
@@ -469,87 +520,6 @@ namespace Frost
 
 
 	}
-#if 0
-	VkInstance VulkanContext::m_Instance;
-	VkDebugUtilsMessengerEXT VulkanContext::m_DebugMessenger;
-	VkSurfaceKHR VulkanContext::m_Surface;
-	Scope<VulkanSwapChain> VulkanContext::m_SwapChain;
-	Scope<VulkanDevice> VulkanContext::m_Device;
-
-
-	VulkanContext::VulkanContext(GLFWwindow* window)
-		: m_Window(window)
-	{
-		
-	}
-
-	VulkanContext::~VulkanContext()
-	{
-
-		VulkanBufferAllocator::ShutDown();
-		m_SwapChain->Destroy();
-		m_Device->ShutDown();
-
-#if 0
-		if (s_EnableValidationLayers)
-			VulkanUtils::DestroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessenger, nullptr);
-#endif
-
-		vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
-
-		//vkDestroyInstance(m_Instance, nullptr);
-
-
-	}
-
-	void VulkanContext::Init()
-	{
-		//VulkanUtils::CreateInstance(m_Instance, m_DebugMessenger);
-		VkApplicationInfo appInfo = {};
-		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		appInfo.pApplicationName = "Frost Engine";
-		appInfo.pEngineName = "Frost";
-		appInfo.apiVersion = m_VulkanAPIVersion;
-
-
-		m_Settings.Validation = s_EnableValidationLayers;
-
-		VulkanUtils::CreateInstance(appInfo, m_Settings, m_SupportedInstanceExtensions, m_Instance, m_DebugMessenger);
-
-
-		m_Device = CreateScope<VulkanDevice>();
-
-		m_Device->Init(m_Instance, m_DebugMessenger);
-		VulkanUtils::CreateSurface(m_Instance, m_Window, m_Surface);
-
-		m_Device->SetQueues(m_Surface);
-
-		m_SwapChain = CreateScope<VulkanSwapChain>();
-
-
-		VulkanBufferAllocator::Init();
-	}
-
-	void VulkanContext::ResetSwapChain()
-	{
-		// This is mainly useful to recreate the swapchain when the window is resized
-		m_SwapChain->CreateSwapChain();
-	}
-
-	std::tuple<VkResult, uint32_t> VulkanContext::AcquireNextSwapChainImage(VulkanSemaphore availableSemaphore)
-	{
-		VkDevice device = m_Device->GetVulkanDevice();
-		uint32_t imageIndex;
-		VkResult result;
-
-		result = vkAcquireNextImageKHR(device, m_SwapChain->GetVulkanSwapChain(), UINT64_MAX, availableSemaphore.GetSemaphore(), VK_NULL_HANDLE, &imageIndex);
-		return std::make_tuple(result, imageIndex);
-	}
-
-	void VulkanContext::WaitDevice()
-	{
-		vkDeviceWaitIdle(m_Device->GetVulkanDevice());
-	}
 
 	VkPipelineBindPoint VulkanContext::GetVulkanGraphicsType(GraphicsType type)
 	{
@@ -560,9 +530,8 @@ namespace Frost
 			case GraphicsType::Raytracing:  return VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 		}
 
-		FROST_ASSERT(false, "");
+		FROST_ASSERT(false, "GraphicsType not supported!");
 		return VkPipelineBindPoint();
 	}
-#endif
 
 }

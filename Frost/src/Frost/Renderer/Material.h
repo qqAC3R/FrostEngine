@@ -27,14 +27,6 @@ namespace Frost
 
 		virtual void Invalidate() = 0;
 
-		virtual void Set(const std::string& name, float value) = 0;
-		virtual void Set(const std::string& name, int value) = 0;
-		virtual void Set(const std::string& name, glm::vec2 value) = 0;
-		virtual void Set(const std::string& name, glm::vec3 value) = 0;
-		virtual void Set(const std::string& name, glm::vec4 value) = 0;
-		virtual void Set(const std::string& name, glm::mat3 value) = 0;
-		virtual void Set(const std::string& name, glm::mat4 value) = 0;
-
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) = 0;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) = 0;
 
@@ -43,15 +35,6 @@ namespace Frost
 
 		virtual void Set(const std::string& name, const Ref<TopLevelAccelertionStructure>& accelerationStructure) = 0;
 
-
-		virtual float GetFloat(const std::string& name) = 0;
-		virtual int GetInt(const std::string& name) = 0;
-		virtual glm::vec2 GetVector2(const std::string& name) = 0;
-		virtual glm::vec3 GetVector3(const std::string& name) = 0;
-		virtual glm::vec4 GetVector4(const std::string& name) = 0;
-		virtual glm::mat3 GetMatrix3(const std::string& name) = 0;
-		virtual glm::mat4 GetMatrix4(const std::string& name) = 0;
-		
 		virtual Ref<Buffer> GetBuffer(const std::string& name) = 0;
 		virtual Ref<UniformBuffer> GetUniformBuffer(const std::string& name) = 0;
 		virtual Ref<Texture2D> GetTexture2D(const std::string& name) = 0;

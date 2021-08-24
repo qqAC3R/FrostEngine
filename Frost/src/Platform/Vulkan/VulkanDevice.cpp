@@ -17,13 +17,13 @@ namespace Frost
 	VulkanDevice::~VulkanDevice()
 	{
 		//vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
-		//vkctx.deinit();
-
+		
 	}
 
 	void VulkanDevice::ShutDown()
 	{
 		vkDeviceWaitIdle(m_Device);
+		vkctx.deinit();
 		//vkDestroyDevice(m_Device, nullptr);
 	}
 
@@ -1017,6 +1017,7 @@ namespace Frost
 		contextInfo.addDeviceExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
 		contextInfo.addDeviceExtension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
 		contextInfo.addDeviceExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
+		//contextInfo.addDeviceExtension(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME);
 
 
 

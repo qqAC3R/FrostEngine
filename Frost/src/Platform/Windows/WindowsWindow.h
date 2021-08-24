@@ -32,6 +32,8 @@ namespace Frost
 		inline virtual void* GetNativeWindow() const override { return m_Window; }
 		virtual const Scope<GraphicsContext>& GetGraphicsContext() const override { return m_Context; }
 
+		virtual void Resize(uint32_t width, uint32_t height) override;
+
 	private:
 		void Init(const WindowProps& props);
 		void Shutdown();

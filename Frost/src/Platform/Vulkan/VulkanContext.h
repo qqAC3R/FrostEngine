@@ -19,6 +19,7 @@ namespace Frost
 
 
 		virtual void Init() override;
+		virtual void Resize(uint32_t width, uint32_t height) override;
 
 		/* OpenGL Specific */
 		virtual void SwapBuffers() override {}
@@ -26,15 +27,19 @@ namespace Frost
 		/* Vulkan Specific */
 		virtual WindowDimension GetWindowDimension() override { return WindowDimension(); }
 
-		static const Scope<VulkanDevice>& GetCurrentDevice() { return m_Device; }
-		static VkInstance GetInstance() { return m_Instance; }
+		static const Scope<VulkanDevice>&	 GetCurrentDevice() { return m_Device; }
+		static VkInstance					 GetInstance() { return m_Instance; }
 		static const Scope<VulkanSwapChain>& GetSwapChain() { return m_SwapChain; }
-		static VkSurfaceKHR GetSurface() { return m_Surface; }
+		static VkSurfaceKHR					 GetSurface() { return m_Surface; }
+		static Ref<RenderPass>				 GetRenderPass() { return m_RenderPass; }
 
 		static VkPipelineBindPoint GetVulkanGraphicsType(GraphicsType type);
 
 		static void ResetSwapChain();
 		static std::tuple<VkResult, uint32_t> AcquireNextSwapChainImage(VulkanSemaphore availableSemaphore);
+		static void BeginFrame(VkCommandBuffer cmdBuf, uint32_t imageIndex);
+		static void EndFrame(VkCommandBuffer cmdbuf);
+		static void Present(VkSemaphore waitSemaphore, uint32_t imageIndex);
 
 		virtual void WaitDevice() override;
 
@@ -66,6 +71,7 @@ namespace Frost
 
 		static Scope<VulkanDevice> m_Device;
 		static Scope<VulkanSwapChain> m_SwapChain;
+		static Ref<RenderPass> m_RenderPass;
 
 		Vector<const char*> m_SupportedInstanceExtensions;
 

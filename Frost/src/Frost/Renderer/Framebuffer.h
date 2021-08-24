@@ -21,19 +21,13 @@ namespace Frost
 		SWAPCHAIN = 4 // Lmao this is so bad (basically gets the texture format from the swapchain)
 	};
 
-	struct FramebufferComponents
-	{
-		void* Image;
-	};
-
 	struct FramebufferTextureSpecification
 	{
 		FramebufferTextureSpecification() = default;
-		FramebufferTextureSpecification(FramebufferTextureFormat format, FramebufferComponents components = {})
-			: TextureFormat(format), Components(components) {}
+		FramebufferTextureSpecification(FramebufferTextureFormat format)
+			: TextureFormat(format) {}
 
 		FramebufferTextureFormat TextureFormat = FramebufferTextureFormat::None;
-		FramebufferComponents Components = {};
 	};
 
 	struct FramebufferAttachmentSpecification
@@ -51,12 +45,11 @@ namespace Frost
 		uint32_t Width, Height;
 	};
 
-	
+	class RenderPass;
 
 	class Framebuffer
 	{
 	public:
-		//VulkanFramebuffer(const VkRenderPass& renderPass, const FramebufferSpecification& spec);
 		virtual ~Framebuffer() {}
 
 
@@ -66,6 +59,8 @@ namespace Frost
 
 		virtual void* GetRendererID() const = 0;
 		virtual const Ref<Image2D>& GetColorAttachmentRendererID(uint32_t index = 0) const = 0;
+		virtual Vector<Ref<Image2D>> GetColorAttachments() const = 0;
+
 
 		/* OpenGL Specific API */
 		virtual void Bind(uint32_t slot = 0) const = 0;
@@ -81,7 +76,7 @@ namespace Frost
 
 
 		/* Vulkan Specific constructor */
-		static Ref<Framebuffer> Create(void* renderPass, const FramebufferSpecification& spec = {});
+		static Ref<Framebuffer> Create(Ref<RenderPass> renderPass, const FramebufferSpecification& spec = {});
 
 		/* Opengl Specific constructor */
 		static Ref<Framebuffer> Create(const FramebufferSpecification& spec = {});

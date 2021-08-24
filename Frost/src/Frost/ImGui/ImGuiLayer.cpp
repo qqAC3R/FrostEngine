@@ -48,7 +48,6 @@ namespace Frost
 
 	void ImGuiLayer::OnInit(VkRenderPass renderPass)
 	{
-		
 		VkInstance instance = VulkanContext::GetInstance();
 		VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -94,12 +93,9 @@ namespace Frost
 		io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/san-francisco/SF-Regular.otf", 18.0f);
 
 
-		// Setup Dear ImGui style
-		//ImGui::StyleColorsDark();
-
-
 		ImGui_ImplGlfw_InitForVulkan(window, true);
 		
+
 		//this initializes imgui for Vulkan
 		ImGui_ImplVulkan_InitInfo init_info = {};
 		init_info.Instance = instance;
@@ -119,7 +115,6 @@ namespace Frost
 		// Upload Fonts
 		{
 			// Use any command queue
-			//VkCommandPool command_pool = wd->Frames[wd->FrameIndex].CommandPool;
 			VulkanCommandPool cmdPool;
 			VulkanCommandBuffer cmdBuf = cmdPool.CreateCommandBuffer(false);
 			VkCommandBuffer vkCmdBuf = cmdBuf.GetCommandBuffer();
@@ -141,10 +136,14 @@ namespace Frost
 			FROST_VKCHECK(vkEndCommandBuffer(vkCmdBuf), "");
 			FROST_VKCHECK(vkQueueSubmit(graphicsQueue, 1, &end_info, VK_NULL_HANDLE), "");
 
-			FROST_VKCHECK(vkDeviceWaitIdle(device), "");
+			vkDeviceWaitIdle(device);
 			
 			ImGui_ImplVulkan_DestroyFontUploadObjects();
+
+			cmdPool.Destroy();
 		}
+		m_DescriptorPool = imguiPool;
+
 	}
 	
 
@@ -152,6 +151,9 @@ namespace Frost
 
 	void ImGuiLayer::OnDetach()
 	{
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		vkDestroyDescriptorPool(device, m_DescriptorPool, nullptr);
+
 		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
@@ -185,25 +187,22 @@ namespace Frost
 
 	}
 
-	void ImGuiLayer::OnResize()
+	void ImGuiLayer::OnResize(uint32_t width, uint32_t height)
 	{
-		//VkExtent2D extent = VulkanRenderer::GetResolution();
-		//
-		//if (ImGui::GetCurrentContext() != nullptr)
-		//{
-		//	auto& imgui_io = ImGui::GetIO();
-		//	imgui_io.DisplaySize = ImVec2(static_cast<float>(extent.width), static_cast<float>(extent.height));
-		//}
+		if (ImGui::GetCurrentContext() != nullptr)
+		{
+			auto& imgui_io = ImGui::GetIO();
+			imgui_io.DisplaySize = ImVec2(static_cast<float>(width), static_cast<float>(height));
+		}
+
+
 	}
 
 	void ImGuiLayer::OnEvent(Event& event)
 	{
-		//+
 		ImGuiIO& io = ImGui::GetIO();
 		event.Handled |= event.IsInCategory(EventCategoryMouse) & io.WantCaptureMouse;
 		event.Handled |= event.IsInCategory(EventCategoryKeyboard) & io.WantCaptureKeyboard;
-
-		m_BlockEvents = event.Handled;
 	}
 
 	void ImGuiLayer::Begin()

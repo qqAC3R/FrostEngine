@@ -34,8 +34,8 @@ namespace Frost
 
 		/* Rendering Part */
 		Ref<Pipeline> Pipeline;
-		Ref<RenderPass> RenderPass;
-		Vector<Ref<Framebuffer>> Framebuffer;
+		//Ref<RenderPass> RenderPass;
+		//Vector<Ref<Framebuffer>> Framebuffer;
 		
 		// TODO: Make 3 because we need frames in flight
 		VulkanCommandPool CmdPool;
@@ -101,9 +101,9 @@ namespace Frost
 		}
 
 
+#if 0
 		{
 			// Framebuffers/Renderpasses/SceneRenderpasses
-
 
 			{
 				FramebufferSpecification framebufferSpec{};
@@ -124,24 +124,24 @@ namespace Frost
 
 				for (uint32_t i = 0; i < swapChain->GetSwapChainImages().size(); i++)
 				{
-					//void* swapChainImageFormat = (void*)swapChain->GetImageFormat();
 					void* swapChainImage = swapChain->GetSwapChainImages()[i];
 
 					FramebufferSpecification framebufferSpec{};
 					framebufferSpec.Width = Application::Get().GetWindow().GetWidth();
 					framebufferSpec.Height = Application::Get().GetWindow().GetHeight();
 					framebufferSpec.Attachments = {
-						{ FramebufferTextureFormat::SWAPCHAIN, { swapChainImage } },
+						  FramebufferTextureFormat::SWAPCHAIN,
 						  FramebufferTextureFormat::Depth
 					};
 
 					// TODO: Meh, should pass Frost API's renderpass (not the vk one)
-					s_Data->Framebuffer[i] = Framebuffer::Create(s_Data->RenderPass->GetVulkanRenderPass(), framebufferSpec);
+					s_Data->Framebuffer[i] = Framebuffer::Create(s_Data->RenderPass, framebufferSpec);
 
 				}
 			}
 
 		}
+#endif
 
 
 
@@ -200,7 +200,7 @@ namespace Frost
 			Pipeline::CreateInfo pipelineCreateInfo{};
 			pipelineCreateInfo.FramebufferSpecification = framebufferSpec;
 			pipelineCreateInfo.Shader = s_Data->QuadShader;
-			pipelineCreateInfo.RenderPass = s_Data->RenderPass;
+			pipelineCreateInfo.RenderPass = VulkanContext::GetRenderPass();
 			pipelineCreateInfo.VertexBufferLayout = bufferLayout;
 			pipelineCreateInfo.PushConstant.PushConstantRange = sizeof(PipelinePushConstant);
 			pipelineCreateInfo.PushConstant.PushConstantShaderStages = { ShaderType::Fragment };
@@ -210,12 +210,12 @@ namespace Frost
 
 		}
 
-		Application::Get().GetImGuiLayer()->OnInit(s_Data->RenderPass->GetVulkanRenderPass());
+		Application::Get().GetImGuiLayer()->OnInit(VulkanContext::GetRenderPass()->GetVulkanRenderPass());
 
 
 	}
 
-	static void PresentImage()
+	static void SubmitToGraphicsQueue()
 	{
 		VkCommandBuffer cmdBuf = s_Data->CmdBuffer[s_CurrentFrame].GetCommandBuffer();
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -248,54 +248,128 @@ namespace Frost
 		vkResetFences(device, 1, &fenceInFlight);
 
 		VkQueue graphicsQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().GraphicsFamily.Queue;
-		VkQueue presentQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().PresentFamily.Queue;
 		FROST_VKCHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fenceInFlight), "Failed to submit draw command buffer!");
 
-
-
-
-		// Start Presenting
-		auto swapChain = VulkanContext::GetSwapChain()->GetVulkanSwapChain();
-		VkPresentInfoKHR presentInfo{};
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &finishedSemaphore;
-		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = &swapChain;
-		presentInfo.pImageIndices = &s_ImageIndex;
-
-		auto result = vkQueuePresentKHR(presentQueue, &presentInfo);
-
-		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-		{
-			// TODO: window resizing
-			//m_IsSwapChainValid = false;
-		}
-		else if (result != VK_SUCCESS)
-		{
-			FROST_ASSERT(0, "Failed to present swap chain image!");
-		}
-
 	}
 
 
-	void VulkanRenderer::BeginRenderPass(const EditorCamera& camera)
+	void VulkanRenderer::BeginScene(const EditorCamera& camera)
 	{
-		s_Data->ViewMatrix = camera.GetViewMatrix();
-		s_Data->ProjectionMatrix = camera.GetProjectionMatrix();
+		s_RenderSubmitQueue.Submit([=]()
+		{
+			s_Data->ViewMatrix = camera.GetViewMatrix();
+			s_Data->ProjectionMatrix = camera.GetProjectionMatrix();
 
-		// Inverting the y coordonate because glm was designed for OpenGL :/
-		//s_Data->ProjectionMatrix[1][1] *= -1;
-
-
-		s_RenderQueue[s_CurrentFrame].SetCamera(camera);
+			s_RenderQueue[s_CurrentFrame].SetCamera(camera);
+		});
 	}
 
-	void VulkanRenderer::EndRenderPass()
+	void VulkanRenderer::EndScene()
+	{
+	}
+
+	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform)
+	{
+		s_RenderSubmitQueue.Submit([=]()
+		{
+			s_RenderQueue[s_CurrentFrame].Add(mesh, transform);
+		});
+	}
+
+	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform)
+	{
+		// TODO: Materials dont acutally work
+	
+		//s_RenderQueue.Add(mesh, material, transform);
+	}
+
+	void VulkanRenderer::ShutDown()
+	{
+		s_Data->SceneRenderPasses->ShutDown();
+
+		
+
+		s_Data->Pipeline->Destroy();
+		//s_Data->RenderPass->Destroy();
+		
+#if 0
+		for (auto& framebuffer : s_Data->Framebuffer)
+		{
+			framebuffer->Destroy();
+		}
+#endif
+
+
+		s_Data->QuadVertexBuffer->Destroy();
+		s_Data->QuadIndexBuffer->Destroy();
+		s_Data->QuadShader->Destroy();
+
+		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+			s_Data->QuadDescriptor[i]->Destroy();
+
+
+
+		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+		{
+			s_Data->AvailableSemapore[i].Destroy();
+			s_Data->FinishedSemapore[i].Destroy();
+
+			s_Data->FencesInFlight[i].Destroy();
+			s_Data->CmdBuffer[i].Destroy();
+			
+		}
+
+		s_Data->CmdPool.Destroy();
+	}
+
+
+
+#if 0
+	void VulkanRenderer::BeginVulkanRenderPass(Ref<RenderPass> renderPass)
+	{
+		VkCommandBuffer cmdBuf = (VkCommandBuffer)s_Data->CmdBuffer[s_CurrentFrame].GetCommandBuffer();
+		VkRenderPass vkRenderPass = (VkRenderPass)s_Data->RenderPass->GetVulkanRenderPass();
+		Ref<Framebuffer> framebuffer = s_Data->Framebuffer[s_ImageIndex];
+
+
+
+		VkRenderPassBeginInfo renderPassInfo{};
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassInfo.renderPass = vkRenderPass;
+		renderPassInfo.framebuffer = (VkFramebuffer)framebuffer->GetRendererID();
+		renderPassInfo.renderArea.offset = { 0, 0 };
+		renderPassInfo.renderArea.extent = { framebuffer->GetSpecification().Width, framebuffer->GetSpecification().Height
+		};
+
+
+		std::array<VkClearValue, 2> vkClearValues;
+		vkClearValues[0].color = { 0.05f, 0.05f, 0.05f, 0.05f };
+		vkClearValues[1].depthStencil = { 1.0f, 0 };
+
+
+		renderPassInfo.clearValueCount = static_cast<uint32_t>(vkClearValues.size());
+		renderPassInfo.pClearValues = vkClearValues.data();
+
+
+		vkCmdBeginRenderPass(cmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	}
+
+	void VulkanRenderer::EndVulkanRenderPass()
+	{
+		vkCmdEndRenderPass(s_Data->CmdBuffer[s_CurrentFrame].GetCommandBuffer());
+	}
+#endif
+
+	void VulkanRenderer::Update()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		VkCommandBuffer cmdBuf = s_Data->CmdBuffer[s_CurrentFrame].GetCommandBuffer();
 
+		/* Run the render submitted queue */
+		s_RenderSubmitQueue.Run();
+
+
+		/* Acquire the image */
 		s_Data->FencesInFlight[s_CurrentFrame].Wait();
 		auto [result, imageIndex] = VulkanContext::AcquireNextSwapChainImage(s_Data->AvailableSemapore[s_CurrentFrame]);
 		s_ImageIndex = imageIndex;
@@ -316,15 +390,16 @@ namespace Frost
 
 		s_Data->CmdBuffer[s_CurrentFrame].Begin();
 
+
 		/* Updating all the graphics Passes */
 		s_Data->SceneRenderPasses->UpdateRenderPasses(s_RenderQueue[s_CurrentFrame], cmdBuf, s_CurrentFrame);
 		s_RenderQueue[s_CurrentFrame].Reset();
 
 
-		
+
 
 		/* Rendering a quad for the swap chain image */
-		BeginVulkanRenderPass(s_Data->RenderPass);
+		VulkanContext::BeginFrame(cmdBuf, s_ImageIndex);
 
 
 		s_Data->Pipeline->Bind(cmdBuf);
@@ -348,14 +423,14 @@ namespace Frost
 		}
 
 
-		
+
 		{
 			/* Rendering the UI over the quad */
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
 			ImGui::Begin("Viewport");
 
 			bool IsViewPortFocused = ImGui::IsWindowFocused();
-			Application::Get().GetImGuiLayer()->BlockEvents(false);
+			Application::Get().GetImGuiLayer()->BlockEvents(!IsViewPortFocused);
 
 			auto texture = s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[s_CurrentFrame];
 			ImVec2 viewPortSizePanel = ImGui::GetContentRegionAvail();
@@ -367,127 +442,26 @@ namespace Frost
 			Application::Get().GetImGuiLayer()->Render(cmdBuf);
 		}
 
-		EndVulkanRenderPass();
+		VulkanContext::EndFrame(cmdBuf);
 		s_Data->CmdBuffer[s_CurrentFrame].End();
 
 
-		PresentImage();
+		SubmitToGraphicsQueue();
+		VulkanContext::Present(s_Data->FinishedSemapore[s_CurrentFrame].GetSemaphore(), s_ImageIndex);
+
+
 		s_CurrentFrame = (s_CurrentFrame + 1) % FRAMES_IN_FLIGHT;
 	}
 
-	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform)
+	void VulkanRenderer::Resize(uint32_t width, uint32_t height)
 	{
-		s_RenderQueue[s_CurrentFrame].Add(mesh, transform);
-	}
-
-	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform)
-	{
-		// TODO: Materials dont acutally work
-	
-		//s_RenderQueue.Add(mesh, material, transform);
-	}
-
-	void VulkanRenderer::ShutDown()
-	{
-		s_Data->SceneRenderPasses->ShutDown();
-
-		s_Data->CmdPool.Destroy();
-
-
-		s_Data->Pipeline->Destroy();
-		s_Data->RenderPass->Destroy();
-		
-		for (auto& framebuffer : s_Data->Framebuffer)
-		{
-			framebuffer->Destroy();
-		}
-
-
-		s_Data->QuadVertexBuffer->Destroy();
-		s_Data->QuadIndexBuffer->Destroy();
-		s_Data->QuadShader->Destroy();
+		s_Data->SceneRenderPasses->ResizeRenderPasses(width, height);
 
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
-			s_Data->QuadDescriptor[i]->Destroy();
-
-
-
 		{
-			for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
-			{
-				s_Data->AvailableSemapore[i].Destroy();
-				s_Data->FinishedSemapore[i].Destroy();
-
-				s_Data->FencesInFlight[i].Destroy();
-			}
-
+			s_Data->QuadDescriptor[i]->Set("u_FullScreenTexture", s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[i]);
+			s_Data->QuadDescriptor[i]->UpdateVulkanDescriptor();
 		}
 	}
 
-
-
-	void VulkanRenderer::BeginVulkanRenderPass(Ref<RenderPass> renderPass)
-	{
-		VkFramebuffer framebuffer = (VkFramebuffer)s_Data->Framebuffer[s_ImageIndex]->GetRendererID();
-		VkCommandBuffer cmdBuf = (VkCommandBuffer)s_Data->CmdBuffer[s_CurrentFrame].GetCommandBuffer();
-
-		VkRenderPass vkRenderPass = (VkRenderPass)s_Data->RenderPass->GetVulkanRenderPass();
-
-
-		VkRenderPassBeginInfo renderPassInfo{};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = vkRenderPass;
-		renderPassInfo.framebuffer = framebuffer;
-		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = { s_Data->Framebuffer[s_ImageIndex]->GetSpecification().Width, s_Data->Framebuffer[s_ImageIndex]->GetSpecification().Height };
-
-		std::array<VkClearValue, 2> vkClearValues;
-		vkClearValues[0].color = { 0.05f, 0.05f, 0.05f, 0.05f };
-		vkClearValues[1].depthStencil = { 1.0f, 0 };
-
-
-		renderPassInfo.clearValueCount = static_cast<uint32_t>(vkClearValues.size());
-		renderPassInfo.pClearValues = vkClearValues.data();
-
-
-		vkCmdBeginRenderPass(cmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-	}
-
-	void VulkanRenderer::EndVulkanRenderPass()
-	{
-		vkCmdEndRenderPass(s_Data->CmdBuffer[s_CurrentFrame].GetCommandBuffer());
-	}
-
-
-	void VulkanRenderer::Resize()
-	{
-#if 0
-		struct RenderData
-		{
-			/* The engine can support multiple renderpasses */
-			Ref<SceneRenderPassPipeline> SceneRenderPasses;
-
-			/* Rendering Part */
-			Ref<RenderPass> RenderPass;
-			Vector<Ref<Framebuffer>> Framebuffer;
-
-
-		};
-
-#endif
-
-		//int width = 0, height = 0;
-		//glfwGetFramebufferSize(window, &width, &height);
-		//while (width == 0 || height == 0) {
-		//	glfwGetFramebufferSize(window, &width, &height);
-		//	glfwWaitEvents();
-		//}
-
-
-#if 0
-		uint32_t width, height;
-		s_Data->SceneRenderPasses->ResizeRenderPasses(width, height);
-#endif
-
-	}
 }

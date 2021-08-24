@@ -8,7 +8,7 @@
 namespace Frost
 {
 
-	Ref<Framebuffer> Framebuffer::Create(void* renderPass, const FramebufferSpecification& spec)
+	Ref<Framebuffer> Framebuffer::Create(Ref<RenderPass> renderPass, const FramebufferSpecification& spec)
 	{
 		switch (RendererAPI::GetAPI())
 		{

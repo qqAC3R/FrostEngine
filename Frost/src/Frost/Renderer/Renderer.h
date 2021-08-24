@@ -4,8 +4,6 @@
 
 namespace Frost
 {
-	
-
 
 	class Renderer
 	{
@@ -20,13 +18,13 @@ namespace Frost
 			s_RendererAPI->ShutDown();
 		}
 
-		inline static void BeginRenderPass(const EditorCamera& camera)
+		inline static void BeginScene(const EditorCamera& camera)
 		{
-			s_RendererAPI->BeginRenderPass(camera);
+			s_RendererAPI->BeginScene(camera);
 		}
-		inline static void EndRenderPass()
+		inline static void EndScene()
 		{
-			s_RendererAPI->EndRenderPass();
+			s_RendererAPI->EndScene();
 		}
 
 
@@ -39,9 +37,25 @@ namespace Frost
 			s_RendererAPI->Submit(mesh, material, transform);
 		}
 
+		inline static void Submit(std::function<void()> func)
+		{
+			s_RendererAPI->Submit(func);
+		}
+
+	private:
+		inline static void Update()
+		{
+			s_RendererAPI->Update();
+		}
+		
+		inline static void Resize(uint32_t width, uint32_t height)
+		{
+			s_RendererAPI->Resize(width, height);
+		}
+
 	private:
 		static RendererAPI* s_RendererAPI;
-
+		friend class Application;
 	};
 
 

@@ -2,10 +2,8 @@
 
 #include "Frost/Renderer/Framebuffer.h"
 
-
 /* Vulkan Structs */
 using VkRenderPass = struct VkRenderPass_T*;
-
 
 namespace Frost
 {

@@ -43,7 +43,7 @@ namespace Frost
 				return VMA_MEMORY_USAGE_GPU_ONLY;
 
 			else if ((flags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) ==
-				(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+					(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
 				return VMA_MEMORY_USAGE_CPU_ONLY;
 
 			else if ((flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) == VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
@@ -98,50 +98,7 @@ namespace Frost
 		VmaAllocation allocation;
 		vmaCreateBuffer(s_Allocator, &bufferInfo, &allocCreateInfo, &buffer, &allocation, nullptr);
 
-		//vmaMapMemory(s_Allocator, allocation, 0);
 		bufferMemory.allocation = allocation;
-
-#if 0
-		// Transform from Frost::BufferType to Vk
-		VkBufferUsageFlags bufferUsage{};
-		for (auto& type : usage)
-		{
-			bufferUsage |= Utils::BufferTypeToVk(type);
-		}
-
-		VkBufferCreateInfo bufferInfo{};
-		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferInfo.size = size;
-		bufferInfo.usage = bufferUsage;
-		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-		if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
-		{
-			FROST_ASSERT(0, "Failed to create buffer!");
-		}
-
-		VkMemoryRequirements memRequirements;
-		vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
-
-		VkMemoryAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		allocInfo.allocationSize = memRequirements.size;
-		allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
-
-		// Device Address
-		VkMemoryAllocateFlagsInfo memFlagInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
-		if (bufferUsage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) memFlagInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-
-		allocInfo.pNext = &memFlagInfo;
-
-		FROST_VKCHECK(vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory), "Failed to allocate memory for the buffer!");
-
-		FROST_CORE_INFO("Buffer created! Memory: {0}", (void*)&bufferMemory);
-
-		vkBindBufferMemory(device, (VkBuffer)buffer, bufferMemory, 0);
-#endif
-
-
 
 	}
 

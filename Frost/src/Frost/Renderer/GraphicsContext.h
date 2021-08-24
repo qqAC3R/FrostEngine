@@ -23,6 +23,7 @@ namespace Frost
 		virtual ~GraphicsContext() {}
 
 		virtual void Init() = 0;
+		virtual void Resize(uint32_t width, uint32_t height) = 0;
 
 		/* OpenGL Specific */
 		virtual void SwapBuffers() = 0;
@@ -31,8 +32,6 @@ namespace Frost
 		/* Vulkan Specific */
 		virtual WindowDimension GetWindowDimension() = 0;
 		virtual void WaitDevice() = 0;
-
-		//static const Scope<VulkanDevice>& GetCurrentDevice();
 
 		static Scope<GraphicsContext> Create(GLFWwindow* window);
 

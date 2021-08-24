@@ -32,7 +32,7 @@ namespace Frost
 		{
 			m_Camera.OnUpdate(ts);
 
-			Renderer::BeginRenderPass(m_Camera);
+			Renderer::BeginScene(m_Camera);
 
 			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
 			Renderer::Submit(m_PlaneMesh, planeTransform);
@@ -43,8 +43,7 @@ namespace Frost
 
 
 
-			Renderer::EndRenderPass();
-
+			Renderer::EndScene();
 		}
 
 		virtual void OnDetach()
@@ -128,7 +127,6 @@ namespace Frost
 			UI::End();
 
 			ImGui::End();
-
 		}
 
 		virtual void OnResize()
@@ -147,8 +145,6 @@ namespace Frost
 
 		Ref<Mesh> m_PlaneMesh;
 		Ref<Mesh> m_VikingMesh;
-
-		bool m_ViewPortFocused;
 
 	};
 

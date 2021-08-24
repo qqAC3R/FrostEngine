@@ -152,17 +152,6 @@ namespace Frost
 
 
 			VulkanBufferAllocator::CreateMemoryForImage(image, imageMemory);
-
-
-			//if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS)
-			//{
-			//	FROST_ASSERT(0, "Failed to allocate image memory!");
-			//}
-			//
-			//vkBindImageMemory(device, image, imageMemory, 0);
-
-			//vmaAllocateMemoryForImage()
-
 		}
 
 		static void ChangeImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VkImage& image)
@@ -354,24 +343,31 @@ namespace Frost
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-			VkImageViewCreateInfo viewInfo{};
-			viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			viewInfo.image = image;
-			viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			viewInfo.format = format;
+			VkImageViewUsageCreateInfo usageInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO };
+			usageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-			viewInfo.subresourceRange.baseMipLevel = 0;
-			viewInfo.subresourceRange.levelCount = mipLevels;
-			viewInfo.subresourceRange.baseArrayLayer = 0;
-			viewInfo.subresourceRange.layerCount = 1;
+			VkImageViewCreateInfo createInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+			bool useImageless = format == VulkanContext::GetSwapChain()->GetImageFormat();
+			createInfo.pNext = useImageless ? &usageInfo : nullptr;
+			createInfo.image = image;
+			createInfo.format = format;
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 
-			if (format == VK_FORMAT_D32_SFLOAT) viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-			else viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			createInfo.subresourceRange.baseMipLevel = 0;
+			createInfo.subresourceRange.levelCount = mipLevels;
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 1;
 
-
-			if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
-				throw std::runtime_error("failed to create texture image view!");
+			switch (format)
+			{
+				case VK_FORMAT_D32_SFLOAT:
+				case VK_FORMAT_D24_UNORM_S8_UINT:
+					createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; break;
+				default:
+					createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			}
+
+			FROST_VKCHECK(vkCreateImageView(device, &createInfo, nullptr, &imageView), "Failed to create texture image view!");
 
 		}
 

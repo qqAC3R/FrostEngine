@@ -137,8 +137,7 @@ namespace Frost
 		VkSurfaceFormatKHR surfaceFormat = VulkanUtils::GetSwapChainSurfaceFormat();
 		VkPresentModeKHR presentMode = VulkanUtils::GetSwapChainPresentMode();
 		VkExtent2D extent = VulkanUtils::GetSwapChainExtent();
-
-
+		
 		uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
 
 		if (swapChainSupport.capabilities.minImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
@@ -157,10 +156,6 @@ namespace Frost
 		createInfo.imageExtent = extent;
 		createInfo.imageArrayLayers = 1;
 		createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-
-		//QueueFamilyIndices indices = VulkanContext::GetCurrentDevice()->FindQueueFamilies(physicalDevice);
-		//uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
 
 
 
@@ -207,26 +202,77 @@ namespace Frost
 		m_SwapChainImages.resize(imageCount);
 		vkGetSwapchainImagesKHR(device, m_SwapChain, &imageCount, m_SwapChainImages.data());
 
-
-
 		VulkanContext::SetStructDebugName("SwapChain", VK_OBJECT_TYPE_SWAPCHAIN_KHR, m_SwapChain);
+		m_Extent = extent;
+		m_SwapChainFormat = surfaceFormat.format;
 
 	}
 
-	VkExtent2D VulkanSwapChain::GetExtent()
+	void VulkanSwapChain::CreateFramebuffer(Ref<RenderPass> renderPass)
 	{
-		return VulkanUtils::GetSwapChainExtent();
-	}
+		VkExtent2D extent = VulkanUtils::GetSwapChainExtent();
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-	VkFormat VulkanSwapChain::GetImageFormat()
-	{
-		return VulkanUtils::GetSwapChainSurfaceFormat().format;
+
+		for (uint32_t i = 0; i < m_SwapChainImages.size(); i++)
+		{
+			VkImage swapChainImage = m_SwapChainImages[i];
+
+			TextureSpecs spec{};
+			spec.Width = extent.width;
+			spec.Height = extent.height;
+			spec.Usage = { TextureSpecs::UsageSpec::ColorAttachment };
+			spec.Format = TextureSpecs::FormatSpec::SWAPCHAIN;
+
+			Ref<Image2D> texture = Image2D::Create(swapChainImage, spec);
+			m_FramebufferAttachments.push_back(texture);
+		}
+
+
+		VkFramebufferAttachmentImageInfo attachmentImageInfo{ VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO };
+		attachmentImageInfo.pNext = nullptr;
+		attachmentImageInfo.width = extent.width;
+		attachmentImageInfo.height = extent.height;
+		attachmentImageInfo.flags = 0;
+		attachmentImageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		attachmentImageInfo.layerCount = 1;
+		attachmentImageInfo.viewFormatCount = 1;
+		attachmentImageInfo.pViewFormats = &VulkanUtils::GetSwapChainSurfaceFormat().format;
+
+
+		VkFramebufferAttachmentsCreateInfo attachmentCreateInfo{ VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO };
+		attachmentCreateInfo.attachmentImageInfoCount = 1;
+		attachmentCreateInfo.pAttachmentImageInfos = &attachmentImageInfo;
+
+		VkFramebufferCreateInfo framebufferInfo{};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferInfo.pNext = &attachmentCreateInfo;
+		framebufferInfo.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
+		framebufferInfo.renderPass = renderPass->GetVulkanRenderPass();
+		framebufferInfo.attachmentCount = 1;
+		framebufferInfo.pAttachments = nullptr;
+		framebufferInfo.width = extent.width;
+		framebufferInfo.height = extent.height;
+		framebufferInfo.layers = 1;
+
+		if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &m_Framebuffer) != VK_SUCCESS)
+			FROST_ASSERT(0, "Failed to create framebuffer!");
+
+		VulkanContext::SetStructDebugName("Framebuffer", VK_OBJECT_TYPE_FRAMEBUFFER, m_Framebuffer);
+
+
 	}
 
 	void VulkanSwapChain::Destroy()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		vkDestroySwapchainKHR(device, m_SwapChain, nullptr);
+
+		for (auto& attachment : m_FramebufferAttachments)
+			attachment->Destroy();
+		m_FramebufferAttachments.clear();
+
+		vkDestroyFramebuffer(device, m_Framebuffer, nullptr);
 	}
 	
 }

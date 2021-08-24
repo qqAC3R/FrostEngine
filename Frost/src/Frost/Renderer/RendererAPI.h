@@ -10,6 +10,30 @@
 
 namespace Frost
 {
+	class RenderSubmitQueue
+	{
+	public:
+		RenderSubmitQueue() = default;
+		virtual ~RenderSubmitQueue() {}
+
+		void Submit(std::function<void()> func)
+		{
+			m_Queue.push(func);
+		}
+
+		void Run()
+		{
+			while (!m_Queue.empty())
+			{
+				auto func = m_Queue.front();
+				func();
+				m_Queue.pop();
+			}
+		}
+
+	private:
+		std::queue<std::function<void()>> m_Queue;
+	};
 
 	class RendererAPI
 	{
@@ -25,16 +49,22 @@ namespace Frost
 		virtual void Init() = 0;
 		virtual void ShutDown() = 0;
 
-		virtual void BeginRenderPass(const EditorCamera& camera) = 0;
-		virtual void EndRenderPass() = 0;
+		virtual void BeginScene(const EditorCamera& camera) = 0;
+		virtual void EndScene() = 0;
 
 		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform) = 0;
 		virtual void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform) = 0;
 
 
+		inline void Submit(std::function<void()> func) { s_RenderSubmitQueue.Submit(func); }
 		inline static API GetAPI() { return s_API; }
+	protected:
+		virtual void Update() = 0;
+		virtual void Resize(uint32_t width, uint32_t height) = 0;
+		RenderSubmitQueue s_RenderSubmitQueue;
 	private:
 		static API s_API;
+		friend class Renderer;
 	};
 
 	class RenderQueue
@@ -79,24 +109,6 @@ namespace Frost
 		glm::mat4 CameraViewMatrix;
 		glm::mat4 CameraProjectionMatrix;
 	};
-
-#if 0
-	class Renderer
-	{
-	public:
-		virtual ~Renderer() {}
-
-		virtual void Init() = 0;
-		virtual void ShutDown() = 0;
-
-		virtual void BeginRenderPass(const Ref<EditorCamera>& camera) = 0;
-		virtual void EndRenderPass() = 0;
-
-		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform) = 0;
-		virtual void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform) = 0;
-
-	};
-#endif
 
 
 }

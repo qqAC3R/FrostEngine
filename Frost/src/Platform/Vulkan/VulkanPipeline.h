@@ -7,22 +7,6 @@
 namespace Frost
 {
 
-	// Push Constants(range, data)
-	// DescriptorLayout
-	// 
-	// DepthStencilStateInfo depthStencilStateInfo {};
-	// depthStencilStateInfo.DepthEnable = true;
-	// depthStencilStateInfo.StencilEnable = false;
-	// 
-	// PipelineStates pipelineStates{};
-	// pipelineStates.DepthStencil = &depthStencilStateInfo;
-	// pipelineStates.Multisampling = nullptr;
-	// 
-	// BufferLayout
-	// 
-	// RenderPass
-	// Shaders
-
 	class VulkanPipeline : public Pipeline
 	{
 	public:

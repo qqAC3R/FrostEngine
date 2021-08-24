@@ -16,7 +16,7 @@ namespace Frost
 		virtual void OnDetach() {}
 		virtual void OnUpdate(Timestep ts) {}
 		virtual void OnEvent(Event& event) {}
-		virtual void OnResize() {}
+		virtual void OnResize(uint32_t width, uint32_t height) {}
 		virtual void OnImGuiRender() {}
 
 		inline const std::string& GetName() const { return m_DebugName; }

@@ -14,8 +14,8 @@ namespace Frost
 		{
 			switch (type)
 			{
-			case BufferData::BufferType::Uniform: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			case BufferData::BufferType::Storage: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				case BufferData::BufferType::Uniform: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+				case BufferData::BufferType::Storage: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 			}
 
 			FROST_ASSERT(false, "");
@@ -26,8 +26,8 @@ namespace Frost
 		{
 			switch (type)
 			{
-			case TextureData::TextureType::Sampled: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			case TextureData::TextureType::Storage:	return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				case TextureData::TextureType::Sampled: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				case TextureData::TextureType::Storage:	return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 			}
 
 			FROST_ASSERT(false, "");
@@ -146,7 +146,9 @@ namespace Frost
 		poolInfo.maxSets = (uint32_t)reflectedData.GetDescriptorSetsCount().size();
 
 		FROST_VKCHECK(vkCreateDescriptorPool(device, &poolInfo, nullptr, &m_DescriptorPool), "Failed to create a descriptor pool!");
-		VulkanContext::SetStructDebugName("VulkanShader-DescriptorPool", VK_OBJECT_TYPE_DESCRIPTOR_POOL, m_DescriptorPool);
+
+		std::string descriptorPoolName = "VulkanShader-DescriptorPool[" + m_Shader->GetName() + "]";
+		VulkanContext::SetStructDebugName(descriptorPoolName, VK_OBJECT_TYPE_DESCRIPTOR_POOL, m_DescriptorPool);
 
 
 
@@ -164,7 +166,9 @@ namespace Frost
 			allocInfo.pSetLayouts = &m_DescriptorSetLayouts[descriptorSetNumber];
 
 			FROST_VKCHECK(vkAllocateDescriptorSets(device, &allocInfo, &m_DescriptorSets[descriptorSetNumber]), "Failed to create a descriptor set!");
-			VulkanContext::SetStructDebugName("VulkanShader-DescriptorSet", VK_OBJECT_TYPE_DESCRIPTOR_SET, m_DescriptorSets[descriptorSetNumber]);
+
+			std::string descriptorSetName = "VulkanShader-DescriptorSet[" + m_Shader->GetName() + "]";
+			VulkanContext::SetStructDebugName(descriptorSetName, VK_OBJECT_TYPE_DESCRIPTOR_SET, m_DescriptorSets[descriptorSetNumber]);
 		}
 
 	}
@@ -213,41 +217,6 @@ namespace Frost
 
 		FROST_ASSERT(false, "");
 		return std::make_pair(0, 0);
-	}
-
-	void VulkanMaterial::Set(const std::string& name, float value)
-	{
-
-	}
-
-	void VulkanMaterial::Set(const std::string& name, int value)
-	{
-
-	}
-
-	void VulkanMaterial::Set(const std::string& name, glm::vec2 value)
-	{
-
-	}
-
-	void VulkanMaterial::Set(const std::string& name, glm::vec3 value)
-	{
-
-	}
-
-	void VulkanMaterial::Set(const std::string& name, glm::vec4 value)
-	{
-
-	}
-
-	void VulkanMaterial::Set(const std::string& name, glm::mat3 value)
-	{
-
-	}
-
-	void VulkanMaterial::Set(const std::string& name, glm::mat4 value)
-	{
-
 	}
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<Buffer>& storageBuffer)
@@ -431,42 +400,6 @@ namespace Frost
 	{
 		FROST_ASSERT(bool(m_MaterialData.find(name) != m_MaterialData.end()), "Couldn't find the member");
 		return m_MaterialData[name].Pointer.As<TopLevelAccelertionStructure>();
-	}
-
-
-	float VulkanMaterial::GetFloat(const std::string& name)
-	{
-		return float();
-	}
-
-	int VulkanMaterial::GetInt(const std::string& name)
-	{
-		return int();
-	}
-
-	glm::vec2 VulkanMaterial::GetVector2(const std::string& name)
-	{
-		return glm::vec2();
-	}
-
-	glm::vec3 VulkanMaterial::GetVector3(const std::string& name)
-	{
-		return glm::vec3();
-	}
-
-	glm::vec4 VulkanMaterial::GetVector4(const std::string& name)
-	{
-		return glm::vec4();
-	}
-
-	glm::mat3 VulkanMaterial::GetMatrix3(const std::string& name)
-	{
-		return glm::mat3();
-	}
-
-	glm::mat4 VulkanMaterial::GetMatrix4(const std::string& name)
-	{
-		return glm::mat4();
 	}
 
 	void VulkanMaterial::Destroy()

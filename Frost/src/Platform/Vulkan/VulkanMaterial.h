@@ -25,14 +25,6 @@ namespace Frost
 
 		virtual void Invalidate() override;
 
-		virtual void Set(const std::string& name, float value) override;
-		virtual void Set(const std::string& name, int value) override;
-		virtual void Set(const std::string& name, glm::vec2 value) override;
-		virtual void Set(const std::string& name, glm::vec3 value) override;
-		virtual void Set(const std::string& name, glm::vec4 value) override;
-		virtual void Set(const std::string& name, glm::mat3 value) override;
-		virtual void Set(const std::string& name, glm::mat4 value) override;
-
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) override;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) override;
 		
@@ -40,16 +32,6 @@ namespace Frost
 		virtual void Set(const std::string& name, const Ref<UniformBuffer>& uniformBuffer) override;
 
 		virtual void Set(const std::string& name, const Ref<TopLevelAccelertionStructure>& accelerationStructure) override;
-
-
-		// TODO: Do getters
-		virtual float GetFloat(const std::string& name) override;
-		virtual int GetInt(const std::string& name) override;
-		virtual glm::vec2 GetVector2(const std::string& name) override;
-		virtual glm::vec3 GetVector3(const std::string& name) override;
-		virtual glm::vec4 GetVector4(const std::string& name) override;
-		virtual glm::mat3 GetMatrix3(const std::string& name) override;
-		virtual glm::mat4 GetMatrix4(const std::string& name) override;
 
 
 		virtual Ref<Buffer> GetBuffer(const std::string& name) override;
