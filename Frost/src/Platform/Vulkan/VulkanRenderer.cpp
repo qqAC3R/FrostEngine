@@ -2,6 +2,7 @@
 #include "VulkanRenderer.h"
 
 #include "Frost/Core/Application.h"
+#include "Frost/Renderer/Renderer.h"
 
 #include "Frost/Renderer/Pipeline.h"
 #include "Frost/Renderer/ShaderLibrary.h"
@@ -255,7 +256,7 @@ namespace Frost
 
 	void VulkanRenderer::BeginScene(const EditorCamera& camera)
 	{
-		s_RenderSubmitQueue.Submit([=]()
+		Renderer::Submit([=]() mutable
 		{
 			s_Data->ViewMatrix = camera.GetViewMatrix();
 			s_Data->ProjectionMatrix = camera.GetProjectionMatrix();
@@ -266,11 +267,95 @@ namespace Frost
 
 	void VulkanRenderer::EndScene()
 	{
+		Renderer::Submit([=]() mutable
+		{
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+			VkCommandBuffer cmdBuf = s_Data->CmdBuffer[s_CurrentFrame].GetCommandBuffer();
+
+			/* Acquire the image */
+			s_Data->FencesInFlight[s_CurrentFrame].Wait();
+			auto [result, imageIndex] = VulkanContext::AcquireNextSwapChainImage(s_Data->AvailableSemapore[s_CurrentFrame]);
+			s_ImageIndex = imageIndex;
+
+
+
+			/* Checking if the fence is flight is already being used to render */
+			if (s_Data->FencesInCheck[s_ImageIndex] != VK_NULL_HANDLE)
+				vkWaitForFences(device, 1, &s_Data->FencesInCheck[s_ImageIndex], VK_TRUE, UINT64_MAX);
+
+
+			/* When the fence was finished being used by the renderer, we mark the fence as now being in use by this frame */
+			s_Data->FencesInCheck[s_ImageIndex] = s_Data->FencesInFlight[s_CurrentFrame].GetFence();
+
+
+
+			/* Begin recording the frame's commandbuffer */
+			s_Data->CmdBuffer[s_CurrentFrame].Begin();
+
+
+			/* Updating all the graphics Passes */
+			s_Data->SceneRenderPasses->UpdateRenderPasses(s_RenderQueue[s_CurrentFrame], cmdBuf, s_CurrentFrame);
+			s_RenderQueue[s_CurrentFrame].Reset();
+
+
+
+
+			/* Rendering a quad for the swap chain image */
+			VulkanContext::BeginFrame(cmdBuf, s_ImageIndex);
+
+
+			s_Data->Pipeline->Bind(cmdBuf);
+			s_Data->Pipeline->BindVulkanPushConstant(cmdBuf, (void*)&s_PushConstant);
+
+			s_Data->QuadDescriptor[s_CurrentFrame]->Bind(cmdBuf, s_Data->Pipeline->GetVulkanPipelineLayout(), GraphicsType::Graphics);
+
+
+			auto& vertexBuffer = s_Data->QuadVertexBuffer;
+			auto& indexBuffer = s_Data->QuadIndexBuffer;
+
+			{
+
+				// TODO: DrawIndexed etc.
+				//RenderCommand::DrawIndexed(vertexBuffer, indexBuffer, cmdBuf);
+				uint32_t count = static_cast<uint32_t>(indexBuffer->GetBufferSize() / sizeof(uint32_t));
+				vertexBuffer->Bind(cmdBuf);
+				indexBuffer->Bind(cmdBuf);
+
+				vkCmdDrawIndexed(cmdBuf, count, 1, 0, 0, 0);
+			}
+
+
+
+			{
+				/* Rendering the UI over the quad */
+				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
+				ImGui::Begin("Viewport");
+
+				bool IsViewPortFocused = ImGui::IsWindowFocused();
+				Application::Get().GetImGuiLayer()->BlockEvents(!IsViewPortFocused);
+
+				auto texture = s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[s_CurrentFrame];
+				ImVec2 viewPortSizePanel = ImGui::GetContentRegionAvail();
+				ImGui::Image(ImGuiLayer::GetTextureIDFromVulkanTexture(texture), ImVec2{ viewPortSizePanel.x, viewPortSizePanel.y });
+
+				ImGui::End();
+				ImGui::PopStyleVar();
+
+				Application::Get().GetImGuiLayer()->Render(cmdBuf);
+			}
+
+			VulkanContext::EndFrame(cmdBuf);
+			s_Data->CmdBuffer[s_CurrentFrame].End();
+
+
+			SubmitToGraphicsQueue();
+		});
+
 	}
 
 	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform)
 	{
-		s_RenderSubmitQueue.Submit([=]()
+		Renderer::Submit([=]() mutable
 		{
 			s_RenderQueue[s_CurrentFrame].Add(mesh, transform);
 		});
@@ -286,19 +371,9 @@ namespace Frost
 	void VulkanRenderer::ShutDown()
 	{
 		s_Data->SceneRenderPasses->ShutDown();
-
 		
 
 		s_Data->Pipeline->Destroy();
-		//s_Data->RenderPass->Destroy();
-		
-#if 0
-		for (auto& framebuffer : s_Data->Framebuffer)
-		{
-			framebuffer->Destroy();
-		}
-#endif
-
 
 		s_Data->QuadVertexBuffer->Destroy();
 		s_Data->QuadIndexBuffer->Destroy();
@@ -322,44 +397,6 @@ namespace Frost
 		s_Data->CmdPool.Destroy();
 	}
 
-
-
-#if 0
-	void VulkanRenderer::BeginVulkanRenderPass(Ref<RenderPass> renderPass)
-	{
-		VkCommandBuffer cmdBuf = (VkCommandBuffer)s_Data->CmdBuffer[s_CurrentFrame].GetCommandBuffer();
-		VkRenderPass vkRenderPass = (VkRenderPass)s_Data->RenderPass->GetVulkanRenderPass();
-		Ref<Framebuffer> framebuffer = s_Data->Framebuffer[s_ImageIndex];
-
-
-
-		VkRenderPassBeginInfo renderPassInfo{};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = vkRenderPass;
-		renderPassInfo.framebuffer = (VkFramebuffer)framebuffer->GetRendererID();
-		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = { framebuffer->GetSpecification().Width, framebuffer->GetSpecification().Height
-		};
-
-
-		std::array<VkClearValue, 2> vkClearValues;
-		vkClearValues[0].color = { 0.05f, 0.05f, 0.05f, 0.05f };
-		vkClearValues[1].depthStencil = { 1.0f, 0 };
-
-
-		renderPassInfo.clearValueCount = static_cast<uint32_t>(vkClearValues.size());
-		renderPassInfo.pClearValues = vkClearValues.data();
-
-
-		vkCmdBeginRenderPass(cmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-	}
-
-	void VulkanRenderer::EndVulkanRenderPass()
-	{
-		vkCmdEndRenderPass(s_Data->CmdBuffer[s_CurrentFrame].GetCommandBuffer());
-	}
-#endif
-
 	void VulkanRenderer::Update()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -369,84 +406,7 @@ namespace Frost
 		s_RenderSubmitQueue.Run();
 
 
-		/* Acquire the image */
-		s_Data->FencesInFlight[s_CurrentFrame].Wait();
-		auto [result, imageIndex] = VulkanContext::AcquireNextSwapChainImage(s_Data->AvailableSemapore[s_CurrentFrame]);
-		s_ImageIndex = imageIndex;
-
-
-
-
-		/* Checking if the fence is flight is already being used to render */
-		if (s_Data->FencesInCheck[s_ImageIndex] != VK_NULL_HANDLE)
-			vkWaitForFences(device, 1, &s_Data->FencesInCheck[s_ImageIndex], VK_TRUE, UINT64_MAX);
-
-
-		/* When the fence was finished being used by the renderer, we mark the fence as now being in use by this frame */
-		s_Data->FencesInCheck[s_ImageIndex] = s_Data->FencesInFlight[s_CurrentFrame].GetFence();
-
-
-
-
-		s_Data->CmdBuffer[s_CurrentFrame].Begin();
-
-
-		/* Updating all the graphics Passes */
-		s_Data->SceneRenderPasses->UpdateRenderPasses(s_RenderQueue[s_CurrentFrame], cmdBuf, s_CurrentFrame);
-		s_RenderQueue[s_CurrentFrame].Reset();
-
-
-
-
-		/* Rendering a quad for the swap chain image */
-		VulkanContext::BeginFrame(cmdBuf, s_ImageIndex);
-
-
-		s_Data->Pipeline->Bind(cmdBuf);
-		s_Data->Pipeline->BindVulkanPushConstant(cmdBuf, (void*)&s_PushConstant);
-
-		s_Data->QuadDescriptor[s_CurrentFrame]->Bind(cmdBuf, s_Data->Pipeline->GetVulkanPipelineLayout(), GraphicsType::Graphics);
-
-
-		auto& vertexBuffer = s_Data->QuadVertexBuffer;
-		auto& indexBuffer = s_Data->QuadIndexBuffer;
-
-		{
-
-			// TODO: DrawIndexed etc.
-			//RenderCommand::DrawIndexed(vertexBuffer, indexBuffer, cmdBuf);
-			uint32_t count = static_cast<uint32_t>(indexBuffer->GetBufferSize() / sizeof(uint32_t));
-			vertexBuffer->Bind(cmdBuf);
-			indexBuffer->Bind(cmdBuf);
-
-			vkCmdDrawIndexed(cmdBuf, count, 1, 0, 0, 0);
-		}
-
-
-
-		{
-			/* Rendering the UI over the quad */
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
-			ImGui::Begin("Viewport");
-
-			bool IsViewPortFocused = ImGui::IsWindowFocused();
-			Application::Get().GetImGuiLayer()->BlockEvents(!IsViewPortFocused);
-
-			auto texture = s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[s_CurrentFrame];
-			ImVec2 viewPortSizePanel = ImGui::GetContentRegionAvail();
-			ImGui::Image(ImGuiLayer::GetTextureIDFromVulkanTexture(texture), ImVec2{ viewPortSizePanel.x, viewPortSizePanel.y });
-
-			ImGui::End();
-			ImGui::PopStyleVar();
-
-			Application::Get().GetImGuiLayer()->Render(cmdBuf);
-		}
-
-		VulkanContext::EndFrame(cmdBuf);
-		s_Data->CmdBuffer[s_CurrentFrame].End();
-
-
-		SubmitToGraphicsQueue();
+		
 		VulkanContext::Present(s_Data->FinishedSemapore[s_CurrentFrame].GetSemaphore(), s_ImageIndex);
 
 

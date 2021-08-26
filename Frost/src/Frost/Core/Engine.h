@@ -50,8 +50,6 @@ namespace Frost
 		return Ref<T>::Create(std::forward<Args>(args)...);
 	}
 
-	
-
 	template<typename T>
 	using Vector = std::vector<T>;
 	
