@@ -14,7 +14,6 @@
 
 
 /* ------------------------ ECS ------------------------- */
-#include "Frost/Scene/Scene.h"
 /* ------------------------------------------------------ */
 
 /* ---------------------- Renderer ---------------------- */
@@ -24,7 +23,6 @@
 
 #include "Frost/Renderer/RenderPass.h"
 #include "Frost/Renderer/Renderer.h"
-#include "Frost/Renderer/RenderCommand.h"
 
 #include "Frost/Renderer/Buffers/Buffer.h"
 #include "Frost/Renderer/Buffers/VertexBuffer.h"

@@ -1,11 +1,9 @@
 #include "frostpch.h"
 #include "Application.h"
 
-#include "Frost/Core/StaticFunctions.h"
 #include "Frost/Utils/Timer.h"
 
 #include "Frost/Renderer/Renderer.h"
-#include "Frost/Renderer/RenderCommand.h"
 
 #include "Frost/Core/Input.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
@@ -48,34 +46,35 @@ namespace Frost
 	{
 		while (m_Running)
 		{
-			if (m_Minimized)
-			{
-				m_Window->OnUpdate();
-				continue;
-			}
-			
+			m_Window->OnUpdate();
 			
 			// Timestep
 			float time = (float)m_Window->GetTime(); // Platform::GetTime
 			Timestep timestep = time - m_LastFrameTime;
 			m_LastFrameTime = time;
 
-			// ImGui
-			m_ImGuiLayer->Begin();
-			for (Layer* layer : m_LayerStack)
+			if (!m_Minimized)
 			{
-				layer->OnImGuiRender();
+				Renderer::BeginFrame();
+
+				// ImGui
+				m_ImGuiLayer->Begin();
+				for (Layer* layer : m_LayerStack)
+				{
+					layer->OnImGuiRender();
+				}
+
+
+				// Update
+				for (Layer* layer : m_LayerStack)
+				{
+					layer->OnUpdate(timestep);
+				}
+
+				Renderer::EndFrame();
+
+				Renderer::ExecuteCommandBuffer();
 			}
-
-			// Update
-			for (Layer* layer : m_LayerStack)
-			{
-				layer->OnUpdate(timestep);
-			}
-
-			// Renderer update
-			Renderer::Update();
-
 
 			// Poll Events
 			m_Window->OnUpdate();
@@ -83,6 +82,7 @@ namespace Frost
 		}
 
 		m_Window->GetGraphicsContext()->WaitDevice();
+
 	}
 
 	void Application::OnEvent(Event& e)
@@ -119,8 +119,8 @@ namespace Frost
 			return false;
 		}
 		m_Minimized = false;
+		
 		m_Window->Resize(e.GetWidth(), e.GetHeight());
-
 		Renderer::Resize(e.GetWidth(), e.GetHeight());
 		m_ImGuiLayer->OnResize(e.GetWidth(), e.GetHeight());
 

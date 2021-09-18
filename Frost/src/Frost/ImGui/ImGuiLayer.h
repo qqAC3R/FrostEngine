@@ -5,7 +5,6 @@
 
 #include "Frost/Core/Layer.h"
 
-
 namespace Frost
 {
 	class Texture2D;
@@ -27,11 +26,9 @@ namespace Frost
 		virtual void OnEvent(Event& event) override;
 
 		void Begin();
-		void Render(VkCommandBuffer cmdBuf);
+		void Render();
 
-		static void* GetTextureIDFromVulkanTexture(Ref<Texture2D> texture);
 		static void* GetTextureIDFromVulkanTexture(Ref<Image2D> texture);
-
 	private:
 		void SetDarkThemeColors();
 
@@ -40,6 +37,7 @@ namespace Frost
 
 		VkRenderPass m_ImGuiRenderPass;
 		VkDescriptorPool m_DescriptorPool;
+		VkPhysicalDeviceProperties m_RendererSpecs;
 	};
 
 	class UI
@@ -53,6 +51,7 @@ namespace Frost
 		static void Slider(const std::string& name, glm::vec3& value, float min, float max);
 		static void Slider(const std::string& name, float& value, float min, float max);
 		static void Slider(const std::string& name, int& value, int min, int max);
+		static void CheckMark(const std::string& name, bool& value);
 	};
 
 

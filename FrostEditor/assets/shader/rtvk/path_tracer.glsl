@@ -213,16 +213,16 @@ hitAttributeEXT vec2 attribs;
 layout(location = 0) rayPayloadInEXT hitPayload prd;
 layout(location = 1) rayPayloadEXT bool isShadowed;
 
-layout(binding = 1, set = 1, scalar) buffer ScnDesc { sceneDesc i[]; } scnDesc;
-layout(binding = 2, set = 1, scalar) buffer Vertices { Vertex v[]; } vertices[];
-layout(binding = 3, set = 1) buffer Indices { uint i[]; } indices[];
+layout(binding = 0, set = 1, scalar) buffer ScnDesc { sceneDesc i[]; } scnDesc;
+layout(binding = 0, set = 2, scalar) buffer Vertices { Vertex v[]; } vertices[];
+layout(binding = 0, set = 3) buffer Indices { uint i[]; } indices[];
 
 
 //layout(binding = 4, set = 1, scalar) buffer MatColorBufferObject { WaveFrontMaterial m[]; } materials[];
-layout(binding = 4, set = 1, scalar) buffer MatColorBufferObject { WaveFrontMaterial m; } materials[];
+layout(binding = 0, set = 4, scalar) buffer MatColorBufferObject { WaveFrontMaterial m; } materials[];
 
-layout(binding = 5, set = 1) buffer MatIndexColorBuffer { int i[]; } matIndex[];
-layout(binding = 6, set = 1) uniform sampler2D texturesMap[];
+layout(binding = 0, set = 5) buffer MatIndexColorBuffer { int i[]; } matIndex[];
+layout(binding = 0, set = 6) uniform sampler2D texturesMap[];
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 

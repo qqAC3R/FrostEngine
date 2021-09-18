@@ -6,18 +6,15 @@
 #include "examples/imgui_impl_glfw.h"
 
 #include "Frost/Core/Application.h"
-#include "Platform/Vulkan/VulkanContext.h"
-
-#include "Platform/Vulkan/VulkanCommandBuffer.h"
+#include "Frost/Platform/Vulkan/VulkanContext.h"
 
 #include "Frost/Renderer/Renderer.h"
-
 #include "Frost/Renderer/Texture.h"
 
 namespace Frost
 {
 
-	namespace VulkanUtils
+	namespace Utils
 	{
 
 		static void CheckVkResult(VkResult err)
@@ -42,8 +39,6 @@ namespace Frost
 
 	void ImGuiLayer::OnAttach()
 	{
-		
-
 	}
 
 	void ImGuiLayer::OnInit(VkRenderPass renderPass)
@@ -76,8 +71,7 @@ namespace Frost
 		pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
 		pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
 		pool_info.pPoolSizes = pool_sizes;
-		FROST_VKCHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &imguiPool), "Failed to create imgui descriptor pool!");
-
+		FROST_VKCHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &imguiPool));
 		
 
 		IMGUI_CHECKVERSION();
@@ -94,7 +88,6 @@ namespace Frost
 
 
 		ImGui_ImplGlfw_InitForVulkan(window, true);
-		
 
 		//this initializes imgui for Vulkan
 		ImGui_ImplVulkan_InitInfo init_info = {};
@@ -105,50 +98,25 @@ namespace Frost
 		init_info.DescriptorPool = imguiPool;
 		init_info.Allocator = nullptr;
 		init_info.PipelineCache = VK_NULL_HANDLE;
-		init_info.MinImageCount = FRAMES_IN_FLIGHT;
-		init_info.ImageCount = (uint32_t)VulkanContext::GetSwapChain()->GetSwapChainImages().size();
+		init_info.MinImageCount = Renderer::GetRendererConfig().FramesInFlight;
+		init_info.MinImageCount = 3;
+		init_info.ImageCount = (uint32_t)VulkanContext::GetSwapChain()->GetImageCount();
 		init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-		init_info.CheckVkResultFn = VulkanUtils::CheckVkResult;
+		init_info.CheckVkResultFn = Utils::CheckVkResult;
 		ImGui_ImplVulkan_Init(&init_info, renderPass);
 
 
 		// Upload Fonts
-		{
-			// Use any command queue
-			VulkanCommandPool cmdPool;
-			VulkanCommandBuffer cmdBuf = cmdPool.CreateCommandBuffer(false);
-			VkCommandBuffer vkCmdBuf = cmdBuf.GetCommandBuffer();
-
-
-			vkResetCommandPool(device, cmdPool.GetCommandPool(), 0);
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+		ImGui_ImplVulkan_CreateFontsTexture(cmdBuf);
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
 			
-			VkCommandBufferBeginInfo begin_info = {};
-			begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-			begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-			FROST_VKCHECK(vkBeginCommandBuffer(vkCmdBuf, &begin_info), "");
-
-			ImGui_ImplVulkan_CreateFontsTexture(vkCmdBuf);
-
-			VkSubmitInfo end_info = {};
-			end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			end_info.commandBufferCount = 1;
-			end_info.pCommandBuffers = &vkCmdBuf;
-			FROST_VKCHECK(vkEndCommandBuffer(vkCmdBuf), "");
-			FROST_VKCHECK(vkQueueSubmit(graphicsQueue, 1, &end_info, VK_NULL_HANDLE), "");
-
-			vkDeviceWaitIdle(device);
-			
-			ImGui_ImplVulkan_DestroyFontUploadObjects();
-
-			cmdPool.Destroy();
-		}
+		ImGui_ImplVulkan_DestroyFontUploadObjects();
 		m_DescriptorPool = imguiPool;
 
+		vkGetPhysicalDeviceProperties(physicalDevice, &m_RendererSpecs);
 	}
 	
-
-	
-
 	void ImGuiLayer::OnDetach()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -163,15 +131,12 @@ namespace Frost
 	{
 		VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
 
-		VkPhysicalDeviceProperties deviceProperties;
-		vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
-
 		ImGui::Begin("Renderer:");
 		{
-			const char* deviceName = (const char*)deviceProperties.deviceName;
+			const char* deviceName = (const char*)m_RendererSpecs.deviceName;
 
 			const char* vendor;
-			switch (deviceProperties.vendorID)
+			switch (m_RendererSpecs.vendorID)
 			{
 				case 0x1002: vendor = "AMD "; break;
 				case 0x10DE: vendor = "NVIDIA Corporation"; break;
@@ -184,18 +149,10 @@ namespace Frost
 			ImGui::Text("Frametime: %.1f ms", 1000.0f / ImGui::GetIO().Framerate);
 		}
 		ImGui::End();
-
 	}
 
 	void ImGuiLayer::OnResize(uint32_t width, uint32_t height)
 	{
-		if (ImGui::GetCurrentContext() != nullptr)
-		{
-			auto& imgui_io = ImGui::GetIO();
-			imgui_io.DisplaySize = ImVec2(static_cast<float>(width), static_cast<float>(height));
-		}
-
-
 	}
 
 	void ImGuiLayer::OnEvent(Event& event)
@@ -212,8 +169,12 @@ namespace Frost
 		ImGui::NewFrame();
 	}
 
-	void ImGuiLayer::Render(VkCommandBuffer cmdBuf)
+	void ImGuiLayer::Render()
 	{
+#if 1
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
 		ImGui::Render();
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuf);
 
@@ -223,12 +184,7 @@ namespace Frost
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
 		}
-	}
-
-
-	void* ImGuiLayer::GetTextureIDFromVulkanTexture(Ref<Texture2D> texture)
-	{
-		return ImGui_ImplVulkan_AddTexture(texture->GetVulkanSampler(), texture->GetVulkanImageView(), texture->GetVulkanImageLayout());
+#endif
 	}
 
 	void* ImGuiLayer::GetTextureIDFromVulkanTexture(Ref<Image2D> texture)
@@ -267,6 +223,24 @@ namespace Frost
 		colors[ImGuiCol_TitleBg] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
 		colors[ImGuiCol_TitleBgActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
 		colors[ImGuiCol_TitleBgCollapsed] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+
+		// Resize Grip
+		colors[ImGuiCol_ResizeGrip] = ImVec4(0.91f, 0.91f, 0.91f, 0.25f);
+		colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.81f, 0.81f, 0.81f, 0.67f);
+		colors[ImGuiCol_ResizeGripActive] = ImVec4(0.46f, 0.46f, 0.46f, 0.95f);
+
+		// Scrollbar
+		colors[ImGuiCol_ScrollbarBg] = ImVec4(0.02f, 0.02f, 0.02f, 0.53f);
+		colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.31f, 0.31f, 0.31f, 1.0f);
+		colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.41f, 0.41f, 0.41f, 1.0f);
+		colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.51f, 0.51f, 0.51f, 1.0f);
+
+		// Check Mark
+		colors[ImGuiCol_CheckMark] = ImVec4(0.94f, 0.94f, 0.94f, 1.0f);
+
+		// Slider
+		colors[ImGuiCol_SliderGrab] = ImVec4(0.51f, 0.51f, 0.51f, 0.7f);
+		colors[ImGuiCol_SliderGrabActive] = ImVec4(0.66f, 0.66f, 0.66f, 1.0f);
 	}
 
 	void UI::Begin(const std::string& title)
@@ -304,5 +278,9 @@ namespace Frost
 		ImGui::SliderInt(name.c_str(), reinterpret_cast<int*>(&value), min, max);
 	}
 
+	void UI::CheckMark(const std::string& name, bool& value)
+	{
+		ImGui::Checkbox(name.c_str(), &value);
+	}
 
 }
