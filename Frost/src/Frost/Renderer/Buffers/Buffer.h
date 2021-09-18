@@ -1,7 +1,5 @@
 #pragma once
 
-using VkBuffer = struct VkBuffer_T*;
-
 namespace Frost
 {
 	enum class ShaderType;
@@ -21,6 +19,12 @@ namespace Frost
 		TransferSrc, TransferDst, ShaderAddress, ShaderBindingTable
 	};
 
+	struct BufferData
+	{
+		void* Data = nullptr;
+		uint32_t Size = 0;
+	};
+
 	class Buffer
 	{
 	public:
@@ -28,21 +32,17 @@ namespace Frost
 
 
 		virtual uint32_t GetBufferSize() const = 0;
+		virtual BufferData GetBufferData() const = 0;
 		virtual void SetData(uint32_t size, void* data) = 0;
 		virtual void SetData(void* data) = 0;
 
-		/* OpenGL Specific API */
 		virtual void Bind() const = 0;
 		virtual void Unbind() const = 0;
 		
-		/* Vulkan Specific API */
-		virtual VkBuffer GetVulkanBuffer() const = 0;
-
 		virtual void Destroy() = 0;
 
-
 		static Ref<Buffer> Create(uint32_t size, std::initializer_list<BufferType> types = {});
-		static Ref<Buffer> Create(void* data, uint32_t size, std::initializer_list<BufferType> types = {});
+		static Ref<Buffer> Create(uint32_t size, void* data, std::initializer_list<BufferType> types = {});
 
 	};
 

@@ -17,8 +17,6 @@ namespace Frost
 
 		// Defaults
 		Depth = DEPTH32,
-
-		SWAPCHAIN = 4 // Lmao this is so bad (basically gets the texture format from the swapchain)
 	};
 
 	struct FramebufferTextureSpecification
@@ -56,11 +54,9 @@ namespace Frost
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
 		virtual const FramebufferSpecification& GetSpecification() const = 0;
 
-
-		virtual void* GetRendererID() const = 0;
+		virtual void* GetFramebufferHandle() const = 0;
 		virtual const Ref<Image2D>& GetColorAttachmentRendererID(uint32_t index = 0) const = 0;
 		virtual Vector<Ref<Image2D>> GetColorAttachments() const = 0;
-
 
 		/* OpenGL Specific API */
 		virtual void Bind(uint32_t slot = 0) const = 0;
@@ -69,11 +65,7 @@ namespace Frost
 		virtual void ClearAttachment(uint32_t attachmentIndex, int value) = 0;
 		virtual int ReadPixel(uint32_t attachmentIndex, int x, int y) = 0;
 
-
-		/* Vulkan Specific API */
 		virtual void Destroy() = 0;
-
-
 
 		/* Vulkan Specific constructor */
 		static Ref<Framebuffer> Create(Ref<RenderPass> renderPass, const FramebufferSpecification& spec = {});

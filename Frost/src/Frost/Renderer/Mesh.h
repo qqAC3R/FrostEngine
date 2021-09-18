@@ -16,6 +16,8 @@ namespace Frost
 		glm::vec3 Position;
 		glm::vec2 TexCoords;
 		glm::vec3 Normal;
+		glm::vec3 Tagent;
+		glm::vec3 Bitangent;
 	};
 
 	struct Index
@@ -27,11 +29,8 @@ namespace Frost
 	{
 		glm::vec3 ambient = glm::vec3(1.0f);
 		glm::vec3 emission = glm::vec3(0.0f);
-		glm::vec3 roughness = glm::vec3(0.0f);
+		float roughness = 0.0f;
 		float ior = 1.0f;
-
-		int illum = 0;
-		int textureID = -1;
 	};
 
 	struct Submesh
@@ -59,13 +58,13 @@ namespace Frost
 		const Ref<VertexBuffer>& GetVertexBuffer() const { return m_VertexBuffer; }
 		const Ref<IndexBuffer>& GetIndexBuffer() const { return m_IndexBuffer; }
 		const Ref<BottomLevelAccelerationStructure>& GetAccelerationStructure() const { return m_AccelerationStructure; }
+		const MaterialInstance& GetMaterial() const { return m_Material; }
 
-		const glm::mat4& GetTransform() { return m_Transform; }
+		const Math::BoundingBox& GetBoundingBox() const { return m_Submeshes[0].BoundingBox; }
 
 		static Ref<Mesh> Load(const std::string& filepath, MaterialInstance material = {});
 
 		void Destroy();
-
 	private:
 		Vector<Submesh> m_Submeshes;
 
@@ -80,29 +79,6 @@ namespace Frost
 
 		Ref<BottomLevelAccelerationStructure> m_AccelerationStructure;
 
-		glm::mat4 m_Transform{ 1.0f };
-
+		Math::BoundingBox m_AABB;
 	};
-
-	//class Model
-	//{
-	//public:
-	//	Model(const std::string& name);
-	//	virtual ~Model();
-	//	
-	//	static Ref<Model> Create(const std::string& name)
-	//	{
-	//		return CreateRef<Model>(name);
-	//	}
-	//
-	//private:
-	//	void LoadMesh(const std::string& filepath);
-	//
-	//private:
-	//	Vector<Ref<Mesh>> m_Meshes;
-	//
-	//	std::string m_Filepath;
-	//
-	//};
-
 }

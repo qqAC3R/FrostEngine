@@ -9,10 +9,7 @@
 
 namespace Frost
 {
-	//static Ref<Texture2D> s_WhiteTexture = Texture2D::Create("assets/media/textures/white.jpg");
-	//static Ref<Texture2D> s_WhiteTexture;
-
-
+	
 	Ref<Mesh> Mesh::Load(const std::string& filepath, MaterialInstance material /*= {}*/)
 	{
 		return CreateRef<Mesh>(filepath, material);
@@ -29,6 +26,16 @@ namespace Frost
 			result[0][3] = matrix.d1; result[1][3] = matrix.d2; result[2][3] = matrix.d3; result[3][3] = matrix.d4;
 			return result;
 		}
+
+		static const uint32_t s_MeshImportFlags =
+			aiProcess_CalcTangentSpace |        // Create binormals/tangents just in case
+			aiProcess_Triangulate |             // Make sure we're triangles
+			aiProcess_SortByPType |             // Split meshes by primitive type
+			aiProcess_GenNormals |              // Make sure we have legit normals
+			aiProcess_GenUVCoords |             // Convert UVs if required 
+			aiProcess_OptimizeMeshes |          // Batch draws where possible
+			aiProcess_JoinIdenticalVertices |
+			aiProcess_ValidateDataStructure;    // Validation
 
 		void TraverseNodes(aiNode* node, Vector<Submesh>& submeshes, glm::mat4 parentTransform = glm::mat4(1.0f))
 		{
@@ -49,14 +56,13 @@ namespace Frost
 
 		}
 
-		void SetSubmeshesAndBuffers(const aiScene* scene, Vector<Submesh>& submeshes, Vector<Vertex>& vertices, Vector<Index>& indices)
+		void SetSubmeshesAndBuffers(const aiScene* scene, Vector<Submesh>& submeshes, Vector<Vertex>& vertices, Vector<Index>& indices,
+									Math::BoundingBox& generalAABB)
 		{
 			submeshes.reserve(scene->mNumMeshes);
 
 			uint32_t vertexCount = 0;
 			uint32_t indexCount = 0;
-
-			scene->mMaterials;
 
 			for (size_t m = 0; m < scene->mNumMeshes; m++)
 			{
@@ -96,11 +102,23 @@ namespace Frost
 					aabb.Max.y = glm::max(vertex.Position.y, aabb.Max.y);
 					aabb.Max.z = glm::max(vertex.Position.z, aabb.Max.z);
 
+
+					generalAABB.Min.x = glm::min(vertex.Position.x, generalAABB.Min.x);
+					generalAABB.Min.y = glm::min(vertex.Position.y, generalAABB.Min.y);
+					generalAABB.Min.z = glm::min(vertex.Position.z, generalAABB.Min.z);
+
+					generalAABB.Max.x = glm::max(vertex.Position.x, generalAABB.Max.x);
+					generalAABB.Max.y = glm::max(vertex.Position.y, generalAABB.Max.y);
+					generalAABB.Max.z = glm::max(vertex.Position.z, generalAABB.Max.z);
+
+
  
 					if (mesh->HasTangentsAndBitangents())
 					{
 						// TODO: add TBN matricies
 						// Currently doing nothing, but I will add TBN matricies when I get to normal mapping
+						vertex.Tagent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
+						vertex.Bitangent = { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z };
 					}
 
 					if (mesh->HasTextureCoords(0))
@@ -132,19 +150,18 @@ namespace Frost
 	}
 
 	Mesh::Mesh(const std::string& filepath, MaterialInstance material)
+		: m_Material(material)
 	{
-		//if (!s_WhiteTexture)
-		//	s_WhiteTexture = Texture2D::Create("assets/media/textures/white.jpg");
 
 		Assimp::Importer importer;
-		const aiScene* scene = importer.ReadFile(filepath, aiProcess_Triangulate | aiProcess_FlipUVs);
+		const aiScene* scene = importer.ReadFile(filepath, AssimpUtils::s_MeshImportFlags);
 
 		if (!scene || !scene->HasMeshes())
 			FROST_ASSERT(0, importer.GetErrorString());
 
 		
 		// Getting the submeshes, verticies and indices
-		AssimpUtils::SetSubmeshesAndBuffers(scene, m_Submeshes, m_Vertices, m_Indices);
+		AssimpUtils::SetSubmeshesAndBuffers(scene, m_Submeshes, m_Vertices, m_Indices, m_AABB);
 		
 		// Traversing throw all the nodes to get the transforms of every submesh
 		AssimpUtils::TraverseNodes(scene->mRootNode, m_Submeshes);
@@ -154,13 +171,12 @@ namespace Frost
 
 
 		m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), (uint32_t)m_Vertices.size() * sizeof(Vertex));
-		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)m_Indices.size());
+		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), sizeof(Index) * (uint32_t)m_Indices.size());
 
 		{
 			Timer timer("BLAS");
 
 			m_AccelerationStructure = BottomLevelAccelerationStructure::Create(m_VertexBuffer, m_IndexBuffer);
-
 		}
 
 

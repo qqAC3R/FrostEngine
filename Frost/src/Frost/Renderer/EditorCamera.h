@@ -32,7 +32,6 @@ namespace Frost
 		inline void SetViewportSize(float width, float height) { m_ViewportWidth = width; m_ViewportHeight = height; UpdateProjection(); }
 		void SetProjectionMatrix(glm::mat4& projection) { m_ProjectionMatrix = projection; }
 
-
 		glm::vec3 GetUpDirection() const;
 		glm::vec3 GetRightDirection() const;
 		glm::vec3 GetForwardDirection() const;
@@ -42,13 +41,8 @@ namespace Frost
 		const glm::mat4& GetViewMatrix() const { return m_ViewMatrix; }
 		const glm::mat4& GetProjectionMatrix() const { return m_ProjectionMatrix; }
 
-
-		//const glm::mat4& GetFPSViewMatrix();
-
 		float GetPitch() const { return m_Pitch; }
 		float GetYaw() const { return m_Yaw; }
-
-
 	private:
 		void UpdateProjection();
 		void UpdateView();
@@ -87,12 +81,11 @@ namespace Frost
 
 		CameraMode m_CameraMode;
 
-		//float m_MouseX = 1280.0f / 2.0f;
-		//float m_MouseY = 720.0f / 2.0f;
 		bool m_MouseBool = true;
 
 		glm::vec3 m_CameraFront;
 		glm::vec3 m_CameraUp;
 
+		friend class RenderQueue;
 	};
 }

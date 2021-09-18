@@ -1,15 +1,15 @@
 #include "frostpch.h"
 #include "Texture.h"
 
-#include "Frost/Renderer/RendererAPI.h"
-#include "Platform/Vulkan/VulkanTexture.h"
+#include "Frost/Renderer/Renderer.h"
+#include "Frost/Platform/Vulkan/VulkanTexture.h"
 
 namespace Frost
 {
 	
 	Ref<Texture2D> Texture2D::Create(const std::string& path, TextureSpecs spec /*= {}*/)
 	{
-		switch (RendererAPI::GetAPI())
+		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
 			case RendererAPI::API::Vulkan: return CreateRef<VulkanTexture2D>(path, spec);
@@ -23,7 +23,7 @@ namespace Frost
 
 	Ref<Image2D> Image2D::Create(TextureSpecs spec /*= {}*/)
 	{
-		switch (RendererAPI::GetAPI())
+		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
 			case RendererAPI::API::Vulkan: return CreateRef<VulkanImage2D>(spec);
@@ -35,7 +35,7 @@ namespace Frost
 
 	Ref<Image2D> Image2D::Create(void* image, TextureSpecs spec /*= {}*/)
 	{
-		switch (RendererAPI::GetAPI())
+		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
 			case RendererAPI::API::Vulkan: return CreateRef<VulkanImage2D>(image, spec);

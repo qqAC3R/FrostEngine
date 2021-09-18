@@ -15,7 +15,6 @@ namespace Frost
 
 		virtual void Init(SceneRenderPassPipeline* renderPassPipeline) = 0;
 		virtual void OnUpdate(const RenderQueue& renderQueue) = 0;
-		virtual void OnUpdate(const RenderQueue& renderQueue, void* cmdBuf, uint32_t swapChainIndex) = 0;
 		virtual void OnResize(uint32_t width, uint32_t height) = 0;
 		virtual void ShutDown() = 0;
 
@@ -30,14 +29,6 @@ namespace Frost
 		SceneRenderPassPipeline() = default;
 		virtual ~SceneRenderPassPipeline() {}
 		void ShutDown();
-
-#if 0
-		template <typename T>
-		void AddRenderPass(Ref<T> renderPass);
-
-		template <class T, class ... Ts>
-		void AddRenderPass(Ref<T> renderPass, Ref<Ts>... renderPasses);
-#endif
 
 		template <typename T>
 		void AddRenderPass(Ref<T> renderPass)
@@ -84,9 +75,7 @@ namespace Frost
 			return static_cast<typename T::InternalData*>(m_RenderPassesByTypeId[typeIdx]->GetInternalData());
 		}
 		
-		// 2 renderpass update functions needed because vulkan needs to be asynchronous
 		void UpdateRenderPasses(const RenderQueue& renderQueue);
-		void UpdateRenderPasses(const RenderQueue& renderQueue, void* cmdBuf, uint32_t swapChainIndex);
 
 	private:
 		Vector<Ref<SceneRenderPass>> m_RenderPasses;

@@ -39,7 +39,6 @@ namespace Frost
 	{
 		m_AspectRatio = m_ViewportWidth / m_ViewportHeight;
 		m_ProjectionMatrix = glm::perspective(glm::radians(m_FOV), m_AspectRatio, m_NearClip, m_FarClip);
-		
 	}
 
 	void EditorCamera::UpdateView()
@@ -89,11 +88,12 @@ namespace Frost
 	{
 		if (m_CameraMode == CameraMode::ORBIT)
 		{
+			const glm::vec2& mouse{ Input::GetMouseX(), Input::GetMouseY() };
+			glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.005f;
+			m_InitialMousePosition = mouse;
+
 			if (!Application::Get().GetImGuiLayer()->IsBlocking())
 			{
-				const glm::vec2& mouse{ Input::GetMouseX(), Input::GetMouseY() };
-				glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.005f;
-				m_InitialMousePosition = mouse;
 
 				if (Input::IsMouseButtonPressed(Mouse::Button1))
 					MouseZoom(delta.y);

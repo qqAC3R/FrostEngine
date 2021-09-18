@@ -21,7 +21,7 @@ namespace Frost
 	public:
 
 		virtual void UpdateVulkanDescriptor() = 0;
-		virtual void Bind(void* cmdBuf, VkPipelineLayout pipelineLayout, GraphicsType graphicsType) const = 0;;
+		virtual void Bind(VkPipelineLayout pipelineLayout, GraphicsType graphicsType) const = 0;;
 
 		virtual Vector<VkDescriptorSetLayout> GetVulkanDescriptorLayout() const = 0;
 

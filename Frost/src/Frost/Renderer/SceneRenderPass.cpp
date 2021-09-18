@@ -48,17 +48,12 @@ namespace Frost
 
 	void SceneRenderPassPipeline::UpdateRenderPasses(const RenderQueue& renderQueue)
 	{
-		for (auto& renderPass : m_RenderPasses)
+		if (renderQueue.m_Data.size() != 0)
 		{
-			renderPass->OnUpdate(renderQueue);
-		}
-	}
-
-	void SceneRenderPassPipeline::UpdateRenderPasses(const RenderQueue& renderQueue, void* cmdBuf, uint32_t swapChainIndex)
-	{
-		for (auto& renderPass : m_RenderPasses)
-		{
-			renderPass->OnUpdate(renderQueue, cmdBuf, swapChainIndex);
+			for (auto& renderPass : m_RenderPasses)
+			{
+				renderPass->OnUpdate(renderQueue);
+			}
 		}
 	}
 
@@ -69,7 +64,6 @@ namespace Frost
 			renderPass->OnResize(width, height);
 		}
 	}
-
 
 	void SceneRenderPassPipeline::ShutDown()
 	{

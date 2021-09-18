@@ -12,16 +12,10 @@ using VkSampler = VkSampler_T*;
 
 enum VkImageLayout;
 
-
-
 namespace Frost
 {
-
 	enum class ShaderType;
 	class VulkanDescriptorLayout;
-
-
-
 
 	struct TextureSpecs
 	{
@@ -46,16 +40,14 @@ namespace Frost
 
 		enum class UsageSpec
 		{
-			ColorAttachment, DepthStencilAttachment,
-
-			Storage
+			ColorAttachment, DepthStencilAttachment, Storage
 		};
 
 		FormatSpec Format = FormatSpec::RGBA8;
 		FilteringSpec Filtering = FilteringSpec::LINEAR;
 		bool UseMipMaps = false;
 
-		std::vector<UsageSpec> Usage;
+		Vector<UsageSpec> Usage;
 
 		uint32_t Width, Height;
 	};
@@ -72,6 +64,8 @@ namespace Frost
 		virtual uint32_t GetRendererID() const = 0;
 		virtual void Bind(uint32_t slot = 0) const = 0;
 		virtual void Unbind(uint32_t slot = 0) const = 0;
+
+		//virtual void Resize() = 0;
 
 		/* Vulkan Specific API */
 		virtual VkSampler GetVulkanSampler() const = 0;

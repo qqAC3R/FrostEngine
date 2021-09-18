@@ -1,7 +1,5 @@
 #pragma once
 
-using VkBuffer = struct VkBuffer_T*;
-
 namespace Frost
 {
 	enum class ShaderType;
@@ -11,17 +9,12 @@ namespace Frost
 	public:
 		virtual ~UniformBuffer() {}
 
-
-		/* Vulkan Specific API */
 		virtual void SetData(void* data) = 0;
-
-		virtual VkBuffer GetVulkanBuffer() const = 0;
 		virtual uint32_t GetBufferSize() const = 0;
 
 		virtual void Destroy() = 0;
 
 		static Ref<UniformBuffer> Create(uint32_t size);
-
 	};
 
 }

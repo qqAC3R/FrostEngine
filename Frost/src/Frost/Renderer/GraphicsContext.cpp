@@ -1,9 +1,9 @@
 #include "frostpch.h"
 #include "GraphicsContext.h"
 
-#include "Frost/Renderer/RendererAPI.h"
+#include "Frost/Renderer/Renderer.h"
 
-#include "Platform/Vulkan/VulkanContext.h"
+#include "Frost/Platform/Vulkan/VulkanContext.h"
 
 namespace Frost
 {
@@ -12,7 +12,7 @@ namespace Frost
 
 	Scope<GraphicsContext> GraphicsContext::Create(GLFWwindow* window)
 	{
-		switch (RendererAPI::GetAPI())
+		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
 			case RendererAPI::API::Vulkan: return CreateScope<VulkanContext>(window);

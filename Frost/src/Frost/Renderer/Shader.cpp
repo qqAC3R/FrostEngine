@@ -1,8 +1,8 @@
 #include "frostpch.h"
 #include "Shader.h"
 
-#include "Platform/Vulkan/VulkanShader.h"
-#include "Frost/Renderer/RendererAPI.h"
+#include "Frost/Platform/Vulkan/VulkanShader.h"
+#include "Frost/Renderer/Renderer.h"
 
 #include <spirv_cross.hpp>
 
@@ -11,7 +11,7 @@ namespace Frost
 	
 	Ref<Shader> Shader::Create(const std::string& filepath)
 	{
-		switch (RendererAPI::GetAPI())
+		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
 			case RendererAPI::API::Vulkan: return CreateRef<VulkanShader>(filepath);
@@ -37,98 +37,88 @@ namespace Frost
 			// Uniform buffers
 			for (const auto& resource : resources.uniform_buffers)
 			{
-				BufferData& uniformBuffer = m_BufferData.emplace_back();
-
+				ShaderBufferData& uniformBuffer = m_BufferData.emplace_back();
 				const auto& bufferType = compiler.get_type(resource.base_type_id);
 				const auto& typeID = compiler.get_type(resource.type_id);
 
+				uniformBuffer.Type = ShaderBufferData::BufferType::Uniform;
 				uniformBuffer.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 				uniformBuffer.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-
-				uniformBuffer.Size = (uint32_t)compiler.get_declared_struct_size(bufferType);
 				uniformBuffer.ShaderStage.push_back(stage);
-
-				uniformBuffer.Type = BufferData::BufferType::Uniform;
+				uniformBuffer.Size = (uint32_t)compiler.get_declared_struct_size(bufferType);
 				uniformBuffer.Name = resource.name;
-
 				uniformBuffer.Count = typeID.array[0] == 0 ? 1 : typeID.array[0];
 			}
 
 			// Storage buffers
 			for (const auto& resource : resources.storage_buffers)
 			{
-				BufferData& storageBuffer = m_BufferData.emplace_back();
-
+				ShaderBufferData& storageBuffer = m_BufferData.emplace_back();
 				const auto& bufferType = compiler.get_type(resource.base_type_id);
 				const auto& typeID = compiler.get_type(resource.type_id);
 
+				storageBuffer.Type = ShaderBufferData::BufferType::Storage;
 				storageBuffer.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 				storageBuffer.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-
-				storageBuffer.Size = (uint32_t)compiler.get_declared_struct_size(bufferType);
 				storageBuffer.ShaderStage.push_back(stage);
-
-				storageBuffer.Type = BufferData::BufferType::Storage;
+				storageBuffer.Size = (uint32_t)compiler.get_declared_struct_size(bufferType);
 				storageBuffer.Name = resource.name;
-
 				storageBuffer.Count = typeID.array[0] == 0 ? 1 : typeID.array[0];
-
-
 			}
 
 			// Sampler Textures
 			for (const auto& resource : resources.sampled_images)
 			{
-				TextureData& sampledTexture = m_TextureData.emplace_back();
-
+				ShaderTextureData& sampledTexture = m_TextureData.emplace_back();
 				const auto& bufferType = compiler.get_type(resource.base_type_id);
 				const auto& typeID = compiler.get_type(resource.type_id);
 
+				sampledTexture.Type = ShaderTextureData::TextureType::Sampled;
 				sampledTexture.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 				sampledTexture.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-
 				sampledTexture.ShaderStage.push_back(stage);
-
-				sampledTexture.Type = TextureData::TextureType::Sampled;
 				sampledTexture.Name = resource.name;
-
 				sampledTexture.Count = typeID.array[0] == 0 ? 1 : typeID.array[0];
-
 			}
 
 			// Storage Textures
 			for (const auto& resource : resources.storage_images)
 			{
-				TextureData& storageTexture = m_TextureData.emplace_back();
-
+				ShaderTextureData& storageTexture = m_TextureData.emplace_back();
 				const auto& bufferType = compiler.get_type(resource.base_type_id);
 				const auto& typeID = compiler.get_type(resource.type_id);
 
+				storageTexture.Type = ShaderTextureData::TextureType::Storage;
 				storageTexture.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 				storageTexture.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-
 				storageTexture.ShaderStage.push_back(stage);
-
-				storageTexture.Type = TextureData::TextureType::Storage;
 				storageTexture.Name = resource.name;
-
 				storageTexture.Count = typeID.array[0] == 0 ? 1 : typeID.array[0];
+			}
+
+			// Push Constant buffers
+			for (const auto& resource : resources.push_constant_buffers)
+			{
+				PushConstantData& pushConstantData = m_PushConstantData.emplace_back();
+				const auto& bufferType = compiler.get_type(resource.base_type_id);
+				const auto& typeID = compiler.get_type(resource.type_id);
+
+				pushConstantData.Size = (uint32_t)compiler.get_declared_struct_size(bufferType);
+				pushConstantData.ShaderStage.push_back(stage);
+				pushConstantData.Name = resource.name;
 			}
 
 			// Acceleration Structure
 			for (const auto& resource : resources.acceleration_structures)
 			{
-				AccelerationStructureData& storageTexture = m_AccelerationStructureData.emplace_back();
-
+				ShaderAccelerationStructureData& storageTexture = m_AccelerationStructureData.emplace_back();
 				const auto& bufferType = compiler.get_type(resource.base_type_id);
 				const auto& typeID = compiler.get_type(resource.type_id);
 
 				storageTexture.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 				storageTexture.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-
 				storageTexture.ShaderStage.push_back(stage);
 				storageTexture.Count = typeID.array[0] == 0 ? 1 : typeID.array[0];
-
 				storageTexture.Name = resource.name;
 			}
 
@@ -174,8 +164,11 @@ namespace Frost
 				auto& bufferData1 = m_BufferData[i];
 				auto& bufferData2 = m_BufferData[j];
 
+				// Check if the binding and set of the buffers is the same
 				if (bufferData1.Set == bufferData2.Set && bufferData1.Binding == bufferData2.Binding)
 				{
+					// If the binding and set of the buffer is the same, then we add the shaderstages from the second buffer into the first one
+					// (so like we combine them), and then erase the second buffer so we have only one combined
 					bufferData1.ShaderStage.push_back(bufferData2.ShaderStage[0]);
 
 					// Deleting the second copy of the same member
@@ -192,8 +185,11 @@ namespace Frost
 				auto& textureData1 = m_TextureData[i];
 				auto& textureData2 = m_TextureData[j];
 
+				// Check if the binding and set of the textures is the same
 				if (textureData1.Set == textureData2.Set && textureData1.Binding == textureData2.Binding)
 				{
+					// If the binding and set of the texture is the same, then we add the shaderstages from the second texture into the first one
+					// (so like we combine them), and then erase the second texture so we have only one combined
 					textureData1.ShaderStage.push_back(textureData2.ShaderStage[0]);
 
 					// Deleting the second copy of the same member
@@ -210,12 +206,37 @@ namespace Frost
 				auto& ASData1 = m_AccelerationStructureData[i];
 				auto& ASData2 = m_AccelerationStructureData[j];
 
+				// Check if the binding and set of the AStructures is the same
 				if (ASData1.Set == ASData2.Set && ASData1.Binding == ASData2.Binding)
 				{
+					// If the binding and set of the AStructure is the same, then we add the shaderstages from the second AStructure into the first one
+					// (so like we combine them), and then erase the second AStructure so we have only one combined
 					ASData1.ShaderStage.push_back(ASData2.ShaderStage[0]);
 
 					// Deleting the second copy of the same member
 					m_AccelerationStructureData.erase(m_AccelerationStructureData.begin() + j);
+				}
+			}
+		}
+
+		// For Push Constants
+		for (uint32_t i = 0; i < m_PushConstantData.size(); i++)
+		{
+			for (uint32_t j = i + 1; j < m_PushConstantData.size(); j++)
+			{
+				auto& pushConstant1 = m_PushConstantData[i];
+				auto& pushConstant2 = m_PushConstantData[j];
+
+				// Check if the size of the push constants are the same
+				if (pushConstant1.Size == pushConstant2.Size && pushConstant1.Name == pushConstant2.Name)
+				{
+					// If the size of the push constants are the same, then we add the shaderstages from the second push constant buffer into the first one
+					// (so like we combine them), and then erase the second push constant buffer so we have only one combined |Explanation 100|
+					for (auto shaderStages : pushConstant2.ShaderStage)
+						pushConstant1.ShaderStage.push_back(shaderStages);
+
+					// Deleting the second copy of the same member
+					m_PushConstantData.erase(m_PushConstantData.begin() + j);
 				}
 			}
 		}

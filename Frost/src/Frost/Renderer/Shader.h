@@ -18,7 +18,6 @@ namespace Frost
 
 		// Ray Tracing
 		RayGen, AnyHit, ClosestHit, Miss, Intersection
-
 	};
 
 	class ShaderReflectionData;
@@ -29,7 +28,7 @@ namespace Frost
 		~Shader() = default;
 		
 		virtual const std::string& GetName() const = 0;
-		virtual ShaderReflectionData GetShaderReflectionData() = 0;
+		virtual ShaderReflectionData GetShaderReflectionData() const = 0;
 		virtual void Destroy() = 0;
 
 		/* OpenGL Specific API */
@@ -45,60 +44,54 @@ namespace Frost
 
 		virtual void UploadUniformMat3(const std::string& name, const glm::mat3& matrix) = 0;
 		virtual void UploadUniformMat4(const std::string& name, const glm::mat4& matrix) = 0;
-
 		
 		/* Vulkan Specific API */
 		virtual std::unordered_map<uint32_t, VkDescriptorSetLayout> GetVulkanDescriptorSetLayout() const = 0;
-
 		
 		static Ref<Shader> Create(const std::string& filepath);
 	};
 
 
-	struct BufferData
+	struct ShaderBufferData
 	{
 		enum class BufferType {
 			Uniform, Storage
 		};
-
+		BufferType Type;
 		uint32_t Set;
 		uint32_t Binding;
-
 		uint32_t Size;
-
-		BufferType Type;
-		Vector<ShaderType> ShaderStage;
-
 		uint32_t Count;
-
+		Vector<ShaderType> ShaderStage;
 		std::string Name;
 	};
 
-	struct TextureData
+	struct ShaderTextureData
 	{
 		enum class TextureType {
 			Sampled, Storage
 		};
-
+		TextureType Type;
 		uint32_t Set;
 		uint32_t Binding;
-
-		TextureType Type;
-		Vector<ShaderType> ShaderStage;
-
 		uint32_t Count;
-
+		Vector<ShaderType> ShaderStage;
 		std::string Name;
 	};
 
-	struct AccelerationStructureData
+	struct ShaderAccelerationStructureData
 	{
 		uint32_t Set;
 		uint32_t Binding;
-
-		Vector<ShaderType> ShaderStage;
 		uint32_t Count;
+		Vector<ShaderType> ShaderStage;
+		std::string Name;
+	};
 
+	struct PushConstantData
+	{
+		uint32_t Size;
+		Vector<ShaderType> ShaderStage;
 		std::string Name;
 	};
 
@@ -109,20 +102,21 @@ namespace Frost
 
 		void SetReflectionData(std::unordered_map<ShaderType, std::vector<uint32_t>> reflectionData);
 
-		const Vector<BufferData>& GetBuffersData() const { return m_BufferData; }
-		const Vector<TextureData>& GetTextureData() const { return m_TextureData; }
-		const Vector<AccelerationStructureData>& GetAccelerationStructureData() const { return m_AccelerationStructureData; }
+		const Vector<ShaderBufferData>& GetBuffersData() const { return m_BufferData; }
+		const Vector<ShaderTextureData>& GetTextureData() const { return m_TextureData; }
+		const Vector<ShaderAccelerationStructureData>& GetAccelerationStructureData() const { return m_AccelerationStructureData; }
+		const Vector<PushConstantData>& GetPushConstantData() const { return m_PushConstantData; }
 
 		const Vector<uint32_t> GetDescriptorSetsCount() const { return m_DescriptorSetsCount; }
 
 	private:
 		void SetDescriptorSetsCount();
 		void ClearRepeatedMembers();
-
 	private:
-		Vector<BufferData> m_BufferData;
-		Vector<TextureData> m_TextureData;
-		Vector<AccelerationStructureData> m_AccelerationStructureData;
+		Vector<ShaderBufferData> m_BufferData;
+		Vector<ShaderTextureData> m_TextureData;
+		Vector<ShaderAccelerationStructureData> m_AccelerationStructureData;
+		Vector<PushConstantData> m_PushConstantData;
 
 		Vector<uint32_t> m_DescriptorSetsCount;
 	};
