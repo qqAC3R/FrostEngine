@@ -5,7 +5,7 @@
 #include "Frost/Events/KeyEvent.h"
 #include "Frost/Events/MouseEvent.h"
 
-#include "Frost/Renderer/RendererAPI.h"
+#include "Frost/Renderer/Renderer.h"
 
 namespace Frost
 {
@@ -67,14 +67,14 @@ namespace Frost
 		m_Data.Height = props.Height;
 		m_Data.Name = props.Title;
 
-		switch (RendererAPI::GetAPI())
+		switch (Renderer::GetAPI())
 		{
-		case RendererAPI::API::Vulkan:
-			m_Data.Name += " (Vulkan)"; break;
-		case RendererAPI::API::OpenGL:
-			m_Data.Name += " (OpenGL)"; break;
-		case RendererAPI::API::None:
-			FROST_ASSERT(false, "Renderer::API does not have an API");
+			case RendererAPI::API::Vulkan:
+				m_Data.Name += " (Vulkan)"; break;
+			case RendererAPI::API::OpenGL:
+				m_Data.Name += " (OpenGL)"; break;
+			case RendererAPI::API::None:
+				FROST_ASSERT(false, "Renderer::API does not have an API");
 		}
 
 		m_Data.Name += " | x64 ";
@@ -148,7 +148,6 @@ namespace Frost
 
 			KeyTypedEvent event(keycode);
 			data.EventCallback(event);
-
 		});
 
 		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods)
