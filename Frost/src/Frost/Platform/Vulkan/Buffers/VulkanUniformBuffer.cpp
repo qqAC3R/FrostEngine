@@ -1,0 +1,37 @@
+#include "frostpch.h"
+#include "VulkanUniformBuffer.h"
+
+#include "Frost/Platform/Vulkan/VulkanContext.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanBuffer.h"
+
+namespace Frost
+{
+
+	VulkanUniformBuffer::VulkanUniformBuffer(uint32_t size)
+		: m_BufferSize(size)
+	{
+		m_UniformBuffer = Buffer::Create(size, { BufferType::Uniform, BufferType::AccelerationStructureReadOnly });
+
+		// Getting the buffer and buffer address
+		Ref<VulkanBuffer> uniformBuffer = m_UniformBuffer.As<VulkanBuffer>();
+		m_BufferAddress = uniformBuffer->GetVulkanBufferAddress();
+		m_Buffer = uniformBuffer->GetVulkanBuffer();
+
+		VulkanContext::SetStructDebugName("UniformBuffer", VK_OBJECT_TYPE_BUFFER, m_Buffer);
+	}
+
+	VulkanUniformBuffer::~VulkanUniformBuffer()
+	{
+	}
+
+	void VulkanUniformBuffer::SetData(void* data)
+	{
+		m_UniformBuffer->SetData(data);
+	}
+
+	void VulkanUniformBuffer::Destroy()
+	{
+		m_UniformBuffer->Destroy();
+	}
+
+}
