@@ -1,5 +1,6 @@
 #pragma once
 
+#if 0
 /* Vulkan Structs */
 struct VkImage_T;
 using VkImage = VkImage_T*;
@@ -11,6 +12,7 @@ struct VkSampler_T;
 using VkSampler = VkSampler_T*;
 
 enum VkImageLayout;
+#endif
 
 namespace Frost
 {
@@ -28,9 +30,6 @@ namespace Frost
 
 			// Depth/Stencil
 			DEPTH32 = 3,
-
-			SWAPCHAIN = 4
-
 		};
 
 		enum class FilteringSpec
@@ -59,19 +58,18 @@ namespace Frost
 
 		virtual uint32_t GetWidth() const = 0;
 		virtual uint32_t GetHeight() const = 0;
+		virtual const TextureSpecs& GetTextureSpecification() const = 0;
 
 		/* OpenGL Specific API */
 		virtual uint32_t GetRendererID() const = 0;
 		virtual void Bind(uint32_t slot = 0) const = 0;
 		virtual void Unbind(uint32_t slot = 0) const = 0;
-
-		//virtual void Resize() = 0;
-
+		
 		/* Vulkan Specific API */
-		virtual VkSampler GetVulkanSampler() const = 0;
-		virtual VkImage GetVulkanImage() const = 0;
-		virtual VkImageView GetVulkanImageView() const = 0;
-		virtual VkImageLayout GetVulkanImageLayout() const = 0;
+		//virtual VkSampler GetVulkanSampler() const = 0;
+		//virtual VkImage GetVulkanImage() const = 0;
+		//virtual VkImageView GetVulkanImageView() const = 0;
+		//virtual VkImageLayout GetVulkanImageLayout() const = 0;
 
 		virtual void Destroy() const = 0;
 	};
@@ -82,12 +80,17 @@ namespace Frost
 		static Ref<Texture2D> Create(const std::string& path, TextureSpecs spec = {});
 	};
 
+	class TextureCubeMap : public Texture
+	{
+	public:
+		static Ref<TextureCubeMap> Create(TextureSpecs spec = {});
+	};
+
 	class Image2D : public Texture
 	{
 	public:
 		static Ref<Image2D> Create(TextureSpecs spec = {});
-		static Ref<Image2D> Create(void* image, TextureSpecs spec = {});
-
 	};
+
 
 }

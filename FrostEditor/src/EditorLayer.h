@@ -24,8 +24,8 @@ namespace Frost
 		virtual void OnAttach()
 		{
 			m_PlaneMesh = Mesh::Load("assets/media/scenes/plane.obj");
-			m_VikingMesh = Mesh::Load("assets/models/stanford-bunny.fbx", { glm::vec3(1.0f), glm::vec3(0.0f), 0.0f, 1.33f });
-			m_VulkanMesh = Mesh::Load("assets/models/globe-sphere.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 0.5f, 1.0f });
+			m_BunnyMesh = Mesh::Load("assets/models/stanford-bunny.fbx", { glm::vec3(1.0f), glm::vec3(0.0f), 0.0f, 1.1f });
+			m_SphereMesh = Mesh::Load("assets/models/globe-sphere.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 0.5f, 1.0f });
 		}
 
 		virtual void OnUpdate(Frost::Timestep ts)
@@ -38,11 +38,11 @@ namespace Frost
 			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
 			Renderer::Submit(m_PlaneMesh, planeTransform);
 			
-			glm::mat4 vikingTransform = glm::translate(glm::mat4(1.0f), m_VikingMeshPosition) * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
-			Renderer::Submit(m_VikingMesh, vikingTransform);
+			glm::mat4 bunnyTransform = glm::translate(glm::mat4(1.0f), m_VikingMeshPosition) * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
+			Renderer::Submit(m_BunnyMesh, bunnyTransform);
 			
-			glm::mat4 vulkanMeshTransform = glm::translate(glm::mat4(1.0f), glm::vec3(5.0f, 2.0f, 1.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(1.5f));;
-			Renderer::Submit(m_VulkanMesh, vulkanMeshTransform);
+			glm::mat4 sphereTransform = glm::translate(glm::mat4(1.0f), glm::vec3(5.0f, 2.0f, 1.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(1.5f));;
+			Renderer::Submit(m_SphereMesh, sphereTransform);
 
 
 			Renderer::EndScene();
@@ -51,8 +51,8 @@ namespace Frost
 		virtual void OnDetach()
 		{
 			m_PlaneMesh->Destroy();
-			m_VikingMesh->Destroy();
-			m_VulkanMesh->Destroy();
+			m_BunnyMesh->Destroy();
+			m_SphereMesh->Destroy();
 		}
 
 		virtual void OnEvent(Event& event)
@@ -75,8 +75,8 @@ namespace Frost
 				if (opt_fullscreen)
 				{
 					ImGuiViewport* viewport = ImGui::GetMainViewport();
-					ImGui::SetNextWindowPos(viewport->GetWorkPos());
-					ImGui::SetNextWindowSize(viewport->GetWorkSize());
+					ImGui::SetNextWindowPos(viewport->WorkPos);
+					ImGui::SetNextWindowSize(viewport->WorkSize);
 					ImGui::SetNextWindowViewport(viewport->ID);
 					ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 					ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -179,10 +179,10 @@ namespace Frost
 		ImVec2 m_ViewPortSize{};
 
 		Ref<Mesh> m_PlaneMesh;
-		Ref<Mesh> m_VikingMesh;
-		Ref<Mesh> m_VulkanMesh;
+		Ref<Mesh> m_BunnyMesh;
+		Ref<Mesh> m_SphereMesh;
 
-		bool m_UseRT = false;
+		bool m_UseRT = true;
 
 	};
 

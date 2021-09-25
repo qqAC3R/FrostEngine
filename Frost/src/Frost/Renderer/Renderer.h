@@ -38,6 +38,7 @@ namespace Frost
 		static RenderCommandQueue& GetRenderCommandQueue();
 	private:
 		static RendererAPI* s_RendererAPI;
+		//static RendererConfig m_RenderConfig;
 		friend class Application;
 	};
 }

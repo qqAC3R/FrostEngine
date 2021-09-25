@@ -34,7 +34,7 @@ namespace Frost
 		FramebufferAttachmentSpecification(std::initializer_list<FramebufferTextureSpecification> attachments)
 			: Attachments(attachments) {}
 
-		std::vector<FramebufferTextureSpecification> Attachments;
+		Vector<FramebufferTextureSpecification> Attachments;
 	};
 
 	struct FramebufferSpecification
@@ -55,7 +55,7 @@ namespace Frost
 		virtual const FramebufferSpecification& GetSpecification() const = 0;
 
 		virtual void* GetFramebufferHandle() const = 0;
-		virtual const Ref<Image2D>& GetColorAttachmentRendererID(uint32_t index = 0) const = 0;
+		virtual const Ref<Image2D>& GetColorAttachment(uint32_t index = 0) const = 0;
 		virtual Vector<Ref<Image2D>> GetColorAttachments() const = 0;
 
 		/* OpenGL Specific API */
@@ -68,12 +68,8 @@ namespace Frost
 		virtual void Destroy() = 0;
 
 		/* Vulkan Specific constructor */
-		static Ref<Framebuffer> Create(Ref<RenderPass> renderPass, const FramebufferSpecification& spec = {});
-
-		/* Opengl Specific constructor */
+		//static Ref<Framebuffer> Create(Ref<RenderPass> renderPass, const FramebufferSpecification& spec = {});
 		static Ref<Framebuffer> Create(const FramebufferSpecification& spec = {});
-
-
 	};
 
 }

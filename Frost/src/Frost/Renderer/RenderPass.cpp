@@ -8,12 +8,12 @@
 namespace Frost
 {
 
-	Ref<RenderPass> RenderPass::Create(const FramebufferSpecification& framebufferSpecs)
+	Ref<RenderPass> RenderPass::Create(const RenderPassSpecification& renderPassSpecs)
 	{
 		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-			case RendererAPI::API::Vulkan: return CreateRef<VulkanRenderPass>(framebufferSpecs);
+			case RendererAPI::API::Vulkan: return CreateRef<VulkanRenderPass>(renderPassSpecs);
 			case RendererAPI::API::OpenGL: return nullptr;
 		}
 

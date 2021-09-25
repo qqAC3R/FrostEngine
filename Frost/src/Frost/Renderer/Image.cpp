@@ -12,7 +12,7 @@ namespace Frost
 		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-			case RendererAPI::API::Vulkan: return CreateRef<VulkanImage2DD>(specification, data);
+			//case RendererAPI::API::Vulkan: return CreateRef<VulkanImage2DD>(specification, data);
 		}
 
 		FROST_ASSERT(false, "Unknown RendererAPI");
@@ -24,7 +24,7 @@ namespace Frost
 		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-			case RendererAPI::API::Vulkan: return CreateRef<VulkanImage2DD>(specification);
+			//case RendererAPI::API::Vulkan: return CreateRef<VulkanImage2DD>(specification);
 		}
 
 		FROST_ASSERT(false, "Unknown RendererAPI");

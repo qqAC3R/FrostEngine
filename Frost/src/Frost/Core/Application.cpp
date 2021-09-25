@@ -57,18 +57,17 @@ namespace Frost
 			{
 				Renderer::BeginFrame();
 
+				// Update
+				for (Layer* layer : m_LayerStack)
+				{
+					layer->OnUpdate(timestep);
+				}
+
 				// ImGui
 				m_ImGuiLayer->Begin();
 				for (Layer* layer : m_LayerStack)
 				{
 					layer->OnImGuiRender();
-				}
-
-
-				// Update
-				for (Layer* layer : m_LayerStack)
-				{
-					layer->OnUpdate(timestep);
 				}
 
 				Renderer::EndFrame();

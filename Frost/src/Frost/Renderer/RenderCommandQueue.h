@@ -11,6 +11,6 @@ namespace Frost
 		void Allocate(std::function<void()> func);
 		void Execute();
 	private:
-		Vector<std::function<void()>> m_CommandBuffer;
+		std::queue<std::function<void()>> m_CommandBuffer;
 	};
 }

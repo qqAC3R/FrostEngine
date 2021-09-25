@@ -29,6 +29,7 @@ IncludeDir["nvvk"] = "Frost/vendor/nvvk/shared_sources"
 IncludeDir["vma"] = "Frost/vendor/VulkanMemoryAllocator/include"
 IncludeDir["ImGui"] = "Frost/vendor/ImGui"
 IncludeDir["SPIRV_Cross"] = "Frost/vendor/VulkanSDK/SPIRV-Cross/include"
+IncludeDir["yaml_cpp"] = "Frost/vendor/yaml-cpp/include"
 
 LibraryDir = {}
 
@@ -48,11 +49,11 @@ Library["ShaderC_Release"] = "%{LibraryDir.VulkanSDK}/shaderc_shared.lib"
 Library["SPIRV_Cross_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-core.lib"
 Library["SPIRV_Cross_GLSL_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-glsl.lib"
 
-
 group "Dependencies"
 	include "Frost/vendor/GLFW"
 	include "Frost/vendor/nvvk/shared_sources"
 	include "Frost/vendor/imgui"
+	include "Frost/vendor/yaml-cpp"
 group ""
 
 group "Core"
@@ -103,8 +104,8 @@ project "Frost"
 		"%{IncludeDir.vma}",
 		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.SPIRV_Cross}",
+		"%{IncludeDir.yaml_cpp}",
 		"%{IncludeDir.nvvk}"
-
 	}
 
 	flags
@@ -118,6 +119,7 @@ project "Frost"
 		"nvvk",
 		"assimp-vc142-mtd.lib",
 		"ImGui",
+		"yaml-cpp",
 		"vulkan-1.lib",
 	}
 
@@ -197,7 +199,8 @@ project "FrostEditor"
 
 	links 
 	{
-		"Frost"
+		"Frost",
+		"ImGui"
 	}
 
 	filter "system:windows"

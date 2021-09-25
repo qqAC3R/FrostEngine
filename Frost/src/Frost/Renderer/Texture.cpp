@@ -18,7 +18,19 @@ namespace Frost
 
 		FROST_ASSERT(false, "Unknown RendererAPI!");
 		return nullptr;
-		
+	}
+
+	Ref<TextureCubeMap> TextureCubeMap::Create(TextureSpecs spec /*= {}*/)
+	{
+		switch (Renderer::GetAPI())
+		{
+		case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
+		case RendererAPI::API::Vulkan: return CreateRef<VulkanTextureCubeMap>(spec);
+		case RendererAPI::API::OpenGL: return nullptr;
+		}
+
+		FROST_ASSERT(false, "Unknown RendererAPI!");
+		return nullptr;
 	}
 
 	Ref<Image2D> Image2D::Create(TextureSpecs spec /*= {}*/)
@@ -32,17 +44,4 @@ namespace Frost
 		FROST_ASSERT(false, "Unknown RendererAPI!");
 		return nullptr;
 	}
-
-	Ref<Image2D> Image2D::Create(void* image, TextureSpecs spec /*= {}*/)
-	{
-		switch (Renderer::GetAPI())
-		{
-			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-			case RendererAPI::API::Vulkan: return CreateRef<VulkanImage2D>(image, spec);
-		}
-
-		FROST_ASSERT(false, "Unknown RendererAPI!");
-		return nullptr;
-	}
-
 }

@@ -2,21 +2,20 @@
 #include "ImGuiLayer.h"
 
 #include "imgui.h"
-#include "examples/imgui_impl_vulkan.h"
-#include "examples/imgui_impl_glfw.h"
+#include "backends/imgui_impl_vulkan.h"
+#include "backends/imgui_impl_glfw.h"
 
 #include "Frost/Core/Application.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 
 #include "Frost/Renderer/Renderer.h"
-#include "Frost/Renderer/Texture.h"
+#include "Frost/Platform/Vulkan/VulkanTexture.h"
 
 namespace Frost
 {
 
 	namespace Utils
 	{
-
 		static void CheckVkResult(VkResult err)
 		{
 			if (err == 0) return;
@@ -73,19 +72,24 @@ namespace Frost
 		pool_info.pPoolSizes = pool_sizes;
 		FROST_VKCHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &imguiPool));
 		
-
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
-
-		SetDarkThemeColors();
-		
 		
 		ImGuiIO& io = ImGui::GetIO();
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
 		io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/san-francisco/SF-Regular.otf", 18.0f);
 
+		ImGui::StyleColorsDark();
+		SetDarkThemeColors();
+
+		ImGuiStyle& style = ImGui::GetStyle();
+		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			style.WindowRounding = 0.0f;
+			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+		}
 
 		ImGui_ImplGlfw_InitForVulkan(window, true);
 
@@ -99,12 +103,10 @@ namespace Frost
 		init_info.Allocator = nullptr;
 		init_info.PipelineCache = VK_NULL_HANDLE;
 		init_info.MinImageCount = Renderer::GetRendererConfig().FramesInFlight;
-		init_info.MinImageCount = 3;
 		init_info.ImageCount = (uint32_t)VulkanContext::GetSwapChain()->GetImageCount();
 		init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 		init_info.CheckVkResultFn = Utils::CheckVkResult;
 		ImGui_ImplVulkan_Init(&init_info, renderPass);
-
 
 		// Upload Fonts
 		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
@@ -121,7 +123,6 @@ namespace Frost
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		vkDestroyDescriptorPool(device, m_DescriptorPool, nullptr);
-
 		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
@@ -142,8 +143,6 @@ namespace Frost
 				case 0x10DE: vendor = "NVIDIA Corporation"; break;
 				case 0x8086: vendor = "Intel"; break;
 			}
-
-
 			ImGui::Text(vendor);
 			ImGui::Text(deviceName);
 			ImGui::Text("Frametime: %.1f ms", 1000.0f / ImGui::GetIO().Framerate);
@@ -153,6 +152,11 @@ namespace Frost
 
 	void ImGuiLayer::OnResize(uint32_t width, uint32_t height)
 	{
+		if (ImGui::GetCurrentContext() != nullptr)
+		{
+			auto& imgui_io = ImGui::GetIO();
+			imgui_io.DisplaySize = ImVec2(static_cast<float>(width), static_cast<float>(height));
+		}
 	}
 
 	void ImGuiLayer::OnEvent(Event& event)
@@ -171,7 +175,6 @@ namespace Frost
 
 	void ImGuiLayer::Render()
 	{
-#if 1
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 
@@ -184,12 +187,12 @@ namespace Frost
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
 		}
-#endif
 	}
 
 	void* ImGuiLayer::GetTextureIDFromVulkanTexture(Ref<Image2D> texture)
 	{
-		return ImGui_ImplVulkan_AddTexture(texture->GetVulkanSampler(), texture->GetVulkanImageView(), texture->GetVulkanImageLayout());
+		Ref<VulkanImage2D> vulkanTexture = texture.As<VulkanImage2D>();
+		return ImGui_ImplVulkan_AddTexture(vulkanTexture->GetVulkanSampler(), vulkanTexture->GetVulkanImageView(), vulkanTexture->GetVulkanImageLayout());
 	}
 
 	void ImGuiLayer::SetDarkThemeColors()
