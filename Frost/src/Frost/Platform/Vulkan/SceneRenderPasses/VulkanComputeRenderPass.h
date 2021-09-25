@@ -32,9 +32,13 @@ namespace Frost
 			Ref<ComputePipeline> ComputePipeline;
 
 			Ref<Image2D> DisplayTexture;
+			Ref<TextureCubeMap> CubeMap;
+			Ref<UniformBuffer> UniformBuffer;
 			Ref<Material> Descriptor;
 			Ref<Shader> Shader;
 		};
+
+		glm::vec3 m_TurbidityAzimuthInclination;
 
 		InternalData m_Data;
 		std::string m_Name;

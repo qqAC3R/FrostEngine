@@ -24,7 +24,7 @@ namespace Frost
 		void CompileVulkanBinaries(std::unordered_map<ShaderType, std::string> shaderSources);
 		void CreateShaderModules();
 		void CreateVulkanDescriptorSetLayout();
-
+		bool IsFiledChanged();
 	private:
 		std::unordered_map<VkShaderStageFlagBits, VkShaderModule> m_ShaderModules;
 		std::unordered_map<ShaderType, std::string> m_ShaderSources;

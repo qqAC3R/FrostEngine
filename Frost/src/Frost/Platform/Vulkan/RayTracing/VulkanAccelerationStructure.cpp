@@ -251,7 +251,7 @@ namespace Frost
 
 		VulkanAllocator::DeleteBuffer(scratchBuffer, scratchMemoryBuffer);
 		vkDestroyQueryPool(device, queryPool, nullptr);
-}
+	}
 
 	void VulkanBottomLevelAccelerationStructure::Destroy()
 	{
@@ -283,11 +283,11 @@ namespace Frost
 	void VulkanTopLevelAccelertionStructure::UpdateAccelerationStructure(Vector<std::pair<Ref<Mesh>, glm::mat4>>& meshes)
 	{
 		Vector<VkAccelerationStructureInstanceKHR> accelerationStructureInstances;
-
 		for(auto mesh : meshes)
 			accelerationStructureInstances.emplace_back(InstanceToVkGeometryInstance(mesh));
 
 		BuildTLAS(accelerationStructureInstances);
+		UpdateDescriptor();
 	}
 
 	void VulkanTopLevelAccelertionStructure::Destroy()
@@ -460,4 +460,13 @@ namespace Frost
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
 		VulkanAllocator::DeleteBuffer(scratchBuffer, scratchMemoryBuffer);
 	}
+
+	void VulkanTopLevelAccelertionStructure::UpdateDescriptor()
+	{
+		m_DescriptorInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+		m_DescriptorInfo.pNext = nullptr;
+		m_DescriptorInfo.accelerationStructureCount = 1;
+		m_DescriptorInfo.pAccelerationStructures = &m_AccelerationStructure;
+	}
+
 }

@@ -3,8 +3,10 @@
 
 #include "Frost/Platform/Vulkan/VulkanFramebuffer.h"
 #include "Frost/Platform/Vulkan/VulkanRenderPass.h"
+#include "Frost/Platform/Vulkan/VulkanRenderer.h"
 #include "Frost/Platform/Vulkan/VulkanPipeline.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
+#include "Frost/Platform/Vulkan/VulkanTexture.h"
 
 namespace Frost
 {
@@ -24,12 +26,24 @@ namespace Frost
 
 		m_Data.Shader = Shader::Create("assets/shader/geometry_pass.glsl");
 
-		FramebufferSpecification framebufferSpec{};
-		framebufferSpec.Width = 1600;
-		framebufferSpec.Height = 900;
-		framebufferSpec.Attachments = { FramebufferTextureFormat::RGBA16F, FramebufferTextureFormat::Depth };
+		RenderPassSpecification renderPassSpec = 
+		{
+			1600, 900, 3,
+			{
+				{
+					FramebufferTextureFormat::RGBA16F, TextureSpecs::UsageSpec::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
 
-		m_Data.RenderPass = RenderPass::Create(framebufferSpec);
+				{
+					FramebufferTextureFormat::Depth, TextureSpecs::UsageSpec::DepthStencilAttachment,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				}
+			}
+		};
+		m_Data.RenderPass = RenderPass::Create(renderPassSpec);
 
 
 		BufferLayout bufferLayout = {
@@ -47,45 +61,31 @@ namespace Frost
 		m_Data.Pipeline = Pipeline::Create(pipelineCreateInfo);
 
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
-		{
-			m_Data.Framebuffer[i] = Framebuffer::Create(m_Data.RenderPass, framebufferSpec);
 			m_Data.Descriptor[i] = Material::Create(m_Data.Shader, "GeometryPassDescriptor");
-		}
 	}
 
 	void VulkanGeometryPass::OnUpdate(const RenderQueue& renderQueue)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
-		auto framebufferSpec = m_Data.Framebuffer[currentFrameIndex]->GetSpecification();
+		Ref<Framebuffer> framebuffer = m_Data.RenderPass->GetFramebuffer(currentFrameIndex);
 		Ref<VulkanPipeline> vulkanPipeline = m_Data.Pipeline.As<VulkanPipeline>();
 
-		VkRenderPassBeginInfo renderPassInfo{};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = m_Data.RenderPass.As<VulkanRenderPass>()->GetVulkanRenderPass();
-		renderPassInfo.framebuffer = (VkFramebuffer)m_Data.Framebuffer[currentFrameIndex]->GetFramebufferHandle();
-		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = { framebufferSpec.Width, framebufferSpec.Height };
+		Ref<VulkanImage2D> texture = framebuffer->GetColorAttachment(0).As<VulkanImage2D>();
+		//texture->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-		std::array<VkClearValue, 2> vkClearValues;
-		vkClearValues[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
-		vkClearValues[1].depthStencil = { 1.0f, 0 };
-
-		renderPassInfo.clearValueCount = static_cast<uint32_t>(vkClearValues.size());
-		renderPassInfo.pClearValues = vkClearValues.data();
-
-		vkCmdBeginRenderPass(cmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		m_Data.RenderPass->Bind();
 		vulkanPipeline->Bind();
 
 		VkViewport viewport{};
-		viewport.width = (float)framebufferSpec.Width;
-		viewport.height = (float)framebufferSpec.Height;
+		viewport.width = (float)framebuffer->GetSpecification().Width;
+		viewport.height = (float)framebuffer->GetSpecification().Height;
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 		vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
 
 		VkRect2D scissor{};
-		scissor.extent = { framebufferSpec.Width, framebufferSpec.Height };
+		scissor.extent = { framebuffer->GetSpecification().Width, framebuffer->GetSpecification().Height };
 		scissor.offset = { 0, 0 };
 		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
@@ -110,23 +110,37 @@ namespace Frost
 			vkCmdDrawIndexed(cmdBuf, count, 1, 0, 0, 0);
 		}
 
-		vkCmdEndRenderPass(cmdBuf);
-
+		m_Data.RenderPass->Unbind();
 	}
 
 	void VulkanGeometryPass::OnResize(uint32_t width, uint32_t height)
 	{
-		FramebufferSpecification framebufferSpec{};
-		framebufferSpec.Width = width;
-		framebufferSpec.Height = height;
-		framebufferSpec.Attachments = { FramebufferTextureFormat::RGBA16F, FramebufferTextureFormat::Depth };
+
+		m_Data.RenderPass->Destroy();
+
+		RenderPassSpecification renderPassSpec =
+		{
+			width, height, 3,
+			{
+				{
+					FramebufferTextureFormat::RGBA16F, TextureSpecs::UsageSpec::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
+				{
+					FramebufferTextureFormat::Depth, TextureSpecs::UsageSpec::DepthStencilAttachment,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				}
+			}
+		};
+		m_Data.RenderPass = RenderPass::Create(renderPassSpec);
+
 
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
-			m_Data.Framebuffer[i]->Destroy();
 			m_Data.Descriptor[i]->Destroy();
-
-			m_Data.Framebuffer[i] = Framebuffer::Create(m_Data.RenderPass, framebufferSpec);
 			m_Data.Descriptor[i] = Material::Create(m_Data.Shader, "GeometryPassDescriptor");
 		}
 	}
@@ -139,7 +153,6 @@ namespace Frost
 
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
-			m_Data.Framebuffer[i]->Destroy();
 			m_Data.Descriptor[i]->Destroy();
 		}
 	}

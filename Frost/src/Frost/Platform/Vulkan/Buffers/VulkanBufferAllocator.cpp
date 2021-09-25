@@ -57,7 +57,7 @@ namespace Frost
 				}
 			}
 
-			FROST_ASSERT(0, "Failed to find suitable memory type!");
+			FROST_ASSERT(false, "Failed to find suitable memory type!");
 			return 0;
 		}
 	}

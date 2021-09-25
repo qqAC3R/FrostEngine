@@ -53,15 +53,18 @@ namespace Frost
 
 		virtual void UpdateAccelerationStructure(Vector<std::pair<Ref<Mesh>, glm::mat4>>& meshes) override;
 		const VkAccelerationStructureKHR& GetVulkanAccelerationStructure() const { return m_AccelerationStructure; }
+		VkWriteDescriptorSetAccelerationStructureKHR& GetVulkanDescriptorInfo() { return m_DescriptorInfo; }
 
 		virtual void Destroy() override;
 	private:
 		VkAccelerationStructureInstanceKHR InstanceToVkGeometryInstance(std::pair<Ref<Mesh>, glm::mat4>& meshBLAS);
 		void BuildTLAS(std::vector<VkAccelerationStructureInstanceKHR>& instances);
+		void UpdateDescriptor();
 	private:
 		VkAccelerationStructureKHR m_AccelerationStructure = VK_NULL_HANDLE;
 		VkBuffer m_ASBuffer;
 		VulkanMemoryInfo m_ASBufferMemory;
+		VkWriteDescriptorSetAccelerationStructureKHR m_DescriptorInfo;
 		uint32_t m_ASBufferSize;
 
 		Ref<Buffer> m_InstanceBuffer;

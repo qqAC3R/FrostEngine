@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <shaderc/shaderc.hpp>
+#include <yaml-cpp/yaml.h>
 
 #include "Frost/Utils/Timer.h"
 
@@ -13,17 +14,25 @@ namespace Frost
 	
 	namespace Utils
 	{
-		static const char* GetCacheDirectory()
+		static const char* GetShaderCacheDirectory()
 		{
-			// TODO: make sure the assets directory is valid
 			return "assets/cache/shader/vulkan";
+		}
+
+		static const char* GetShaderHashCacheDirectory()
+		{
+			return "assets/cache/shader/vulkan/hash";
 		}
 
 		static void CreateCacheDirectoryIfNeeded()
 		{
-			std::string cacheDirectory = GetCacheDirectory();
-			if (!std::filesystem::exists(cacheDirectory))
-				std::filesystem::create_directories(cacheDirectory);
+			std::string shaderCacheDirectory = GetShaderCacheDirectory();
+			if (!std::filesystem::exists(shaderCacheDirectory))
+				std::filesystem::create_directories(shaderCacheDirectory);
+
+			std::string shaderHashCacheDirectory = GetShaderHashCacheDirectory();
+			if (!std::filesystem::exists(shaderHashCacheDirectory))
+				std::filesystem::create_directories(shaderHashCacheDirectory);
 		}
 
 		static std::string GetNameFromFilepath(const std::string& filepath)
@@ -59,10 +68,7 @@ namespace Frost
 			{
 				FROST_CORE_ERROR("Could not open file '{0}'", filename);
 			}
-
 			return result;
-
-
 		}
 
 
@@ -183,16 +189,12 @@ namespace Frost
 			while (pos != std::string::npos)
 			{
 				size_t eol = source.find_first_of("\r\n", pos); //End of shader type declaration line
-				//FROST_ASSERT(eol != std::string::npos, "Syntax error");
 				size_t begin = pos + typeTokenLength + 1; //Start of shader type name (after "#type " keyword)
 				std::string type = source.substr(begin, eol - begin);
-				
 
 				FROST_ASSERT((int)ShaderTypeFromString(type), "Invalid shader type specified");
 
-
 				size_t nextLinePos = source.find_first_not_of("\r\n", eol); //Start of shader code after shader type declaration line
-				//FROST_ASSERT(nextLinePos != std::string::npos, "Syntax error");
 				pos = source.find(typeToken, nextLinePos); //Start of next shader type declaration line
 
 				shaderSources[ShaderTypeFromString(type)] = (pos == std::string::npos) ? source.substr(nextLinePos) : source.substr(nextLinePos, pos - nextLinePos);
@@ -244,15 +246,12 @@ namespace Frost
 		m_Name = Utils::GetNameFromFilepath(filepath);
 
 		Utils::CreateCacheDirectoryIfNeeded();
-
 		std::string source = Utils::ReadFile(filepath);
 		auto shaderSources = Utils::PreProccesShaders(source);
 		m_ShaderSources = shaderSources;
 
-
 		{
 			Timer shaderCompileTimer("VulkanShader");
-
 			CompileVulkanBinaries(shaderSources);
 			CreateShaderModules();
 		}
@@ -260,6 +259,10 @@ namespace Frost
 		m_ReflectionData.SetReflectionData(m_VulkanSPIRV);
 		CreateVulkanDescriptorSetLayout();
 
+	}
+
+	VulkanShader::~VulkanShader()
+	{
 	}
 
 	void VulkanShader::CreateShaderModules()
@@ -284,12 +287,10 @@ namespace Frost
 		if (optimize)
 			options.SetOptimizationLevel(shaderc_optimization_level_performance);
 
-		std::filesystem::path cacheDirectory = Utils::GetCacheDirectory();
-
+		std::filesystem::path cacheDirectory = Utils::GetShaderCacheDirectory();
 
 		auto& shaderData = m_VulkanSPIRV;
 		shaderData.clear();
-
 
 		for (auto&& [stage, source] : shaderSources)
 		{
@@ -299,6 +300,8 @@ namespace Frost
 			std::ifstream in(cachedPath, std::ios::in | std::ios::binary);
 			if (in.is_open())
 			{
+				bool isChanged = IsFiledChanged();
+
 				in.seekg(0, std::ios::end);
 				auto size = in.tellg();
 				in.seekg(0, std::ios::beg);
@@ -402,133 +405,100 @@ namespace Frost
 
 	}
 
+	bool VulkanShader::IsFiledChanged()
+	{
+		uint32_t hashCode = 0;
+
+		{
+			// Hashing the new shader
+			std::ifstream instream(m_Filepath, std::ios::in | std::ios::binary);
+			std::string result;
+			instream.seekg(0, std::ios::end);
+			size_t size = instream.tellg();
+			if (size != -1)
+			{
+				result.resize(size);
+				instream.seekg(0, std::ios::beg);
+				instream.read(&result[0], size);
+			}
+
+			hashCode = std::hash<std::string>{}(result);
+			FROST_INFO("{0} shader hash code: {1}", m_Name, hashCode);
+		}
+
+
+		{
+			// Getting the hash code from the old shader
+			std::filesystem::path cacheDir = Utils::GetShaderHashCacheDirectory();
+			std::filesystem::path cachedPath = cacheDir / (m_Name + ".cache");
+
 #if 0
-	void VulkanShader::CreateVulkanDescriptor()
-	{
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		auto reflectedData = GetShaderReflectionData();
-
-
-		if (reflectedData.GetDescriptorSetsCount().size() == 0) return;
-
-		///////////////////////////////////////////////////////////
-		// Descriptor Pool
-		///////////////////////////////////////////////////////////
-
-		Vector<VkDescriptorPoolSize> descriptorPoolSize;
-		// Getting the needed descriptor pool size for the buffers
-		for (auto& buffer : reflectedData.GetBuffersData())
-		{
-			VkDescriptorPoolSize& dpSize = descriptorPoolSize.emplace_back();
-			dpSize.type = Utils::BufferTypeToVulkan(buffer.Type);
-			dpSize.descriptorCount = buffer.Count;
-		}
-
-		// Getting the needed descriptor pool size for the textures
-		for (auto& texture : reflectedData.GetTextureData())
-		{
-			VkDescriptorPoolSize& dpSize = descriptorPoolSize.emplace_back();
-			dpSize.type = Utils::TextureTypeToVulkan(texture.Type);
-			dpSize.descriptorCount = texture.Count;
-		}
-
-		// Getting the needed descriptor pool size for the acceleration structures
-		for (auto& accelerationStructure : reflectedData.GetAccelerationStructureData())
-		{
-			VkDescriptorPoolSize& dpSize = descriptorPoolSize.emplace_back();
-			dpSize.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-			dpSize.descriptorCount = accelerationStructure.Count;
-		}
-
-		VkDescriptorPoolCreateInfo poolInfo{};
-		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = static_cast<uint32_t>(descriptorPoolSize.size());
-		poolInfo.pPoolSizes = descriptorPoolSize.data();
-		poolInfo.maxSets = (uint32_t)reflectedData.GetDescriptorSetsCount().size();
-
-		FROST_VKCHECK(vkCreateDescriptorPool(device, &poolInfo, nullptr, &m_DescriptorPool), "Failed to create a descriptor pool!");
-		VulkanContext::SetStructDebugName("VulkanShader-DescriptorPool", VK_OBJECT_TYPE_DESCRIPTOR_POOL, m_DescriptorPool);
-
-
-
-
-		for (auto& descriptorSetNumber : reflectedData.GetDescriptorSetsCount())
-		{
-
-
-			///////////////////////////////////////////////////////////
-			// Descriptor Set Layout
-			///////////////////////////////////////////////////////////
-
-			Vector<VkDescriptorSetLayoutBinding> layoutBindings;
-
-			for (auto& buffer : reflectedData.GetBuffersData())
+			std::ifstream instream(cachedPath, std::ios::in | std::ios::binary);
+			if (instream.is_open())
 			{
-				if (buffer.Set != descriptorSetNumber) continue;
+				std::stringstream strStream;
+				strStream << instream.rdbuf();
 
-				VkDescriptorSetLayoutBinding& LayoutBinding = layoutBindings.emplace_back();
-				LayoutBinding.binding = buffer.Binding;
-				LayoutBinding.descriptorCount = buffer.Count;
-				LayoutBinding.descriptorType = Utils::BufferTypeToVulkan(buffer.Type);
-				LayoutBinding.stageFlags = Utils::GetShaderStagesFlagsFromShaderTypes(buffer.ShaderStage);
+				YAML::Node data = YAML::Load(strStream.str());
+				{
+					auto shaderName = data["ShaderHash"];
+					for (auto& shader : shaderName)
+					{
+						uint64_t shaderFileCode = shader["Filepath"].as<uint64_t>();
+					}
+					//auto shaderName2 = shaderName["Filepath"];
+					//uint64_t shaderFileCode = shaderName2["HashCode"].as<uint64_t>();
+
+					//
+					//std::string shaderFilepath = shaderName["Filepath"].as<std::string>();
+					//auto shaderHashCode = shaderName["HashCode"];
+					//uint32_t shaderCode = shaderHashCode["Code"].as<uint64_t>();
+
+					//if (shaderCode != hashCode)
+					//{
+					//	return true;
+					//}
+
+					//std::string shaderName = shader["Filepath"].as<std::string>();
+					//if (shaderName == m_Filepath)
+					{
+						//auto hashCodeYaml = shader["HashCode"];
+						//auto code = hashCodeYaml["Code"].as<uint32_t>();
+						//if (code != hashCode)
+						//{
+						//	return true;
+						//}
+					}
+				}
+
 			}
-
-			for (auto& texture : reflectedData.GetTextureData())
-			{
-				if (texture.Set != descriptorSetNumber) continue;
-
-				VkDescriptorSetLayoutBinding& LayoutBinding = layoutBindings.emplace_back();
-				LayoutBinding.binding = texture.Binding;
-				LayoutBinding.descriptorCount = texture.Count;
-				LayoutBinding.descriptorType = Utils::TextureTypeToVulkan(texture.Type);
-				LayoutBinding.stageFlags = Utils::GetShaderStagesFlagsFromShaderTypes(texture.ShaderStage);
-			}
-
-			for (auto& accelerationStructure : reflectedData.GetAccelerationStructureData())
-			{
-				if (accelerationStructure.Set != descriptorSetNumber) continue;
-
-				VkDescriptorSetLayoutBinding& LayoutBinding = layoutBindings.emplace_back();
-				LayoutBinding.binding = accelerationStructure.Binding;
-				LayoutBinding.descriptorCount = accelerationStructure.Count;
-				LayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-				LayoutBinding.stageFlags = Utils::GetShaderStagesFlagsFromShaderTypes(accelerationStructure.ShaderStage);
-			}
-
-			VkDescriptorSetLayoutCreateInfo layoutInfo{};
-			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			layoutInfo.flags = 0;
-			layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
-			layoutInfo.pBindings = layoutBindings.data();
-
-			FROST_VKCHECK(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &m_DescriptorSetLayouts[descriptorSetNumber]),
-				"Failed to create a descriptor set layout");
-			VulkanContext::SetStructDebugName("VulkanShader-DescriptorSetLayout", VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, m_DescriptorSetLayouts[descriptorSetNumber]);
-
-
-
-
-			///////////////////////////////////////////////////////////
-			// Descriptor Set
-			///////////////////////////////////////////////////////////
-
-			VkDescriptorSetAllocateInfo allocInfo{};
-			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			allocInfo.descriptorPool = m_DescriptorPool;
-			allocInfo.descriptorSetCount = 1;
-			allocInfo.pSetLayouts = &m_DescriptorSetLayouts[descriptorSetNumber];
-
-			FROST_VKCHECK(vkAllocateDescriptorSets(device, &allocInfo, &m_DescriptorSets[descriptorSetNumber]), "Failed to create a descriptor set!");
-			VulkanContext::SetStructDebugName("VulkanShader-DescriptorSet", VK_OBJECT_TYPE_DESCRIPTOR_SET, m_DescriptorSets[descriptorSetNumber]);
-
-
-		}
-
-	}
 #endif
+			//else
+			{
+				YAML::Emitter out;
 
-	VulkanShader::~VulkanShader()
-	{
+				out << YAML::BeginMap;
+				out << YAML::Key << "ShaderName" << YAML::Value << m_Name;
+				out << YAML::Key << "ShaderHash" << YAML::Value << YAML::BeginSeq;
+
+				{
+					out << YAML::BeginMap;
+					out << YAML::Key << "Filepath" << YAML::Value << m_Filepath;
+					out << YAML::Key << "HashCode" << YAML::Value << hashCode;
+					out << YAML::EndMap;
+				}
+				out << YAML::EndSeq;
+				out << YAML::EndMap;
+
+
+				std::ofstream fout(cachedPath, std::ios::out);
+				fout << out.c_str();
+			}
+
+
+		}
+
+		return false;
 	}
 
 	void VulkanShader::Destroy()

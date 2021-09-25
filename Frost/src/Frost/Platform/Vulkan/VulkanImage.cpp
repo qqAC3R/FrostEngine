@@ -2,10 +2,10 @@
 #include "VulkanImage.h"
 
 #include "VulkanContext.h"
-#include "Frost/Platform/Vulkan/VulkanCommandBuffer.h"
 
 namespace Frost
 {
+#if 0
 	namespace Utils
 	{
 		static void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels,
@@ -394,4 +394,5 @@ namespace Frost
 		vkDestroySampler(device, m_Sampler, nullptr);
 		VulkanBufferAllocator::DestroyImage(m_Image, m_ImageMemory);
 	}
+#endif
 }

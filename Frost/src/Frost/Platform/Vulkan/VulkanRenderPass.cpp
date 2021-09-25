@@ -1,7 +1,9 @@
 #include "frostpch.h"
 #include "VulkanRenderPass.h"
 
-#include "VulkanContext.h"
+#include "Frost/Platform/Vulkan/VulkanContext.h"
+#include "Frost/Platform/Vulkan/VulkanFramebuffer.h"
+#include "Frost/Platform/Vulkan/VulkanTexture.h"
 
 namespace Frost
 {
@@ -18,86 +20,109 @@ namespace Frost
 
 		static RenderPassAttachmentSpecs FBFormatToRenderPassSpecs(FramebufferTextureFormat format)
 		{
-			VkImageLayout colorImageLayout   = VK_IMAGE_LAYOUT_GENERAL;
+			VkImageLayout colorImageLayout   = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			VkImageLayout depthImageLayout   = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			VkImageLayout presentImageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 			switch (format)
 			{
-				case Frost::FramebufferTextureFormat::RGBA8:	 return { VK_FORMAT_R8G8B8A8_SRGB,       VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
-				case Frost::FramebufferTextureFormat::RGBA16F:	 return { VK_FORMAT_R16G16B16A16_SFLOAT, VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
-				case Frost::FramebufferTextureFormat::DEPTH32:	 return { VK_FORMAT_D32_SFLOAT,			 VK_ATTACHMENT_STORE_OP_STORE, depthImageLayout };
+			case FramebufferTextureFormat::RGBA8:	 return { VK_FORMAT_R8G8B8A8_SRGB,       VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
+			case FramebufferTextureFormat::RGBA16F:	 return { VK_FORMAT_R16G16B16A16_SFLOAT, VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
+			case FramebufferTextureFormat::DEPTH32:	 return { VK_FORMAT_D32_SFLOAT,			 VK_ATTACHMENT_STORE_OP_STORE, depthImageLayout };
 			}
 
 			FROST_ASSERT(false, "");
 			return {};
 		}
 
+		VkAttachmentStoreOp GetVulkanAttachmentStoreOp(OperationStore attachmentOp)
+		{
+			switch (attachmentOp)
+			{
+				case OperationStore::Store:     return VK_ATTACHMENT_STORE_OP_STORE;
+				case OperationStore::DontCare:  return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			}
+
+			FROST_ASSERT(false, "");
+			return VkAttachmentStoreOp();
+		}
+
+		VkAttachmentLoadOp GetVulkanAttachmentLoadOp(OperationLoad attachmentOp)
+		{
+			switch (attachmentOp)
+			{
+				case OperationLoad::Clear:     return VK_ATTACHMENT_LOAD_OP_CLEAR;
+				case OperationLoad::Load:      return VK_ATTACHMENT_LOAD_OP_LOAD;
+				case OperationLoad::DontCare:  return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			}
+
+			FROST_ASSERT(false, "");
+			return VkAttachmentLoadOp();
+		}
+
+		VkFormat GetVulkanFBFormat(FramebufferTextureFormat format)
+		{
+			switch (format)
+			{
+				case FramebufferTextureFormat::RGBA8:	 return VK_FORMAT_R8G8B8A8_SRGB;
+				case FramebufferTextureFormat::RGBA16F:	 return VK_FORMAT_R16G16B16A16_SFLOAT;
+				case FramebufferTextureFormat::DEPTH32:  return VK_FORMAT_D32_SFLOAT;
+			}
+
+			FROST_ASSERT(false, "");
+			return VkFormat();
+		}
 	}
 
-	VulkanRenderPass::VulkanRenderPass(const FramebufferSpecification& framebufferSpecs)
+	VulkanRenderPass::VulkanRenderPass(const RenderPassSpecification& renderPassSpecs)
+		: m_Specification(renderPassSpecs)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
+		m_Framebuffers.resize(renderPassSpecs.FramebufferCount);
+		for (auto& framebuffer : m_Framebuffers)
+			framebuffer = Framebuffer::Create(renderPassSpecs.FramebufferSpecification);
+
+
 		Vector<VkAttachmentDescription> attachmentDescriptions;
-		Vector<VkAttachmentReference> colorAttachementRef{};
-		Vector<VkAttachmentReference> depthAttachmentRef{};
+		Vector<VkAttachmentReference> colorAttachmentRefs;
+		Vector<VkAttachmentReference> depthAttachmentRefs;
+
+		//uint32_t colorAttachmentCount = 0; uint32_t depthAttachmentCount = 0;
+		uint32_t attachmentCount = 0;
+		for(uint32_t i = 0; i < renderPassSpecs.RenderPassSpec.size(); i++)
+		{
+			Vector<FramebufferTextureSpecification> framebufferAttachmentInfo = renderPassSpecs.FramebufferSpecification.Attachments.Attachments;
+
+			VkAttachmentDescription& attachment = attachmentDescriptions.emplace_back();
+			attachment.format = Utils::GetVulkanFBFormat(framebufferAttachmentInfo[i].TextureFormat);
+			attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+			attachment.loadOp = Utils::GetVulkanAttachmentLoadOp(renderPassSpecs.RenderPassSpec[i].LoadOperation);
+			attachment.storeOp = Utils::GetVulkanAttachmentStoreOp(renderPassSpecs.RenderPassSpec[i].StoreOperation);
+			attachment.stencilLoadOp = Utils::GetVulkanAttachmentLoadOp(renderPassSpecs.RenderPassSpec[i].DepthLoadOperation);;
+			attachment.stencilStoreOp = Utils::GetVulkanAttachmentStoreOp(renderPassSpecs.RenderPassSpec[i].DepthStoreOperation);;
+			attachment.initialLayout = m_Framebuffers[0]->GetColorAttachment(i).As<VulkanImage2D>()->GetVulkanImageLayout();
+			attachment.finalLayout = Utils::TextureUsageToLayoutVk(renderPassSpecs.RenderPassSpec[i].FinalLayout);
+			
+			VkAttachmentReference attachmentRef;
+			attachmentRef.layout = m_Framebuffers[0]->GetColorAttachment(i).As<VulkanImage2D>()->GetVulkanImageLayout();
+			attachmentRef.attachment = attachmentCount;
+			attachmentCount++;
+
+			if (framebufferAttachmentInfo[i].TextureFormat == FramebufferTextureFormat::DEPTH32)
+				depthAttachmentRefs.push_back(attachmentRef);
+			else
+				colorAttachmentRefs.push_back(attachmentRef);
+
+
+			m_AttachmentLayouts[i] = attachment.finalLayout;
+		}
 
 		VkSubpassDescription subpass{};
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-
-		uint32_t colorAttachmentCount = 0;
-		for (uint32_t i = 0; i < framebufferSpecs.Attachments.Attachments.size(); i++)
-		{
-
-			auto attachmentSpec = Utils::FBFormatToRenderPassSpecs(framebufferSpecs.Attachments.Attachments[i].TextureFormat);
-	
-			{
-				VkAttachmentDescription attachment{};
-				attachment.format = attachmentSpec.Format;
-				attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-				attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-				attachment.storeOp = attachmentSpec.StoreOp;
-				attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-				attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-				
-				attachment.initialLayout = attachmentSpec.Layout;
-				attachment.finalLayout = attachmentSpec.Layout;
-				
-				attachmentDescriptions.push_back(attachment);
-
-			}
-
-
-			{
-				VkAttachmentReference attachment{};
-				attachment.attachment = i;
-				
-				switch (attachmentSpec.Layout)
-				{
-				case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-					attachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; break;
-				default:
-					attachment.layout = attachmentSpec.Layout;
-				}
-
-
-				if (attachment.layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-				{
-					depthAttachmentRef.push_back(attachment);
-				}
-				else
-				{
-					subpass.colorAttachmentCount = ++colorAttachmentCount;
-					colorAttachementRef.push_back(attachment);
-				}
-
-			}
-		}
-
-		subpass.pColorAttachments = colorAttachementRef.data();
-		subpass.pDepthStencilAttachment = depthAttachmentRef.data();
-
+		subpass.pColorAttachments = colorAttachmentRefs.data();
+		subpass.colorAttachmentCount = colorAttachmentRefs.size();
+		subpass.pDepthStencilAttachment = depthAttachmentRefs.data();
 
 		VkSubpassDependency dependency{};
 		dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -116,12 +141,15 @@ namespace Frost
 		renderPassInfo.dependencyCount = 1;
 		renderPassInfo.pDependencies = &dependency;
 
-		if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &m_RenderPass) != VK_SUCCESS)
-		{
-			FROST_ASSERT(0, "Failed to create render pass!");
-		}
-
+		FROST_VKCHECK(vkCreateRenderPass(device, &renderPassInfo, nullptr, &m_RenderPass));
 		VulkanContext::SetStructDebugName("RenderPass", VK_OBJECT_TYPE_RENDER_PASS, m_RenderPass);
+
+		// Creating the framebuffer (after creating the renderpass)
+		for (auto& framebuffer : m_Framebuffers)
+		{
+			Ref<VulkanFramebuffer> vulkanFramebuffer = framebuffer.As<VulkanFramebuffer>();
+			vulkanFramebuffer->CreateFramebuffer(m_RenderPass);
+		}
 	}
 
 	VulkanRenderPass::~VulkanRenderPass()
@@ -130,16 +158,17 @@ namespace Frost
 
 	void VulkanRenderPass::Bind()
 	{
-#if 0
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		Ref<Framebuffer> framebuffer = m_Framebuffers.size() > 1 ? m_Framebuffers[currentFrameIndex] : m_Framebuffers[0];
+		VkFramebuffer framebufferHandle = (VkFramebuffer)framebuffer->GetFramebufferHandle();
 
 		VkRenderPassBeginInfo renderPassInfo{};
 		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassInfo.renderPass = m_RenderPass;
-		renderPassInfo.framebuffer = ;
+		renderPassInfo.framebuffer = framebufferHandle;
 		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = { extent.width, extent.height };
+		renderPassInfo.renderArea.extent = { m_Specification.FramebufferSpecification.Width, m_Specification.FramebufferSpecification.Height };
 
 		std::array<VkClearValue, 2> vkClearValues;
 		vkClearValues[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -148,18 +177,35 @@ namespace Frost
 		renderPassInfo.clearValueCount = static_cast<uint32_t>(vkClearValues.size());
 		renderPassInfo.pClearValues = vkClearValues.data();
 
-		vkCmdBeginRenderPass(cmdBuf, , VK_SUBPASS_CONTENTS_INLINE)
-#endif
+		vkCmdBeginRenderPass(cmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		// TODO: Change Image2D Layout Here
+		// TODO: Change Image2D Layout Here
+		// TODO: Change Image2D Layout Here
+		// TODO: Change Image2D Layout Here
 	}
 
 	void VulkanRenderPass::Unbind()
 	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		vkCmdEndRenderPass(cmdBuf);
 
+		Ref<Framebuffer> framebuffer = m_Framebuffers.size() > 1 ? m_Framebuffers[currentFrameIndex] : m_Framebuffers[0];
+		auto attachments = framebuffer->GetColorAttachments();
+		for (uint32_t i = 0; i < attachments.size(); i++)
+		{
+			Ref<VulkanImage2D> attachment = attachments[i].As<VulkanImage2D>();
+			attachment->m_Layout = m_AttachmentLayouts[i];
+		}
 	}
 
 	void VulkanRenderPass::Destroy()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		for (auto& framebuffer : m_Framebuffers)
+			framebuffer->Destroy();
 		vkDestroyRenderPass(device, m_RenderPass, nullptr);
 	}
 

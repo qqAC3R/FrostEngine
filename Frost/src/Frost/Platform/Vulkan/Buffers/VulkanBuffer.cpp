@@ -20,6 +20,7 @@ namespace Frost
 		VulkanAllocator::AllocateBuffer(size, usages, MemoryUsage::CPU_AND_GPU, m_Buffer, m_BufferMemory);
 		VulkanContext::SetStructDebugName("Buffer", VK_OBJECT_TYPE_BUFFER, m_Buffer);
 		GetBufferAddress();
+		UpdateDescriptor();
 	}
 
 
@@ -36,6 +37,7 @@ namespace Frost
 		VulkanAllocator::AllocateBuffer(size, usages, m_Buffer, m_BufferMemory, data);
 		VulkanContext::SetStructDebugName("Buffer", VK_OBJECT_TYPE_BUFFER, m_Buffer);
 		GetBufferAddress();
+		UpdateDescriptor();
 	}
 
 	VulkanBuffer::~VulkanBuffer()
@@ -69,6 +71,13 @@ namespace Frost
 		VkBufferDeviceAddressInfo bufferInfo{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
 		bufferInfo.buffer = m_Buffer;
 		m_BufferAddress = vkGetBufferDeviceAddress(device, &bufferInfo);
+	}
+
+	void VulkanBuffer::UpdateDescriptor()
+	{
+		m_DescriptorInfo.buffer = m_Buffer;
+		m_DescriptorInfo.offset = 0;
+		m_DescriptorInfo.range = m_BufferData.Size;
 	}
 
 	void VulkanBuffer::Destroy()

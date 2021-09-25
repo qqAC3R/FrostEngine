@@ -22,17 +22,14 @@ namespace Frost
 				descriptorSetLayouts.push_back(descriptorSetLayout.second);
 			return descriptorSetLayouts;
 		}
-
 		virtual void Invalidate() override;
 
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) override;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) override;
-		
+		virtual void Set(const std::string& name, const Ref<TextureCubeMap>& image) override;
 		virtual void Set(const std::string& name, const Ref<Buffer>& storageBuffer) override;
 		virtual void Set(const std::string& name, const Ref<UniformBuffer>& uniformBuffer) override;
-
 		virtual void Set(const std::string& name, const Ref<TopLevelAccelertionStructure>& accelerationStructure) override;
-
 
 		virtual Ref<Buffer> GetBuffer(const std::string& name) override;
 		virtual Ref<UniformBuffer> GetUniformBuffer(const std::string& name) override;
@@ -40,14 +37,11 @@ namespace Frost
 		virtual Ref<Image2D> GetImage2D(const std::string& name) override;
 		virtual Ref<TopLevelAccelertionStructure> GetAccelerationStructure(const std::string& name) override;
 
-
 		virtual void Destroy() override;
-
 	private:
 		std::pair<uint32_t, uint32_t> GetShaderLocationFromString(const std::string& name);
 		void CreateVulkanDescriptor();
 		void CreateMaterialData();
-
 	private:
 		Ref<Shader> m_Shader;
 
@@ -83,9 +77,9 @@ namespace Frost
 		};
 
 		// Keeping them because in a vector because they fucking die and crashes the whole engine
-		Vector<VkDescriptorImageInfo> ImageInfos;
-		Vector<VkDescriptorBufferInfo> BufferInfos;
-		Vector<VkWriteDescriptorSetAccelerationStructureKHR> ASInfos;
+		//Vector<VkDescriptorImageInfo> ImageInfos;
+		//Vector<VkDescriptorBufferInfo> BufferInfos;
+		//Vector<VkWriteDescriptorSetAccelerationStructureKHR> ASInfos;
 
 		Vector<PendingDescriptor> m_PendingDescriptor;
 	};

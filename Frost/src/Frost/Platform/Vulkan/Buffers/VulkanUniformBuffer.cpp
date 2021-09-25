@@ -14,8 +14,9 @@ namespace Frost
 
 		// Getting the buffer and buffer address
 		Ref<VulkanBuffer> uniformBuffer = m_UniformBuffer.As<VulkanBuffer>();
-		m_BufferAddress = uniformBuffer->GetVulkanBufferAddress();
 		m_Buffer = uniformBuffer->GetVulkanBuffer();
+		m_BufferAddress = uniformBuffer->GetVulkanBufferAddress();
+		m_DescriptorInfo = uniformBuffer->GetVulkanDescriptorInfo();
 
 		VulkanContext::SetStructDebugName("UniformBuffer", VK_OBJECT_TYPE_BUFFER, m_Buffer);
 	}

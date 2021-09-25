@@ -11,20 +11,28 @@ namespace Frost
 	class VulkanRenderPass : public RenderPass
 	{
 	public:
-		VulkanRenderPass(const FramebufferSpecification& framebufferSpecs);
+		VulkanRenderPass(const RenderPassSpecification& renderPassSpecs);
 		virtual ~VulkanRenderPass();
 
-		VkRenderPass GetVulkanRenderPass() const { return m_RenderPass; }
+		virtual Ref<Framebuffer> GetFramebuffer(uint32_t index) const override { return m_Framebuffers[index]; }
+		virtual Ref<Image2D> GetColorAttachment(uint32_t attachmentSlot, uint32_t index) const override {
+			return m_Framebuffers[index]->GetColorAttachment(attachmentSlot);
+		}
+
+		virtual const RenderPassSpecification& GetSpecification() const override { return m_Specification; }
+
 		virtual void Destroy() override;
 		
 		virtual void Bind() override;
 		virtual void Unbind() override;
 
-		virtual Ref<Framebuffer> GetFramebuffer() override { return nullptr; }
+		VkRenderPass GetVulkanRenderPass() const { return m_RenderPass; }
 	private:
+		Vector<Ref<Framebuffer>> m_Framebuffers;
 		VkRenderPass m_RenderPass;
-	public:
-		// Useless functions
+
+		RenderPassSpecification m_Specification;
+		std::unordered_map<uint32_t, VkImageLayout> m_AttachmentLayouts;
 	};
 
 }

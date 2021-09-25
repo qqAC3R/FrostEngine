@@ -29,8 +29,8 @@ namespace Frost
 		{
 			Ref<Pipeline> Pipeline;
 			Ref<RenderPass> RenderPass;
-			Ref<Framebuffer> Framebuffer[FRAMES_IN_FLIGHT];
-			Ref<Material> Descriptor[FRAMES_IN_FLIGHT];;
+			//Ref<Framebuffer> Framebuffer[FRAMES_IN_FLIGHT];
+			Ref<Material> Descriptor[FRAMES_IN_FLIGHT];
 			Ref<Shader> Shader;
 		};
 

@@ -7,7 +7,7 @@
 
 namespace Frost
 {
-
+#if 0
 	class VulkanImage2DD : public Image2DD
 	{
 	public:
@@ -113,5 +113,6 @@ namespace Frost
 			return VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 		}
 	}
+#endif
 
 }

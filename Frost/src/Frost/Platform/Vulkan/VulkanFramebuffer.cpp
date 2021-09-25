@@ -3,20 +3,20 @@
 
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanRenderPass.h"
+#include "Frost/Platform/Vulkan/VulkanTexture.h"
 
 namespace Frost
 {
 
 	namespace Utils
 	{
-
 		static std::pair<VkImageUsageFlags, VkFormat> FBFormatToVK(FramebufferTextureFormat format)
 		{
 			switch (format)
 			{
-				case Frost::FramebufferTextureFormat::RGBA8:	return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_FORMAT_R8G8B8A8_SRGB);
-				case Frost::FramebufferTextureFormat::RGBA16F:	return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_FORMAT_R16G16B16A16_SFLOAT);
-				case Frost::FramebufferTextureFormat::DEPTH32:  return std::make_pair(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT);
+				case FramebufferTextureFormat::RGBA8:	 return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_FORMAT_R8G8B8A8_SRGB);
+				case FramebufferTextureFormat::RGBA16F:	 return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_FORMAT_R16G16B16A16_SFLOAT);
+				case FramebufferTextureFormat::DEPTH32:  return std::make_pair(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT);
 			}
 
 			FROST_ASSERT(false, "");
@@ -29,18 +29,15 @@ namespace Frost
 			{
 				case FramebufferTextureFormat::DEPTH32:  return true;
 			}
-
 			return false;
 		}
 	}
 
-	VulkanFramebuffer::VulkanFramebuffer(Ref<RenderPass> renderPass, const FramebufferSpecification& spec)
+	VulkanFramebuffer::VulkanFramebuffer(const FramebufferSpecification& spec)
 		: m_Specification(spec)
 	{
 		FROST_ASSERT(m_Specification.Attachments.Attachments.size() != 0, "Framebuffer should have atleast 1 attachment");
-
 		CreateAttachments();
-		CreateFramebuffer(renderPass);
 	}
 
 	VulkanFramebuffer::~VulkanFramebuffer()
@@ -89,7 +86,8 @@ namespace Frost
 			if (attachment.TextureFormat == FramebufferTextureFormat::Depth)
 				spec.Usage = { TextureSpecs::UsageSpec::DepthStencilAttachment };
 			else
-				spec.Usage = { TextureSpecs::UsageSpec::ColorAttachment, TextureSpecs::UsageSpec::Storage };
+				spec.Usage = { TextureSpecs::UsageSpec::Storage, TextureSpecs::UsageSpec::ColorAttachment };
+				//spec.Usage = { TextureSpecs::UsageSpec::ColorAttachment, TextureSpecs::UsageSpec::Storage };
 
 			Ref<Image2D> texture = Image2D::Create(spec);
 			m_Attachments.push_back(texture);
@@ -97,30 +95,26 @@ namespace Frost
 
 	}
 
-	void VulkanFramebuffer::CreateFramebuffer(Ref<RenderPass> renderPass)
+	void VulkanFramebuffer::CreateFramebuffer(VkRenderPass renderPass)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-		std::vector<VkImageView> attachments;
+		Vector<VkImageView> attachments;
 		for (auto& attachment : m_Attachments)
 		{
-			attachments.push_back(attachment->GetVulkanImageView());
+			attachments.push_back(attachment.As<VulkanImage2D>()->GetVulkanImageView());
 		}
 
 		VkFramebufferCreateInfo framebufferInfo{};
 		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		framebufferInfo.renderPass = renderPass.As<VulkanRenderPass>()->GetVulkanRenderPass();
+		framebufferInfo.renderPass = renderPass;
 		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 		framebufferInfo.pAttachments = attachments.data();
 		framebufferInfo.width = m_Specification.Width;
 		framebufferInfo.height = m_Specification.Height;
 		framebufferInfo.layers = 1;
 
-		if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &m_Framebuffer) != VK_SUCCESS)
-		{
-			FROST_ASSERT(0, "Failed to create framebuffer!");
-		}
-
+		FROST_VKCHECK(vkCreateFramebuffer(device, &framebufferInfo, nullptr, &m_Framebuffer));
 		VulkanContext::SetStructDebugName("Framebuffer", VK_OBJECT_TYPE_FRAMEBUFFER, m_Framebuffer);
 	}
 

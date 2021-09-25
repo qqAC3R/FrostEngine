@@ -16,7 +16,7 @@
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 
 #include <imgui.h>
-#include <examples/imgui_impl_vulkan.h>
+#include <backends/imgui_impl_vulkan.h>
 
 namespace Frost
 {
@@ -102,22 +102,22 @@ namespace Frost
 		{
 			VkDescriptorPoolSize pool_sizes[] =
 			{
-				{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-				{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+				{ VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
+				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
+				{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100 },
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 100 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 100 },
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 },
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 100 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100 },
+				{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100 }
 			};
 			VkDescriptorPoolCreateInfo pool_info = {};
 			pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 			pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-			pool_info.maxSets = 1000 * (sizeof(pool_sizes) / sizeof(VkDescriptorPoolSize));
+			pool_info.maxSets = 100 * (sizeof(pool_sizes) / sizeof(VkDescriptorPoolSize));
 			pool_info.poolSizeCount = (uint32_t)(sizeof(pool_sizes) / sizeof(VkDescriptorPoolSize));
 			pool_info.pPoolSizes = pool_sizes;
 			FROST_VKCHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool));
@@ -125,6 +125,7 @@ namespace Frost
 
 		// Initalizing the ImGui layer by sending it the default renderpass
 		Application::Get().GetImGuiLayer()->OnInit(VulkanContext::GetSwapChain()->GetRenderPass());
+
 	}
 
 	void VulkanRenderer::BeginFrame()
@@ -265,10 +266,13 @@ namespace Frost
 
 	void VulkanRenderer::Resize(uint32_t width, uint32_t height)
 	{
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		vkDeviceWaitIdle(device);
+		Renderer::Submit([width, height]()
+		{
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+			vkDeviceWaitIdle(device);
 
-		s_Data->SceneRenderPasses->ResizeRenderPasses(width, height);
+			s_Data->SceneRenderPasses->ResizeRenderPasses(width, height);
+		});
 	}
 
 	void VulkanRenderer::ShutDown()
@@ -294,11 +298,9 @@ namespace Frost
 	Ref<Image2D> VulkanRenderer::GetFinalImage(uint32_t id) const
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-
 		if(id == 0)
 			return s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[currentFrameIndex];
-
-		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->Framebuffer[currentFrameIndex]->GetColorAttachmentRendererID(0);
+		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
 	}
 
 	VkDescriptorSet VulkanRenderer::AllocateDescriptorSet(VkDescriptorSetAllocateInfo allocInfo)

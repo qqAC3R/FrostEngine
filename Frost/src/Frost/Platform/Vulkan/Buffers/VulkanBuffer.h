@@ -23,18 +23,20 @@ namespace Frost
 
 		VkBuffer GetVulkanBuffer() const { return m_Buffer; }
 		VkDeviceAddress GetVulkanBufferAddress() const { return m_BufferAddress; }
+		VkDescriptorBufferInfo& GetVulkanDescriptorInfo() { return m_DescriptorInfo; }
 
 		virtual void Destroy() override;
-
 	private:
 		void GetBufferAddress();
+		void UpdateDescriptor();
 	private:
 		VkBuffer m_Buffer;
 		VulkanMemoryInfo m_BufferMemory;
 		VkDeviceAddress m_BufferAddress;
 
-		BufferData m_BufferData;
+		VkDescriptorBufferInfo m_DescriptorInfo;
 
+		BufferData m_BufferData;
 		Vector<BufferType> m_Types;
 	public:
 		// Functions that are useless
