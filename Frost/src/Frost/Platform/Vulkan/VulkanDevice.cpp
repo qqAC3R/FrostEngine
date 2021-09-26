@@ -496,7 +496,7 @@ namespace Frost
 
 		nvvk::ContextCreateInfo contextInfo;
 		contextInfo.setVersion(1, 2);
-		contextInfo.addInstanceLayer("VK_LAYER_LUNARG_monitor", true);
+		//contextInfo.addInstanceLayer("VK_LAYER_LUNARG_monitor", true);
 		contextInfo.addInstanceExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, true);
 		contextInfo.addInstanceExtension(VK_EXT_DEBUG_REPORT_EXTENSION_NAME, true);
 		contextInfo.addInstanceExtension(VK_KHR_SURFACE_EXTENSION_NAME);

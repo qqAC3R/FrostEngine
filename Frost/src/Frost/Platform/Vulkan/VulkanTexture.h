@@ -105,6 +105,10 @@ namespace Frost
 
 		virtual void Destroy() const override;
 
+		void TransitionLayout(VkCommandBuffer cmdBuf, VkImageLayout newLayout,
+			VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+
 	private:
 		void UpdateDescriptor();
 	private:
@@ -114,6 +118,7 @@ namespace Frost
 		VulkanMemoryInfo m_ImageMemory;
 
 		VkDescriptorImageInfo m_DescriptorInfo;
+		uint32_t m_MipLevels;
 
 		VkSampler m_TextureSampler;
 		TextureSpecs m_TextureSpecification;

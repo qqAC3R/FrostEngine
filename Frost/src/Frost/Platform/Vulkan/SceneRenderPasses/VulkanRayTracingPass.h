@@ -60,6 +60,7 @@ namespace Frost
 			glm::mat4 Transform;
 			glm::mat4 InverseTransform;
 
+			glm::vec3 Albedo{ 1.0f };
 			glm::vec3 Emittance{ 0.0f };
 			float Roughness{ 0.0f };
 			float RefractionIndex = 1.0f;

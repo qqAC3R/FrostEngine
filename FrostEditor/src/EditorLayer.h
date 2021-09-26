@@ -23,9 +23,9 @@ namespace Frost
 
 		virtual void OnAttach()
 		{
-			m_PlaneMesh = Mesh::Load("assets/media/scenes/plane.obj");
-			m_BunnyMesh = Mesh::Load("assets/models/stanford-bunny.fbx", { glm::vec3(1.0f), glm::vec3(0.0f), 0.0f, 1.1f });
-			m_SphereMesh = Mesh::Load("assets/models/globe-sphere.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 0.5f, 1.0f });
+			m_PlaneMesh = Mesh::Load("assets/media/scenes/plane.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 0.3f, 0.1f });
+			m_BunnyMesh = Mesh::Load("assets/models/stanford-bunny.fbx", { glm::vec3(0.7f), glm::vec3(0.0f), 0.0f, 1.11f });
+			m_SphereMesh = Mesh::Load("assets/models/globe-sphere.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 0.0f, 1.0f });
 		}
 
 		virtual void OnUpdate(Frost::Timestep ts)
@@ -183,7 +183,6 @@ namespace Frost
 		Ref<Mesh> m_SphereMesh;
 
 		bool m_UseRT = true;
-
 	};
 
 

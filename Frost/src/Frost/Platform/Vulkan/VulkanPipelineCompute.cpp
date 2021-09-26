@@ -93,7 +93,6 @@ namespace Frost
 		FROST_VKCHECK(vkQueueSubmit(computeQueue, 1, &computeSubmitInfo, s_ComputeFence));
 
 		vkWaitForFences(device, 1, &s_ComputeFence, VK_TRUE, UINT64_MAX);
-
 	}
 
 	void VulkanComputePipeline::Unbind()

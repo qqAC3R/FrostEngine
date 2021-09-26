@@ -199,17 +199,17 @@ namespace Frost
 
 		VkImageLayout textureLayout = Utils::TextureUsageToLayoutVk(spec.Usage[0]);
 		m_Layout = textureLayout;
-		Utils::ChangeImageLayout(m_TextureImage, textureFormat, VK_IMAGE_LAYOUT_UNDEFINED, textureLayout, 1, 1);
 
 		// Generating mip maps if necessary and changing the layout to SHADER_READ_ONLY_OPTIMAL
 		if (spec.UseMipMaps)
 		{
-			int mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(spec.Width, spec.Height)))) + 1;
+			m_MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(spec.Width, spec.Height)))) + 1;
 			Utils::ChangeImageLayout(m_TextureImage, textureFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, 1);
-			Utils::GenerateMipMaps(m_TextureImage, textureFormat, textureLayout, spec.Width, spec.Width, mipLevels);
+			Utils::GenerateMipMaps(m_TextureImage, textureFormat, textureLayout, spec.Width, spec.Width, m_MipLevels);
 		}
 		else
 		{
+			m_MipLevels = 1;
 			Utils::ChangeImageLayout(m_TextureImage, textureFormat, VK_IMAGE_LAYOUT_UNDEFINED, textureLayout, 1, 6);
 		}
 
@@ -217,7 +217,7 @@ namespace Frost
 
 		// Creating the sampler
 		VkFilter filtering = Utils::TextureFilteringToVk(spec.Filtering);
-		Utils::CreateImageSampler(filtering, 1, m_TextureSampler);
+		Utils::CreateImageSampler(filtering, m_MipLevels, m_TextureSampler);
 
 		VulkanContext::SetStructDebugName("TextureCubeMap-Image", VK_OBJECT_TYPE_IMAGE, m_TextureImage);
 		VulkanContext::SetStructDebugName("TextureCubeMap-ImageView", VK_OBJECT_TYPE_IMAGE_VIEW, m_ImageView);
@@ -238,6 +238,23 @@ namespace Frost
 		vkDestroyImageView(device, m_ImageView, nullptr);
 		vkDestroySampler(device, m_TextureSampler, nullptr);
 		VulkanAllocator::DestroyImage(m_TextureImage, m_ImageMemory);
+	}
+
+	void VulkanTextureCubeMap::TransitionLayout(VkCommandBuffer cmdBuf, VkImageLayout newLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
+	{
+		Utils::SetImageLayout(cmdBuf, m_TextureImage,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			m_Layout, newLayout
+		);
+
+		VkImageSubresourceRange subresourceRange{};
+		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		subresourceRange.baseMipLevel = 0;
+		subresourceRange.levelCount = m_MipLevels;
+		subresourceRange.layerCount = 6;
+		Utils::SetImageLayout(cmdBuf, m_TextureImage, m_Layout, newLayout, subresourceRange, srcStageMask, dstStageMask);
+
+		m_Layout = newLayout;
 	}
 
 	void VulkanTextureCubeMap::UpdateDescriptor()
@@ -564,7 +581,6 @@ namespace Frost
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 			VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
-
 
 			VkSamplerCreateInfo samplerInfo{};
 			samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

@@ -31,7 +31,6 @@ namespace Frost
 		{
 			Ref<ComputePipeline> ComputePipeline;
 
-			Ref<Image2D> DisplayTexture;
 			Ref<TextureCubeMap> CubeMap;
 			Ref<UniformBuffer> UniformBuffer;
 			Ref<Material> Descriptor;

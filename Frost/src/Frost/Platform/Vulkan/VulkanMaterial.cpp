@@ -377,7 +377,8 @@ namespace Frost
 		//imageInfo.imageLayout = image->GetVulkanImageLayout();
 		//imageInfo.imageView = image->GetVulkanImageView();
 
-		VkDescriptorImageInfo& imageDescriptorInfo = image.As<VulkanTextureCubeMap>()->GetVulkanDescriptorInfo();
+		auto imageCubeMap = image.As<VulkanTextureCubeMap>();
+		VkDescriptorImageInfo& imageDescriptorInfo = imageCubeMap->GetVulkanDescriptorInfo();
 
 		//if (shaderTextureType == ShaderTextureData::TextureType::Sampled)
 		//	imageInfo.sampler = image->GetVulkanSampler();
@@ -386,6 +387,8 @@ namespace Frost
 
 		if (shaderTextureType == ShaderTextureData::TextureType::Storage)
 			imageDescriptorInfo.sampler = nullptr;
+		else
+			imageDescriptorInfo.sampler = imageCubeMap->GetVulkanSampler();
 
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

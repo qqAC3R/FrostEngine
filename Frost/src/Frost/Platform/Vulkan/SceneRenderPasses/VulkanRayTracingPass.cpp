@@ -6,6 +6,7 @@
 #include "Frost/Platform/Vulkan/Buffers/VulkanIndexBuffer.h"
 #include "Frost/Platform/Vulkan/RayTracing/VulkanRayTracingPipeline.h"
 #include "Frost/Platform/Vulkan/RayTracing/VulkanShaderBindingTable.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanComputeRenderPass.h"
 #include "Frost/Math/Math.h"
 
 namespace Frost
@@ -34,6 +35,8 @@ namespace Frost
 		imageSpec.Usage = { TextureSpecs::UsageSpec::Storage };
 		imageSpec.Format = TextureSpecs::FormatSpec::RGBA16F;
 
+		auto cubeMapTexture = m_RenderPassPipeline->GetRenderPassData<VulkanComputeRenderPass>()->CubeMap;
+
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
 			m_Data.TopLevelAS[i] = TopLevelAccelertionStructure::Create();
@@ -47,6 +50,7 @@ namespace Frost
 
 			m_Data.Descriptor[i] = Material::Create(m_Data.Shader, "RayTracingDescriptor");
 			m_Data.Descriptor[i]->Set("u_Image", m_Data.DisplayTexture[i]);
+			m_Data.Descriptor[i]->Set("u_CubeMapSky", cubeMapTexture);
 			m_Data.Descriptor[i]->Set("VertexPointers", m_Data.SceneVertexData[i]);
 			m_Data.Descriptor[i]->Set("IndexPointers", m_Data.SceneIndexData[i]);
 			m_Data.Descriptor[i]->Set("TransformInstancePointers", m_Data.SceneTransformData[i]);
@@ -61,9 +65,6 @@ namespace Frost
 		createInfo.ShaderBindingTable = m_Data.SBT;
 		createInfo.Shader = m_Data.Shader;
 		m_Data.Pipeline = RayTracingPipeline::Create(createInfo);
-
-
-
 
 
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
@@ -119,6 +120,7 @@ namespace Frost
 				InstanceInfo instanceInfo{};
 				instanceInfo.Transform = mesh.Transform;
 				instanceInfo.InverseTransform = glm::inverse(mesh.Transform);
+				instanceInfo.Albedo = mesh.Mesh->GetMaterial().ambient;
 				instanceInfo.Emittance = mesh.Mesh->GetMaterial().emission;
 				instanceInfo.Roughness = mesh.Mesh->GetMaterial().roughness;
 				instanceInfo.RefractionIndex = mesh.Mesh->GetMaterial().ior;

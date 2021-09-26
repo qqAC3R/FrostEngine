@@ -79,7 +79,6 @@ void main()
 
     for(; rayPayLoad.bounces < 4; rayPayLoad.bounces++)
     {
-
         traceRayEXT(u_TopLevelAS,     // acceleration structure
                     rayFlags,       // rayFlags
                     0xFF,           // cullMask
@@ -97,7 +96,20 @@ void main()
         curWeight *= rayPayLoad.weight;
     }
     
-    imageStore(u_Image, ivec2(gl_LaunchIDEXT.xy), vec4(hitValue, 1.0));
+    // Do accumulation over time
+    //if(ps_Camera.rayAccumulation > 0)
+    if(false)
+    {
+        float a         = 1.0f / float(ps_Camera.rayAccumulation + 1);
+        vec3  old_color = imageLoad(u_Image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+        imageStore(u_Image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_color, hitValue, a), 1.0f));
+    }
+    else
+    {
+        // First frame, replace the value in the buffer
+        imageStore(u_Image, ivec2(gl_LaunchIDEXT.xy), vec4(hitValue, 1.0f));
+    }
+
 }
 
 #type miss
@@ -120,10 +132,12 @@ struct rayInfo
     vec3 color;
 };
 layout(location = 0) rayPayloadInEXT rayInfo rayPayLoad;
+layout(binding = 6, set = 0) uniform samplerCube u_CubeMapSky;
 
 void main()
 {
-    rayPayLoad.hitValue = vec3(0.9f);
+    vec3 color = texture(u_CubeMapSky, rayPayLoad.rayDirection).rgb;
+    rayPayLoad.hitValue = color;
     rayPayLoad.color = vec3(0.9f);
     rayPayLoad.bounces = 100;
 }
@@ -169,6 +183,7 @@ struct InstanceInfo
     mat4 Transform;
     mat4 InverseTransform;
 
+    vec3 Albedo;
     vec3 Emittance;
     float Roughness;
     float RefractionIndex;
@@ -394,61 +409,57 @@ void main()
 
 
 
-
     vec3 rayDirection = SamplingHemisphere(rayPayLoad.seed, tangent, bitangent, normal);
 
+    vec3 albedo = instanceInfo.Albedo;
+    vec3 emittance = instanceInfo.Emittance;
+    float refractionIndex = instanceInfo.RefractionIndex;
+    float roughness = instanceInfo.Roughness;
+
+    if(roughness < 1.0f)
+    {
+        vec3 reflectedVector = reflect(rayPayLoad.rayDirection, normal);
+        rayDirection = reflectedVector + (rayDirection * vec3(roughness));
+    }
+    if(refractionIndex > 1.0f)
+    {
+        rayDirection = Refract(normal, worldPos, rayDirection, refractionIndex);
+    }
+
+
+    //vec3 F0 = vec3(0.04); 
+    //F0 = mix(F0, albedo, metallic);
+
+
+    //vec3 lightPosition = vec3(20.0f, 10.0f, 10.0f);
+    //vec3 V = normalize(ps_Camera.cameraPosition - worldPos);
+
+    //vec3 L = normalize(lightPosition - worldPos);
+    //vec3 H = normalize(V + L);
+
+
+    //float NDF = DistributionGGX(normal, H, roughness);
+    //float G = GeometrySmith(normal, V, L, roughness);
+    //vec3 F = FresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
+
+    //vec3 numerator = NDF * G * F; 
+    //vec3 numerator = F; 
+    //float denominator = 4 * max(dot(normal, V), 0.0) * max(dot(normal, L), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
+    //float denominator = 4 * max(dot(normal, V), 0.0);
+    //vec3 specular = numerator / denominator;
+    
+    //vec3 kS = F;
+    //vec3 kD = vec3(1.0) - kS;
+    //kD *= 1.0 - metallic;
+    //float NdotL = max(dot(normal, L), 0.0);
+    
     // Probability of the newRay (cosine distributed)
   	const float p = 1 / M_PI;
 
 	// Compute the BRDF for this ray (assuming Lambertian reflection)
   	float cos_theta = dot(rayDirection, normal);
     
-
-    vec3 albedo = vec3(0.7f);
-
-    vec3 emittance = instanceInfo.Emittance;
-    float refractionIndex = instanceInfo.RefractionIndex;
-    float roughness = instanceInfo.Roughness;
-    float metallic = 0.5f;
-
-    if(refractionIndex > 1.0f)
-        rayDirection = Refract(normal, worldPos, rayDirection, refractionIndex);
-
-    if(roughness > 0.0f)
-    {
-        vec3 reflectedVector = reflect(rayPayLoad.rayDirection, normal);
-        //rayDirection = Reflect(normal, tangent, roughness);
-        rayDirection = reflectedVector;
-    }
-
-
-    vec3 F0 = vec3(0.04); 
-    F0 = mix(F0, albedo, metallic);
-
-
-    vec3 lightPosition = vec3(20.0f, 10.0f, 10.0f);
-    vec3 V = normalize(ps_Camera.cameraPosition - worldPos);
-
-    vec3 L = normalize(lightPosition - worldPos);
-    vec3 H = normalize(V + L);
-
-
-    float cookTorrance;
-    float NDF = DistributionGGX(normal, H, roughness);
-    float G = GeometrySmith(normal, V, L, roughness);
-    vec3 F = FresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
-
-    vec3 numerator = NDF * G * F; 
-    float denominator = 4 * max(dot(normal, V), 0.0) * max(dot(normal, L), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
-    vec3 specular = numerator / denominator;
-    
-    vec3 kS = F;
-    vec3 kD = vec3(1.0) - kS;
-    kD *= 1.0 - metallic;
-    float NdotL = max(dot(normal, L), 0.0);
-    
-
-    vec3 BRDF = (albedo / M_PI + specular);
+    vec3 BRDF = (albedo / M_PI);
 
     rayPayLoad.rayOrigin    = worldPos;
   	rayPayLoad.rayDirection = rayDirection;

@@ -298,7 +298,8 @@ namespace Frost
 			std::filesystem::path cachedPath = cacheDirectory / (shaderFilePath.filename().string() + Utils::ShaderStageCachedFileExtension(stage));
 
 			std::ifstream in(cachedPath, std::ios::in | std::ios::binary);
-			if (in.is_open())
+			//if (in.is_open())
+			if (false)
 			{
 				bool isChanged = IsFiledChanged();
 
