@@ -2,147 +2,344 @@
 #include "VulkanImage.h"
 
 #include "VulkanContext.h"
+#include "Frost/Platform/Vulkan/VulkanRenderer.h"
 
 namespace Frost
 {
-#if 0
+
+	VulkanImage2D::VulkanImage2D(const ImageSpecification& specification)
+		: m_ImageSpecification(specification), m_ImageLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+	{
+		VkFormat textureFormat = Utils::GetImageFormat(specification.Format);
+		VkImageUsageFlags usageFlags = Utils::GetImageUsageFlags(specification.Usage);
+		VkImageLayout newImageLayout = Utils::GetImageLayout(specification.Usage);
+
+		// Creating the image and allocating the needed buffer
+		// (for creation we use `VK_IMAGE_LAYOUT_UNDEFINED` layout, which will be later changed to the user's input")
+		Utils::CreateImage(specification.Width, specification.Height, 1, specification.Mips,
+			VK_IMAGE_TYPE_2D, textureFormat,
+			VK_IMAGE_TILING_OPTIMAL,
+			usageFlags | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, // Need the trasnfer src/dst bits for generating the mips
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, // GPU only
+			m_Image, m_ImageMemory);
+
+		// Recording a temporary commandbuffer for transitioning
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+
+		// Generating mip maps if the mip count is higher than 1, else just transition to user's input `VkImageLayout`
+		if (specification.Mips > 1)
+		{
+			TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+							 Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
+							 Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+			);
+
+			GenerateMipMaps(cmdBuf, newImageLayout);
+		}
+		else
+		{
+			TransitionLayout(cmdBuf, newImageLayout, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(newImageLayout));
+		}
+
+		// Ending the temporary commandbuffer for transitioning
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
+
+
+		// Creating the image view
+		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, specification.Mips, 1);
+
+		// Creating the sampler
+		VkFilter filtering = Utils::GetImageFiltering(specification.Sampler.SamplerFilter);
+		VkSamplerAddressMode addressMode = Utils::GetImageWrap(specification.Sampler.SamplerWrap);
+		Utils::CreateImageSampler(m_ImageSampler, filtering, addressMode, specification.Mips);
+
+		// Updating the descriptor
+		UpdateDescriptor();
+	}
+
+	VulkanImage2D::VulkanImage2D(const ImageSpecification& specification, const void* data)
+		: m_ImageSpecification(specification), m_ImageLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+	{
+		VkFormat textureFormat = Utils::GetImageFormat(specification.Format);
+		VkImageUsageFlags usageFlags = Utils::GetImageUsageFlags(specification.Usage);
+		VkImageLayout newImageLayout = Utils::GetImageLayout(specification.Usage);
+
+		uint32_t imageSize = Utils::CalculateImageBufferSize(specification.Width, specification.Height, specification.Format);
+
+		// Making a staging buffer to copy the data
+		VkBuffer stagingBuffer;
+		VulkanMemoryInfo stagingBufferMemory;
+		VulkanAllocator::AllocateBuffer(imageSize, { BufferType::TransferSrc }, MemoryUsage::CPU_AND_GPU, stagingBuffer, stagingBufferMemory);
+
+		// Copying the data
+		void* copyData;
+		VulkanAllocator::BindBuffer(stagingBuffer, stagingBufferMemory, &copyData);
+		memcpy(copyData, data, static_cast<size_t>(imageSize));
+		VulkanAllocator::UnbindBuffer(stagingBufferMemory);
+
+
+		// Creating the image and allocating the needed buffer
+		// (for creation we use `VK_IMAGE_LAYOUT_UNDEFINED` layout, which will be later changed to the user's input")
+		Utils::CreateImage(specification.Width, specification.Height, 1, specification.Mips,
+			VK_IMAGE_TYPE_2D, textureFormat,
+			VK_IMAGE_TILING_OPTIMAL,
+			usageFlags | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, // Need the trasnfer src/dst bits for generating the mips
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, // GPU only
+			m_Image, m_ImageMemory
+		);
+
+		// Recording a temporary commandbuffer for transitioning
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+
+
+		// Changing the layout for copying the staging buffer to the image
+		TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+						VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+		Utils::CopyBufferToImage(cmdBuf, stagingBuffer, m_Image, m_ImageSpecification.Width, m_ImageSpecification.Height, 1);
+
+
+		// Generating mip maps if the mip count is higher than 1, else just transition to user's input `VkImageLayout`
+		if (specification.Mips > 1)
+		{
+			//TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			//	Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
+			//	Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+			//);
+
+			GenerateMipMaps(cmdBuf, newImageLayout);
+		}
+		else
+		{
+			auto srcPipelineStageMask = Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+			auto dstPipelineStageMask = Utils::GetPipelineStageFlagsFromLayout(newImageLayout);
+			TransitionLayout(cmdBuf, newImageLayout, srcPipelineStageMask, dstPipelineStageMask);
+		}
+
+		// Ending the temporary commandbuffer for transitioning
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
+
+
+		// Creating the image view
+		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, specification.Mips, 1);
+
+		// Creating the sampler
+		VkFilter filtering = Utils::GetImageFiltering(specification.Sampler.SamplerFilter);
+		VkSamplerAddressMode addressMode = Utils::GetImageWrap(specification.Sampler.SamplerWrap);
+		Utils::CreateImageSampler(m_ImageSampler, filtering, addressMode, specification.Mips);
+
+		// Setting the debug names for the structs
+		VulkanContext::SetStructDebugName("Image2D-Image", VK_OBJECT_TYPE_IMAGE, m_Image);
+		VulkanContext::SetStructDebugName("Image2D-ImageView", VK_OBJECT_TYPE_IMAGE_VIEW, m_ImageView);
+		VulkanContext::SetStructDebugName("Image2D-Sampler", VK_OBJECT_TYPE_SAMPLER, m_ImageSampler);
+
+		// Updating the descriptor
+		UpdateDescriptor();
+	}
+
+	VulkanImage2D::~VulkanImage2D()
+	{
+	}
+
+	void VulkanImage2D::Destroy()
+	{
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		VulkanAllocator::DestroyImage(m_Image, m_ImageMemory);
+		vkDestroyImageView(device, m_ImageView, nullptr);
+		vkDestroySampler(device, m_ImageSampler, nullptr);
+	}
+
+	void VulkanImage2D::TransitionLayout(VkCommandBuffer cmdBuf, VkImageLayout newImageLayout,
+										  VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
+	{
+		VkImageAspectFlags imageAspectFlags;
+		if (m_ImageSpecification.Format == ImageFormat::Depth24Stencil8 || m_ImageSpecification.Format == ImageFormat::Depth32)
+			imageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
+		else
+			imageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
+
+		VkImageSubresourceRange subresourceRange{};
+		subresourceRange.aspectMask = imageAspectFlags;
+		subresourceRange.baseMipLevel = 0;
+		subresourceRange.levelCount = m_ImageSpecification.Mips;
+		subresourceRange.layerCount = 1; // TODO: For cubemaps is 6
+		Utils::SetImageLayout(cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
+
+		m_ImageLayout = newImageLayout;
+	}
+
+	void VulkanImage2D::GenerateMipMaps(VkCommandBuffer cmdBuffer, VkImageLayout newImageLayout)
+	{
+		int32_t mipWidth = m_ImageSpecification.Width;
+		int32_t mipHeight = m_ImageSpecification.Height;
+
+		VkImageSubresourceRange subresourceRange{};
+		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		subresourceRange.baseArrayLayer = 0;
+		subresourceRange.layerCount = 1;
+		subresourceRange.levelCount = 1;
+
+		for (uint32_t i = 1; i < m_ImageSpecification.Mips; i++)
+		{
+			subresourceRange.baseMipLevel = i - 1;
+
+			Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
+				Utils::GetAccessFlagsFromLayout(m_ImageLayout), Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+				m_ImageLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout), Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+				subresourceRange
+			);
+
+
+			VkImageBlit blit{};
+			blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.srcOffsets[0] = { 0, 0, 0 };
+			blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+			blit.srcSubresource.mipLevel = i - 1;
+			blit.srcSubresource.baseArrayLayer = 0;
+			blit.srcSubresource.layerCount = 1;
+
+			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.dstOffsets[0] = { 0, 0, 0 };
+			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+			blit.dstSubresource.mipLevel = i;
+			blit.dstSubresource.baseArrayLayer = 0;
+			blit.dstSubresource.layerCount = 1;
+
+			vkCmdBlitImage(cmdBuffer,
+				m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				1, &blit,
+				VK_FILTER_LINEAR
+			);
+
+			Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
+				Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL), Utils::GetAccessFlagsFromLayout(newImageLayout),
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, newImageLayout,
+				Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL), Utils::GetPipelineStageFlagsFromLayout(newImageLayout),
+				subresourceRange
+			);
+
+			if (mipWidth > 1) mipWidth /= 2;
+			if (mipHeight > 1) mipHeight /= 2;
+		}
+
+		subresourceRange.baseMipLevel = m_ImageSpecification.Mips - 1;
+
+		Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
+			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), Utils::GetAccessFlagsFromLayout(newImageLayout),
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, newImageLayout,
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), Utils::GetPipelineStageFlagsFromLayout(newImageLayout),
+			subresourceRange
+		);
+
+		m_ImageLayout = newImageLayout;
+	}
+
+	void VulkanImage2D::UpdateDescriptor()
+	{
+		m_DescriptorInfo[DescriptorImageType::Sampled].imageView = m_ImageView;
+		m_DescriptorInfo[DescriptorImageType::Sampled].imageLayout = m_ImageLayout;
+		m_DescriptorInfo[DescriptorImageType::Sampled].sampler = m_ImageSampler;
+
+		m_DescriptorInfo[DescriptorImageType::Storage].imageView = m_ImageView;
+		m_DescriptorInfo[DescriptorImageType::Storage].imageLayout = m_ImageLayout;
+		m_DescriptorInfo[DescriptorImageType::Storage].sampler = nullptr;
+	}
+
 	namespace Utils
 	{
-		static void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels,
-								VkFormat format, VkImageType type, VkImageTiling tiling,
-								VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-								VkImage& image, VulkanMemoryInfo& imageMemory)
-		{
 
+		void CreateImage(uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels,
+						 VkImageType type, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
+						 VkMemoryPropertyFlags properties,
+						 VkImage& image, VulkanMemoryInfo& imageMemory)
+		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-			VkImageCreateInfo imageInfo{};
-			imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+			VkImageCreateInfo imageInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 			imageInfo.imageType = type;
 			imageInfo.extent.width = width;
 			imageInfo.extent.height = height;
-			imageInfo.extent.depth = 1;
+			imageInfo.extent.depth = 1; //TODO: Take in another parameter (for 3D textures?)
 			imageInfo.mipLevels = mipLevels;
-			imageInfo.arrayLayers = 1;
+			imageInfo.arrayLayers = depth;
 			imageInfo.format = format;
 			imageInfo.tiling = tiling;
 			imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			imageInfo.usage = usage;
 			imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 			imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			imageInfo.flags = depth == 6 ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0; // If the image has 6 faces, then it is a cubemap
 
-			FROST_VKCHECK(vkCreateImage(device, &imageInfo, nullptr, &image), "Failed to create image!");
-
-			VkMemoryRequirements memRequirements;
-			vkGetImageMemoryRequirements(device, image, &memRequirements);
-
-			VkMemoryAllocateInfo allocInfo{};
-			allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-			allocInfo.allocationSize = memRequirements.size;
-			allocInfo.memoryTypeIndex = VulkanBufferAllocator::FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-
-			VulkanBufferAllocator::CreateMemoryForImage(image, imageMemory);
+			VulkanAllocator::AllocateImage(imageInfo, MemoryUsage::GPU_ONLY, image, imageMemory);
 		}
 
-		static void ChangeImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VkImage& image)
-		{
-			VulkanCommandPool cmdPool;
-			auto cmdBuf = VulkanCommandBuffer::BeginSingleTimeCommands(cmdPool);
-
-			VkImageMemoryBarrier barrier{};
-			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			barrier.oldLayout = oldLayout;
-			barrier.newLayout = newLayout;
-			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.image = image;
-			barrier.subresourceRange.baseMipLevel = 0;
-			barrier.subresourceRange.levelCount = mipLevels;
-			barrier.subresourceRange.baseArrayLayer = 0;
-			barrier.subresourceRange.layerCount = 1;
-			barrier.subresourceRange.aspectMask = format == VK_FORMAT_D32_SFLOAT ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-			barrier.srcAccessMask = AccessFlagsToImageLayout(oldLayout);
-			barrier.dstAccessMask = AccessFlagsToImageLayout(newLayout);
-
-			VkPipelineStageFlags sourceStage = PipelineStageForLayout(oldLayout);
-			VkPipelineStageFlags destinationStage = PipelineStageForLayout(newLayout);
-			vkCmdPipelineBarrier(
-				cmdBuf.GetCommandBuffer(),
-				sourceStage, destinationStage,
-				0,
-				0, nullptr,
-				0, nullptr,
-				1, &barrier
-			);
-
-			VulkanCommandBuffer::EndSingleTimeCommands(cmdBuf);
-
-			cmdPool.Destroy();
-		}
-
-		static void CreateImageView(VkImageView& imageView, VkImage& image, VkFormat format, uint32_t mipLevels)
+		void CreateImageView(VkImageView& imageView, VkImage image, VkImageUsageFlags imageUsage, VkFormat format, uint32_t mipLevels, uint32_t textureDepth)
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-			VkImageViewUsageCreateInfo usageInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO };
-			usageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
 			VkImageViewCreateInfo createInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-			createInfo.pNext = nullptr;
 			createInfo.image = image;
 			createInfo.format = format;
-			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			createInfo.viewType = textureDepth == 6 ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
+
 			createInfo.subresourceRange.baseMipLevel = 0;
 			createInfo.subresourceRange.levelCount = mipLevels;
 			createInfo.subresourceRange.baseArrayLayer = 0;
-			createInfo.subresourceRange.layerCount = 1;
-			createInfo.subresourceRange.aspectMask = format == VK_FORMAT_D32_SFLOAT ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+			createInfo.subresourceRange.layerCount = textureDepth;
+			switch (format)
+			{
+			case VK_FORMAT_D32_SFLOAT:
+			case VK_FORMAT_D24_UNORM_S8_UINT:
+				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; break;
+			default:
+				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			}
 
-			FROST_VKCHECK(vkCreateImageView(device, &createInfo, nullptr, &imageView), "Failed to create texture image view!");
+			FROST_VKCHECK(vkCreateImageView(device, &createInfo, nullptr, &imageView));
 		}
 
-		static void CreateImageSampler(VkFilter filtering, uint32_t mipLevels, VkSampler& sampler)
+		void CreateImageSampler(VkSampler& sampler, VkFilter filtering, VkSamplerAddressMode samplerAdressMode, uint32_t mipLevels)
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 			VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
 
-
-			VkSamplerCreateInfo samplerInfo{};
-			samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			samplerInfo.magFilter = filtering;
-			samplerInfo.minFilter = filtering;
-			samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			samplerInfo.anisotropyEnable = VK_FALSE;
-			samplerInfo.maxAnisotropy = 1.0f;
-
-			VkPhysicalDeviceProperties properties{};
+			VkPhysicalDeviceProperties properties;
 			vkGetPhysicalDeviceProperties(physicalDevice, &properties);
 
+			VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+			samplerInfo.magFilter = filtering;
+			samplerInfo.minFilter = filtering;
+			
+			samplerInfo.addressModeU = samplerAdressMode;
+			samplerInfo.addressModeV = samplerAdressMode;
+			samplerInfo.addressModeW = samplerAdressMode;
+
+			samplerInfo.anisotropyEnable = VK_TRUE;
 			samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
 			samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 			samplerInfo.unnormalizedCoordinates = VK_FALSE;
 			samplerInfo.compareEnable = VK_FALSE;
-			samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+			samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
 
 			samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 			samplerInfo.mipLodBias = 0.0f;
 			samplerInfo.minLod = 0.0f;
 			samplerInfo.maxLod = static_cast<float>(mipLevels);
 
-			if (vkCreateSampler(device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS)
-			{
-				FROST_ASSERT(0, "Failed to create texture sampler!");
-			}
+			FROST_VKCHECK(vkCreateSampler(device, &samplerInfo, nullptr, &sampler));
 		}
 
-		static void CopyBufferToImage(const VkBuffer& buffer, VkImage& image, uint32_t width, uint32_t height)
+#if 0
+		void ChangeImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t depthMap, uint32_t mipLevels)
 		{
-			VulkanCommandPool cmdPool;
-			auto cmdBuf = VulkanCommandBuffer::BeginSingleTimeCommands(cmdPool);
+			VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
 
+		}
+#endif
+
+		void CopyBufferToImage(VkCommandBuffer cmdBuf, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t depth)
+		{
 			VkBufferImageCopy region{};
 			region.bufferOffset = 0;
 			region.bufferRowLength = 0;
@@ -150,249 +347,119 @@ namespace Frost
 
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			region.imageSubresource.mipLevel = 0;
-			region.imageSubresource.baseArrayLayer = 0;
 			region.imageSubresource.layerCount = 1;
+			region.imageSubresource.baseArrayLayer = 0;
 
 			region.imageOffset = { 0, 0, 0 };
 			region.imageExtent = {
 				width,
 				height,
-				1
+				depth
 			};
 
-			vkCmdCopyBufferToImage(
-				cmdBuf.GetCommandBuffer(),
-				buffer,
-				image,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				1,
-				&region
-			);
-
-			VulkanCommandBuffer::EndSingleTimeCommands(cmdBuf);
-
-			cmdPool.Destroy();
+			vkCmdCopyBufferToImage(cmdBuf, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 		}
 
-		static void GenerateMipMaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels)
+
+		VkFormat GetImageFormat(ImageFormat imageFormat)
 		{
-			VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
-
-			// Check if image format supports linear blitting
-			VkFormatProperties formatProperties;
-			vkGetPhysicalDeviceFormatProperties(physicalDevice, imageFormat, &formatProperties);
-
-			if (!(formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
-				FROST_ASSERT(false, "Linear blitting not supported!");
-
-
-
-			VulkanCommandPool cmdPool;
-			auto cmdBuf = VulkanCommandBuffer::BeginSingleTimeCommands(cmdPool);
-			auto vkCmdBuf = cmdBuf.GetCommandBuffer();
-
-			VkImageMemoryBarrier barrier{};
-			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			barrier.image = image;
-			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			barrier.subresourceRange.baseArrayLayer = 0;
-			barrier.subresourceRange.layerCount = 1;
-			barrier.subresourceRange.levelCount = 1;
-
-
-
-			int32_t mipWidth = texWidth;
-			int32_t mipHeight = texHeight;
-
-			for (uint32_t i = 1; i < mipLevels; i++)
+			switch (imageFormat)
 			{
-				barrier.subresourceRange.baseMipLevel = i - 1;
-				barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-				barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-				barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-				barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-				vkCmdPipelineBarrier(vkCmdBuf,
-					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-					0, nullptr,
-					0, nullptr,
-					1, &barrier);
-
-				VkImageBlit blit{};
-				blit.srcOffsets[0] = { 0, 0, 0 };
-				blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
-				blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				blit.srcSubresource.mipLevel = i - 1;
-				blit.srcSubresource.baseArrayLayer = 0;
-				blit.srcSubresource.layerCount = 1;
-				blit.dstOffsets[0] = { 0, 0, 0 };
-				blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
-				blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				blit.dstSubresource.mipLevel = i;
-				blit.dstSubresource.baseArrayLayer = 0;
-				blit.dstSubresource.layerCount = 1;
-
-				vkCmdBlitImage(vkCmdBuf,
-					image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-					image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					1, &blit,
-					VK_FILTER_LINEAR);
-
-				barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-				barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-				vkCmdPipelineBarrier(vkCmdBuf,
-					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-					0, nullptr,
-					0, nullptr,
-					1, &barrier);
-
-				if (mipWidth > 1) mipWidth /= 2;
-				if (mipHeight > 1) mipHeight /= 2;
-
+				case ImageFormat::RGBA8:            return VK_FORMAT_R8G8B8A8_UNORM;
+				case ImageFormat::RGBA16F:          return VK_FORMAT_R16G16B16A16_SFLOAT;
+				case ImageFormat::RGBA32F:          return VK_FORMAT_R32G32B32A32_SFLOAT;
+				case ImageFormat::Depth24Stencil8:  return VK_FORMAT_D24_UNORM_S8_UINT;
+				case ImageFormat::Depth32:          return VK_FORMAT_D32_SFLOAT;
+				case ImageFormat::None:             FROST_ASSERT_MSG("ImageFormat::None is invalid!");
 			}
-
-			barrier.subresourceRange.baseMipLevel = mipLevels - 1;
-			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-			barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-			vkCmdPipelineBarrier(vkCmdBuf,
-				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-				0, nullptr,
-				0, nullptr,
-				1, &barrier);
-
-			VulkanCommandBuffer::EndSingleTimeCommands(cmdBuf);
-
-			cmdPool.Destroy();
+			return VkFormat();
 		}
 
+		VkFilter GetImageFiltering(ImageFilter imageFiltering)
+		{
+			switch (imageFiltering)
+			{
+				case ImageFilter::Linear:   return VK_FILTER_LINEAR;
+				case ImageFilter::Nearest:  return VK_FILTER_NEAREST;
+			}
+			FROST_ASSERT_MSG("ImageFilter is invalid!");
+			return VkFilter();
+		}
+
+		VkSamplerAddressMode GetImageWrap(ImageWrap imageWrap)
+		{
+			switch (imageWrap)
+			{
+				case ImageWrap::Repeat: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			}
+			FROST_ASSERT_MSG("ImageWrap is invalid!");
+			return VkSamplerAddressMode();
+		}
+
+		VkImageUsageFlags GetImageUsageFlags(ImageUsage imageUsage)
+		{
+			switch (imageUsage)
+			{
+				case ImageUsage::Storage:       return VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+													   VK_IMAGE_USAGE_SAMPLED_BIT;
+				case ImageUsage::Attachment:    return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+				case ImageUsage::DepthStencil:  return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+				case ImageUsage::None:          FROST_ASSERT_MSG("ImageUsage::None is invalid!");
+			}
+			return VkImageUsageFlags();
+		}
+
+		VkImageLayout GetImageLayout(ImageUsage imageUsage)
+		{
+			switch (imageUsage)
+			{
+				case ImageUsage::Storage:       return VK_IMAGE_LAYOUT_GENERAL;
+				case ImageUsage::Attachment:    return VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
+				case ImageUsage::DepthStencil:  return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
+				case ImageUsage::None:          FROST_ASSERT_MSG("ImageUsage::None is invalid!");
+			}
+			return VkImageLayout();
+		}
+
+		VkAccessFlags GetAccessFlagsFromLayout(VkImageLayout imageLayout)
+		{
+			switch (imageLayout)
+			{
+				case VK_IMAGE_LAYOUT_PREINITIALIZED:                   return VK_ACCESS_HOST_WRITE_BIT;
+				case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:             return VK_ACCESS_TRANSFER_WRITE_BIT;
+				case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:             return VK_ACCESS_TRANSFER_READ_BIT;
+				case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:         return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL: return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:         return VK_ACCESS_SHADER_READ_BIT;
+			}
+			return VK_ACCESS_NONE_KHR;
+		}
+
+		VkPipelineStageFlags GetPipelineStageFlagsFromLayout(VkImageLayout imageLayout)
+		{
+			switch (imageLayout)
+			{
+				case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+				case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:             return VK_PIPELINE_STAGE_TRANSFER_BIT;
+				case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:         return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL: return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+				case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:         return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				case VK_IMAGE_LAYOUT_PREINITIALIZED:                   return VK_PIPELINE_STAGE_HOST_BIT;
+				case VK_IMAGE_LAYOUT_UNDEFINED:                        return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			}
+			return VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+		}
+
+		VkDeviceSize CalculateImageBufferSize(uint32_t width, uint32_t height, ImageFormat imageFormat)
+		{
+			switch (imageFormat)
+			{
+				case ImageFormat::RGBA8:     return width * height * sizeof(float);
+				case ImageFormat::RGBA16F:   return width * height * sizeof(float) * 2;
+				case ImageFormat::RGBA32F:   return width * height * sizeof(float) * 4;
+				case ImageFormat::None:      FROST_ASSERT_MSG("ImageFormat::None is invalid!");
+			}
+			return 0;
+		}
 	}
-
-	VulkanImage2DD::VulkanImage2DD(ImageSpecification specification)
-	{
-		// Getting the texture format
-		VkFormat textureFormat = Utils::GetVulkanImageFormat(m_ImageSpecification.Format);
-
-		// Getting the usage flags
-		VkImageUsageFlags imageUsageFlags{};
-		if (m_ImageSpecification.Usage == ImageUsage::Texture)
-			imageUsageFlags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-		else if (m_ImageSpecification.Usage == ImageUsage::Storage)
-			imageUsageFlags |= VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
-		else if (m_ImageSpecification.Usage == ImageUsage::Attachment)
-			imageUsageFlags |= VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-		// Creating the image
-		Utils::CreateImage(m_ImageSpecification.Width, m_ImageSpecification.Height, m_ImageSpecification.Mips,
-			textureFormat, VK_IMAGE_TYPE_2D,
-			VK_IMAGE_TILING_OPTIMAL,
-			imageUsageFlags,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			m_Image, m_ImageMemory);
-
-		// Chaning its layout from UNDEFINED to the one specified
-		VkImageLayout imageLayout = Utils::GetVulkanImageLayout(m_ImageSpecification.Usage);
-		Utils::ChangeImageLayout(textureFormat, VK_IMAGE_LAYOUT_UNDEFINED, imageLayout, 1, m_Image);
-
-		// Creating the imageview
-		Utils::CreateImageView(m_ImageView, m_Image, textureFormat, m_ImageSpecification.Mips);
-
-
-		// Creating the sampler
-		VkFilter filtering = Utils::GetVulkanSamplerFiltering(m_ImageSpecification.Sampler.SamplerFilter);
-		Utils::CreateImageSampler(filtering, 1, m_Sampler);
-
-		VulkanContext::SetStructDebugName("Image2D-Image", VK_OBJECT_TYPE_IMAGE, m_Image);
-		VulkanContext::SetStructDebugName("Image2D-ImageView", VK_OBJECT_TYPE_IMAGE_VIEW, m_ImageView);
-		VulkanContext::SetStructDebugName("Image2D-Sampler", VK_OBJECT_TYPE_SAMPLER, m_Sampler);
-
-	}
-
-	VulkanImage2DD::VulkanImage2DD(ImageSpecification specification, const void* data)
-		: m_ImageSpecification(specification)
-	{
-		// Calculating the size of the buffer and the number of mip levels needed
-		VkDeviceSize imageSize = m_ImageSpecification.Width * m_ImageSpecification.Height * 4;
-		int mipLevels = specification.Mips;
-		//int mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(m_ImageSpecification.Width, m_ImageSpecification.Height)))) + 1;
-
-
-		// Making a staging buffer to copy the data
-		VkBuffer stagingBuffer;
-		VulkanMemoryInfo stagingBufferMemory;
-		VulkanBufferAllocator::CreateBuffer(imageSize,
-			{ BufferType::TransferSrc },
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			stagingBuffer, stagingBufferMemory);
-
-		// Copying the data
-		void* temporaryData;
-		VulkanBufferAllocator::BindBuffer(stagingBuffer, stagingBufferMemory, &temporaryData);
-		memcpy(temporaryData, data, static_cast<size_t>(imageSize));
-		VulkanBufferAllocator::UnbindBuffer(stagingBufferMemory);
-
-
-
-
-
-		// Creation of the image
-		VkFormat TextureFromat = Utils::GetVulkanImageFormat(m_ImageSpecification.Format);
-		Utils::CreateImage(m_ImageSpecification.Width, m_ImageSpecification.Height, mipLevels, TextureFromat, VK_IMAGE_TYPE_2D,
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			m_Image, m_ImageMemory);
-
-
-		// Changing the layout for copying the staging buffer to the iamge
-		Utils::ChangeImageLayout(TextureFromat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels, m_Image);
-		Utils::CopyBufferToImage(stagingBuffer, m_Image, static_cast<uint32_t>(m_ImageSpecification.Width), static_cast<uint32_t>(m_ImageSpecification.Height));
-
-		// Generating mip maps if necessary and changing the layout to SHADER_READ_ONLY_OPTIMAL
-		Utils::GenerateMipMaps(m_Image, TextureFromat, m_ImageSpecification.Width, m_ImageSpecification.Width, mipLevels);
-
-		// Creating the ImageView
-		Utils::CreateImageView(m_ImageView, m_Image, TextureFromat, mipLevels);
-		m_ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-		// Creating the sampler
-		VkFilter filtering = Utils::GetVulkanSamplerFiltering(m_ImageSpecification.Sampler.SamplerFilter);
-		Utils::CreateImageSampler(filtering, mipLevels, m_Sampler);
-
-
-		// Clean up the staging buffer and the stbi_image
-		VulkanBufferAllocator::DeleteBuffer(stagingBuffer, stagingBufferMemory);
-
-
-		VulkanContext::SetStructDebugName("Image2D-Image", VK_OBJECT_TYPE_IMAGE, m_Image);
-		VulkanContext::SetStructDebugName("Image2D-ImageView", VK_OBJECT_TYPE_IMAGE_VIEW, m_ImageView);
-		VulkanContext::SetStructDebugName("Image2D-Sampler", VK_OBJECT_TYPE_SAMPLER, m_Sampler);
-
-	}
-
-	VulkanImage2DD::~VulkanImage2DD()
-	{
-
-	}
-
-	void VulkanImage2DD::Invalidate()
-	{
-		
-	}
-
-	void VulkanImage2DD::Destroy()
-	{
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-		vkDestroyImageView(device, m_ImageView, nullptr);
-		vkDestroySampler(device, m_Sampler, nullptr);
-		VulkanBufferAllocator::DestroyImage(m_Image, m_ImageMemory);
-	}
-#endif
 }

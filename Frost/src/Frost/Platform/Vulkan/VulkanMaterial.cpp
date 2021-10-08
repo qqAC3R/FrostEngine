@@ -4,6 +4,7 @@
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanShader.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
+#include "Frost/Platform/Vulkan/VulkanImage.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBuffer.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanUniformBuffer.h"
 #include "Frost/Platform/Vulkan/RayTracing/VulkanAccelerationStructure.h"
@@ -297,18 +298,16 @@ namespace Frost
 		if (m_MaterialData[name].Type != DataPointer::DataType::TEXTURE) FROST_ASSERT(false, "Wrong data type!");
 		m_MaterialData[name].Pointer = texture.As<void*>();
 
-		//VkDescriptorImageInfo& imageInfo = ImageInfos.emplace_back();
-		//imageInfo.imageLayout = texture->GetVulkanImageLayout();
-		//imageInfo.imageView = texture->GetVulkanImageView();
-		//imageInfo.sampler = texture->GetVulkanSampler();
-		VkDescriptorImageInfo& imageDescriptorInfo = texture.As<VulkanTexture2D>()->GetVulkanDescriptorInfo();
+
+		Ref<VulkanTexture2D> vulkanImage2d = texture.As<VulkanTexture2D>();
+		VkDescriptorImageInfo* imageDescriptorInfo = &vulkanImage2d->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
 
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writeDescriptorSet.dstBinding = location.second;
 		writeDescriptorSet.dstArrayElement = 0;
 		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
+		writeDescriptorSet.pImageInfo = imageDescriptorInfo;
 		writeDescriptorSet.descriptorCount = 1;
 
 		writeDescriptorSet.dstSet = m_DescriptorSets[location.first];
@@ -330,19 +329,14 @@ namespace Frost
 		m_MaterialData[name].Pointer = image.As<void*>();
 
 
-		//VkDescriptorImageInfo& imageInfo = ImageInfos.emplace_back();
-		//imageInfo.imageLayout = image->GetVulkanImageLayout();
-		//imageInfo.imageView = image->GetVulkanImageView();
+		Ref<VulkanImage2D> vulkanImage2d = image.As<VulkanImage2D>();
+		VkDescriptorImageInfo* imageDescriptorInfo;
 
-		VkDescriptorImageInfo& imageDescriptorInfo = image.As<VulkanImage2D>()->GetVulkanDescriptorInfo();
-
-		//if (shaderTextureType == ShaderTextureData::TextureType::Sampled)
-		//	imageDescriptorInfo.sampler = image->GetVulkanSampler();
-		//else if (shaderTextureType == ShaderTextureData::TextureType::Storage)
-		//	imageInfo.sampler = nullptr;
 		if (shaderTextureType == ShaderTextureData::TextureType::Storage)
-			imageDescriptorInfo.sampler = nullptr;
-
+			imageDescriptorInfo = &vulkanImage2d->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
+		else
+			imageDescriptorInfo = &vulkanImage2d->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
+		
 
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -351,7 +345,7 @@ namespace Frost
 		writeDescriptorSet.descriptorType = shaderTextureType == ShaderTextureData::TextureType::Storage ?
 											VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-		writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
+		writeDescriptorSet.pImageInfo = imageDescriptorInfo;
 		writeDescriptorSet.descriptorCount = 1;
 
 		writeDescriptorSet.dstSet = m_DescriptorSets[location.first];
@@ -378,17 +372,12 @@ namespace Frost
 		//imageInfo.imageView = image->GetVulkanImageView();
 
 		auto imageCubeMap = image.As<VulkanTextureCubeMap>();
-		VkDescriptorImageInfo& imageDescriptorInfo = imageCubeMap->GetVulkanDescriptorInfo();
-
-		//if (shaderTextureType == ShaderTextureData::TextureType::Sampled)
-		//	imageInfo.sampler = image->GetVulkanSampler();
-		//else if (shaderTextureType == ShaderTextureData::TextureType::Storage)
-		//	imageInfo.sampler = nullptr;
+		VkDescriptorImageInfo* imageDescriptorInfo;
 
 		if (shaderTextureType == ShaderTextureData::TextureType::Storage)
-			imageDescriptorInfo.sampler = nullptr;
+			imageDescriptorInfo = &imageCubeMap->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
 		else
-			imageDescriptorInfo.sampler = imageCubeMap->GetVulkanSampler();
+			imageDescriptorInfo = &imageCubeMap->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
 
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -397,7 +386,7 @@ namespace Frost
 		writeDescriptorSet.descriptorType = shaderTextureType == ShaderTextureData::TextureType::Storage ?
 			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-		writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
+		writeDescriptorSet.pImageInfo = imageDescriptorInfo;
 		writeDescriptorSet.descriptorCount = 1;
 
 		writeDescriptorSet.dstSet = m_DescriptorSets[location.first];

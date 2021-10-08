@@ -14,8 +14,15 @@
 	#endif
 #endif
 
-
-#define FROST_ASSERT(x, ...) { if(!x) { FROST_CORE_ERROR(__VA_ARGS__); __debugbreak(); } }
+#ifdef FROST_DEBUG
+	#define FROST_ASSERT(x, ...) { if(!x) { FROST_CORE_ERROR(__VA_ARGS__); __debugbreak(); } }
+	#define FROST_ASSERT_MSG(...) { FROST_CORE_ERROR(__VA_ARGS__); __debugbreak(); }
+	#define FROST_ASSERT_INTERNAL(x) { if(!x) { __debugbreak(); } }
+#else
+	#define FROST_ASSERT(x, ...)
+	#define FROST_ASSERT_MSG(...)
+	#define FROST_ASSERT_INTERNAL(x)
+#endif
 
 #define BIT(x) (1 << x)
 #define FROST_BIND_EVENT_FN(fn) std::bind(&fn, this, std::placeholders::_1)
@@ -43,5 +50,4 @@ namespace Frost
 	using HashMap = std::unordered_map<T1, T2>;
 
 	using Byte = uint8_t;
-
 }

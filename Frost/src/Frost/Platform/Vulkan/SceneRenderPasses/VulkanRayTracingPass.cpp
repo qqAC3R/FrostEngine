@@ -29,11 +29,11 @@ namespace Frost
 
 		m_Data.Shader = Shader::Create("assets/shader/path_tracer_demo.glsl");
 
-		TextureSpecs imageSpec{};
+		ImageSpecification imageSpec{};
 		imageSpec.Width = 1600;
 		imageSpec.Height = 900;
-		imageSpec.Usage = { TextureSpecs::UsageSpec::Storage };
-		imageSpec.Format = TextureSpecs::FormatSpec::RGBA16F;
+		imageSpec.Usage = ImageUsage::Storage;
+		imageSpec.Format = ImageFormat::RGBA16F;
 
 		auto cubeMapTexture = m_RenderPassPipeline->GetRenderPassData<VulkanComputeRenderPass>()->CubeMap;
 
@@ -69,6 +69,8 @@ namespace Frost
 
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 			s_UpdateTLAS[i] = true;
+
+		
 
 	}
 
@@ -183,11 +185,11 @@ namespace Frost
 
 	void VulkanRayTracingPass::OnResize(uint32_t width, uint32_t height)
 	{
-		TextureSpecs imageSpec{};
+		ImageSpecification imageSpec{};
 		imageSpec.Width = width;
 		imageSpec.Height = height;
-		imageSpec.Usage = { TextureSpecs::UsageSpec::Storage };
-		imageSpec.Format = TextureSpecs::FormatSpec::RGBA16F;
+		imageSpec.Usage = ImageUsage::Storage;
+		imageSpec.Format = ImageFormat::RGBA16F;
 
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{

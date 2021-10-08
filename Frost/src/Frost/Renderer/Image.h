@@ -8,57 +8,41 @@ namespace Frost
 		None = 0,
 
 		// Color
-		RGBA8, RGBA16F,
+		RGBA8, RGBA16F, RGBA32F,
 
 		// Depth/Stencil
-		DEPTH32
+		Depth24Stencil8, Depth32
 	};
 
 	enum class ImageUsage
 	{
 		None = 0,
-		Texture, // VK_GENERAL
-		Attachment, // VK_ATTACHEMNT
-		Storage, // VK_STORAGE
-		DepthStencil // VK_STORAGE
+		Storage,
+		Attachment,
+		DepthStencil
 	};
 
-	enum class ShaderUsage
-	{
-		None = 0,
-
-		// Rasterization
-		Fragment,
-
-		// Compute
-		Compute,
-
-		// Ray Tracing
-		RayGen, AnyHit, ClosestHit, Miss, Intersection
-	};
-
-	enum class TextureFilter
+	enum class ImageFilter
 	{
 		Linear, Nearest
 	};
 
-	enum class TextureWrap
+	enum class ImageWrap
 	{
 		Repeat
 	};
 
 	struct SamplerProperties
 	{
-		TextureWrap SamplerWrap = TextureWrap::Repeat;
-		TextureFilter SamplerFilter = TextureFilter::Linear;
+		ImageWrap SamplerWrap = ImageWrap::Repeat;
+		ImageFilter SamplerFilter = ImageFilter::Linear;
 	};
 
 	struct ImageSpecification
 	{
 		ImageFormat Format = ImageFormat::RGBA8;
-		ImageUsage Usage = ImageUsage::Texture;
+		ImageUsage Usage = ImageUsage::Storage;
 		SamplerProperties Sampler{};
-		Vector<ShaderUsage> ShaderUsage;
 		uint32_t Width = 0;
 		uint32_t Height = 0;
 		uint32_t Mips = 1;
@@ -69,7 +53,6 @@ namespace Frost
 	public:
 		virtual ~Image() {}
 
-		virtual void Invalidate() = 0;
 		virtual void Destroy() = 0;
 
 		virtual uint32_t GetWidth() const = 0;
@@ -79,11 +62,11 @@ namespace Frost
 		virtual const ImageSpecification& GetSpecification() const = 0;
 	};
 
-	class Image2DD : public Image
+	class Image2D : public Image
 	{
 	public:
-		static Ref<Image2DD> Create(ImageSpecification specification);
-		static Ref<Image2DD> Create(ImageSpecification specification, const void* data = nullptr);
+		static Ref<Image2D> Create(const ImageSpecification& specification);
+		static Ref<Image2D> Create(const ImageSpecification& specification, const void* data);
 	};
 
 }

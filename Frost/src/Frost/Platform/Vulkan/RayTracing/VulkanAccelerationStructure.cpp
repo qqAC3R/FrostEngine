@@ -425,7 +425,7 @@ namespace Frost
 		VkBuffer scratchBuffer;
 		VulkanMemoryInfo scratchMemoryBuffer;
 		VulkanAllocator::AllocateBuffer(sizeInfo.buildScratchSize,
-											{ BufferType::ShaderAddress, BufferType::AccelerationStructure },
+											{ BufferType::ShaderAddress, BufferType::AccelerationStructure, BufferType::Storage },
 											MemoryUsage::GPU_ONLY,
 											scratchBuffer, scratchMemoryBuffer);
 		

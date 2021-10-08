@@ -5,7 +5,6 @@
 #include "Frost/Renderer/Renderer.h"
 
 #include "Frost/Renderer/Pipeline.h"
-#include "Frost/Renderer/ShaderLibrary.h"
 #include "Frost/Renderer/SceneRenderPass.h"
 #include "Frost/Renderer/Buffers/UniformBuffer.h"
 
@@ -17,6 +16,8 @@
 
 #include <imgui.h>
 #include <backends/imgui_impl_vulkan.h>
+
+#include "Frost/Platform/Vulkan/VulkanImage.h"
 
 namespace Frost
 {
@@ -81,7 +82,6 @@ namespace Frost
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputeRenderPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
-
 
 		// Creating the semaphores and fences
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)

@@ -6,39 +6,24 @@
 
 namespace Frost
 {
-	
-	Ref<Texture2D> Texture2D::Create(const std::string& path, TextureSpecs spec /*= {}*/)
+	Ref<Texture2D> Texture2D::Create(const std::string& filepath, TextureSpecification textureSpec)
 	{
 		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-			case RendererAPI::API::Vulkan: return CreateRef<VulkanTexture2D>(path, spec);
-			case RendererAPI::API::OpenGL: return nullptr;
+			case RendererAPI::API::Vulkan: return CreateRef<VulkanTexture2D>(filepath, textureSpec);
 		}
 
 		FROST_ASSERT(false, "Unknown RendererAPI!");
 		return nullptr;
 	}
 
-	Ref<TextureCubeMap> TextureCubeMap::Create(TextureSpecs spec /*= {}*/)
-	{
-		switch (Renderer::GetAPI())
-		{
-		case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-		case RendererAPI::API::Vulkan: return CreateRef<VulkanTextureCubeMap>(spec);
-		case RendererAPI::API::OpenGL: return nullptr;
-		}
-
-		FROST_ASSERT(false, "Unknown RendererAPI!");
-		return nullptr;
-	}
-
-	Ref<Image2D> Image2D::Create(TextureSpecs spec /*= {}*/)
+	Ref<TextureCubeMap> TextureCubeMap::Create(ImageSpecification imageSpec)
 	{
 		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-			case RendererAPI::API::Vulkan: return CreateRef<VulkanImage2D>(spec);
+			case RendererAPI::API::Vulkan: return CreateRef<VulkanTextureCubeMap>(imageSpec);
 		}
 
 		FROST_ASSERT(false, "Unknown RendererAPI!");

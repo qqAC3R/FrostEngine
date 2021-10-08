@@ -19,7 +19,7 @@ namespace Frost
 		struct RenderPassFramebufferSpec
 		{
 			FramebufferTextureSpecification FramebufferAttachmentSpec;
-			TextureSpecs::UsageSpec FinalLayout;
+			ImageUsage FinalLayout;
 
 			OperationLoad LoadOperation;
 			OperationStore StoreOperation;

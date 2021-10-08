@@ -22,11 +22,11 @@ namespace Frost
 		m_Data.Shader = Shader::Create("assets/shader/compute.glsl");
 
 		{
-			TextureSpecs imageSpec{};
+			ImageSpecification imageSpec{};
 			imageSpec.Width = 512;
 			imageSpec.Height = 512;
-			imageSpec.Usage = { TextureSpecs::UsageSpec::Storage };
-			imageSpec.Format = TextureSpecs::FormatSpec::RGBA16F;
+			imageSpec.Usage = ImageUsage::Storage;
+			imageSpec.Format = ImageFormat::RGBA16F;
 			m_Data.CubeMap = TextureCubeMap::Create(imageSpec);
 		}
 		m_Data.UniformBuffer = UniformBuffer::Create(sizeof(m_TurbidityAzimuthInclination));

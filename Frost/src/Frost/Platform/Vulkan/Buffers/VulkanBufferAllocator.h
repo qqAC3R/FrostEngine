@@ -42,12 +42,11 @@ namespace Frost
 		static void UnbindBuffer(VulkanMemoryInfo& memory);
 
 		static void AllocateMemoryForImage(VkImage& image, VulkanMemoryInfo& memory);
+		static void AllocateImage(VkImageCreateInfo imageCreateInfo, MemoryUsage memoryFlags, VkImage& image, VulkanMemoryInfo& memory);
 		static void DestroyImage(const VkImage& image, const VulkanMemoryInfo& memory);
 
 		static void DeleteBuffer(VkBuffer& buffer, VulkanMemoryInfo& memory);
 		static void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-
-		//static uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	private:
 		friend class VulkanContext;
 	};

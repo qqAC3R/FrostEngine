@@ -7,6 +7,7 @@
 #include "Frost/Platform/Vulkan/VulkanPipeline.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
+#include "Frost/Platform/Vulkan/VulkanImage.h"
 
 namespace Frost
 {
@@ -31,13 +32,13 @@ namespace Frost
 			1600, 900, 3,
 			{
 				{
-					FramebufferTextureFormat::RGBA16F, TextureSpecs::UsageSpec::Storage,
+					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
 				{
-					FramebufferTextureFormat::Depth, TextureSpecs::UsageSpec::DepthStencilAttachment,
+					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				}
@@ -123,13 +124,13 @@ namespace Frost
 			width, height, 3,
 			{
 				{
-					FramebufferTextureFormat::RGBA16F, TextureSpecs::UsageSpec::Storage,
+					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
 				{
-					FramebufferTextureFormat::Depth, TextureSpecs::UsageSpec::DepthStencilAttachment,
+					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				}

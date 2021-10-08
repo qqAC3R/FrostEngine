@@ -4,26 +4,32 @@
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanRenderPass.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
+#include "Frost/Platform/Vulkan/VulkanImage.h"
 
 namespace Frost
 {
 
 	namespace Utils
 	{
-		static std::pair<VkImageUsageFlags, VkFormat> FBFormatToVK(FramebufferTextureFormat format)
+		std::pair<VkImageUsageFlags, VkFormat> FBFormatToVK(FramebufferTextureFormat format)
 		{
 			switch (format)
 			{
-				case FramebufferTextureFormat::RGBA8:	 return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_FORMAT_R8G8B8A8_SRGB);
-				case FramebufferTextureFormat::RGBA16F:	 return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_FORMAT_R16G16B16A16_SFLOAT);
-				case FramebufferTextureFormat::DEPTH32:  return std::make_pair(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT);
+				case FramebufferTextureFormat::RGBA8:	 
+					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R8G8B8A8_UNORM);
+
+				case FramebufferTextureFormat::RGBA16F:	
+					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R16G16B16A16_SFLOAT);
+
+				case FramebufferTextureFormat::DEPTH32: 
+					return std::make_pair(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_D32_SFLOAT);
 			}
 
-			FROST_ASSERT(false, "");
+			FROST_ASSERT_MSG("FramebufferTextureFormat is invalid!")
 			return {};
 		}
 
-		static bool IsDepthFormat(FramebufferTextureFormat format)
+		bool IsDepthFormat(FramebufferTextureFormat format)
 		{
 			switch (format)
 			{
@@ -31,6 +37,19 @@ namespace Frost
 			}
 			return false;
 		}
+
+		ImageFormat GetImageFormat(FramebufferTextureFormat framebufferFormat)
+		{
+			switch (framebufferFormat)
+			{
+			case FramebufferTextureFormat::RGBA8:    return ImageFormat::RGBA8;
+			case FramebufferTextureFormat::RGBA16F:  return ImageFormat::RGBA16F;
+			case FramebufferTextureFormat::Depth:    return ImageFormat::Depth32;
+			case FramebufferTextureFormat::None:     FROST_ASSERT_MSG("FramebufferTextureFormat::None is invalid!");
+			}
+			return ImageFormat::None;
+		}
+
 	}
 
 	VulkanFramebuffer::VulkanFramebuffer(const FramebufferSpecification& spec)
@@ -78,15 +97,15 @@ namespace Frost
 		{
 			FramebufferTextureSpecification attachment = m_Specification.Attachments.Attachments[i];
 
-			TextureSpecs spec{};
+			ImageSpecification spec{};
 			spec.Width = m_Specification.Width;
 			spec.Height = m_Specification.Height;
-			spec.Format = (TextureSpecs::FormatSpec)attachment.TextureFormat;
+			spec.Format = Utils::GetImageFormat(attachment.TextureFormat);
 
 			if (attachment.TextureFormat == FramebufferTextureFormat::Depth)
-				spec.Usage = { TextureSpecs::UsageSpec::DepthStencilAttachment };
+				spec.Usage = ImageUsage::DepthStencil;
 			else
-				spec.Usage = { TextureSpecs::UsageSpec::Storage, TextureSpecs::UsageSpec::ColorAttachment };
+				spec.Usage = ImageUsage::Storage;
 				//spec.Usage = { TextureSpecs::UsageSpec::ColorAttachment, TextureSpecs::UsageSpec::Storage };
 
 			Ref<Image2D> texture = Image2D::Create(spec);

@@ -34,7 +34,6 @@ namespace Frost
 
 		struct CreateInfo
 		{
-			/* Vulkan API specific */
 			Ref<Shader> Shader;
 			BufferLayout VertexBufferLayout;
 			Ref<RenderPass> RenderPass;

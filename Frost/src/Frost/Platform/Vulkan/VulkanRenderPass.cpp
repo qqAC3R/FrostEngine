@@ -4,6 +4,7 @@
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanFramebuffer.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
+#include "Frost/Platform/Vulkan/VulkanImage.h"
 
 namespace Frost
 {
@@ -93,6 +94,7 @@ namespace Frost
 		for(uint32_t i = 0; i < renderPassSpecs.RenderPassSpec.size(); i++)
 		{
 			Vector<FramebufferTextureSpecification> framebufferAttachmentInfo = renderPassSpecs.FramebufferSpecification.Attachments.Attachments;
+			Ref<VulkanImage2D> attachmentImage = m_Framebuffers[0]->GetColorAttachment(i).As<VulkanImage2D>();
 
 			VkAttachmentDescription& attachment = attachmentDescriptions.emplace_back();
 			attachment.format = Utils::GetVulkanFBFormat(framebufferAttachmentInfo[i].TextureFormat);
@@ -101,15 +103,15 @@ namespace Frost
 			attachment.storeOp = Utils::GetVulkanAttachmentStoreOp(renderPassSpecs.RenderPassSpec[i].StoreOperation);
 			attachment.stencilLoadOp = Utils::GetVulkanAttachmentLoadOp(renderPassSpecs.RenderPassSpec[i].DepthLoadOperation);;
 			attachment.stencilStoreOp = Utils::GetVulkanAttachmentStoreOp(renderPassSpecs.RenderPassSpec[i].DepthStoreOperation);;
-			attachment.initialLayout = m_Framebuffers[0]->GetColorAttachment(i).As<VulkanImage2D>()->GetVulkanImageLayout();
-			attachment.finalLayout = Utils::TextureUsageToLayoutVk(renderPassSpecs.RenderPassSpec[i].FinalLayout);
+			attachment.initialLayout = attachmentImage->GetVulkanImageLayout();
+			attachment.finalLayout = Utils::GetImageLayout(renderPassSpecs.RenderPassSpec[i].FinalLayout);
 			
 			VkAttachmentReference attachmentRef;
 			attachmentRef.layout = m_Framebuffers[0]->GetColorAttachment(i).As<VulkanImage2D>()->GetVulkanImageLayout();
 			attachmentRef.attachment = attachmentCount;
 			attachmentCount++;
 
-			if (framebufferAttachmentInfo[i].TextureFormat == FramebufferTextureFormat::DEPTH32)
+			if (framebufferAttachmentInfo[i].TextureFormat == FramebufferTextureFormat::Depth)
 				depthAttachmentRefs.push_back(attachmentRef);
 			else
 				colorAttachmentRefs.push_back(attachmentRef);
@@ -196,7 +198,7 @@ namespace Frost
 		for (uint32_t i = 0; i < attachments.size(); i++)
 		{
 			Ref<VulkanImage2D> attachment = attachments[i].As<VulkanImage2D>();
-			attachment->m_Layout = m_AttachmentLayouts[i];
+			attachment->m_ImageLayout = m_AttachmentLayouts[i];
 		}
 	}
 

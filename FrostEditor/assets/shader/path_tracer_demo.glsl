@@ -106,7 +106,6 @@ void main()
     }
     else
     {
-        // First frame, replace the value in the buffer
         imageStore(u_Image, ivec2(gl_LaunchIDEXT.xy), vec4(hitValue, 1.0f));
     }
 
@@ -151,6 +150,7 @@ void main()
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
+#extension GL_ARB_shader_clock : enable
 
 hitAttributeEXT vec2 attribs;
 
@@ -204,6 +204,11 @@ layout(binding = 3, set = 0, scalar) readonly buffer VertexPointers { uint64_t v
 layout(binding = 4, set = 0, scalar) readonly buffer IndexPointers { uint64_t indexPointer[1000]; } u_IndexPointers;
 layout(binding = 5, set = 0, scalar) readonly buffer TransformInstancePointers { InstanceInfo mat[1000];  } u_TransformPointers;
 
+
+#define M_PI 3.141592
+#define TWO_PI 6.28318530717958648
+
+
 // Generate a random unsigned int in [0, 2^24) given the previous RNG state
 // using the Numerical Recipes linear congruential generator
 uint lcg(inout uint prev)
@@ -220,11 +225,9 @@ float rnd(inout uint prev)
     return (float(lcg(prev)) / float(0x01000000));
 }
 
-#define M_PI 3.141592
 // Randomly sampling around +Z
 vec3 SamplingHemisphere(inout uint seed, in vec3 x, in vec3 y, in vec3 z)
 {
-
     float r1 = rnd(seed);
     float r2 = rnd(seed);
     float sq = sqrt(1.0 - r2);
@@ -235,6 +238,54 @@ vec3 SamplingHemisphere(inout uint seed, in vec3 x, in vec3 y, in vec3 z)
     return direction;
 }
 
+//-----------------------------------------------------------------------
+//-----------------------------------------------------------------------
+vec3 ImportanceSampleGTR2(float rgh, inout uint seed)
+{
+    float r1 = rnd(seed);
+    float r2 = rnd(seed);
+    
+    float a = max(0.001, rgh);
+
+    float phi = r1 * TWO_PI;
+
+    float cosTheta = sqrt((1.0 - r2) / (1.0 + (a * a - 1.0) * r2));
+    float sinTheta = clamp(sqrt(1.0 - (cosTheta * cosTheta)), 0.0, 1.0);
+    float sinPhi   = sin(phi);
+    float cosPhi   = cos(phi);
+
+    return vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
+}
+
+// Input Ve: view direction
+// Input alpha_x, alpha_y: roughness parameters
+// Input U1, U2: uniform random numbers
+// Output Ne: normal sampled with PDF D_Ve(Ne) = G1(Ve) * max(0, dot(Ve, Ne)) * D(Ne) / Ve.z
+vec3 sampleGGXVNDF(vec3 Ve, float alpha_x, float alpha_y, float U1, float U2)
+{
+    // Section 3.2: transforming the view direction to the hemisphere configuration
+    vec3 Vh = normalize(vec3(alpha_x * Ve.x, alpha_y * Ve.y, Ve.z));
+    
+    // Section 4.1: orthonormal basis (with special case if cross product is zero)
+    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+    vec3 T1 = lensq > 0 ? vec3(-Vh.y, Vh.x, 0) * inversesqrt(lensq) : vec3(1,0,0);
+    vec3 T2 = cross(Vh, T1);
+    
+    // Section 4.2: parameterization of the projected area
+    float r = sqrt(U1);
+    float phi = 2.0 * M_PI * U2;
+    float t1 = r * cos(phi);
+    float t2 = r * sin(phi);
+    float s = 0.5 * (1.0 + Vh.z);
+    t2 = (1.0 - s)*sqrt(1.0 - t1*t1) + s*t2;
+    
+    // Section 4.3: reprojection onto hemisphere
+    vec3 Nh = t1*T1 + t2*T2 + sqrt(max(0.0, 1.0 - t1*t1 - t2*t2))*Vh;
+    
+    // Section 3.4: transforming the normal back to the ellipsoid configuration
+    vec3 Ne = normalize(vec3(alpha_x * Nh.x, alpha_y * Nh.y, max(0.0, Nh.z)));
+    return Ne;
+}
 
 void ComputeTBN(in Vertices vertices, in Indices indices, out vec3 N, out vec3 T, out vec3 B)
 {
@@ -311,9 +362,6 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 
     return nom / denom;
 }
-
-
-
 
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
@@ -409,29 +457,65 @@ void main()
 
 
 
-    vec3 rayDirection = SamplingHemisphere(rayPayLoad.seed, tangent, bitangent, normal);
 
     vec3 albedo = instanceInfo.Albedo;
     vec3 emittance = instanceInfo.Emittance;
     float refractionIndex = instanceInfo.RefractionIndex;
     float roughness = instanceInfo.Roughness;
+    vec3 lightPosition = vec3(20.0f, 10.0f, 10.0f);
+
+    vec3 rayDirection = SamplingHemisphere(rayPayLoad.seed, tangent, bitangent, normal);
 
     if(roughness < 1.0f)
     {
         vec3 reflectedVector = reflect(rayPayLoad.rayDirection, normal);
-        rayDirection = reflectedVector + (rayDirection * vec3(roughness));
+        rayDirection = (reflectedVector + rayDirection * roughness);
+        //rayDirection = reflectedVector + (rayDirection * vec3(roughness));
+
+        /*
+        float anisotropy = 0.0f;
+        // Calculate anisotropic roughness along the tangent and bitangent directions
+        float aspect = sqrt(1.0 - anisotropy * 0.9);
+        float ax = max(0.001, roughness / aspect);
+        float ay = max(0.001, roughness * aspect);
+
+        float r1 = rnd(rayPayLoad.seed);
+        float r2 = rnd(rayPayLoad.seed);
+
+        vec3 viewVector = normalize(ps_Camera.cameraPosition - worldPos);
+
+        rayDirection *= sampleGGXVNDF(viewVector, ax, ay, r1, r2);
+        */
+
+        /*
+        vec3 V = normalize(ps_Camera.cameraPosition - worldPos);
+        vec2 Xi = Hammersley(0, 1);
+        vec3 H  = ImportanceSampleGGX(Xi, normal, roughness);
+        vec3 L  = normalize(2.0 * dot(V, H) * H - V);
+
+        float NdotL = max(dot(normal, L), 0.0);
+        //if(NdotL > 0.0f)
+        {
+            rayDirection = H;
+            //rayDirection += reflectedVector;
+            //rayDirection = normalize(rayDirection);
+            //rayDirection = SamplingHemisphere(rayPayLoad.seed, tangent, bitangent, normal);
+        }
+        */
     }
-    if(refractionIndex > 1.0f)
+    if(refractionIndex != 1.0f)
     {
         rayDirection = Refract(normal, worldPos, rayDirection, refractionIndex);
     }
+
+   
 
 
     //vec3 F0 = vec3(0.04); 
     //F0 = mix(F0, albedo, metallic);
 
 
-    //vec3 lightPosition = vec3(20.0f, 10.0f, 10.0f);
+    
     //vec3 V = normalize(ps_Camera.cameraPosition - worldPos);
 
     //vec3 L = normalize(lightPosition - worldPos);

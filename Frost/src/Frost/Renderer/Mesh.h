@@ -59,6 +59,7 @@ namespace Frost
 		const Ref<IndexBuffer>& GetIndexBuffer() const { return m_IndexBuffer; }
 		const Ref<BottomLevelAccelerationStructure>& GetAccelerationStructure() const { return m_AccelerationStructure; }
 		const MaterialInstance& GetMaterial() const { return m_Material; }
+		MaterialInstance& GetMaterial() { return m_Material; }
 
 		const Math::BoundingBox& GetBoundingBox() const { return m_Submeshes[0].BoundingBox; }
 

@@ -168,6 +168,14 @@ namespace Frost
 		vmaBindImageMemory(s_Allocator, memory.allocation, image);
 	}
 
+	void VulkanAllocator::AllocateImage(VkImageCreateInfo imageCreateInfo, MemoryUsage memoryFlags, VkImage& image, VulkanMemoryInfo& memory)
+	{
+		VmaAllocationCreateInfo allocCreateInfo = {};
+		allocCreateInfo.usage = Utils::GetVmaMemoryUsage(memoryFlags);
+
+		vmaCreateImage(s_Allocator, &imageCreateInfo, &allocCreateInfo, &image, &memory.allocation, nullptr);
+	}
+
 	void VulkanAllocator::DestroyImage(const VkImage& image, const VulkanMemoryInfo& memory)
 	{
 		vmaDestroyImage(s_Allocator, image, memory.allocation);

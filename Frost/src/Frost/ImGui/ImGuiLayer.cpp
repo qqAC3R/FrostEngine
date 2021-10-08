@@ -10,6 +10,7 @@
 
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
+#include "Frost/Platform/Vulkan/VulkanImage.h"
 
 namespace Frost
 {
