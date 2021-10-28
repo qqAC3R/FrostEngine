@@ -121,5 +121,4 @@ void main()
 	float metalness = GetFloatValueFromTexture(u_MetalnessTexture, MaterialUniform.Metalness);
 	float roughness = GetFloatValueFromTexture(u_RoughnessTexture, MaterialUniform.Roughness);
 	o_Composite = vec4(metalness, roughness, 1.0f, 1.0f);
-
 }
