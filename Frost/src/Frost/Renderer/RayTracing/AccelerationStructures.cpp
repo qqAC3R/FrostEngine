@@ -6,14 +6,13 @@
 
 namespace Frost
 {
-	Ref<BottomLevelAccelerationStructure> BottomLevelAccelerationStructure::Create(const Ref<VertexBuffer>& vertexBuffer,
-																				   const Ref<IndexBuffer>& indexBuffer)
+	Ref<BottomLevelAccelerationStructure> BottomLevelAccelerationStructure::Create(const MeshASInfo& meshInfo)
 	{
 		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
 			case RendererAPI::API::OpenGL: FROST_ASSERT(false, "OpenGL::API doesn't support RayTracing!");
-			case RendererAPI::API::Vulkan: return Ref<VulkanBottomLevelAccelerationStructure>::Create(vertexBuffer, indexBuffer);
+			case RendererAPI::API::Vulkan: return Ref<VulkanBottomLevelAccelerationStructure>::Create(meshInfo);
 		}
 
 		FROST_ASSERT(false, "Unknown RendererAPI!");

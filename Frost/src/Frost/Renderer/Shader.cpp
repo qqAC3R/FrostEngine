@@ -22,6 +22,16 @@ namespace Frost
 		return nullptr;
 	}
 
+	ShaderLibrary::ShaderLibrary()
+	{
+	}
+
+	ShaderLibrary::~ShaderLibrary()
+	{
+		for (auto& shader : m_Shaders)
+			shader.second->Destroy();
+	}
+
 	void ShaderLibrary::Add(const Ref<Shader>& shader)
 	{
 		auto& name = shader->GetName();
@@ -32,7 +42,6 @@ namespace Frost
 	{
 		FROST_ASSERT(!Exists(name), "Shader already exists!");
 		m_Shaders[name] = shader;
-
 	}
 
 	void ShaderLibrary::Load(const std::string& filepath)
@@ -40,7 +49,6 @@ namespace Frost
 		auto shader = Shader::Create(filepath);
 
 		Add(shader);
-		//return shader;
 	}
 
 	Ref<Shader> ShaderLibrary::Get(const std::string& name)
@@ -63,6 +71,10 @@ namespace Frost
 	}
 
 	ShaderReflectionData::ShaderReflectionData()
+	{
+	}
+
+	ShaderReflectionData::~ShaderReflectionData()
 	{
 	}
 

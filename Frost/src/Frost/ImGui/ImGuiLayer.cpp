@@ -80,7 +80,7 @@ namespace Frost
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
-		io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/san-francisco/SF-Regular.otf", 18.0f);
+		io.FontDefault = io.Fonts->AddFontFromFileTTF("Resources/Fonts/san-francisco/SF-Regular.otf", 18.0f);
 
 		ImGui::StyleColorsDark();
 		SetDarkThemeColors();
@@ -103,14 +103,15 @@ namespace Frost
 		init_info.DescriptorPool = imguiPool;
 		init_info.Allocator = nullptr;
 		init_info.PipelineCache = VK_NULL_HANDLE;
-		init_info.MinImageCount = Renderer::GetRendererConfig().FramesInFlight;
+		//init_info.MinImageCount = Renderer::GetRendererConfig().FramesInFlight;
+		init_info.MinImageCount = 3;
 		init_info.ImageCount = (uint32_t)VulkanContext::GetSwapChain()->GetImageCount();
 		init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 		init_info.CheckVkResultFn = Utils::CheckVkResult;
 		ImGui_ImplVulkan_Init(&init_info, renderPass);
 
 		// Upload Fonts
-		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 		ImGui_ImplVulkan_CreateFontsTexture(cmdBuf);
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
 			

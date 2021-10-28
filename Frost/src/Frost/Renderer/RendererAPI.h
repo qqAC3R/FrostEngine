@@ -46,10 +46,8 @@ namespace Frost
 	class RenderQueue
 	{
 	public:
-		RenderQueue()
-		{
-			//m_Data.reserve(1024);
-		}
+		RenderQueue() = default;
+		virtual ~RenderQueue() {}
 
 		void SetCamera(const EditorCamera& camera)
 		{

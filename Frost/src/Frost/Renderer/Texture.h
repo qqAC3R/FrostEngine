@@ -12,10 +12,10 @@ namespace Frost
 		bool UseMips = false;
 	};
 
-	class Texturee
+	class Texture
 	{
 	public:
-		virtual ~Texturee() {}
+		virtual ~Texture() {}
 
 		virtual void Destroy() = 0;
 
@@ -24,9 +24,11 @@ namespace Frost
 
 		virtual TextureSpecification& GetSpecification() = 0;
 		virtual const TextureSpecification& GetSpecification() const = 0;
+
+		virtual bool Loaded() const = 0;
 	};
 
-	class Texture2D : public Texturee
+	class Texture2D : public Texture
 	{
 	public:
 		virtual const Ref<Image2D> GetImage2D() const = 0;

@@ -2,7 +2,6 @@
 
 namespace Frost
 {
-
 	class BufferLayout;
 	class Buffer;
 
@@ -14,7 +13,7 @@ namespace Frost
 		virtual BufferLayout GetLayout() const = 0;
 		virtual void SetLayout(const BufferLayout& layout) = 0;
 
-		virtual uint32_t GetBufferSize() const = 0;
+		virtual uint64_t GetBufferSize() const = 0;
 		virtual Ref<Buffer> GetBuffer() const = 0;
 
 		virtual void Bind() const = 0;
@@ -22,7 +21,7 @@ namespace Frost
 
 		virtual void Destroy() = 0;
 
-		static Ref<VertexBuffer> Create(void* verticies, uint32_t size);
+		static Ref<VertexBuffer> Create(void* verticies, uint64_t size);
 	};
 
 }

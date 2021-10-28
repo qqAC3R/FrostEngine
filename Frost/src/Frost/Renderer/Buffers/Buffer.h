@@ -22,7 +22,7 @@ namespace Frost
 	struct BufferData
 	{
 		void* Data = nullptr;
-		uint32_t Size = 0;
+		uint64_t Size = 0;
 	};
 
 	class Buffer
@@ -31,9 +31,9 @@ namespace Frost
 		virtual ~Buffer() {}
 
 
-		virtual uint32_t GetBufferSize() const = 0;
+		virtual uint64_t GetBufferSize() const = 0;
 		virtual BufferData GetBufferData() const = 0;
-		virtual void SetData(uint32_t size, void* data) = 0;
+		virtual void SetData(uint64_t size, void* data) = 0;
 		virtual void SetData(void* data) = 0;
 
 		virtual void Bind() const = 0;
@@ -41,8 +41,8 @@ namespace Frost
 		
 		virtual void Destroy() = 0;
 
-		static Ref<Buffer> Create(uint32_t size, std::initializer_list<BufferType> types = {});
-		static Ref<Buffer> Create(uint32_t size, void* data, std::initializer_list<BufferType> types = {});
+		static Ref<Buffer> Create(uint64_t size, std::initializer_list<BufferType> types = {});
+		static Ref<Buffer> Create(uint64_t size, void* data, std::initializer_list<BufferType> types = {});
 
 	};
 

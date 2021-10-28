@@ -7,7 +7,7 @@
 namespace Frost
 {
 
-	VulkanBuffer::VulkanBuffer(uint32_t size, std::initializer_list<BufferType> types)
+	VulkanBuffer::VulkanBuffer(uint64_t size, std::initializer_list<BufferType> types)
 		: m_BufferData{ nullptr, size }
 	{
 		// Every buffer MUST be accesed by the shader
@@ -24,7 +24,7 @@ namespace Frost
 	}
 
 
-	VulkanBuffer::VulkanBuffer(uint32_t size, void* data, std::initializer_list<BufferType> types)
+	VulkanBuffer::VulkanBuffer(uint64_t size, void* data, std::initializer_list<BufferType> types)
 		: m_Types(types), m_BufferData{ data, size }
 	{
 		std::vector<BufferType> usages;
@@ -54,7 +54,7 @@ namespace Frost
 		VulkanAllocator::UnbindBuffer(m_BufferMemory);
 	}
 
-	void VulkanBuffer::SetData(uint32_t size, void* data)
+	void VulkanBuffer::SetData(uint64_t size, void* data)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -82,8 +82,10 @@ namespace Frost
 
 	void VulkanBuffer::Destroy()
 	{
+		if (m_Buffer == VK_NULL_HANDLE) return;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		VulkanAllocator::DeleteBuffer(m_Buffer, m_BufferMemory);
+		m_Buffer = VK_NULL_HANDLE;
 	}
 
 }

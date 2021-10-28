@@ -14,8 +14,8 @@ namespace Frost
 			Ref<Shader> Shader;
 		};
 
-		virtual void Bind() = 0;
-		virtual void Unbind() = 0;
+		//virtual void Bind() = 0;
+		//virtual void Unbind() = 0;
 		virtual void Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) = 0;
 
 		virtual void Destroy() = 0;

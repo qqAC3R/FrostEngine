@@ -37,11 +37,6 @@ namespace Frost
 			FROST_ASSERT(bool(index < (uint32_t)m_RenderCommandBuffer.size()), "Index is invalid!");
 			return m_RenderCommandBuffer[index];
 		}
-		VkCommandBuffer GetComputeCommandBuffer(uint32_t index)
-		{
-			FROST_ASSERT(bool(index < (uint32_t)m_ComputeCommandBuffer.size()), "Index is invalid!");
-			return m_ComputeCommandBuffer[index];
-		}
 
 	private:
 		void PickPresentQueue();
@@ -49,7 +44,6 @@ namespace Frost
 		void CreateRenderPass();
 		void CreateFramebuffer();
 		void CreateRenderCommandBuffer();
-		void CreateComputeCommandBuffer();
 		void Destroy();
 		uint32_t AcquireImage(VkSemaphore availableSemaphore);
 	private:
@@ -64,9 +58,8 @@ namespace Frost
 		VkExtent2D m_SwapChainExtent;
 		VkSurfaceFormatKHR m_ColorFormat;
 
-		VkCommandPool m_RenderCommandPool, m_ComputeCommandPool;
+		VkCommandPool m_RenderCommandPool;
 		Vector<VkCommandBuffer> m_RenderCommandBuffer;
-		Vector<VkCommandBuffer> m_ComputeCommandBuffer;
 
 		VkQueue m_PresentQueue;
 		uint32_t m_PresentQueueIndex;

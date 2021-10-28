@@ -7,10 +7,11 @@
 #include "Frost/Renderer/RayTracing/AccelerationStructures.h"
 #include "Frost/Renderer/Texture.h"
 
-#include <glm/glm.hpp>
+#include "Frost/Renderer/Pipeline.h"
+#include "Frost/Renderer/PipelineCompute.h"
+#include "Frost/Renderer/RayTracing/RayTracingPipeline.h"
 
-using VkDescriptorSetLayout = struct VkDescriptorSetLayout_T*;
-using VkPipelineLayout = struct VkPipelineLayout_T*;
+#include <glm/glm.hpp>
 
 namespace Frost
 {
@@ -19,13 +20,11 @@ namespace Frost
 	class Material
 	{
 	public:
+		virtual ~Material() {}
 
-		virtual void UpdateVulkanDescriptor() = 0;
-		virtual void Bind(VkPipelineLayout pipelineLayout, GraphicsType graphicsType) const = 0;;
-
-		virtual Vector<VkDescriptorSetLayout> GetVulkanDescriptorLayout() const = 0;
-
-		virtual void Invalidate() = 0;
+		virtual void Bind(Ref<Pipeline> pipeline) = 0;
+		virtual void Bind(Ref<ComputePipeline> computePipeline) = 0;
+		virtual void Bind(Ref<RayTracingPipeline> rayTracingPipeline) = 0;
 
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) = 0;
 		virtual void Set(const std::string& name, const Ref<TextureCubeMap>& image) = 0;
@@ -42,11 +41,9 @@ namespace Frost
 		virtual Ref<Image2D> GetImage2D(const std::string& name) = 0;
 		virtual Ref<TopLevelAccelertionStructure> GetAccelerationStructure(const std::string& name) = 0;
 
-
 		virtual void Destroy() = 0;
 
 		static Ref<Material> Create(const Ref<Shader>& shader, const std::string& name = "");
-
 	};
 
 }

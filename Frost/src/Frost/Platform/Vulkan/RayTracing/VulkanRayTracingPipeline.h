@@ -5,8 +5,6 @@
 
 namespace Frost
 {
-
-
 	class VulkanRayTracingPipeline : public RayTracingPipeline
 	{
 	public:
@@ -29,5 +27,4 @@ namespace Frost
 		std::unordered_map<std::string, VkPushConstantRange> m_PushConstantRangeCache;
 		RayTracingPipeline::CreateInfo m_Specification;
 	};
-
 }

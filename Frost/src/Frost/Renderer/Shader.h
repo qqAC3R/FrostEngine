@@ -55,6 +55,8 @@ namespace Frost
 	class ShaderLibrary
 	{
 	public:
+		ShaderLibrary();
+		~ShaderLibrary();
 
 		void Add(const Ref<Shader>& shader);
 		void Add(const std::string& name, const Ref<Shader>& shader);
@@ -65,9 +67,8 @@ namespace Frost
 		bool Exists(const std::string& name) const;
 
 		void Clear();
-
 	private:
-		std::unordered_map<std::string, Ref<Shader>> m_Shaders;
+		HashMap<std::string, Ref<Shader>> m_Shaders;
 	};
 
 	struct ShaderBufferData
@@ -117,6 +118,7 @@ namespace Frost
 	{
 	public:
 		ShaderReflectionData();
+		virtual ~ShaderReflectionData();
 
 		void SetReflectionData(std::unordered_map<ShaderType, std::vector<uint32_t>> reflectionData);
 

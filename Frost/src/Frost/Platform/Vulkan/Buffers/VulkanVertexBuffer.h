@@ -12,13 +12,13 @@ namespace Frost
 	class VulkanVertexBuffer : public VertexBuffer
 	{
 	public:
-		VulkanVertexBuffer(void* verticies, uint32_t size);
+		VulkanVertexBuffer(void* verticies, uint64_t size);
 		virtual ~VulkanVertexBuffer();
 
 		virtual void Bind() const override;
 		virtual void Unbind() const override {}
 
-		virtual uint32_t GetBufferSize() const { return m_BufferSize; }
+		virtual uint64_t GetBufferSize() const { return m_BufferSize; }
 		virtual BufferLayout GetLayout() const override;
 		virtual void SetLayout(const BufferLayout& layout) override {}
 		
@@ -27,13 +27,12 @@ namespace Frost
 		virtual Ref<Buffer> GetBuffer() const override { return m_VertexBuffer; }
 
 		virtual void Destroy() override;
-		
 	private:
 		VkBuffer m_Buffer;
 		VkDeviceAddress m_BufferAddress;
 		
 		Ref<Buffer> m_VertexBuffer;
-		uint32_t m_BufferSize;
+		uint64_t m_BufferSize;
 	};
 
 }

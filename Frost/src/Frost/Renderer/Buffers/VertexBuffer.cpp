@@ -7,7 +7,7 @@
 namespace Frost
 {
 
-	Ref<VertexBuffer> VertexBuffer::Create(void* verticies, uint32_t size)
+	Ref<VertexBuffer> VertexBuffer::Create(void* verticies, uint64_t size)
 	{
 		switch (Renderer::GetAPI())
 		{

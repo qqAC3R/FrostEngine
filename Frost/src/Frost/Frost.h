@@ -32,6 +32,7 @@
 #include "Frost/Renderer/Mesh.h"
 #include "Frost/Renderer/Texture.h"
 #include "Frost/Renderer/EditorCamera.h"
+#include "Frost/Renderer/Material.h"
 
 #include "Frost/ImGui/ImGuiLayer.h"
 /* ------------------------------------------------------ */

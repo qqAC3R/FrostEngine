@@ -12,13 +12,14 @@ namespace Frost
 		VulkanComputePipeline(ComputePipeline::CreateInfo& createInfo);
 		virtual ~VulkanComputePipeline();
 
-		virtual void Bind() override;
-		virtual void Unbind() override;
+		//virtual void Bind() override;
+		//virtual void Unbind() override;
 		virtual void Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) override;
+		void Dispatch(VkCommandBuffer cmdBuf, uint32_t groupX, uint32_t groupY, uint32_t groupZ);
 
 		VkPipeline GetVulkanPipeline() const { return m_Pipeline; }
 		VkPipelineLayout GetVulkanPipelineLayout() const { return m_PipelineLayout; }
-		void BindVulkanPushConstant(std::string name, void* data);
+		void BindVulkanPushConstant(VkCommandBuffer cmdBuf, std::string name, void* data);
 
 		virtual void Destroy() override;
 	private:

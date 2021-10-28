@@ -30,6 +30,7 @@ namespace Frost
 	private:
 		Vector<Ref<Framebuffer>> m_Framebuffers;
 		VkRenderPass m_RenderPass;
+		Vector<VkClearValue> m_ClearValues;
 
 		RenderPassSpecification m_Specification;
 		std::unordered_map<uint32_t, VkImageLayout> m_AttachmentLayouts;

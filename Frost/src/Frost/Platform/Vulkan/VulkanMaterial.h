@@ -1,28 +1,27 @@
 #pragma once
 
-#include "Frost/Platform/Vulkan/Vulkan.h"
-
 #include "Frost/Renderer/Material.h"
+#include "Frost/Platform/Vulkan/Vulkan.h"
 
 namespace Frost
 {
-
 	class VulkanMaterial : public Material
 	{
 	public:
 		VulkanMaterial(const Ref<Shader>& shader, const std::string& name);
 		virtual ~VulkanMaterial();
 
-		virtual void UpdateVulkanDescriptor() override;
-		virtual void Bind(VkPipelineLayout pipelineLayout, GraphicsType graphicsType) const override;
+		virtual void Bind(Ref<Pipeline> pipeline) override;
+		virtual void Bind(Ref<ComputePipeline> computePipeline) override;
+		virtual void Bind(Ref<RayTracingPipeline> rayTracingPipeline) override;
+		void Bind(VkCommandBuffer cmdBuf, Ref<ComputePipeline> computePipeline);
 
-		virtual Vector<VkDescriptorSetLayout> GetVulkanDescriptorLayout() const override {
+		Vector<VkDescriptorSetLayout> GetVulkanDescriptorLayout() const {
 			Vector<VkDescriptorSetLayout> descriptorSetLayouts;
 			for (auto& descriptorSetLayout : m_DescriptorSetLayouts)
 				descriptorSetLayouts.push_back(descriptorSetLayout.second);
 			return descriptorSetLayouts;
 		}
-		virtual void Invalidate() override;
 
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) override;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) override;
@@ -38,24 +37,28 @@ namespace Frost
 		virtual Ref<TopLevelAccelertionStructure> GetAccelerationStructure(const std::string& name) override;
 
 		virtual void Destroy() override;
+		void UpdateVulkanDescriptorIfNeeded();
 	private:
-		std::pair<uint32_t, uint32_t> GetShaderLocationFromString(const std::string& name);
+		struct ShaderLocation { uint32_t Set, Binding; };
+
+		ShaderLocation GetShaderLocationFromString(const std::string& name);
 		void CreateVulkanDescriptor();
 		void CreateMaterialData();
+
+		static void AllocateDescriptorPool();
+		static void DeallocateDescriptorPool();
 	private:
 		Ref<Shader> m_Shader;
 
-		VkDescriptorPool m_DescriptorPool;
 		std::unordered_map<uint32_t, VkDescriptorSetLayout> m_DescriptorSetLayouts;
 		std::unordered_map<uint32_t, VkDescriptorSet> m_DescriptorSets;
 
 		struct DataPointer
 		{
+			// DataType is for a bit of validation, so for example we could assert if we set a uniform buffer into texture
 			enum class DataType {
 				BUFFER, TEXTURE, ACCELERATION_STRUCTURE
 			};
-
-			// DataType is for a bit of validation, so for example we could assert if we set a uniform buffer into texture
 			DataType Type;
 			Ref<void*> Pointer;
 		};
@@ -76,12 +79,9 @@ namespace Frost
 			VkWriteDescriptorSet WDS{};
 		};
 
-		// Keeping them because in a vector because they fucking die and crashes the whole engine
-		//Vector<VkDescriptorImageInfo> ImageInfos;
-		//Vector<VkDescriptorBufferInfo> BufferInfos;
-		//Vector<VkWriteDescriptorSetAccelerationStructureKHR> ASInfos;
-
 		Vector<PendingDescriptor> m_PendingDescriptor;
+
+		friend class VulkanRenderer;
 	};
 
 }

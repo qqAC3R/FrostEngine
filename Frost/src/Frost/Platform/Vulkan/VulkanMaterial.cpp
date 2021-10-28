@@ -9,6 +9,10 @@
 #include "Frost/Platform/Vulkan/Buffers/VulkanUniformBuffer.h"
 #include "Frost/Platform/Vulkan/RayTracing/VulkanAccelerationStructure.h"
 
+#include "Frost/Platform/Vulkan/VulkanPipeline.h"
+#include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
+#include "Frost/Platform/Vulkan/RayTracing/VulkanRayTracingPipeline.h"
+
 namespace Frost
 {
 
@@ -49,14 +53,11 @@ namespace Frost
 		}
 	}
 
+	// A HUGE descriptor pool for allocating descriptor sets
+	static VkDescriptorPool s_DescriptorPool = VK_NULL_HANDLE;
 
 	VulkanMaterial::VulkanMaterial(const Ref<Shader>& shader, const std::string& name)
 		: m_Shader(shader)
-	{
-		Invalidate();
-	}
-
-	void VulkanMaterial::Invalidate()
 	{
 		Ref<VulkanShader> vulkanShader = m_Shader.As<VulkanShader>();
 		m_DescriptorSetLayouts = vulkanShader->m_DescriptorSetLayouts;
@@ -68,9 +69,38 @@ namespace Frost
 
 	VulkanMaterial::~VulkanMaterial()
 	{
+		m_MaterialData.clear();
 	}
 
-	void VulkanMaterial::UpdateVulkanDescriptor()
+	void VulkanMaterial::AllocateDescriptorPool()
+	{
+		if (s_DescriptorPool != VK_NULL_HANDLE) return;
+
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		Vector<VkDescriptorPoolSize> poolSizes =
+		{
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, 10000 },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10000 },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 10000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 10000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10000 },
+			{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 10000 }
+		};
+		VkDescriptorPoolCreateInfo poolCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+		poolCreateInfo.maxSets = 10000 * poolSizes.size();
+		poolCreateInfo.poolSizeCount = (uint32_t)poolSizes.size();
+		poolCreateInfo.pPoolSizes = poolSizes.data();
+		FROST_VKCHECK(vkCreateDescriptorPool(device, &poolCreateInfo, nullptr, &s_DescriptorPool));
+	}
+
+	void VulkanMaterial::DeallocateDescriptorPool()
+	{
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		vkDestroyDescriptorPool(device, s_DescriptorPool, nullptr);
+	}
+
+	void VulkanMaterial::UpdateVulkanDescriptorIfNeeded()
 	{
 		if (!m_PendingDescriptor.size()) return;
 
@@ -83,35 +113,90 @@ namespace Frost
 		}
 
 		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSet.size()), writeDescriptorSet.data(), 0, nullptr);
-
 		m_PendingDescriptor.clear();
-
-		//ASInfos.clear();
-		//ImageInfos.clear();
-		//BufferInfos.clear();
 	}
 
-	void VulkanMaterial::Bind(VkPipelineLayout pipelineLayout, GraphicsType graphicsType) const
+	void VulkanMaterial::Bind(Ref<Pipeline> pipeline) 
 	{
-		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		
-		VkPipelineBindPoint vkGraphicsType = VulkanContext::GetVulkanGraphicsType(graphicsType);
-		VkCommandBuffer cmdBuf;
-		if (graphicsType == GraphicsType::Graphics || graphicsType == GraphicsType::Raytracing)
-		{
-			cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
-		}
-		else if (graphicsType == GraphicsType::Compute)
-		{
-			cmdBuf = VulkanContext::GetSwapChain()->GetComputeCommandBuffer(currentFrameIndex);
-		}
+		UpdateVulkanDescriptorIfNeeded();
 
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
+		VkPipelineLayout pipelineLayout = vulkanPipeline->GetVulkanPipelineLayout();
+
+		// Typically we have 1-5 descriptor sets and doing a for loop for everyframe wont hurt the performance
 		Vector<VkDescriptorSet> descriptorSets;
 		for (auto& descriptorSet : m_DescriptorSets)
 			descriptorSets.push_back(descriptorSet.second);
 
-		vkCmdBindDescriptorSets(cmdBuf, vkGraphicsType, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 	}
+
+	void VulkanMaterial::Bind(Ref<ComputePipeline> computePipeline)
+	{
+		FROST_ASSERT_MSG("Binding to a compute pipeline needs a command buffer!");
+	}
+
+	void VulkanMaterial::Bind(VkCommandBuffer cmdBuf, Ref<ComputePipeline> computePipeline)
+	{
+		UpdateVulkanDescriptorIfNeeded();
+
+		Ref<VulkanComputePipeline> vulkanComputePipeline = computePipeline.As<VulkanComputePipeline>();
+		VkPipelineLayout pipelineLayout = vulkanComputePipeline->GetVulkanPipelineLayout();
+
+		// Typically we have 1-5 descriptor sets and doing a for loop for everyframe wont hurt the performance
+		Vector<VkDescriptorSet> descriptorSets;
+		for (auto& descriptorSet : m_DescriptorSets)
+			descriptorSets.push_back(descriptorSet.second);
+
+		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+	}
+
+	void VulkanMaterial::Bind(Ref<RayTracingPipeline> rayTracingPipeline)
+	{
+		UpdateVulkanDescriptorIfNeeded();
+
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		Ref<VulkanRayTracingPipeline> vulkanPipeline = rayTracingPipeline.As<VulkanRayTracingPipeline>();
+		VkPipelineLayout pipelineLayout = vulkanPipeline->GetVulkanPipelineLayout();
+
+		// Typically we have 1-5 descriptor sets and doing a for loop for everyframe wont hurt the performance
+		Vector<VkDescriptorSet> descriptorSets;
+		for (auto& descriptorSet : m_DescriptorSets)
+			descriptorSets.push_back(descriptorSet.second);
+
+		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+	}
+
+
+#if 0
+	void VulkanMaterial::Bind() const
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		
+		VkPipelineBindPoint vkGraphicsType = VulkanContext::GetVulkanGraphicsType(m_PipelineGraphicsType);
+		VkCommandBuffer cmdBuf;
+		if (m_PipelineGraphicsType == GraphicsType::Graphics || m_PipelineGraphicsType == GraphicsType::Raytracing)
+		{
+			cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		}
+		else if (m_PipelineGraphicsType == GraphicsType::Compute)
+		{
+			cmdBuf = VulkanContext::GetSwapChain()->GetComputeCommandBuffer(currentFrameIndex);
+		}
+
+		// Typically we have 1-5 descriptor sets and doing a for loop for everyframe wont hurt the performance
+		Vector<VkDescriptorSet> descriptorSets;
+		for (auto& descriptorSet : m_DescriptorSets)
+			descriptorSets.push_back(descriptorSet.second);
+
+		vkCmdBindDescriptorSets(cmdBuf, vkGraphicsType, m_PipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+	}
+#endif
 
 	void VulkanMaterial::CreateVulkanDescriptor()
 	{
@@ -121,6 +206,7 @@ namespace Frost
 
 		if (reflectedData.GetDescriptorSetsCount().size() == 0) return;
 
+#if 0
 		///////////////////////////////////////////////////////////
 		// Descriptor Pool
 		///////////////////////////////////////////////////////////
@@ -160,7 +246,7 @@ namespace Frost
 
 		std::string descriptorPoolName = "VulkanShader-DescriptorPool[" + m_Shader->GetName() + "]";
 		VulkanContext::SetStructDebugName(descriptorPoolName, VK_OBJECT_TYPE_DESCRIPTOR_POOL, m_DescriptorPool);
-
+#endif
 
 
 
@@ -172,7 +258,7 @@ namespace Frost
 
 			VkDescriptorSetAllocateInfo allocInfo{};
 			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			allocInfo.descriptorPool = m_DescriptorPool;
+			allocInfo.descriptorPool = s_DescriptorPool;
 			allocInfo.descriptorSetCount = 1;
 			allocInfo.pSetLayouts = &m_DescriptorSetLayouts[descriptorSetNumber];
 
@@ -186,10 +272,6 @@ namespace Frost
 
 	void VulkanMaterial::CreateMaterialData()
 	{
-		//BufferInfos.reserve(m_ReflectedData.GetBuffersData().size());
-		//ImageInfos.reserve(m_ReflectedData.GetTextureData().size());
-		//ASInfos.reserve(m_ReflectedData.GetAccelerationStructureData().size());
-
 		for (auto& buffer : m_ReflectedData.GetBuffersData())
 		{
 			m_MaterialData[buffer.Name].Pointer = nullptr;
@@ -209,8 +291,7 @@ namespace Frost
 		}
 	}
 
-	std::pair<uint32_t, uint32_t> VulkanMaterial::GetShaderLocationFromString(const std::string& name)
-	//   pair<set, binding>
+	VulkanMaterial::ShaderLocation VulkanMaterial::GetShaderLocationFromString(const std::string& name)
 	{
 		auto bufferData = m_ReflectedData.GetBuffersData();
 		auto textureData = m_ReflectedData.GetTextureData();
@@ -218,20 +299,18 @@ namespace Frost
 
 		for (auto& buffer : bufferData)
 			if (buffer.Name == name)
-				return std::make_pair(buffer.Set, buffer.Binding);
+				return { buffer.Set, buffer.Binding };
 
 		for (auto& texture : textureData)
 			if (texture.Name == name)
-				return std::make_pair(texture.Set, texture.Binding);
+				return { texture.Set, texture.Binding };
 
 		for (auto& as : asData)
 			if(as.Name == name)
-				return std::make_pair(as.Set, as.Binding);
+				return { as.Set, as.Binding };
 
-
-
-		FROST_ASSERT(false, "");
-		return std::make_pair(0, 0);
+		FROST_ASSERT_MSG("Couldn't find the location of the member");
+		return { UINT_MAX, UINT_MAX };
 	}
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<Buffer>& storageBuffer)
@@ -244,21 +323,17 @@ namespace Frost
 		m_MaterialData[name].Pointer = storageBuffer.As<void*>();
 
 
-		//VkDescriptorBufferInfo& bufferInfo = BufferInfos.emplace_back();
-		//bufferInfo.buffer = storageBuffer.As<VulkanBuffer>()->GetVulkanBuffer();
-		//bufferInfo.offset = 0;
-		//bufferInfo.range = storageBuffer->GetBufferSize();
-		VkDescriptorBufferInfo& bufferInfo = storageBuffer.As<VulkanBuffer>()->GetVulkanDescriptorInfo();
+		VkDescriptorBufferInfo* bufferInfo = &storageBuffer.As<VulkanBuffer>()->GetVulkanDescriptorInfo();
 
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstBinding = location.second;
+		writeDescriptorSet.dstBinding = location.Binding;
 		writeDescriptorSet.dstArrayElement = 0;
 		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		writeDescriptorSet.pBufferInfo = &bufferInfo;
+		writeDescriptorSet.pBufferInfo = bufferInfo;
 		writeDescriptorSet.descriptorCount = 1;
 
-		writeDescriptorSet.dstSet = m_DescriptorSets[location.first];
+		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];
 
 	}
 
@@ -271,21 +346,17 @@ namespace Frost
 		if (m_MaterialData[name].Type != DataPointer::DataType::BUFFER) FROST_ASSERT(false, "Wrong data type!");
 		m_MaterialData[name].Pointer = uniformBuffer.As<void*>();
 
-		//VkDescriptorBufferInfo& bufferInfo = BufferInfos.emplace_back();
-		//bufferInfo.buffer = uniformBuffer.As<VulkanUniformBuffer>()->GetVulkanBuffer();
-		//bufferInfo.offset = 0;
-		//bufferInfo.range = uniformBuffer->GetBufferSize();
-		VkDescriptorBufferInfo& bufferInfo = uniformBuffer.As<VulkanUniformBuffer>()->GetVulkanDescriptorInfo();
+		VkDescriptorBufferInfo* bufferInfo = &uniformBuffer.As<VulkanUniformBuffer>()->GetVulkanDescriptorInfo();
 
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstBinding = location.second;
+		writeDescriptorSet.dstBinding = location.Binding;
 		writeDescriptorSet.dstArrayElement = 0;
 		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		writeDescriptorSet.pBufferInfo = &bufferInfo;
+		writeDescriptorSet.pBufferInfo = bufferInfo;
 		writeDescriptorSet.descriptorCount = 1;
 
-		writeDescriptorSet.dstSet = m_DescriptorSets[location.first];
+		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];
 	}
 
 
@@ -295,7 +366,7 @@ namespace Frost
 		pendingDescriptor.Texture = texture;
 		auto location = GetShaderLocationFromString(name);
 
-		if (m_MaterialData[name].Type != DataPointer::DataType::TEXTURE) FROST_ASSERT(false, "Wrong data type!");
+		if (m_MaterialData[name].Type != DataPointer::DataType::TEXTURE) FROST_ASSERT_MSG("Wrong data type!");
 		m_MaterialData[name].Pointer = texture.As<void*>();
 
 
@@ -304,13 +375,15 @@ namespace Frost
 
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstBinding = location.second;
+		writeDescriptorSet.dstBinding = location.Binding;
 		writeDescriptorSet.dstArrayElement = 0;
 		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writeDescriptorSet.pImageInfo = imageDescriptorInfo;
 		writeDescriptorSet.descriptorCount = 1;
 
-		writeDescriptorSet.dstSet = m_DescriptorSets[location.first];
+		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];
+
+		UpdateVulkanDescriptorIfNeeded();
 	}
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<Image2D>& image)
@@ -322,7 +395,7 @@ namespace Frost
 
 		// Getting how the Image2D is being used by the shader (as sampled/storage)
 		for (auto& texture : m_ReflectedData.GetTextureData())
-			if (location.first == texture.Set && location.second == texture.Binding)
+			if (location.Set == texture.Set && location.Binding == texture.Binding)
 				shaderTextureType = texture.Type;
 
 		if (m_MaterialData[name].Type != DataPointer::DataType::TEXTURE) FROST_ASSERT(false, "Wrong data type!");
@@ -340,7 +413,7 @@ namespace Frost
 
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstBinding = location.second;
+		writeDescriptorSet.dstBinding = location.Binding;
 		writeDescriptorSet.dstArrayElement = 0;
 		writeDescriptorSet.descriptorType = shaderTextureType == ShaderTextureData::TextureType::Storage ?
 											VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -348,7 +421,7 @@ namespace Frost
 		writeDescriptorSet.pImageInfo = imageDescriptorInfo;
 		writeDescriptorSet.descriptorCount = 1;
 
-		writeDescriptorSet.dstSet = m_DescriptorSets[location.first];
+		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];
 	}
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<TextureCubeMap>& image)
@@ -360,16 +433,11 @@ namespace Frost
 
 		// Getting how the Image2D is being used by the shader (as sampled/storage)
 		for (auto& texture : m_ReflectedData.GetTextureData())
-			if (location.first == texture.Set && location.second == texture.Binding)
+			if (location.Set == texture.Set && location.Binding == texture.Binding)
 				shaderTextureType = texture.Type;
 
 		if (m_MaterialData[name].Type != DataPointer::DataType::TEXTURE) FROST_ASSERT(false, "Wrong data type!");
 		m_MaterialData[name].Pointer = image.As<void*>();
-
-
-		//VkDescriptorImageInfo& imageInfo = ImageInfos.emplace_back();
-		//imageInfo.imageLayout = image->GetVulkanImageLayout();
-		//imageInfo.imageView = image->GetVulkanImageView();
 
 		auto imageCubeMap = image.As<VulkanTextureCubeMap>();
 		VkDescriptorImageInfo* imageDescriptorInfo;
@@ -381,7 +449,7 @@ namespace Frost
 
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstBinding = location.second;
+		writeDescriptorSet.dstBinding = location.Binding;
 		writeDescriptorSet.dstArrayElement = 0;
 		writeDescriptorSet.descriptorType = shaderTextureType == ShaderTextureData::TextureType::Storage ?
 			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -389,7 +457,7 @@ namespace Frost
 		writeDescriptorSet.pImageInfo = imageDescriptorInfo;
 		writeDescriptorSet.descriptorCount = 1;
 
-		writeDescriptorSet.dstSet = m_DescriptorSets[location.first];
+		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];
 	}
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<TopLevelAccelertionStructure>& accelerationStructure)
@@ -404,22 +472,17 @@ namespace Frost
 		m_MaterialData[name].Pointer = accelerationStructure.As<void*>();
 
 		
-		//VkWriteDescriptorSetAccelerationStructureKHR& asCreateInfo = ASInfos.emplace_back();
-		//asCreateInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-		//asCreateInfo.pNext = nullptr;
-		//asCreateInfo.accelerationStructureCount = 1;
-		//asCreateInfo.pAccelerationStructures = &vkAccelerationStructure->GetVulkanAccelerationStructure();
-		VkWriteDescriptorSetAccelerationStructureKHR& asCreateInfo = accelerationStructure.As<VulkanTopLevelAccelertionStructure>()->GetVulkanDescriptorInfo();
+		VkWriteDescriptorSetAccelerationStructureKHR* asCreateInfo = &accelerationStructure.As<VulkanTopLevelAccelertionStructure>()->GetVulkanDescriptorInfo();
 
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstBinding = location.second;
+		writeDescriptorSet.dstBinding = location.Binding;
 		writeDescriptorSet.dstArrayElement = 0;
 		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-		writeDescriptorSet.pNext = &asCreateInfo;
+		writeDescriptorSet.pNext = asCreateInfo;
 		writeDescriptorSet.descriptorCount = 1;
 
-		writeDescriptorSet.dstSet = m_DescriptorSets[location.first];
+		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];
 
 	}
 
@@ -455,10 +518,6 @@ namespace Frost
 
 	void VulkanMaterial::Destroy()
 	{
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-		if (m_ReflectedData.GetDescriptorSetsCount().size() != 0)
-			vkDestroyDescriptorPool(device, m_DescriptorPool, nullptr);
+		//m_MaterialData.clear();
 	}
-
 }

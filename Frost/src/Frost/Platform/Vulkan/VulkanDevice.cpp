@@ -25,6 +25,7 @@ namespace Frost
 		vkDeviceWaitIdle(m_LogicalDevice);
 
 		vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
+		vkDestroyCommandPool(m_LogicalDevice, m_ComputeCommandPool, nullptr);
 		vkctx.deinit();
 	}
 
@@ -439,13 +440,13 @@ namespace Frost
 		}
 	}
 
-	VkCommandBuffer VulkanDevice::AllocateCommandBuffer(bool beginRecording)
+	VkCommandBuffer VulkanDevice::AllocateCommandBuffer(RenderQueueType queueType, bool beginRecording)
 	{
 		VkCommandBuffer cmdBuf;
 
 		VkCommandBufferAllocateInfo allocInfo = {};
 		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.commandPool = m_CommandPool;
+		allocInfo.commandPool = queueType == RenderQueueType::Graphics ? m_CommandPool : m_ComputeCommandPool;
 		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		allocInfo.commandBufferCount = 1;
 
@@ -462,7 +463,7 @@ namespace Frost
 		return cmdBuf;
 	}
 
-	void VulkanDevice::FlushCommandBuffer(VkCommandBuffer commandBuffer)
+	void VulkanDevice::FlushCommandBuffer(VkCommandBuffer commandBuffer, RenderQueueType queueType)
 	{
 		VkQueue graphicsQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().GraphicsFamily.Queue;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -488,7 +489,9 @@ namespace Frost
 		FROST_VKCHECK(vkWaitForFences(m_LogicalDevice, 1, &fence, VK_TRUE, UINT64_MAX));
 
 		vkDestroyFence(m_LogicalDevice, fence, nullptr);
-		vkFreeCommandBuffers(m_LogicalDevice, m_CommandPool, 1, &commandBuffer);
+
+		VkCommandPool commandPool = queueType == RenderQueueType::Graphics ? m_CommandPool : m_ComputeCommandPool;
+		vkFreeCommandBuffers(m_LogicalDevice, commandPool, 1, &commandBuffer);
 	}
 
 	void VulkanDevice::Init(VkInstance& instance, VkDebugUtilsMessengerEXT& dbMessenger)
@@ -559,12 +562,20 @@ namespace Frost
 		vkGetDeviceQueue(m_LogicalDevice, indices.graphicsFamily.value(), 0, &m_QueueFamilies.GraphicsFamily.Queue);
 		vkGetDeviceQueue(m_LogicalDevice, indices.computeFamily.value(), 0, &m_QueueFamilies.ComputeFamily.Queue);
 
-		// Creating the comamnd pool
-		VkCommandPoolCreateInfo cmdPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-		cmdPoolInfo.queueFamilyIndex = m_QueueFamilies.GraphicsFamily.Index;
-		cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		FROST_VKCHECK(vkCreateCommandPool(m_LogicalDevice, &cmdPoolInfo, nullptr, &m_CommandPool));
-
+		{
+			// Creating the graphics comamnd pool
+			VkCommandPoolCreateInfo cmdPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+			cmdPoolInfo.queueFamilyIndex = m_QueueFamilies.GraphicsFamily.Index;
+			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+			FROST_VKCHECK(vkCreateCommandPool(m_LogicalDevice, &cmdPoolInfo, nullptr, &m_CommandPool));
+		}
+		{
+			// Creating the compute comamnd pool
+			VkCommandPoolCreateInfo cmdPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+			cmdPoolInfo.queueFamilyIndex = m_QueueFamilies.ComputeFamily.Index;
+			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+			FROST_VKCHECK(vkCreateCommandPool(m_LogicalDevice, &cmdPoolInfo, nullptr, &m_ComputeCommandPool));
+		}
 	}
 
 

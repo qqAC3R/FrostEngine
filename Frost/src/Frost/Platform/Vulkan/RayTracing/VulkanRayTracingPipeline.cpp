@@ -9,7 +9,6 @@
 
 namespace Frost
 {
-
 	VulkanRayTracingPipeline::VulkanRayTracingPipeline(const RayTracingPipeline::CreateInfo& createInfo)
 		: m_Specification(createInfo)
 	{
@@ -83,6 +82,4 @@ namespace Frost
 						   data);
 
 	}
-
-
 }

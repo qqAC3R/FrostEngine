@@ -3,21 +3,30 @@
 #include "Frost/Renderer/Buffers/VertexBuffer.h"
 #include "Frost/Renderer/Buffers/IndexBuffer.h"
 #include "Frost/Renderer/Texture.h"
+#include "Frost/Renderer/Material.h"
 
 #include "Frost/Math/BoundingBox.h"
 #include <glm/glm.hpp>
 
 #include "Frost/Renderer/RayTracing/AccelerationStructures.h"
 
+struct aiNode;
+struct aiAnimation;
+struct aiNodeAnim;
+struct aiScene;
+
+namespace Assimp { class Importer; }
+
 namespace Frost
 {
 	struct Vertex
 	{
 		glm::vec3 Position;
-		glm::vec2 TexCoords;
+		glm::vec2 TexCoord;
 		glm::vec3 Normal;
-		glm::vec3 Tagent;
+		glm::vec3 Tangent;
 		glm::vec3 Bitangent;
+		uint32_t  MeshIndex;
 	};
 
 	struct Index
@@ -33,6 +42,14 @@ namespace Frost
 		float ior = 1.0f;
 	};
 
+	struct Triangle
+	{
+		Vertex V0, V1, V2;
+
+		Triangle(const Vertex& v0, const Vertex& v1, const Vertex& v2)
+			: V0(v0), V1(v1), V2(v2) {}
+	};
+
 	struct Submesh
 	{
 		uint32_t BaseVertex;
@@ -43,43 +60,63 @@ namespace Frost
 
 		Math::BoundingBox BoundingBox;
 
-		glm::mat4 Transform;
-		glm::mat4 MeshTransform;
+		glm::mat4 Transform{ 1.0f };
+		glm::mat4 MeshTransform{ 1.0f };
 
-		std::string Name;
+		std::string MeshName;
 	};
 
+	struct MaterialUniform
+	{
+		glm::vec3 AlbedoColor = glm::vec3(0.8f);
+		float Emission = 0.0f;
+		float Roughness = 0.0f;
+		float Metalness = 0.0f;
+		bool UseNormalMap = false;
+	};
 
 	class Mesh
 	{
 	public:
 		Mesh(const std::string& filepath, MaterialInstance material);
+		~Mesh();
 
 		const Ref<VertexBuffer>& GetVertexBuffer() const { return m_VertexBuffer; }
 		const Ref<IndexBuffer>& GetIndexBuffer() const { return m_IndexBuffer; }
-		const Ref<BottomLevelAccelerationStructure>& GetAccelerationStructure() const { return m_AccelerationStructure; }
+		const Ref<IndexBuffer>& GetSubmeshIndexBuffer() const { return m_SubmeshIndexBuffers; }
+		Ref<BottomLevelAccelerationStructure> GetAccelerationStructure() const { return m_AccelerationStructure; }
 		const MaterialInstance& GetMaterial() const { return m_Material; }
 		MaterialInstance& GetMaterial() { return m_Material; }
+		Vector<Ref<Material>> GetVulkanMaterial() { return m_Materials; }
 
-		const Math::BoundingBox& GetBoundingBox() const { return m_Submeshes[0].BoundingBox; }
+		const Vector<Submesh> GetSubMeshes() const { return m_Submeshes; }
+
+		const Math::BoundingBox& GetBoundingBox() const { return m_BoundingBox; }
 
 		static Ref<Mesh> Load(const std::string& filepath, MaterialInstance material = {});
 
 		void Destroy();
 	private:
+		void TraverseNodes(aiNode* node, const glm::mat4& parentTransform = glm::mat4(1.0f), uint32_t level = 0);
+	private:
+		Assimp::Importer* m_Importer;
+		Ref<Shader> m_MeshShader;
+		
+		Math::BoundingBox m_BoundingBox;
 		Vector<Submesh> m_Submeshes;
+		Vector<Vertex> m_Vertices;
+		Vector<Index> m_Indices;
+		HashMap<uint32_t, Vector<Triangle>> m_TriangleCache;
 
 		Ref<VertexBuffer> m_VertexBuffer;
 		Ref<IndexBuffer> m_IndexBuffer;
+		Ref<IndexBuffer> m_SubmeshIndexBuffers;
 
-		Vector<Vertex> m_Vertices;
-		Vector<Index> m_Indices;
+		Ref<UniformBuffer> m_MaterialUniforms;
+		Vector<Ref<Texture2D>> m_Textures;
+		Vector<Ref<Material>> m_Materials;
 
 		MaterialInstance m_Material;
-		Vector<Texture2D> m_Albedo;
-
 		Ref<BottomLevelAccelerationStructure> m_AccelerationStructure;
-
-		Math::BoundingBox m_AABB;
 	};
 }

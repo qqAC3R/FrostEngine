@@ -4,8 +4,9 @@
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
+#include "Frost/Platform/Vulkan/VulkanMaterial.h"
 
-#include "imgui.h"
+#include <imgui.h>
 
 namespace Frost
 {
@@ -19,7 +20,7 @@ namespace Frost
 	{
 		m_RenderPassPipeline = renderPassPipeline;
 
-		m_Data.Shader = Shader::Create("assets/shader/compute.glsl");
+		m_Data.Shader = Renderer::GetShaderLibrary()->Get("PreethamSky");
 
 		{
 			ImageSpecification imageSpec{};
@@ -36,7 +37,7 @@ namespace Frost
 		m_Data.Descriptor = Material::Create(m_Data.Shader, "ComputeDescriptor");
 		m_Data.Descriptor->Set("u_CubeMap", m_Data.CubeMap);
 		m_Data.Descriptor->Set("Uniforms", m_Data.UniformBuffer);
-		m_Data.Descriptor->UpdateVulkanDescriptor();
+		m_Data.Descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 
 
 
@@ -48,15 +49,20 @@ namespace Frost
 	void VulkanComputeRenderPass::OnUpdate(const RenderQueue& renderQueue)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		Ref<VulkanComputePipeline> computePipeline = m_Data.ComputePipeline.As<VulkanComputePipeline>();
-		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		Ref<VulkanComputePipeline> vulkanComputePipeline = m_Data.ComputePipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> vulkanMaterial = m_Data.Descriptor.As<VulkanMaterial>();
+
+		// Allocate the commandbuffer for the compute pipeline
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Compute, true);
 
 		m_Data.UniformBuffer->SetData(&m_TurbidityAzimuthInclination);
-		m_Data.ComputePipeline->Bind();
-		m_Data.Descriptor->Bind(computePipeline->GetVulkanPipelineLayout(), GraphicsType::Compute);
-		m_Data.ComputePipeline->Dispatch(512.0f / 32.0f, 512.0f / 32.0f, 6);
+		vulkanMaterial->Bind(cmdBuf, m_Data.ComputePipeline);
+		vulkanComputePipeline->Dispatch(cmdBuf, 512.0f / 32.0f, 512.0f / 32.0f, 6);
 
-		m_Data.CubeMap.As<VulkanTextureCubeMap>()->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
+		//m_Data.CubeMap.As<VulkanTextureCubeMap>()->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
+
+		// Flush the compute commandbuffer
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
 
 		ImGui::Begin("Sky Settings");
 		ImGui::DragFloat("Turbidity", &m_TurbidityAzimuthInclination.x, 0.05f);
@@ -76,7 +82,6 @@ namespace Frost
 
 		m_Data.Descriptor->Destroy();
 		m_Data.ComputePipeline->Destroy();
-		m_Data.Shader->Destroy();
 	}
 
 }

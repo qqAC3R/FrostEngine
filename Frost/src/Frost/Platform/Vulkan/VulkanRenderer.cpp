@@ -3,21 +3,20 @@
 
 #include "Frost/Core/Application.h"
 #include "Frost/Renderer/Renderer.h"
-
 #include "Frost/Renderer/Pipeline.h"
 #include "Frost/Renderer/SceneRenderPass.h"
 #include "Frost/Renderer/Buffers/UniformBuffer.h"
 
+#include "Frost/Platform/Vulkan/VulkanImage.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
-
+#include "Frost/Platform/Vulkan/VulkanMaterial.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanRayTracingPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanComputeRenderPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanCompositePass.h"
 
 #include <imgui.h>
 #include <backends/imgui_impl_vulkan.h>
-
-#include "Frost/Platform/Vulkan/VulkanImage.h"
 
 namespace Frost
 {
@@ -38,30 +37,8 @@ namespace Frost
 		Vector<VkDescriptorPool> DescriptorPools;
 	};
 
-	struct RenderDataQueue
-	{
-		struct Data
-		{
-			Ref<Mesh> Mesh;
-			glm::mat4 Transform;
-		};
-
-		void Add(Ref<Mesh> mesh, glm::mat4 transform)
-		{
-			Data.push_back({ mesh, transform });
-		}
-
-		void Reset()
-		{
-			Data.clear();
-		}
-
-		Vector<RenderDataQueue::Data> Data;
-	};
-
 	static uint32_t s_ImageIndex = 0;
 	static RenderQueue s_RenderQueue[FRAMES_IN_FLIGHT];
-	static RenderDataQueue s_RenderDataQueue[FRAMES_IN_FLIGHT];
 	static RenderData* s_Data;
 
 	struct PipelinePushConstant
@@ -73,14 +50,18 @@ namespace Frost
 	void VulkanRenderer::Init()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
 		s_Data = new RenderData;
+
+		// Initilization
+		Application::Get().GetImGuiLayer()->OnInit(VulkanContext::GetSwapChain()->GetRenderPass());
+		VulkanMaterial::AllocateDescriptorPool();
 
 
 		// Scene render passes
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
-		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputeRenderPass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
 
 		// Creating the semaphores and fences
@@ -122,10 +103,6 @@ namespace Frost
 			pool_info.pPoolSizes = pool_sizes;
 			FROST_VKCHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool));
 		}
-
-		// Initalizing the ImGui layer by sending it the default renderpass
-		Application::Get().GetImGuiLayer()->OnInit(VulkanContext::GetSwapChain()->GetRenderPass());
-
 	}
 
 	void VulkanRenderer::BeginFrame()
@@ -134,7 +111,6 @@ namespace Frost
 		{
 			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-			VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 
 			/* Acquire the image */
 			VulkanContext::GetSwapChain()->BeginFrame(s_Data->AvailableSemapore[currentFrameIndex], &s_ImageIndex);
@@ -202,8 +178,6 @@ namespace Frost
 			/* Updating all the graphics passes */
 			s_Data->SceneRenderPasses->UpdateRenderPasses(s_RenderQueue[currentFrameIndex]);
 			s_RenderQueue[currentFrameIndex].Reset();
-			//FROST_CORE_INFO(s_RenderDataQueue[currentFrameIndex].Data.size());
-			s_RenderDataQueue[currentFrameIndex].Reset();
 
 
 			/* Rendering a quad for the swap chain image */
@@ -254,7 +228,6 @@ namespace Frost
 		{
 			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 			s_RenderQueue[currentFrameIndex].Add(mesh, transform);
-			//s_RenderDataQueue[currentFrameIndex].Add(mesh, transform);
 		});
 	}
 
@@ -287,6 +260,7 @@ namespace Frost
 			vkDestroyFence(device, s_Data->FencesInFlight[i], nullptr);
 			vkDestroyDescriptorPool(device, s_Data->DescriptorPools[i], nullptr);
 		}
+		VulkanMaterial::DeallocateDescriptorPool();
 	}
 
 	void VulkanRenderer::Render()
@@ -300,7 +274,8 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		if(id == 0)
 			return s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[currentFrameIndex];
-		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
+		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, currentFrameIndex);
+		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
 	}
 
 	VkDescriptorSet VulkanRenderer::AllocateDescriptorSet(VkDescriptorSetAllocateInfo allocInfo)

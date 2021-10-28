@@ -7,7 +7,7 @@
 namespace Frost
 {
 
-	Ref<Buffer> Buffer::Create(uint32_t size, std::initializer_list<BufferType> types)
+	Ref<Buffer> Buffer::Create(uint64_t size, std::initializer_list<BufferType> types)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -19,7 +19,7 @@ namespace Frost
 		return nullptr;
 	}
 
-	Ref<Buffer> Buffer::Create(uint32_t size, void* data, std::initializer_list<BufferType> types)
+	Ref<Buffer> Buffer::Create(uint64_t size, void* data, std::initializer_list<BufferType> types)
 	{
 		switch (Renderer::GetAPI())
 		{

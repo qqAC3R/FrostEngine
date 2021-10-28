@@ -32,12 +32,19 @@ namespace Frost
 		if (stbi_is_hdr(filepath.c_str()))
 		{
 			textureData = (void*)stbi_loadf(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-			imageFormat = ImageFormat::RGBA8;
+			imageFormat = ImageFormat::RGBA32F;
 		}
 		else
 		{
+			stbi_set_flip_vertically_on_load(true);
 			textureData = (void*)stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
 			imageFormat = ImageFormat::RGBA8;
+		}
+
+		if (textureData == nullptr)
+		{
+			m_IsLoaded = false;
+			return;
 		}
 
 		m_Width = width;
@@ -59,6 +66,8 @@ namespace Frost
 		Ref<VulkanImage2D> vulkanImage = m_Image.As<VulkanImage2D>();
 		m_DescriptorInfo[DescriptorImageType::Sampled] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
 		m_DescriptorInfo[DescriptorImageType::Storage] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
+
+		stbi_image_free(textureData);
 	}
 
 	void VulkanTexture2D::Destroy()
@@ -93,7 +102,7 @@ namespace Frost
 		VkImageLayout textureLayout = Utils::GetImageLayout(imageSpecification.Usage);
 
 		// Recording a temporary commandbuffer for transitioning
-		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 
 		// Generating mip maps if necessary and changing the layout to SHADER_READ_ONLY_OPTIMAL
 		if (imageSpecification.Mips > 1)

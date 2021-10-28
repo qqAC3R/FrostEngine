@@ -10,7 +10,6 @@ namespace Frost
 	struct QueueFamilyIndices
 	{
 		std::optional<uint32_t> graphicsFamily;
-		//std::optional<uint32_t> presentFamily;
 		std::optional<uint32_t> computeFamily;
 
 		bool isComplete()
@@ -45,6 +44,10 @@ namespace Frost
 		QueueFamily TransferFamily;
 	};
 
+	enum class RenderQueueType
+	{
+		Graphics, Compute
+	};
 
 	class VulkanDevice
 	{
@@ -63,21 +66,19 @@ namespace Frost
 
 		VkFormat FindDepthFormat();
 
-		VkCommandBuffer AllocateCommandBuffer(bool beginRecording = false);
-		void FlushCommandBuffer(VkCommandBuffer commandBuffer);
+		VkCommandBuffer AllocateCommandBuffer(RenderQueueType queueType = RenderQueueType::Graphics, bool beginRecording = false);
+		void FlushCommandBuffer(VkCommandBuffer commandBuffer, RenderQueueType queueType = RenderQueueType::Graphics);
 
 	private:
 		void CreateDevice(std::vector<const char*> enabledExtensions, void* pNextChain, bool useSwapChain, VkQueueFlags requestedQueueTypes);
-
 		bool ExtensionSupported(std::string extension) { return false; }
-
 		VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
-
 	private:
 		VkPhysicalDevice m_PhysicalDevice;
 		VkDevice m_LogicalDevice;
 
 		VkCommandPool m_CommandPool;
+		VkCommandPool m_ComputeCommandPool;
 
 		QueueFamilies m_QueueFamilies{};
 

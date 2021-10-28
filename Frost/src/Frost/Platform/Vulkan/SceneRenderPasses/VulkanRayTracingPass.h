@@ -36,6 +36,8 @@ namespace Frost
 			Ref<Buffer> SceneVertexData[FRAMES_IN_FLIGHT];
 			Ref<Buffer> SceneIndexData[FRAMES_IN_FLIGHT];
 			Ref<Buffer> SceneTransformData[FRAMES_IN_FLIGHT];
+			Ref<Buffer> SceneGeometryOffsets[FRAMES_IN_FLIGHT];
+			Ref<Buffer> SceneGeometrySubmeshCount[FRAMES_IN_FLIGHT];
 
 			Ref<Image2D> DisplayTexture[FRAMES_IN_FLIGHT];;
 			

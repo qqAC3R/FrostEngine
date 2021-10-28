@@ -12,54 +12,9 @@ namespace Frost
 
 	namespace Utils
 	{
-
-		static VkBufferUsageFlagBits BufferTypeToVk(BufferType usage)
-		{
-			switch (usage)
-			{
-				case BufferType::Uniform:						return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-				case BufferType::Storage:						return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-				case BufferType::Vertex:						return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-				case BufferType::Index:							return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-				case BufferType::AccelerationStructure:			return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
-				case BufferType::AccelerationStructureReadOnly:	return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-				case BufferType::TransferSrc:					return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-				case BufferType::TransferDst:					return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-				case BufferType::ShaderAddress:					return VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-				case BufferType::ShaderBindingTable:			return VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
-			}
-
-			FROST_ASSERT(0, "Couldn't find the buffer usgae flag bits");
-			return VkBufferUsageFlagBits();
-		}
-
-		static VmaMemoryUsage GetVmaMemoryUsage(MemoryUsage usage)
-		{
-			switch (usage)
-			{
-				case MemoryUsage::CPU_ONLY:	   return VMA_MEMORY_USAGE_CPU_ONLY;
-				case MemoryUsage::CPU_AND_GPU: return VMA_MEMORY_USAGE_CPU_TO_GPU;
-				case MemoryUsage::GPU_ONLY:    return VMA_MEMORY_USAGE_GPU_ONLY;
-			}
-			return VMA_MEMORY_USAGE_UNKNOWN;
-		}
-
-		static uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
-		{
-			VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
-
-			VkPhysicalDeviceMemoryProperties memProperties;
-			vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
-
-			for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-				if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-					return i;
-				}
-			}
-
-			FROST_ASSERT(false, "Failed to find suitable memory type!");
-			return 0;
-		}
+		static VkBufferUsageFlagBits BufferTypeToVk(BufferType usage);
+		static VmaMemoryUsage GetVmaMemoryUsage(MemoryUsage usage);
+		static uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	}
 
 	void VulkanAllocator::Init()
@@ -90,23 +45,17 @@ namespace Frost
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 		VkBufferUsageFlags bufferUsage{};
-		for (auto& type : usage)
-			bufferUsage |= Utils::BufferTypeToVk(type);
-
+		for (auto& type : usage) { bufferUsage |= Utils::BufferTypeToVk(type); }
 
 		VkBufferCreateInfo bufferInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-		bufferInfo.size = size;
+		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		bufferInfo.usage = bufferUsage;
+		bufferInfo.size = size;
 
 		VmaAllocationCreateInfo allocCreateInfo{};
 		allocCreateInfo.usage = Utils::GetVmaMemoryUsage(memoryFlags);
-		//allocCreateInfo.preferredFlags = memoryFlags;
 
-		VmaAllocation allocation;
-		vmaCreateBuffer(s_Allocator, &bufferInfo, &allocCreateInfo, &buffer, &allocation, nullptr);
-
-		bufferMemory.allocation = allocation;
-
+		vmaCreateBuffer(s_Allocator, &bufferInfo, &allocCreateInfo, &buffer, &bufferMemory.allocation, nullptr);
 	}
 
 	void VulkanAllocator::AllocateBuffer(VkDeviceSize size, std::vector<BufferType> usage,
@@ -114,16 +63,13 @@ namespace Frost
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-		std::vector<BufferType> usages;
-		for (auto& type : usage)
-			usages.push_back(type);
-		usages.push_back(BufferType::TransferDst);
+		usage.push_back(BufferType::TransferDst);
 
 
 		// Initializating the staging buffer
 		VkBuffer stagingBuffer;
 		VulkanMemoryInfo stagingBufferMemory;
-		AllocateBuffer(size, { BufferType::TransferSrc }, MemoryUsage::CPU_AND_GPU, stagingBuffer, stagingBufferMemory);
+		AllocateBuffer(size, { BufferType::TransferSrc }, MemoryUsage::CPU_ONLY, stagingBuffer, stagingBufferMemory);
 
 		// Binding the data to the staging buffer
 		void* stageData;
@@ -132,16 +78,15 @@ namespace Frost
 		vmaUnmapMemory(s_Allocator, stagingBufferMemory.allocation);
 
 		// Creating the buffer allocated on the gpu
-		AllocateBuffer(size, usages, MemoryUsage::GPU_ONLY, buffer, bufferMemory);
+		AllocateBuffer(size, usage, MemoryUsage::GPU_ONLY, buffer, bufferMemory);
 
 
 		// Copying the data from the staging buffer to the allocated one on the gpu
-		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 		VkBufferCopy copyRegion{};
 		copyRegion.size = size;
 		vkCmdCopyBuffer(cmdBuf, stagingBuffer, buffer, 1, &copyRegion);
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
-
 
 		vmaDestroyBuffer(s_Allocator, stagingBuffer, stagingBufferMemory.allocation);
 	}
@@ -183,14 +128,12 @@ namespace Frost
 
 	void VulkanAllocator::DeleteBuffer(VkBuffer& buffer, VulkanMemoryInfo& memory)
 	{
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
 		vmaDestroyBuffer(s_Allocator, buffer, memory.allocation);
 	}
 
 	void VulkanAllocator::CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
 	{
-		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 
 		VkBufferCopy copyRegion{};
 		copyRegion.size = size;
@@ -208,6 +151,58 @@ namespace Frost
 	void VulkanAllocator::UnbindBuffer(VulkanMemoryInfo& memory)
 	{
 		vmaUnmapMemory(s_Allocator, memory.allocation);
+	}
+
+	namespace Utils
+	{
+
+		static VkBufferUsageFlagBits BufferTypeToVk(BufferType usage)
+		{
+			switch (usage)
+			{
+			case BufferType::Uniform:						return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+			case BufferType::Storage:						return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+			case BufferType::Vertex:						return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			case BufferType::Index:							return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+			case BufferType::AccelerationStructure:			return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
+			case BufferType::AccelerationStructureReadOnly:	return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+			case BufferType::TransferSrc:					return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			case BufferType::TransferDst:					return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			case BufferType::ShaderAddress:					return VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+			case BufferType::ShaderBindingTable:			return VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
+			}
+
+			FROST_ASSERT(0, "Couldn't find the buffer usgae flag bits");
+			return VkBufferUsageFlagBits();
+		}
+
+		static VmaMemoryUsage GetVmaMemoryUsage(MemoryUsage usage)
+		{
+			switch (usage)
+			{
+			case MemoryUsage::CPU_ONLY:	   return VMA_MEMORY_USAGE_CPU_ONLY;
+			case MemoryUsage::CPU_AND_GPU: return VMA_MEMORY_USAGE_CPU_TO_GPU;
+			case MemoryUsage::GPU_ONLY:    return VMA_MEMORY_USAGE_GPU_ONLY;
+			}
+			return VMA_MEMORY_USAGE_UNKNOWN;
+		}
+
+		static uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+		{
+			VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
+
+			VkPhysicalDeviceMemoryProperties memProperties;
+			vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+			for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+				if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+					return i;
+				}
+			}
+
+			FROST_ASSERT(false, "Failed to find suitable memory type!");
+			return 0;
+		}
 	}
 
 }

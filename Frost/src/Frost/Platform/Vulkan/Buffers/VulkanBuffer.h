@@ -12,13 +12,13 @@ namespace Frost
 	class VulkanBuffer : public Buffer
 	{
 	public:
-		VulkanBuffer(uint32_t size, std::initializer_list<BufferType> types);
-		VulkanBuffer(uint32_t size, void* data, std::initializer_list<BufferType> types);
+		VulkanBuffer(uint64_t size, std::initializer_list<BufferType> types);
+		VulkanBuffer(uint64_t size, void* data, std::initializer_list<BufferType> types);
 		virtual ~VulkanBuffer();
 
-		virtual uint32_t GetBufferSize() const override { return m_BufferData.Size; }
+		virtual uint64_t GetBufferSize() const override { return m_BufferData.Size; }
 		virtual BufferData GetBufferData() const override { return m_BufferData; }
-		virtual void SetData(uint32_t size, void* data) override;
+		virtual void SetData(uint64_t size, void* data) override;
 		virtual void SetData(void* data) override;
 
 		VkBuffer GetVulkanBuffer() const { return m_Buffer; }

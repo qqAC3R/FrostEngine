@@ -4,6 +4,7 @@
 #include "Frost/Platform/Vulkan/VulkanShader.h"
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
 #include "Frost/Platform/Vulkan/VulkanRenderPass.h"
+#include "Frost/Platform/Vulkan/VulkanFramebuffer.h"
 
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferLayout.h"
@@ -141,11 +142,30 @@ namespace Frost
 		rasterizer.depthBiasSlopeFactor = 0.0f;
 
 
+
+		Vector<Ref<Image2D>> attachments = createInfo.RenderPass->GetFramebuffer(0).As<VulkanFramebuffer>()->GetColorAttachments();
+		uint32_t colorAttachmentCount = 0;
+		uint32_t depthAttachmentCount = 0;
+		for (auto& attachment : attachments)
+		{
+
+			switch (attachment->GetSpecification().Format)
+			{
+			case ImageFormat::RGBA8:
+			case ImageFormat::RGBA16F:
+			case ImageFormat::RGBA32F: colorAttachmentCount++; break;
+
+			case ImageFormat::Depth24Stencil8:
+			case ImageFormat::Depth32: depthAttachmentCount++; break;
+			}
+		}
+		if (depthAttachmentCount > 1) FROST_ASSERT_MSG("Graphics pipeline supports a maximum of 1 depth attachment");
+
+
 		VkPipelineMultisampleStateCreateInfo multisampling{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
 		multisampling.sampleShadingEnable = VK_FALSE;
 		multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-		// TODO: DepthStencil Option
 		VkPipelineDepthStencilStateCreateInfo depthStencil{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
 		depthStencil.depthTestEnable = createInfo.UseDepth ? true : false;
 		depthStencil.depthWriteEnable = createInfo.UseDepth ? true : false;;
@@ -153,15 +173,18 @@ namespace Frost
 		depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 		depthStencil.depthBoundsTestEnable = VK_FALSE;
 
-		VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-		colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		colorBlendAttachment.blendEnable = VK_FALSE;
-
+		Vector<VkPipelineColorBlendAttachmentState> colorBlendAttachment(colorAttachmentCount);
+		for (auto& colorAttachment : colorBlendAttachment)
+		{
+			colorAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+			colorAttachment.blendEnable = VK_FALSE;
+		}
+		
 		VkPipelineColorBlendStateCreateInfo colorBlending{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
 		colorBlending.logicOpEnable = VK_FALSE;
 		colorBlending.logicOp = VK_LOGIC_OP_COPY;
-		colorBlending.attachmentCount = 1;
-		colorBlending.pAttachments = &colorBlendAttachment;
+		colorBlending.attachmentCount = colorBlendAttachment.size();
+		colorBlending.pAttachments = colorBlendAttachment.data();
 		colorBlending.blendConstants[0] = 0.0f;
 		colorBlending.blendConstants[1] = 0.0f;
 		colorBlending.blendConstants[2] = 0.0f;
@@ -190,7 +213,7 @@ namespace Frost
 		dynamicStatesCreateInfo.pDynamicStates = dynamicStates.data();
 
 		VkGraphicsPipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-		pipelineInfo.pDepthStencilState = &depthStencil;
+		pipelineInfo.pDepthStencilState = depthAttachmentCount == 1 ? &depthStencil : nullptr;
 		pipelineInfo.stageCount = (uint32_t)shaderStages.size();
 		pipelineInfo.pStages = shaderStages.data();
 		pipelineInfo.pVertexInputState = &vertexInputInfo;

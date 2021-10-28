@@ -13,8 +13,7 @@ namespace Frost
 
 	enum class GraphicsType
 	{
-		Graphics, Compute,
-		Raytracing
+		Graphics, Compute, Raytracing
 	};
 
 	class GraphicsContext
@@ -27,7 +26,6 @@ namespace Frost
 
 		/* OpenGL Specific */
 		virtual void SwapBuffers() = 0;
-
 
 		/* Vulkan Specific */
 		virtual WindowDimension GetWindowDimension() = 0;

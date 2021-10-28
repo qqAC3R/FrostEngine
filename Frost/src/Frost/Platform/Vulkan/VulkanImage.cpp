@@ -24,7 +24,7 @@ namespace Frost
 			m_Image, m_ImageMemory);
 
 		// Recording a temporary commandbuffer for transitioning
-		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics ,true);
 
 		// Generating mip maps if the mip count is higher than 1, else just transition to user's input `VkImageLayout`
 		if (specification.Mips > 1)
@@ -89,7 +89,7 @@ namespace Frost
 		);
 
 		// Recording a temporary commandbuffer for transitioning
-		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 
 
 		// Changing the layout for copying the staging buffer to the image
@@ -161,7 +161,7 @@ namespace Frost
 		subresourceRange.aspectMask = imageAspectFlags;
 		subresourceRange.baseMipLevel = 0;
 		subresourceRange.levelCount = m_ImageSpecification.Mips;
-		subresourceRange.layerCount = 1; // TODO: For cubemaps is 6
+		subresourceRange.layerCount = 1;
 		Utils::SetImageLayout(cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
 
 		m_ImageLayout = newImageLayout;

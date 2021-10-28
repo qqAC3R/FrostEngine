@@ -10,24 +10,19 @@
 namespace Frost
 {
 
-	static uint32_t s_BlasIDs = 0;
-
-	VulkanBottomLevelAccelerationStructure::VulkanBottomLevelAccelerationStructure(const Ref<VertexBuffer>& vertexBuffer,
-																				   const Ref<IndexBuffer>& indexBuffer)
+	VulkanBottomLevelAccelerationStructure::VulkanBottomLevelAccelerationStructure(const MeshASInfo& meshInfo)
 	{
-		m_GeometryInfo = MeshToVkGeometry(vertexBuffer, indexBuffer);
-
+		m_GeometryInfo = MeshToVkGeometry(meshInfo);
 		BuildBLAS(m_GeometryInfo);
-
-		m_AccelerationStructureID = s_BlasIDs;
-		s_BlasIDs++;
+		UpdateInstanceInfo();
 	}
 
 	VulkanBottomLevelAccelerationStructure::~VulkanBottomLevelAccelerationStructure()
 	{
+		Destroy();
 	}
 
-	VulkanBottomLevelAccelerationStructure::GeometryInfo VulkanBottomLevelAccelerationStructure::MeshToVkGeometry(const Ref<VertexBuffer>& vertexBuffer,																													const Ref<IndexBuffer>& indexBuffer)
+	VulkanBottomLevelAccelerationStructure::GeometryInfo VulkanBottomLevelAccelerationStructure::MeshToVkGeometry(const MeshASInfo& meshInfo)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -38,39 +33,53 @@ namespace Frost
 			VkBufferDeviceAddressInfo bufferInfo{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
 
 
-			bufferInfo.buffer = vertexBuffer.As<VulkanVertexBuffer>()->GetVulkanBuffer();
+			bufferInfo.buffer = meshInfo.MeshVertexBuffer.As<VulkanVertexBuffer>()->GetVulkanBuffer();
 			vertexAddressBuffer = vkGetBufferDeviceAddress(device, &bufferInfo);
 
-			bufferInfo.buffer = indexBuffer.As<VulkanIndexBuffer>()->GetVulkanBuffer();
+			bufferInfo.buffer = meshInfo.MeshIndexBuffer.As<VulkanIndexBuffer>()->GetVulkanBuffer();
 			indexAddressBuffer = vkGetBufferDeviceAddress(device, &bufferInfo);
 
 		}
 
-		uint32_t maxPrimitiveCount = indexBuffer->GetCount();
-
-		VkAccelerationStructureGeometryTrianglesDataKHR trianglesData{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR };
-		trianglesData.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-		trianglesData.vertexData = *(VkDeviceOrHostAddressConstKHR*)&vertexAddressBuffer;
-		trianglesData.vertexStride = sizeof(Vertex);
-		trianglesData.indexType = VK_INDEX_TYPE_UINT32;
-		trianglesData.indexData = *(VkDeviceOrHostAddressConstKHR*)&indexAddressBuffer;
-		trianglesData.transformData = VkDeviceOrHostAddressConstKHR();
-		trianglesData.maxVertex = vertexBuffer->GetBufferSize() / sizeof(Vertex);
-
-		VkAccelerationStructureGeometryKHR ASGeometry{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
-		ASGeometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-		ASGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-		ASGeometry.geometry.triangles = trianglesData;
-
-		VkAccelerationStructureBuildRangeInfoKHR offset{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
-		offset.firstVertex = 0;
-		offset.transformOffset = 0;
-		offset.primitiveCount = maxPrimitiveCount;
-		offset.primitiveOffset = 0;
-
 		VulkanBottomLevelAccelerationStructure::GeometryInfo input;
-		input.Geometry.emplace_back(ASGeometry);
-		input.BuildOffsetInfo.emplace_back(offset);
+
+		uint32_t lastBaseIndex = 0;
+		uint32_t forLoopIndex = 0;
+		for (auto& subMesh : meshInfo.SubMeshes)
+		{
+			VkAccelerationStructureGeometryTrianglesDataKHR trianglesData{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR };
+			trianglesData.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+			trianglesData.vertexData = *(VkDeviceOrHostAddressConstKHR*)&vertexAddressBuffer;
+			trianglesData.vertexStride = sizeof(Vertex);
+			trianglesData.maxVertex = std::abs((int)subMesh.BaseVertex - (int)subMesh.VertexCount);
+			//trianglesData.maxVertex = meshInfo.VertexBuffer->GetBufferSize() / sizeof(Vertex);
+			trianglesData.indexType = VK_INDEX_TYPE_UINT32;
+			trianglesData.indexData = *(VkDeviceOrHostAddressConstKHR*)&indexAddressBuffer;
+			trianglesData.transformData = VkDeviceOrHostAddressConstKHR();
+
+			VkAccelerationStructureGeometryKHR ASGeometry{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
+			ASGeometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+			ASGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+			ASGeometry.geometry.triangles = trianglesData;
+
+			VkAccelerationStructureBuildRangeInfoKHR offset{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
+			offset.firstVertex = subMesh.BaseVertex;
+			offset.transformOffset = 0;
+			offset.primitiveOffset = (subMesh.BaseIndex) * sizeof(uint32_t);
+			offset.primitiveCount = subMesh.IndexCount / 3;
+
+			input.BuildOffsetInfo.emplace_back(offset);
+			input.Geometry.emplace_back(ASGeometry);
+			 
+			// -----------------------------------------------
+			lastBaseIndex = subMesh.BaseIndex / 3;
+			m_GeometryOffset.push_back(lastBaseIndex);
+			// -----------------------------------------------
+			//uint64_t bda = meshInfo.SubmeshIndexBuffers[forLoopIndex].As<VulkanIndexBuffer>()->GetVulkanBufferAddress();
+			//u_SubmeshIndexBufferBDA.push_back(bda);
+			//forLoopIndex++;
+		}
+		m_GeometryMaxOffset = meshInfo.SubMeshes.size();
 
 		return input;
 	}
@@ -99,8 +108,6 @@ namespace Frost
 		VkAccelerationStructureBuildSizesInfoKHR sizeInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
 		vkGetAccelerationStructureBuildSizesKHR(device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildInfos, maxPrimCount.data(), &sizeInfo);
 
-
-
 		{
 			// Build the acceleration structure
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -109,6 +116,7 @@ namespace Frost
 			Vector<BufferType> usages;
 			usages.push_back(BufferType::AccelerationStructure);
 			usages.push_back(BufferType::ShaderAddress);
+			usages.push_back(BufferType::Storage);
 
 			VulkanAllocator::AllocateBuffer(m_ASBufferSize, usages, MemoryUsage::GPU_ONLY, m_ASBuffer, m_ASBufferMemory);
 
@@ -140,18 +148,17 @@ namespace Frost
 		bool doCompaction = (flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR) == VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
 
 		// Allocate a query pool for storing the needed size for every BLAS compaction.
-		VkQueryPoolCreateInfo qpci{ VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
-		qpci.queryCount = 1;
-		qpci.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
+		VkQueryPoolCreateInfo queryPoolCreateInfo{ VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
+		queryPoolCreateInfo.queryCount = 1;
+		queryPoolCreateInfo.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
 		VkQueryPool queryPool;
-		vkCreateQueryPool(device, &qpci, nullptr, &queryPool);
+		vkCreateQueryPool(device, &queryPoolCreateInfo, nullptr, &queryPool);
 		vkResetQueryPool(device, queryPool, 0, 1);
 
 
 
 		{
-
-			VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+			VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 
 			// Convert user vector of offsets to vector of pointer-to-offset (required by vk).
 			// This defines which (sub)section of the vertex/index arrays will be built into the BLAS.
@@ -186,14 +193,14 @@ namespace Frost
 			}
 
 			VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
-	}
+		}
 
 
 
 		// Compacting all BLAS
 		if (doCompaction)
 		{
-			VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+			VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 
 			// Get the size result back
 			Vector<VkDeviceSize> compactSize(1);
@@ -253,23 +260,39 @@ namespace Frost
 		vkDestroyQueryPool(device, queryPool, nullptr);
 	}
 
-	void VulkanBottomLevelAccelerationStructure::Destroy()
+	void VulkanBottomLevelAccelerationStructure::UpdateInstanceInfo()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-		vkDestroyAccelerationStructureKHR(device, m_AccelerationStructure, nullptr);
-		VulkanAllocator::DeleteBuffer(m_ASBuffer, m_ASBufferMemory);
+
+		// Getting the device address of the mesh blas
+		VkAccelerationStructureDeviceAddressInfoKHR addressInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
+		addressInfo.accelerationStructure = m_AccelerationStructure;
+		VkDeviceAddress blasAddress = vkGetAccelerationStructureDeviceAddressKHR(device, &addressInfo);
+
+
+		// Setting up the instance
+		//glm::mat4 transp = glm::transpose(transform);
+		//memcpy(&accelerationStructureInstanceInfo.transform, &transp, sizeof(accelerationStructureInstanceInfo.transform));
+
+		//accelerationStructureInstanceInfo.instanceCustomIndex = blasIndexID;
+		VkAccelerationStructureInstanceKHR accelerationStructureInstanceInfo{};
+		accelerationStructureInstanceInfo.mask = 0xFF; // Visibility mask, will be AND-ed with ray mask
+		accelerationStructureInstanceInfo.instanceShaderBindingTableRecordOffset = 0; // Idk
+		accelerationStructureInstanceInfo.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR; // Probably will be always this
+		accelerationStructureInstanceInfo.accelerationStructureReference = blasAddress;
+
+		m_InstanceKHR = accelerationStructureInstanceInfo;
 	}
 
-
-
-
-
-
-
-
-
-
+	void VulkanBottomLevelAccelerationStructure::Destroy()
+	{
+		if (m_AccelerationStructure == VK_NULL_HANDLE) return;
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		vkDestroyAccelerationStructureKHR(device, m_AccelerationStructure, nullptr);
+		VulkanAllocator::DeleteBuffer(m_ASBuffer, m_ASBufferMemory);
+		m_AccelerationStructure = VK_NULL_HANDLE;
+	}
 
 
 	VulkanTopLevelAccelertionStructure::VulkanTopLevelAccelertionStructure()
@@ -282,9 +305,29 @@ namespace Frost
 
 	void VulkanTopLevelAccelertionStructure::UpdateAccelerationStructure(Vector<std::pair<Ref<Mesh>, glm::mat4>>& meshes)
 	{
+		uint32_t blasIndex = 0;
+		VkDeviceAddress deviceAddressTemp;
+
 		Vector<VkAccelerationStructureInstanceKHR> accelerationStructureInstances;
-		for(auto mesh : meshes)
-			accelerationStructureInstances.emplace_back(InstanceToVkGeometryInstance(mesh));
+		for (auto& mesh : meshes)
+		{
+			auto bottomLevelAS = mesh.first->GetAccelerationStructure();
+			// Getting the `VkAccelerationStructureInstanceKHR` from the blas
+			VkAccelerationStructureInstanceKHR instance = bottomLevelAS.As<VulkanBottomLevelAccelerationStructure>()->m_InstanceKHR;
+
+			// Setting the index by order
+			instance.instanceCustomIndex = blasIndex;
+				
+			// Copying the transform matrix
+			glm::mat4 transp = glm::transpose(mesh.second);
+			memcpy(&instance.transform, &transp, sizeof(instance.transform));
+
+			accelerationStructureInstances.emplace_back(instance);
+			blasIndex++;
+
+
+			//auto meshInstance = InstanceToVkGeometryInstance(as, mesh.second, blasIndex);
+		}
 
 		BuildTLAS(accelerationStructureInstances);
 		UpdateDescriptor();
@@ -292,6 +335,7 @@ namespace Frost
 
 	void VulkanTopLevelAccelertionStructure::Destroy()
 	{
+		if (m_AccelerationStructure == VK_NULL_HANDLE) return;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 		vkDestroyAccelerationStructureKHR(device, m_AccelerationStructure, nullptr);
@@ -299,26 +343,26 @@ namespace Frost
 		m_InstanceBuffer->Destroy();
 	}
 
-	VkAccelerationStructureInstanceKHR VulkanTopLevelAccelertionStructure::InstanceToVkGeometryInstance(std::pair<Ref<Mesh>, glm::mat4>& meshBLAS)
+	VkAccelerationStructureInstanceKHR VulkanTopLevelAccelertionStructure::InstanceToVkGeometryInstance (
+		Ref<BottomLevelAccelerationStructure> blas, const glm::mat4& transform, uint32_t blasIndexID
+	)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 
 		// Getting the device address of the mesh blas
 		VkAccelerationStructureDeviceAddressInfoKHR addressInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
-		auto blas = meshBLAS.first->GetAccelerationStructure();
 		auto vkBlas = blas.As<VulkanBottomLevelAccelerationStructure>();
 		addressInfo.accelerationStructure = vkBlas->m_AccelerationStructure;
 
 		VkDeviceAddress blasAddress = vkGetAccelerationStructureDeviceAddressKHR(device, &addressInfo);
 
-
 		// Setting up the instance
 		VkAccelerationStructureInstanceKHR accelerationStructureInstanceInfo{};
-		glm::mat4 transp = glm::transpose(meshBLAS.second);
+		glm::mat4 transp = glm::transpose(transform);
 		memcpy(&accelerationStructureInstanceInfo.transform, &transp, sizeof(accelerationStructureInstanceInfo.transform));
 
-		accelerationStructureInstanceInfo.instanceCustomIndex = vkBlas->m_AccelerationStructureID;
+		accelerationStructureInstanceInfo.instanceCustomIndex = blasIndexID;
 		accelerationStructureInstanceInfo.mask = 0xFF; // Visibility mask, will be AND-ed with ray mask
 		accelerationStructureInstanceInfo.instanceShaderBindingTableRecordOffset = 0; // Idk
 		accelerationStructureInstanceInfo.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR; // Probably will be always this
@@ -334,7 +378,7 @@ namespace Frost
 		auto flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
 
 		
-		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 		
 		if (!m_AccelerationStructure)
 		{

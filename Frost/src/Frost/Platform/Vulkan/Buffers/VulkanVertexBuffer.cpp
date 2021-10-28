@@ -9,7 +9,7 @@
 namespace Frost
 {
 
-	VulkanVertexBuffer::VulkanVertexBuffer(void* verticies, uint32_t size)
+	VulkanVertexBuffer::VulkanVertexBuffer(void* verticies, uint64_t size)
 		: m_BufferSize(size)
 	{
 		m_VertexBuffer = Buffer::Create(size, verticies, { BufferType::Vertex, BufferType::AccelerationStructureReadOnly });
@@ -24,6 +24,7 @@ namespace Frost
 
 	VulkanVertexBuffer::~VulkanVertexBuffer()
 	{
+		m_VertexBuffer->Destroy();
 	}
 
 	void VulkanVertexBuffer::Bind() const

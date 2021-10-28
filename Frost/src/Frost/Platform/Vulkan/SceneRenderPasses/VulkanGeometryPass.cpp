@@ -8,6 +8,7 @@
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
 #include "Frost/Platform/Vulkan/VulkanImage.h"
+#include "Frost/Platform/Vulkan/VulkanMaterial.h"
 
 namespace Frost
 {
@@ -25,18 +26,41 @@ namespace Frost
 	{
 		m_RenderPassPipeline = renderPassPipeline;
 
-		m_Data.Shader = Shader::Create("assets/shader/geometry_pass.glsl");
+		m_Data.Shader = Renderer::GetShaderLibrary()->Get("GeometryPass");
 
 		RenderPassSpecification renderPassSpec = 
 		{
 			1600, 900, 3,
 			{
+				// Position Attachment
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
+				// Normals Attachment
+				{
+					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
+				// Albedo Attachment
+				{
+					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
+				// Composite Attachment
+				{
+					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
+				// Depth Attachment
 				{
 					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
@@ -52,7 +76,8 @@ namespace Frost
 			{ "a_TexCoord",	 ShaderDataType::Float2 },
 			{ "a_Normal",	 ShaderDataType::Float3 },
 			{ "a_Tangent",	 ShaderDataType::Float3 },
-			{ "a_Bitangent", ShaderDataType::Float3 }
+			{ "a_Bitangent", ShaderDataType::Float3 },
+			{ "a_MeshIndex", ShaderDataType::Float }
 		};
 		Pipeline::CreateInfo pipelineCreateInfo{};
 		pipelineCreateInfo.Shader = m_Data.Shader;
@@ -61,19 +86,21 @@ namespace Frost
 		pipelineCreateInfo.VertexBufferLayout = bufferLayout;
 		m_Data.Pipeline = Pipeline::Create(pipelineCreateInfo);
 
-		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
-			m_Data.Descriptor[i] = Material::Create(m_Data.Shader, "GeometryPassDescriptor");
+		//for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+		//	m_Data.Descriptor[i] = Material::Create(m_Data.Shader, "GeometryPassDescriptor");
 	}
 
 	void VulkanGeometryPass::OnUpdate(const RenderQueue& renderQueue)
 	{
+		// If we have 0 meshes, we shouldnt render this pass
+		if (renderQueue.m_DataSize == 0) return;
+
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		Ref<Framebuffer> framebuffer = m_Data.RenderPass->GetFramebuffer(currentFrameIndex);
 		Ref<VulkanPipeline> vulkanPipeline = m_Data.Pipeline.As<VulkanPipeline>();
 
 		Ref<VulkanImage2D> texture = framebuffer->GetColorAttachment(0).As<VulkanImage2D>();
-		//texture->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		m_Data.RenderPass->Bind();
 		vulkanPipeline->Bind();
@@ -96,19 +123,24 @@ namespace Frost
 
 		for (uint32_t i = 0; i < renderQueue.m_DataSize; i++)
 		{
-			auto mesh = renderQueue.m_Data[i];
-			
-			std::array<glm::mat4, 2> matricies;
-			matricies[0] = viewProjectionMatrix * renderQueue.m_Data[i].Transform;
-			matricies[1] = renderQueue.m_Data[i].Transform;
+			auto mesh = renderQueue.m_Data[i].Mesh;
 
-			vulkanPipeline->BindVulkanPushConstant("pushC", matricies.data());
+			mesh->GetVertexBuffer()->Bind();
+			mesh->GetIndexBuffer()->Bind();
 
-			mesh.Mesh->GetVertexBuffer()->Bind();
-			mesh.Mesh->GetIndexBuffer()->Bind();
+			for (auto& submesh : mesh->GetSubMeshes())
+			{
+				Ref<VulkanMaterial> material = mesh->GetVulkanMaterial()[submesh.MaterialIndex].As<VulkanMaterial>();
+				//material->UpdateVulkanDescriptorIfNeeded();
+				material->Bind(m_Data.Pipeline);
 
-			uint32_t count = mesh.Mesh->GetIndexBuffer()->GetCount() * 3;
-			vkCmdDrawIndexed(cmdBuf, count, 1, 0, 0, 0);
+				std::array<glm::mat4, 2> matricies;
+				matricies[0] = viewProjectionMatrix * submesh.Transform * renderQueue.m_Data[i].Transform;
+				matricies[1] = renderQueue.m_Data[i].Transform * submesh.Transform;
+				vulkanPipeline->BindVulkanPushConstant("u_PushConstant", matricies.data());
+
+				vkCmdDrawIndexed(cmdBuf, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
+			}
 		}
 
 		m_Data.RenderPass->Unbind();
@@ -123,12 +155,35 @@ namespace Frost
 		{
 			width, height, 3,
 			{
+				// Position Attachment
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
+				// Normals Attachment
+				{
+					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
+				// Albedo Attachment
+				{
+					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
+				// Composite Attachment
+				{
+					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
+				// Depth Attachment
 				{
 					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
@@ -138,24 +193,26 @@ namespace Frost
 		};
 		m_Data.RenderPass = RenderPass::Create(renderPassSpec);
 
-
+#if 0
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
 			m_Data.Descriptor[i]->Destroy();
 			m_Data.Descriptor[i] = Material::Create(m_Data.Shader, "GeometryPassDescriptor");
 		}
+#endif
 	}
 
 	void VulkanGeometryPass::ShutDown()
 	{
 		m_Data.RenderPass->Destroy();
 		m_Data.Pipeline->Destroy();
-		m_Data.Shader->Destroy();
 
+#if 0
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
 			m_Data.Descriptor[i]->Destroy();
 		}
+#endif
 	}
 
 }

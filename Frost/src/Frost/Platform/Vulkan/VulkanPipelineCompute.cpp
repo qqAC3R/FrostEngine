@@ -53,6 +53,7 @@ namespace Frost
 
 	}
 
+#if 0
 	void VulkanComputePipeline::Bind()
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -64,9 +65,12 @@ namespace Frost
 
 		vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pipeline);
 	}
+#endif
 
 	void VulkanComputePipeline::Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ)
 	{
+		FROST_ASSERT_MSG("VulkanComputePipeline::Dispatch needs a command buffer!");
+#if 0
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetComputeCommandBuffer(currentFrameIndex);
@@ -93,17 +97,23 @@ namespace Frost
 		FROST_VKCHECK(vkQueueSubmit(computeQueue, 1, &computeSubmitInfo, s_ComputeFence));
 
 		vkWaitForFences(device, 1, &s_ComputeFence, VK_TRUE, UINT64_MAX);
+#endif
 	}
 
+	void VulkanComputePipeline::Dispatch(VkCommandBuffer cmdBuf, uint32_t groupX, uint32_t groupY, uint32_t groupZ)
+	{
+		vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pipeline);
+		vkCmdDispatch(cmdBuf, groupX, groupY, groupZ);
+	}
+
+#if 0
 	void VulkanComputePipeline::Unbind()
 	{
 	}
+#endif
 
-	void VulkanComputePipeline::BindVulkanPushConstant(std::string name, void* data)
+	void VulkanComputePipeline::BindVulkanPushConstant(VkCommandBuffer cmdBuf, std::string name, void* data)
 	{
-		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetComputeCommandBuffer(currentFrameIndex);
-
 		vkCmdPushConstants(cmdBuf, m_PipelineLayout,
 						m_PushConstantRangeCache[name].stageFlags,
 						m_PushConstantRangeCache[name].offset,

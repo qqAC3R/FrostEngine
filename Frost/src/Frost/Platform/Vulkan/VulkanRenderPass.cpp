@@ -116,8 +116,17 @@ namespace Frost
 			else
 				colorAttachmentRefs.push_back(attachmentRef);
 
-
 			m_AttachmentLayouts[i] = attachment.finalLayout;
+
+
+			VkClearValue clearValue{};
+			switch (renderPassSpecs.RenderPassSpec[i].FramebufferAttachmentSpec.TextureFormat)
+			{
+			case FramebufferTextureFormat::RGBA8:
+			case FramebufferTextureFormat::RGBA16F: clearValue.color =        { 0.0f, 0.0f, 0.0f, 0.0f}; break;
+			case FramebufferTextureFormat::Depth:   clearValue.depthStencil = { 1.0f, 0 };               break;
+			}
+			m_ClearValues.push_back(clearValue);
 		}
 
 		VkSubpassDescription subpass{};
@@ -172,12 +181,9 @@ namespace Frost
 		renderPassInfo.renderArea.offset = { 0, 0 };
 		renderPassInfo.renderArea.extent = { m_Specification.FramebufferSpecification.Width, m_Specification.FramebufferSpecification.Height };
 
-		std::array<VkClearValue, 2> vkClearValues;
-		vkClearValues[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
-		vkClearValues[1].depthStencil = { 1.0f, 0 };
 
-		renderPassInfo.clearValueCount = static_cast<uint32_t>(vkClearValues.size());
-		renderPassInfo.pClearValues = vkClearValues.data();
+		renderPassInfo.clearValueCount = static_cast<uint32_t>(m_ClearValues.size());
+		renderPassInfo.pClearValues = m_ClearValues.data();
 
 		vkCmdBeginRenderPass(cmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 

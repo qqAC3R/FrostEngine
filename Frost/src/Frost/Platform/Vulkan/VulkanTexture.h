@@ -23,18 +23,21 @@ namespace Frost
 
 		virtual const Ref<Image2D> GetImage2D() const override { return m_Image; }
 
+		virtual bool Loaded() const override { return m_IsLoaded; }
+
 		VkDescriptorImageInfo& GetVulkanDescriptorInfo(DescriptorImageType imageType) {
-			FROST_ASSERT_INTERNAL((m_DescriptorInfo.find(imageType) == m_DescriptorInfo.end()));
+			FROST_ASSERT_INTERNAL((m_DescriptorInfo.find(imageType) != m_DescriptorInfo.end()));
 			return m_DescriptorInfo[imageType];
 		}
 	private:
-		Ref<Image2D> m_Image;
+		Ref<Image2D> m_Image = nullptr;
 		TextureSpecification m_TextureSpecification;
 		uint32_t m_Width;
 		uint32_t m_Height;
 		uint32_t m_MipMapLevels = 1;
 
 		HashMap<DescriptorImageType, VkDescriptorImageInfo> m_DescriptorInfo;
+		bool m_IsLoaded;
 	};
 
 	class VulkanTextureCubeMap : public TextureCubeMap
@@ -66,6 +69,7 @@ namespace Frost
 			FROST_ASSERT_INTERNAL((m_DescriptorInfo.find(imageType) != m_DescriptorInfo.end()));
 			return m_DescriptorInfo[imageType];
 		}
+
 	private:
 		void UpdateDescriptor();
 	private:

@@ -6,7 +6,6 @@
 
 namespace Frost
 {
-
 	VulkanIndexBuffer::VulkanIndexBuffer(void* indicies, uint32_t count)
 		: m_BufferSize(count)
 	{
@@ -23,6 +22,7 @@ namespace Frost
 
 	VulkanIndexBuffer::~VulkanIndexBuffer()
 	{
+		m_IndexBuffer->Destroy();
 	}
 
 	void VulkanIndexBuffer::Bind() const
@@ -36,5 +36,4 @@ namespace Frost
 	{
 		m_IndexBuffer->Destroy();
 	}
-
 }

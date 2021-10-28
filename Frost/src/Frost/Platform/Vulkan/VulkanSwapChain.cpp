@@ -29,7 +29,6 @@ namespace Frost
 		CreateRenderPass();
 		CreateFramebuffer();
 		CreateRenderCommandBuffer();
-		CreateComputeCommandBuffer();
 	}
 	
 	VulkanSwapChain::~VulkanSwapChain()
@@ -268,28 +267,6 @@ namespace Frost
 		}
 	}
 
-	void VulkanSwapChain::CreateComputeCommandBuffer()
-	{
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-		// Creating the compute comamnd pool
-		VkCommandPoolCreateInfo cmdPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-		cmdPoolInfo.queueFamilyIndex = VulkanContext::GetCurrentDevice()->GetQueueFamilies().ComputeFamily.Index;
-		cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		FROST_VKCHECK(vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &m_ComputeCommandPool));
-
-		m_ComputeCommandBuffer.resize(m_SwapChainImages.size());
-		for (uint32_t i = 0; i < Renderer::GetRendererConfig().FramesInFlight; i++)
-		{
-			VkCommandBufferAllocateInfo allocInfo = {};
-			allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-			allocInfo.commandPool = m_ComputeCommandPool;
-			allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-			allocInfo.commandBufferCount = 1;
-			FROST_VKCHECK(vkAllocateCommandBuffers(device, &allocInfo, &m_ComputeCommandBuffer[i]));
-		}
-	}
-
 	void VulkanSwapChain::BeginFrame(VkSemaphore imageAvailableSemaphore, uint32_t* imageIndex)
 	{
 		*imageIndex = AcquireImage(imageAvailableSemaphore);
@@ -389,10 +366,8 @@ namespace Frost
 		for (uint32_t i = 0; i < Renderer::GetRendererConfig().FramesInFlight; i++)
 		{
 			vkFreeCommandBuffers(device, m_RenderCommandPool, 1, &m_RenderCommandBuffer[i]);
-			vkFreeCommandBuffers(device, m_ComputeCommandPool, 1, &m_ComputeCommandBuffer[i]);
 		}
 		vkDestroyCommandPool(device, m_RenderCommandPool, nullptr);
-		vkDestroyCommandPool(device, m_ComputeCommandPool, nullptr);
 
 		vkDestroyRenderPass(device, m_RenderPass, nullptr);
 		vkDestroyFramebuffer(device, m_Framebuffer, nullptr);
