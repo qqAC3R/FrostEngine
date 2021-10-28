@@ -23,9 +23,9 @@ namespace Frost
 
 		virtual void OnAttach()
 		{
-			m_PlaneMesh = Mesh::Load("assets/media/scenes/plane.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 1.0f, 1.0f });
-			m_BunnyMesh = Mesh::Load("assets/models/stanford-bunny.fbx", { glm::vec3(0.7f), glm::vec3(0.2f, 0.6f, 0.2f), 0.0f, -1.69f });
-			m_SphereMesh = Mesh::Load("assets/models/globe-sphere.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 0.0f, 1.0f });
+			//m_BunnyMesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(0.0f), 0.3f, 1.0f });
+			m_PlaneMesh = Mesh::Load("Resources/Meshes/plane.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 1.0f, 1.0f });
+			m_SphereMesh = Mesh::Load("Resources/Meshes/cube.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
 		}
 
 		virtual void OnUpdate(Frost::Timestep ts)
@@ -35,18 +35,16 @@ namespace Frost
 			Renderer::BeginScene(m_Camera);
 
 
+			glm::mat4 sphereTransform = glm::translate(glm::mat4(1.0f), m_VikingMeshPosition) * glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));;
+			Renderer::Submit(m_SphereMesh, sphereTransform);
+
+			//glm::mat4 bunnyTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
+			//Renderer::Submit(m_BunnyMesh, bunnyTransform);
+			
 			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
 			Renderer::Submit(m_PlaneMesh, planeTransform);
 			
-			glm::mat4 bunnyTransform = glm::translate(glm::mat4(1.0f), m_VikingMeshPosition) * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
-			Renderer::Submit(m_BunnyMesh, bunnyTransform);
 			
-			auto& material = m_SphereMesh->GetMaterial();
-			material.roughness = m_SphereRoughness;
-
-			glm::mat4 sphereTransform = glm::translate(glm::mat4(1.0f), glm::vec3(5.0f, 2.0f, 1.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(1.5f));;
-			Renderer::Submit(m_SphereMesh, sphereTransform);
-
 
 			Renderer::EndScene();
 		}
@@ -156,7 +154,6 @@ namespace Frost
 
 				UI::Begin("Scene");
 				UI::Slider("Entity Position", m_VikingMeshPosition, -20, 20);
-				UI::Slider("Roughness", m_SphereRoughness, 0.0f, 1.0f);
 				UI::End();
 				
 				UI::Begin("Settings");
@@ -187,6 +184,7 @@ namespace Frost
 		Ref<Mesh> m_SphereMesh;
 
 		bool m_UseRT = true;
+
 	};
 
 

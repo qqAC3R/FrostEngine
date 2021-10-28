@@ -117,7 +117,7 @@ project "Frost"
 	{
 		"GLFW",
 		"nvvk",
-		"assimp-vc142-mtd.lib",
+		"assimp-vc142-mt.lib",
 		"ImGui",
 		"yaml-cpp",
 		"vulkan-1.lib",
