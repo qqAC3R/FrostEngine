@@ -131,13 +131,12 @@ namespace Frost
 			for (auto& submesh : mesh->GetSubMeshes())
 			{
 				Ref<VulkanMaterial> material = mesh->GetVulkanMaterial()[submesh.MaterialIndex].As<VulkanMaterial>();
-				//material->UpdateVulkanDescriptorIfNeeded();
 				material->Bind(m_Data.Pipeline);
 
-				std::array<glm::mat4, 2> matricies;
-				matricies[0] = viewProjectionMatrix * submesh.Transform * renderQueue.m_Data[i].Transform;
-				matricies[1] = renderQueue.m_Data[i].Transform * submesh.Transform;
-				vulkanPipeline->BindVulkanPushConstant("u_PushConstant", matricies.data());
+				PushConstant pushConstant;
+				pushConstant.TransformMatrix = viewProjectionMatrix * submesh.Transform * renderQueue.m_Data[i].Transform;
+				pushConstant.ModelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
+				vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
 
 				vkCmdDrawIndexed(cmdBuf, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
 			}

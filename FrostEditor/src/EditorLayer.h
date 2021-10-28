@@ -23,9 +23,9 @@ namespace Frost
 
 		virtual void OnAttach()
 		{
-			//m_BunnyMesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(0.0f), 0.3f, 1.0f });
+			m_BunnyMesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(0.0f), 0.3f, 1.0f });
 			m_PlaneMesh = Mesh::Load("Resources/Meshes/plane.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 1.0f, 1.0f });
-			m_SphereMesh = Mesh::Load("Resources/Meshes/cube.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
+			m_SphereMesh = Mesh::Load("Resources/Meshes/Sphere.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
 		}
 
 		virtual void OnUpdate(Frost::Timestep ts)
@@ -38,8 +38,8 @@ namespace Frost
 			glm::mat4 sphereTransform = glm::translate(glm::mat4(1.0f), m_VikingMeshPosition) * glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));;
 			Renderer::Submit(m_SphereMesh, sphereTransform);
 
-			//glm::mat4 bunnyTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
-			//Renderer::Submit(m_BunnyMesh, bunnyTransform);
+			glm::mat4 bunnyTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
+			Renderer::Submit(m_BunnyMesh, bunnyTransform);
 			
 			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
 			Renderer::Submit(m_PlaneMesh, planeTransform);

@@ -31,6 +31,12 @@ namespace Frost
 			Ref<Shader> Shader;
 		};
 
+		struct PushConstant
+		{
+			glm::mat4 TransformMatrix;
+			glm::mat4 ModelMatrix;
+		};
+
 		InternalData m_Data;
 		std::string m_Name;
 
