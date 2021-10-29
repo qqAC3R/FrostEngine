@@ -77,6 +77,7 @@ namespace Frost
 
 	VulkanTexture2D::~VulkanTexture2D()
 	{
+		Destroy();
 	}
 
 
@@ -138,14 +139,19 @@ namespace Frost
 
 	VulkanTextureCubeMap::~VulkanTextureCubeMap()
 	{
+		Destroy();
 	}
 
 	void VulkanTextureCubeMap::Destroy()
 	{
+		if (m_Image == VK_NULL_HANDLE) return;
+
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		VulkanAllocator::DestroyImage(m_Image, m_ImageMemory);
 		vkDestroyImageView(device, m_ImageView, nullptr);
 		vkDestroySampler(device, m_ImageSampler, nullptr);
+
+		m_Image = VK_NULL_HANDLE;
 	}
 
 	void VulkanTextureCubeMap::TransitionLayout(VkCommandBuffer cmdBuf, VkImageLayout newImageLayout,

@@ -42,6 +42,7 @@ namespace Frost
 
 	VulkanBuffer::~VulkanBuffer()
 	{
+		Destroy();
 	}
 
 	void VulkanBuffer::SetData(void* data)
@@ -83,6 +84,7 @@ namespace Frost
 	void VulkanBuffer::Destroy()
 	{
 		if (m_Buffer == VK_NULL_HANDLE) return;
+
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		VulkanAllocator::DeleteBuffer(m_Buffer, m_BufferMemory);
 		m_Buffer = VK_NULL_HANDLE;

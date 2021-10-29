@@ -23,6 +23,7 @@ namespace Frost
 
 	VulkanUniformBuffer::~VulkanUniformBuffer()
 	{
+		Destroy();
 	}
 
 	void VulkanUniformBuffer::SetData(void* data)

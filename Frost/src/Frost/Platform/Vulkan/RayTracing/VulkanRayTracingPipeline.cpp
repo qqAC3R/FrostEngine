@@ -10,7 +10,6 @@
 namespace Frost
 {
 	VulkanRayTracingPipeline::VulkanRayTracingPipeline(const RayTracingPipeline::CreateInfo& createInfo)
-		: m_Specification(createInfo)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -50,13 +49,17 @@ namespace Frost
 
 	VulkanRayTracingPipeline::~VulkanRayTracingPipeline()
 	{
+		Destroy();
 	}
 
 	void VulkanRayTracingPipeline::Destroy()
 	{
+		if (m_Pipeline == VK_NULL_HANDLE) return;
+
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		vkDestroyPipeline(device, m_Pipeline, nullptr);
 		vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
+		m_Pipeline = VK_NULL_HANDLE;
 	}
 
 	void VulkanRayTracingPipeline::Bind() const

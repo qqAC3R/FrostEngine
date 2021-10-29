@@ -2,25 +2,11 @@
 
 namespace Frost
 {
-#if 0
+	typedef void(*RenderCommandFn)(void*);
+	
 	class RenderCommandQueue
 	{
 	public:
-		RenderCommandQueue();
-		virtual ~RenderCommandQueue() {}
-
-		void Allocate(std::function<void()> func);
-		void Execute();
-	private:
-		std::queue<std::function<void()>> m_CommandBuffer;
-	};
-#else
-
-	class RenderCommandQueue
-	{
-	public:
-		typedef void(*RenderCommandFn)(void*);
-
 		RenderCommandQueue();
 		~RenderCommandQueue();
 
@@ -32,6 +18,4 @@ namespace Frost
 		uint8_t* m_CommandBufferPtr;
 		uint32_t m_CommandCount = 0;
 	};
-#endif
-
 }

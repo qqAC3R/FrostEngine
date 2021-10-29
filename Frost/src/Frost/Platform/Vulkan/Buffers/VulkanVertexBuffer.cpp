@@ -24,7 +24,7 @@ namespace Frost
 
 	VulkanVertexBuffer::~VulkanVertexBuffer()
 	{
-		m_VertexBuffer->Destroy();
+		Destroy();
 	}
 
 	void VulkanVertexBuffer::Bind() const

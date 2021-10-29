@@ -25,9 +25,6 @@ namespace Frost
 		static void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform);
 		static void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform);
 
-		//static void Submit(std::function<void()> func);
-
-#if 1
 		template<typename FuncT>
 		static void Submit(FuncT&& func)
 		{
@@ -35,15 +32,11 @@ namespace Frost
 				auto pFunc = (FuncT*)ptr;
 				(*pFunc)();
 
-				// NOTE: Instead of destroying we could try and enforce all items to be trivally destructible
-				// however some items like uniforms which contain std::strings still exist for now
-				// static_assert(std::is_trivially_destructible_v<FuncT>, "FuncT must be trivially destructible");
 				pFunc->~FuncT();
 			};
 			auto storageBuffer = GetRenderCommandQueue().Allocate(renderCmd, sizeof(func));
 			new (storageBuffer) FuncT(std::forward<FuncT>(func));
 		}
-#endif
 
 		static void Resize(uint32_t width, uint32_t height) { s_RendererAPI->Resize(width, height); }
 		static Ref<Image2D> GetFinalImage(uint32_t id) { return s_RendererAPI->GetFinalImage(id); }

@@ -41,16 +41,10 @@ namespace Frost
 
 	void Renderer::ShutDown()
 	{
-		delete s_CommandQueue;
 		s_RendererAPI->ShutDown();
-		s_Data->m_WhiteTexture->Destroy();
-		s_Data->m_ShaderLibrary->Clear();
+		delete s_CommandQueue;
+		delete s_Data;
 	}
-
-	//void Renderer::Submit(std::function<void()> func)
-	//{
-	//	s_CommandQueue->Allocate(func);
-	//}
 
 	void Renderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform)
 	{

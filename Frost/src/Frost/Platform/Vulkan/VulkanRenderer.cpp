@@ -272,9 +272,9 @@ namespace Frost
 	Ref<Image2D> VulkanRenderer::GetFinalImage(uint32_t id) const
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		if(id == 0)
+		if(id != 0)
 			return s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[currentFrameIndex];
-		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, currentFrameIndex);
+		
 		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
 	}
 

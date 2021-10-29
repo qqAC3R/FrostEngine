@@ -89,7 +89,6 @@ namespace Frost
 	}
 
 	VulkanPipeline::VulkanPipeline(Pipeline::CreateInfo& createInfo)
-		: m_Specification(createInfo)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -233,6 +232,7 @@ namespace Frost
 
 	VulkanPipeline::~VulkanPipeline()
 	{
+		Destroy();
 	}
 
 	void VulkanPipeline::Bind()
@@ -256,9 +256,12 @@ namespace Frost
 
 	void VulkanPipeline::Destroy()
 	{
+		if (m_Pipeline == VK_NULL_HANDLE) return;
+
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		vkDestroyPipeline(device, m_Pipeline, nullptr);
 		vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
+		m_Pipeline = VK_NULL_HANDLE;
 	}
 
 }

@@ -12,8 +12,6 @@ namespace Frost
 		VulkanComputePipeline(ComputePipeline::CreateInfo& createInfo);
 		virtual ~VulkanComputePipeline();
 
-		//virtual void Bind() override;
-		//virtual void Unbind() override;
 		virtual void Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) override;
 		void Dispatch(VkCommandBuffer cmdBuf, uint32_t groupX, uint32_t groupY, uint32_t groupZ);
 
@@ -23,11 +21,10 @@ namespace Frost
 
 		virtual void Destroy() override;
 	private:
-		VkPipeline m_Pipeline;
+		VkPipeline m_Pipeline = VK_NULL_HANDLE;
 		VkPipelineLayout m_PipelineLayout;
 		VkPipelineCache m_PipelineCache;
 		std::unordered_map<std::string, VkPushConstantRange> m_PushConstantRangeCache;
-		ComputePipeline::CreateInfo m_Specification;
 	};
 
 }

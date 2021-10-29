@@ -73,7 +73,7 @@ namespace Frost
 	private:
 		void UpdateDescriptor();
 	private:
-		VkImage m_Image;
+		VkImage m_Image = VK_NULL_HANDLE;
 		VulkanMemoryInfo m_ImageMemory;
 
 		VkImageView m_ImageView;

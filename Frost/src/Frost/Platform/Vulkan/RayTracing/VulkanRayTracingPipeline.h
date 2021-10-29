@@ -22,9 +22,8 @@ namespace Frost
 		void BindVulkanPushConstant(std::string name, void* data);
 
 	private:
-		VkPipeline m_Pipeline;
+		VkPipeline m_Pipeline = VK_NULL_HANDLE;
 		VkPipelineLayout m_PipelineLayout;
 		std::unordered_map<std::string, VkPushConstantRange> m_PushConstantRangeCache;
-		RayTracingPipeline::CreateInfo m_Specification;
 	};
 }

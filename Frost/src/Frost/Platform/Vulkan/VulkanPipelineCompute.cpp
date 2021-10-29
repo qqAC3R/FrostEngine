@@ -7,10 +7,7 @@
 
 namespace Frost
 {
-	static VkFence s_ComputeFence = nullptr;
-
 	VulkanComputePipeline::VulkanComputePipeline(ComputePipeline::CreateInfo& createInfo)
-		: m_Specification(createInfo)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -50,54 +47,12 @@ namespace Frost
 
 	VulkanComputePipeline::~VulkanComputePipeline()
 	{
-
+		Destroy();
 	}
-
-#if 0
-	void VulkanComputePipeline::Bind()
-	{
-		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetComputeCommandBuffer(currentFrameIndex);
-
-		VkCommandBufferBeginInfo cmdBufferBeginInfo{};
-		cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		FROST_VKCHECK(vkBeginCommandBuffer(cmdBuf, &cmdBufferBeginInfo));
-
-		vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pipeline);
-	}
-#endif
 
 	void VulkanComputePipeline::Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ)
 	{
 		FROST_ASSERT_MSG("VulkanComputePipeline::Dispatch needs a command buffer!");
-#if 0
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetComputeCommandBuffer(currentFrameIndex);
-
-		vkCmdDispatch(cmdBuf, groupX, groupY, groupZ);
-
-		vkEndCommandBuffer(cmdBuf);
-
-		if (!s_ComputeFence)
-		{
-			VkFenceCreateInfo fenceCreateInfo{};
-			fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-			fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-			FROST_VKCHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &s_ComputeFence));
-		}
-		vkWaitForFences(device, 1, &s_ComputeFence, VK_TRUE, UINT64_MAX);
-		vkResetFences(device, 1, &s_ComputeFence);
-
-		VkQueue computeQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().ComputeFamily.Queue;
-		VkSubmitInfo computeSubmitInfo{};
-		computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		computeSubmitInfo.commandBufferCount = 1;
-		computeSubmitInfo.pCommandBuffers = &cmdBuf;
-		FROST_VKCHECK(vkQueueSubmit(computeQueue, 1, &computeSubmitInfo, s_ComputeFence));
-
-		vkWaitForFences(device, 1, &s_ComputeFence, VK_TRUE, UINT64_MAX);
-#endif
 	}
 
 	void VulkanComputePipeline::Dispatch(VkCommandBuffer cmdBuf, uint32_t groupX, uint32_t groupY, uint32_t groupZ)
@@ -106,27 +61,24 @@ namespace Frost
 		vkCmdDispatch(cmdBuf, groupX, groupY, groupZ);
 	}
 
-#if 0
-	void VulkanComputePipeline::Unbind()
-	{
-	}
-#endif
-
 	void VulkanComputePipeline::BindVulkanPushConstant(VkCommandBuffer cmdBuf, std::string name, void* data)
 	{
 		vkCmdPushConstants(cmdBuf, m_PipelineLayout,
-						m_PushConstantRangeCache[name].stageFlags,
-						m_PushConstantRangeCache[name].offset,
-						m_PushConstantRangeCache[name].size,
-				data);
+						   m_PushConstantRangeCache[name].stageFlags,
+						   m_PushConstantRangeCache[name].offset,
+						   m_PushConstantRangeCache[name].size,
+						   data);
 	}
 
 	void VulkanComputePipeline::Destroy()
 	{
+		if (m_Pipeline == VK_NULL_HANDLE) return;
+
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		vkDestroyPipeline(device, m_Pipeline, nullptr);
 		vkDestroyPipelineCache(device, m_PipelineCache, nullptr);
 		vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
-		vkDestroyPipeline(device, m_Pipeline, nullptr);
-		vkDestroyFence(device, s_ComputeFence, nullptr);
+
+		m_Pipeline = VK_NULL_HANDLE;
 	}
 }

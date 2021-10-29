@@ -30,7 +30,6 @@ namespace Frost
 	public:
 		virtual ~Buffer() {}
 
-
 		virtual uint64_t GetBufferSize() const = 0;
 		virtual BufferData GetBufferData() const = 0;
 		virtual void SetData(uint64_t size, void* data) = 0;
@@ -43,7 +42,6 @@ namespace Frost
 
 		static Ref<Buffer> Create(uint64_t size, std::initializer_list<BufferType> types = {});
 		static Ref<Buffer> Create(uint64_t size, void* data, std::initializer_list<BufferType> types = {});
-
 	};
 
 }

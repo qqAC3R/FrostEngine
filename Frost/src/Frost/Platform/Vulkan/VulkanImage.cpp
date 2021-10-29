@@ -134,18 +134,25 @@ namespace Frost
 
 		// Updating the descriptor
 		UpdateDescriptor();
+
+		// Deleting the staging buffer
+		VulkanAllocator::DeleteBuffer(stagingBuffer, stagingBufferMemory);
 	}
 
 	VulkanImage2D::~VulkanImage2D()
 	{
+		Destroy();
 	}
 
 	void VulkanImage2D::Destroy()
 	{
+		if (m_Image == VK_NULL_HANDLE) return;
+
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		VulkanAllocator::DestroyImage(m_Image, m_ImageMemory);
 		vkDestroyImageView(device, m_ImageView, nullptr);
 		vkDestroySampler(device, m_ImageSampler, nullptr);
+		m_Image = VK_NULL_HANDLE;
 	}
 
 	void VulkanImage2D::TransitionLayout(VkCommandBuffer cmdBuf, VkImageLayout newImageLayout,

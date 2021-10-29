@@ -25,7 +25,7 @@ namespace Frost
 
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) override;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) override;
-		virtual void Set(const std::string& name, const Ref<TextureCubeMap>& image) override;
+		virtual void Set(const std::string& name, const Ref<TextureCubeMap>& cubeMap) override;
 		virtual void Set(const std::string& name, const Ref<Buffer>& storageBuffer) override;
 		virtual void Set(const std::string& name, const Ref<UniformBuffer>& uniformBuffer) override;
 		virtual void Set(const std::string& name, const Ref<TopLevelAccelertionStructure>& accelerationStructure) override;
@@ -60,7 +60,7 @@ namespace Frost
 				BUFFER, TEXTURE, ACCELERATION_STRUCTURE
 			};
 			DataType Type;
-			Ref<void*> Pointer;
+			WeakRef<void*> Pointer;
 		};
 		std::unordered_map<std::string, DataPointer> m_MaterialData;
 
@@ -70,12 +70,7 @@ namespace Frost
 		struct PendingDescriptor
 		{
 			// Keeping a reference of every object to not get deleted before the descriptor set is updated (at binding)
-			Ref<Image2D> Image;
-			Ref<Texture2D> Texture;
-			Ref<Buffer> StorageBuffer;
-			Ref<UniformBuffer> UniformBuffer;
-			Ref<TopLevelAccelertionStructure> AccelerationStructure;
-
+			WeakRef<void*> Pointer;
 			VkWriteDescriptorSet WDS{};
 		};
 

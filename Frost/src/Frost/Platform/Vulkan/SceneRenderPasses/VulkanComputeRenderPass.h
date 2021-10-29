@@ -20,12 +20,12 @@ namespace Frost
 		virtual void OnResize(uint32_t width, uint32_t height) override;
 		virtual void ShutDown() override;
 
-		virtual void* GetInternalData() override { return &m_Data; }
+		virtual void* GetInternalData() override { return (void*)m_Data; }
 
 		virtual const std::string& GetName() override { return m_Name; }
-
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
+		std::string m_Name;
 
 		struct InternalData
 		{
@@ -36,11 +36,9 @@ namespace Frost
 			Ref<Material> Descriptor;
 			Ref<Shader> Shader;
 		};
+		InternalData* m_Data;
 
 		glm::vec3 m_TurbidityAzimuthInclination;
-
-		InternalData m_Data;
-		std::string m_Name;
 
 		friend class SceneRenderPassPipeline;
 	};

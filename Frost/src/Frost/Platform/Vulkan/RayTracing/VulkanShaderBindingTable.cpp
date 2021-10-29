@@ -101,10 +101,7 @@ namespace Frost
 				pData += groupSizeAligned;
 			}
 			VulkanAllocator::UnbindBuffer(memory);
-
 		}
-		
-
 	}
 
 	VulkanShaderBindingTable::VulkanShaderBindingTable(const Ref<Shader>& shader)
@@ -136,11 +133,15 @@ namespace Frost
 
 	VulkanShaderBindingTable::~VulkanShaderBindingTable()
 	{
+		Destroy();
 	}
 
 	void VulkanShaderBindingTable::Destroy()
 	{
+		if (m_Buffer == VK_NULL_HANDLE) return;
+
 		VulkanAllocator::DeleteBuffer(m_Buffer, m_BufferMemory);
+		m_Buffer = VK_NULL_HANDLE;
 	}
 
 	std::array<VkStridedDeviceAddressRegionKHR, 4> VulkanShaderBindingTable::GetVulkanShaderAddresses() const
@@ -155,8 +156,6 @@ namespace Frost
 		deviceAddressInfo.buffer = m_Buffer;
 
 		VkDeviceAddress sbtAddress = vkGetBufferDeviceAddress(device, &deviceAddressInfo);
-
-
 
 		auto raygen = m_ShaderStride.RayGen;
 		auto hit = m_ShaderStride.Hit;

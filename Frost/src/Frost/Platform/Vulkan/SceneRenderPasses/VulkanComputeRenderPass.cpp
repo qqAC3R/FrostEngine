@@ -19,8 +19,9 @@ namespace Frost
 	void VulkanComputeRenderPass::Init(SceneRenderPassPipeline* renderPassPipeline)
 	{
 		m_RenderPassPipeline = renderPassPipeline;
+		m_Data = new InternalData();
 
-		m_Data.Shader = Renderer::GetShaderLibrary()->Get("PreethamSky");
+		m_Data->Shader = Renderer::GetShaderLibrary()->Get("PreethamSky");
 
 		{
 			ImageSpecification imageSpec{};
@@ -28,38 +29,38 @@ namespace Frost
 			imageSpec.Height = 512;
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.Format = ImageFormat::RGBA16F;
-			m_Data.CubeMap = TextureCubeMap::Create(imageSpec);
+			m_Data->CubeMap = TextureCubeMap::Create(imageSpec);
 		}
-		m_Data.UniformBuffer = UniformBuffer::Create(sizeof(m_TurbidityAzimuthInclination));
+		m_Data->UniformBuffer = UniformBuffer::Create(sizeof(m_TurbidityAzimuthInclination));
 
 		m_TurbidityAzimuthInclination = glm::vec3(2.32f, 5.14f, 1.53f);
 
-		m_Data.Descriptor = Material::Create(m_Data.Shader, "ComputeDescriptor");
-		m_Data.Descriptor->Set("u_CubeMap", m_Data.CubeMap);
-		m_Data.Descriptor->Set("Uniforms", m_Data.UniformBuffer);
-		m_Data.Descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
+		m_Data->Descriptor = Material::Create(m_Data->Shader, "ComputeDescriptor");
+		m_Data->Descriptor->Set("u_CubeMap", m_Data->CubeMap);
+		m_Data->Descriptor->Set("Uniforms", m_Data->UniformBuffer);
+		m_Data->Descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 
 
 
 		ComputePipeline::CreateInfo computePipelineCreateInfo{};
-		computePipelineCreateInfo.Shader = m_Data.Shader;
-		m_Data.ComputePipeline = ComputePipeline::Create(computePipelineCreateInfo);
+		computePipelineCreateInfo.Shader = m_Data->Shader;
+		m_Data->ComputePipeline = ComputePipeline::Create(computePipelineCreateInfo);
 	}
 
 	void VulkanComputeRenderPass::OnUpdate(const RenderQueue& renderQueue)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		Ref<VulkanComputePipeline> vulkanComputePipeline = m_Data.ComputePipeline.As<VulkanComputePipeline>();
-		Ref<VulkanMaterial> vulkanMaterial = m_Data.Descriptor.As<VulkanMaterial>();
+		Ref<VulkanComputePipeline> vulkanComputePipeline = m_Data->ComputePipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> vulkanMaterial = m_Data->Descriptor.As<VulkanMaterial>();
 
 		// Allocate the commandbuffer for the compute pipeline
 		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Compute, true);
 
-		m_Data.UniformBuffer->SetData(&m_TurbidityAzimuthInclination);
-		vulkanMaterial->Bind(cmdBuf, m_Data.ComputePipeline);
+		m_Data->UniformBuffer->SetData(&m_TurbidityAzimuthInclination);
+		vulkanMaterial->Bind(cmdBuf, m_Data->ComputePipeline);
 		vulkanComputePipeline->Dispatch(cmdBuf, 512.0f / 32.0f, 512.0f / 32.0f, 6);
 
-		//m_Data.CubeMap.As<VulkanTextureCubeMap>()->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
+		//m_Data->CubeMap.As<VulkanTextureCubeMap>()->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
 
 		// Flush the compute commandbuffer
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
@@ -77,11 +78,7 @@ namespace Frost
 
 	void VulkanComputeRenderPass::ShutDown()
 	{
-		m_Data.CubeMap->Destroy();
-		m_Data.UniformBuffer->Destroy();
-
-		m_Data.Descriptor->Destroy();
-		m_Data.ComputePipeline->Destroy();
+		delete m_Data;
 	}
 
 }

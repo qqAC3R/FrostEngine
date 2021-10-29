@@ -22,7 +22,7 @@ namespace Frost
 
 	VulkanIndexBuffer::~VulkanIndexBuffer()
 	{
-		m_IndexBuffer->Destroy();
+		Destroy();
 	}
 
 	void VulkanIndexBuffer::Bind() const

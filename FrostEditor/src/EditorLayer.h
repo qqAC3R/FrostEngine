@@ -21,6 +21,10 @@ namespace Frost
 		{
 		}
 
+		~EditorLayer()
+		{
+		}
+
 		virtual void OnAttach()
 		{
 			m_BunnyMesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(0.0f), 0.3f, 1.0f });
@@ -44,16 +48,13 @@ namespace Frost
 			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
 			Renderer::Submit(m_PlaneMesh, planeTransform);
 			
-			
 
 			Renderer::EndScene();
 		}
 
 		virtual void OnDetach()
 		{
-			m_PlaneMesh->Destroy();
-			m_BunnyMesh->Destroy();
-			m_SphereMesh->Destroy();
+			this->~EditorLayer();
 		}
 
 		virtual void OnEvent(Event& event)

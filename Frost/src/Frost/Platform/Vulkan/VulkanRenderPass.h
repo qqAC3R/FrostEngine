@@ -29,7 +29,7 @@ namespace Frost
 		VkRenderPass GetVulkanRenderPass() const { return m_RenderPass; }
 	private:
 		Vector<Ref<Framebuffer>> m_Framebuffers;
-		VkRenderPass m_RenderPass;
+		VkRenderPass m_RenderPass = VK_NULL_HANDLE;
 		Vector<VkClearValue> m_ClearValues;
 
 		RenderPassSpecification m_Specification;

@@ -386,7 +386,7 @@ namespace Frost
 
 	Mesh::~Mesh()
 	{
-
+		Destroy();
 	}
 
 	void Mesh::TraverseNodes(aiNode* node, const glm::mat4& parentTransform, uint32_t level)
@@ -406,15 +406,17 @@ namespace Frost
 
 	void Mesh::Destroy()
 	{
-		m_VertexBuffer->Destroy();
-		m_IndexBuffer->Destroy();
+		//m_VertexBuffer->Destroy();
+		//m_IndexBuffer->Destroy();
+		//m_SubmeshIndexBuffers->Destroy();
+		//m_MaterialUniforms->Destroy();
 
-		m_AccelerationStructure->Destroy();
+		//m_AccelerationStructure->Destroy();
 
-		m_MaterialUniforms->Destroy();
-		for (auto& material : m_Materials)
-			material->Destroy();
+		//for (auto& material : m_Materials)
+		//	material->Destroy();
 
+	
 		//for (auto& texture : m_Textures)
 		//	texture->Destroy();
 

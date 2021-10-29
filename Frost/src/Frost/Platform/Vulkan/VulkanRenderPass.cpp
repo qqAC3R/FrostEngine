@@ -11,68 +11,11 @@ namespace Frost
 
 	namespace Utils
 	{
-
-		struct RenderPassAttachmentSpecs
-		{
-			VkFormat Format;
-			VkAttachmentStoreOp StoreOp;
-			VkImageLayout Layout;
-		};
-
-		static RenderPassAttachmentSpecs FBFormatToRenderPassSpecs(FramebufferTextureFormat format)
-		{
-			VkImageLayout colorImageLayout   = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			VkImageLayout depthImageLayout   = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			VkImageLayout presentImageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-			switch (format)
-			{
-			case FramebufferTextureFormat::RGBA8:	 return { VK_FORMAT_R8G8B8A8_SRGB,       VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
-			case FramebufferTextureFormat::RGBA16F:	 return { VK_FORMAT_R16G16B16A16_SFLOAT, VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
-			case FramebufferTextureFormat::DEPTH32:	 return { VK_FORMAT_D32_SFLOAT,			 VK_ATTACHMENT_STORE_OP_STORE, depthImageLayout };
-			}
-
-			FROST_ASSERT(false, "");
-			return {};
-		}
-
-		VkAttachmentStoreOp GetVulkanAttachmentStoreOp(OperationStore attachmentOp)
-		{
-			switch (attachmentOp)
-			{
-				case OperationStore::Store:     return VK_ATTACHMENT_STORE_OP_STORE;
-				case OperationStore::DontCare:  return VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			}
-
-			FROST_ASSERT(false, "");
-			return VkAttachmentStoreOp();
-		}
-
-		VkAttachmentLoadOp GetVulkanAttachmentLoadOp(OperationLoad attachmentOp)
-		{
-			switch (attachmentOp)
-			{
-				case OperationLoad::Clear:     return VK_ATTACHMENT_LOAD_OP_CLEAR;
-				case OperationLoad::Load:      return VK_ATTACHMENT_LOAD_OP_LOAD;
-				case OperationLoad::DontCare:  return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			}
-
-			FROST_ASSERT(false, "");
-			return VkAttachmentLoadOp();
-		}
-
-		VkFormat GetVulkanFBFormat(FramebufferTextureFormat format)
-		{
-			switch (format)
-			{
-				case FramebufferTextureFormat::RGBA8:	 return VK_FORMAT_R8G8B8A8_SRGB;
-				case FramebufferTextureFormat::RGBA16F:	 return VK_FORMAT_R16G16B16A16_SFLOAT;
-				case FramebufferTextureFormat::DEPTH32:  return VK_FORMAT_D32_SFLOAT;
-			}
-
-			FROST_ASSERT(false, "");
-			return VkFormat();
-		}
+		struct RenderPassAttachmentSpecs;
+		static RenderPassAttachmentSpecs FBFormatToRenderPassSpecs(FramebufferTextureFormat format);
+		VkAttachmentStoreOp GetVulkanAttachmentStoreOp(OperationStore attachmentOp);
+		VkAttachmentLoadOp GetVulkanAttachmentLoadOp(OperationLoad attachmentOp);
+		VkFormat GetVulkanFBFormat(FramebufferTextureFormat format);
 	}
 
 	VulkanRenderPass::VulkanRenderPass(const RenderPassSpecification& renderPassSpecs)
@@ -89,7 +32,6 @@ namespace Frost
 		Vector<VkAttachmentReference> colorAttachmentRefs;
 		Vector<VkAttachmentReference> depthAttachmentRefs;
 
-		//uint32_t colorAttachmentCount = 0; uint32_t depthAttachmentCount = 0;
 		uint32_t attachmentCount = 0;
 		for(uint32_t i = 0; i < renderPassSpecs.RenderPassSpec.size(); i++)
 		{
@@ -165,6 +107,7 @@ namespace Frost
 
 	VulkanRenderPass::~VulkanRenderPass()
 	{
+		Destroy();
 	}
 
 	void VulkanRenderPass::Bind()
@@ -210,11 +153,81 @@ namespace Frost
 
 	void VulkanRenderPass::Destroy()
 	{
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		if (m_RenderPass == VK_NULL_HANDLE) return;
 
-		for (auto& framebuffer : m_Framebuffers)
-			framebuffer->Destroy();
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		//for (auto& framebuffer : m_Framebuffers)
+		//{
+		//	framebuffer->Destroy();
+		//}
 		vkDestroyRenderPass(device, m_RenderPass, nullptr);
+
+		m_RenderPass = VK_NULL_HANDLE;
 	}
 
+	namespace Utils
+	{
+
+		struct RenderPassAttachmentSpecs
+		{
+			VkFormat Format;
+			VkAttachmentStoreOp StoreOp;
+			VkImageLayout Layout;
+		};
+
+		static RenderPassAttachmentSpecs FBFormatToRenderPassSpecs(FramebufferTextureFormat format)
+		{
+			VkImageLayout colorImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			VkImageLayout depthImageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			VkImageLayout presentImageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+			switch (format)
+			{
+			case FramebufferTextureFormat::RGBA8:	 return { VK_FORMAT_R8G8B8A8_SRGB,       VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
+			case FramebufferTextureFormat::RGBA16F:	 return { VK_FORMAT_R16G16B16A16_SFLOAT, VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
+			case FramebufferTextureFormat::DEPTH32:	 return { VK_FORMAT_D32_SFLOAT,			 VK_ATTACHMENT_STORE_OP_STORE, depthImageLayout };
+			}
+
+			FROST_ASSERT(false, "");
+			return {};
+		}
+
+		VkAttachmentStoreOp GetVulkanAttachmentStoreOp(OperationStore attachmentOp)
+		{
+			switch (attachmentOp)
+			{
+			case OperationStore::Store:     return VK_ATTACHMENT_STORE_OP_STORE;
+			case OperationStore::DontCare:  return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			}
+
+			FROST_ASSERT(false, "");
+			return VkAttachmentStoreOp();
+		}
+
+		VkAttachmentLoadOp GetVulkanAttachmentLoadOp(OperationLoad attachmentOp)
+		{
+			switch (attachmentOp)
+			{
+			case OperationLoad::Clear:     return VK_ATTACHMENT_LOAD_OP_CLEAR;
+			case OperationLoad::Load:      return VK_ATTACHMENT_LOAD_OP_LOAD;
+			case OperationLoad::DontCare:  return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			}
+
+			FROST_ASSERT(false, "");
+			return VkAttachmentLoadOp();
+		}
+
+		VkFormat GetVulkanFBFormat(FramebufferTextureFormat format)
+		{
+			switch (format)
+			{
+			case FramebufferTextureFormat::RGBA8:	 return VK_FORMAT_R8G8B8A8_SRGB;
+			case FramebufferTextureFormat::RGBA16F:	 return VK_FORMAT_R16G16B16A16_SFLOAT;
+			case FramebufferTextureFormat::DEPTH32:  return VK_FORMAT_D32_SFLOAT;
+			}
+
+			FROST_ASSERT(false, "");
+			return VkFormat();
+		}
+	}
 }

@@ -61,24 +61,24 @@ namespace Frost
 
 	VulkanFramebuffer::~VulkanFramebuffer()
 	{
+		Destroy();
 	}
 
 	void VulkanFramebuffer::Resize(uint32_t width, uint32_t height)
 	{
-
 	}
 
 	void VulkanFramebuffer::Destroy()
 	{
+		if (m_Framebuffer == VK_NULL_HANDLE) return;
+
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-
-		for (auto& attachment : m_Attachments)
-		{
-			attachment->Destroy();
-		}
-
+		//for (auto& attachment : m_Attachments)
+		//{
+		//	attachment->Destroy();
+		//}
 		vkDestroyFramebuffer(device, m_Framebuffer, nullptr);
+		m_Framebuffer = VK_NULL_HANDLE;
 	}
 
 	void VulkanFramebuffer::CreateAttachments()

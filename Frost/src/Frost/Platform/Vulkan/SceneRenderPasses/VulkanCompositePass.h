@@ -17,11 +17,13 @@ namespace Frost
 		virtual void OnResize(uint32_t width, uint32_t height) override;
 		virtual void ShutDown() override;
 
-		virtual void* GetInternalData() override { return &m_Data; }
+		virtual void* GetInternalData() override { return (void*)m_Data; }
 
 		virtual const std::string& GetName() override { return m_Name; }
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
+
+		struct PointLightData;
 
 		struct InternalData
 		{
@@ -29,7 +31,11 @@ namespace Frost
 			Ref<RenderPass> RenderPass;
 			Vector<Ref<Material>> Descriptor;
 			Ref<Shader> Shader;
+			Ref<UniformBuffer> m_PointLightUniformBuffer;
 		};
+		InternalData* m_Data;
+		std::string m_Name;
+
 
 		struct PushConstantData
 		{
@@ -50,10 +56,7 @@ namespace Frost
 			Vector<PointLightProperties> PointLights;
 		};
 		PointLightData* m_PointLightData;
-		Ref<UniformBuffer> m_PointLightUniformBuffer;
 
-		InternalData m_Data;
-		std::string m_Name;
 
 		friend class SceneRenderPassPipeline;
 	};

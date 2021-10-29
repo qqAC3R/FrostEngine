@@ -23,13 +23,11 @@ namespace Frost
 		virtual Vector<Ref<Image2D>> GetColorAttachments() const override { return m_Attachments; }
 
 		virtual void Destroy() override;
-		
 	private:
 		void CreateAttachments();
 		void CreateFramebuffer(VkRenderPass renderPass);
-
 	private:
-		VkFramebuffer m_Framebuffer;
+		VkFramebuffer m_Framebuffer = VK_NULL_HANDLE;
 		Vector<Ref<Image2D>> m_Attachments;
 
 		FramebufferSpecification m_Specification;

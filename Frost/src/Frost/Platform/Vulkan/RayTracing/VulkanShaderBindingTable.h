@@ -23,15 +23,14 @@ namespace Frost
 			return std::make_tuple(m_ShadersInfo, m_ShaderModules);
 		}
 	private:
-
 		void CreateShaderBindingTableBuffer(VkPipeline pipeline);
-
+	private:
 		Vector<VkRayTracingShaderGroupCreateInfoKHR> m_ShadersInfo;
 		Vector<VkPipelineShaderStageCreateInfo> m_ShaderModules;
 
 		Ref<Shader> m_SourceShader;
 
-		VkBuffer m_Buffer;
+		VkBuffer m_Buffer = VK_NULL_HANDLE;
 		VulkanMemoryInfo m_BufferMemory;
 
 		struct ShaderStride
@@ -40,11 +39,8 @@ namespace Frost
 			uint32_t Hit = 0;
 			uint32_t Miss = 0;
 		};
-
 		ShaderStride m_ShaderStride;
 
 		friend class VulkanRayTracingPipeline;
-
 	};
-
 }

@@ -27,7 +27,7 @@ namespace Frost
 		virtual void Bind(Ref<RayTracingPipeline> rayTracingPipeline) = 0;
 
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) = 0;
-		virtual void Set(const std::string& name, const Ref<TextureCubeMap>& image) = 0;
+		virtual void Set(const std::string& name, const Ref<TextureCubeMap>& cubeMap) = 0;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) = 0;
 
 		virtual void Set(const std::string& name, const Ref<Buffer>& storageBuffer) = 0;

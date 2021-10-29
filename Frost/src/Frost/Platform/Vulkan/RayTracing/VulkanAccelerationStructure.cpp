@@ -32,13 +32,11 @@ namespace Frost
 			// Getting the buffer address
 			VkBufferDeviceAddressInfo bufferInfo{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
 
-
 			bufferInfo.buffer = meshInfo.MeshVertexBuffer.As<VulkanVertexBuffer>()->GetVulkanBuffer();
 			vertexAddressBuffer = vkGetBufferDeviceAddress(device, &bufferInfo);
 
 			bufferInfo.buffer = meshInfo.MeshIndexBuffer.As<VulkanIndexBuffer>()->GetVulkanBuffer();
 			indexAddressBuffer = vkGetBufferDeviceAddress(device, &bufferInfo);
-
 		}
 
 		VulkanBottomLevelAccelerationStructure::GeometryInfo input;
@@ -52,7 +50,6 @@ namespace Frost
 			trianglesData.vertexData = *(VkDeviceOrHostAddressConstKHR*)&vertexAddressBuffer;
 			trianglesData.vertexStride = sizeof(Vertex);
 			trianglesData.maxVertex = std::abs((int)subMesh.BaseVertex - (int)subMesh.VertexCount);
-			//trianglesData.maxVertex = meshInfo.VertexBuffer->GetBufferSize() / sizeof(Vertex);
 			trianglesData.indexType = VK_INDEX_TYPE_UINT32;
 			trianglesData.indexData = *(VkDeviceOrHostAddressConstKHR*)&indexAddressBuffer;
 			trianglesData.transformData = VkDeviceOrHostAddressConstKHR();
@@ -75,11 +72,8 @@ namespace Frost
 			lastBaseIndex = subMesh.BaseIndex / 3;
 			m_GeometryOffset.push_back(lastBaseIndex);
 			// -----------------------------------------------
-			//uint64_t bda = meshInfo.SubmeshIndexBuffers[forLoopIndex].As<VulkanIndexBuffer>()->GetVulkanBufferAddress();
-			//u_SubmeshIndexBufferBDA.push_back(bda);
-			//forLoopIndex++;
 		}
-		m_GeometryMaxOffset = meshInfo.SubMeshes.size();
+		m_GeometryMaxOffset = (uint32_t)meshInfo.SubMeshes.size();
 
 		return input;
 	}
@@ -301,6 +295,7 @@ namespace Frost
 
 	VulkanTopLevelAccelertionStructure::~VulkanTopLevelAccelertionStructure()
 	{
+		Destroy();
 	}
 
 	void VulkanTopLevelAccelertionStructure::UpdateAccelerationStructure(Vector<std::pair<Ref<Mesh>, glm::mat4>>& meshes)
@@ -336,11 +331,13 @@ namespace Frost
 	void VulkanTopLevelAccelertionStructure::Destroy()
 	{
 		if (m_AccelerationStructure == VK_NULL_HANDLE) return;
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		vkDestroyAccelerationStructureKHR(device, m_AccelerationStructure, nullptr);
 		VulkanAllocator::DeleteBuffer(m_ASBuffer, m_ASBufferMemory);
 		m_InstanceBuffer->Destroy();
+
+		m_AccelerationStructure = VK_NULL_HANDLE;
 	}
 
 	VkAccelerationStructureInstanceKHR VulkanTopLevelAccelertionStructure::InstanceToVkGeometryInstance (

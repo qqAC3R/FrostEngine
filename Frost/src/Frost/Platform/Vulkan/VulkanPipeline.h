@@ -22,12 +22,10 @@ namespace Frost
 		void BindVulkanPushConstant(std::string name, void* data);
 
 		virtual void Destroy() override;
-
 	private:
-		VkPipeline m_Pipeline;
+		VkPipeline m_Pipeline = VK_NULL_HANDLE;
 		VkPipelineLayout m_PipelineLayout;
 		std::unordered_map<std::string, VkPushConstantRange> m_PushConstantRangeCache;
-		Pipeline::CreateInfo m_Specification;
 	};
 
 	namespace Utils

@@ -46,8 +46,13 @@ namespace Frost
 	class RenderQueue
 	{
 	public:
-		RenderQueue() = default;
-		virtual ~RenderQueue() {}
+		RenderQueue()
+		{
+			m_Data.reserve(1024);
+		}
+		~RenderQueue()
+		{
+		}
 
 		void SetCamera(const EditorCamera& camera)
 		{
@@ -61,17 +66,10 @@ namespace Frost
 		void Add(Ref<Mesh> mesh, const glm::mat4& transform)
 		{
 			RenderQueue::RenderData data{};
-			//data.Mesh = mesh;
-			//data.Material = nullptr;
-			//data.Transform = transform;
-
 			data.Mesh = mesh;
 			data.Transform = transform;
-			//data.Material = nullptr;
-			//m_Data.push_back(data);
 
-			m_Data[m_DataSize] = data;
-			m_DataSize++;
+			m_Data.push_back(data);
 		}
 
 		// TODO: Need a way to handle materials around different sceneRenderPasses
@@ -79,29 +77,23 @@ namespace Frost
 
 		void Reset()
 		{
-			//m_Data.clear();
-			m_DataSize = 0;
+			m_Data.clear();
 			CameraViewMatrix = glm::mat4(1.0f);
 			CameraProjectionMatrix = glm::mat4(1.0f);
 		}
 
-	public:
-		//struct Data
-		//{
-		//	Ref<Mesh> Mesh;
-		//	glm::mat4 Transform;
-		//	Ref<Material> Material;
-		//};
+		uint32_t GetQueueSize() const { return (uint32_t)m_Data.size(); }
 
+	public:
 		struct RenderData
 		{
 			Ref<Mesh> Mesh = nullptr;
 			glm::mat4 Transform{};
 		};
 
-		//Vector<RenderQueue::RenderData> m_Data;
-		std::array<RenderQueue::RenderData, 128> m_Data;
-		uint32_t m_DataSize = 0;
+		Vector<RenderQueue::RenderData> m_Data;
+		//std::array<RenderQueue::RenderData, 128> m_Data;
+		//uint32_t m_DataSize = 0;
 
 		glm::mat4 CameraViewMatrix;
 		glm::mat4 CameraProjectionMatrix;
