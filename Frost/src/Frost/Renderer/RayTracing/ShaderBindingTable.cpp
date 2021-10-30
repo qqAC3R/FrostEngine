@@ -21,7 +21,7 @@ namespace Frost
 			case RendererAPI::API::Vulkan: return Ref<VulkanShaderBindingTable>::Create(shader);
 		}
 
-		FROST_ASSERT(false, "Unknown RendererAPI!");
+		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
 

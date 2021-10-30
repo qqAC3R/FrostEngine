@@ -7,7 +7,7 @@
 namespace Frost
 {
 
-	Ref<ComputePipeline> ComputePipeline::Create(ComputePipeline::CreateInfo& createInfo)
+	Ref<ComputePipeline> ComputePipeline::Create(const ComputePipeline::CreateInfo& createInfo)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -15,7 +15,7 @@ namespace Frost
 			case RendererAPI::API::Vulkan: return CreateRef<VulkanComputePipeline>(createInfo);
 		}
 
-		FROST_ASSERT(false, "Unknown RendererAPI!");
+		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
 

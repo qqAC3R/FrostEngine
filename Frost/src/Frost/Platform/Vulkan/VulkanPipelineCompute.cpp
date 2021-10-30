@@ -7,7 +7,7 @@
 
 namespace Frost
 {
-	VulkanComputePipeline::VulkanComputePipeline(ComputePipeline::CreateInfo& createInfo)
+	VulkanComputePipeline::VulkanComputePipeline(const ComputePipeline::CreateInfo& createInfo)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 

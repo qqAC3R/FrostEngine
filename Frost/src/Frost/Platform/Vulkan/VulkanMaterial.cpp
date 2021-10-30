@@ -96,11 +96,7 @@ namespace Frost
 		Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
 		VkPipelineLayout pipelineLayout = vulkanPipeline->GetVulkanPipelineLayout();
 
-		// Typically we have 1-5 descriptor sets and doing a for loop for everyframe wont hurt the performance
-		Vector<VkDescriptorSet> descriptorSets;
-		for (auto& descriptorSet : m_DescriptorSets)
-			descriptorSets.push_back(descriptorSet.second);
-
+		Vector<VkDescriptorSet> descriptorSets = m_VectorDescriptorSets;
 		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 	}
 
@@ -116,11 +112,7 @@ namespace Frost
 		Ref<VulkanComputePipeline> vulkanComputePipeline = computePipeline.As<VulkanComputePipeline>();
 		VkPipelineLayout pipelineLayout = vulkanComputePipeline->GetVulkanPipelineLayout();
 
-		// Typically we have 1-5 descriptor sets and doing a for loop for everyframe wont hurt the performance
-		Vector<VkDescriptorSet> descriptorSets;
-		for (auto& descriptorSet : m_DescriptorSets)
-			descriptorSets.push_back(descriptorSet.second);
-
+		Vector<VkDescriptorSet> descriptorSets = m_VectorDescriptorSets;
 		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 	}
 
@@ -134,11 +126,7 @@ namespace Frost
 		Ref<VulkanRayTracingPipeline> vulkanPipeline = rayTracingPipeline.As<VulkanRayTracingPipeline>();
 		VkPipelineLayout pipelineLayout = vulkanPipeline->GetVulkanPipelineLayout();
 
-		// Typically we have 1-5 descriptor sets and doing a for loop for everyframe wont hurt the performance
-		Vector<VkDescriptorSet> descriptorSets;
-		for (auto& descriptorSet : m_DescriptorSets)
-			descriptorSets.push_back(descriptorSet.second);
-
+		Vector<VkDescriptorSet> descriptorSets = m_VectorDescriptorSets;
 		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 	}
 
@@ -165,6 +153,8 @@ namespace Frost
 
 			std::string descriptorSetName = "VulkanShader-DescriptorSet[" + m_Shader->GetName() + "]";
 			VulkanContext::SetStructDebugName(descriptorSetName, VK_OBJECT_TYPE_DESCRIPTOR_SET, m_DescriptorSets[descriptorSetNumber]);
+
+			m_VectorDescriptorSets.push_back(m_DescriptorSets[descriptorSetNumber]);
 		}
 
 	}

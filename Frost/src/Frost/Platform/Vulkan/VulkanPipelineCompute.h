@@ -9,7 +9,7 @@ namespace Frost
 	class VulkanComputePipeline : public ComputePipeline
 	{
 	public:
-		VulkanComputePipeline(ComputePipeline::CreateInfo& createInfo);
+		VulkanComputePipeline(const ComputePipeline::CreateInfo& createInfo);
 		virtual ~VulkanComputePipeline();
 
 		virtual void Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) override;

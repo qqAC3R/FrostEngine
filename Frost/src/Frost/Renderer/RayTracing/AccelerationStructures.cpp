@@ -15,7 +15,7 @@ namespace Frost
 			case RendererAPI::API::Vulkan: return Ref<VulkanBottomLevelAccelerationStructure>::Create(meshInfo);
 		}
 
-		FROST_ASSERT(false, "Unknown RendererAPI!");
+		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
 
@@ -28,7 +28,7 @@ namespace Frost
 			case RendererAPI::API::Vulkan: return Ref<VulkanTopLevelAccelertionStructure>::Create();
 		}
 
-		FROST_ASSERT(false, "Unknown RendererAPI!");
+		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
 

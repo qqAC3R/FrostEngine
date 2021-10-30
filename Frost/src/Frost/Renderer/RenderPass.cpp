@@ -17,7 +17,7 @@ namespace Frost
 			case RendererAPI::API::OpenGL: return nullptr;
 		}
 
-		FROST_ASSERT(false, "Unknown RendererAPI!");
+		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
 

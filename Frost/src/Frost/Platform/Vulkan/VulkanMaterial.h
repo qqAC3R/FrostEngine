@@ -52,6 +52,7 @@ namespace Frost
 
 		std::unordered_map<uint32_t, VkDescriptorSetLayout> m_DescriptorSetLayouts;
 		std::unordered_map<uint32_t, VkDescriptorSet> m_DescriptorSets;
+		Vector<VkDescriptorSet> m_VectorDescriptorSets;
 
 		struct DataPointer
 		{

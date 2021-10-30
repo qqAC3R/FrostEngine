@@ -14,7 +14,7 @@ namespace Frost
 		case RendererAPI::API::Vulkan: return CreateRef<VulkanImage2D>(specification);
 		}
 
-		FROST_ASSERT(false, "Unknown RendererAPI");
+		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
 
@@ -26,7 +26,7 @@ namespace Frost
 		case RendererAPI::API::Vulkan: return CreateRef<VulkanImage2D>(specification, data);
 		}
 
-		FROST_ASSERT(false, "Unknown RendererAPI");
+		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
 }

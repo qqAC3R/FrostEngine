@@ -69,7 +69,6 @@ namespace Frost
 			FROST_ASSERT_INTERNAL((m_DescriptorInfo.find(imageType) != m_DescriptorInfo.end()));
 			return m_DescriptorInfo[imageType];
 		}
-
 	private:
 		void UpdateDescriptor();
 	private:
