@@ -70,6 +70,12 @@ namespace Frost
 		}
 	}
 
+
+	namespace Utils
+	{
+		ShaderBufferData::Member::Type SPVTypeToShaderDataType(const spirv_cross::SPIRType& spvType);
+	};
+
 	ShaderReflectionData::ShaderReflectionData()
 	{
 	}
@@ -88,7 +94,8 @@ namespace Frost
 			// Uniform buffers
 			for (const auto& resource : resources.uniform_buffers)
 			{
-				ShaderBufferData& uniformBuffer = m_BufferData.emplace_back();
+				//ShaderBufferData& uniformBuffer = m_BufferData[resource.name];
+				ShaderBufferData uniformBuffer;
 				const auto& bufferType = compiler.get_type(resource.base_type_id);
 				const auto& typeID = compiler.get_type(resource.type_id);
 
@@ -97,14 +104,29 @@ namespace Frost
 				uniformBuffer.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 				uniformBuffer.ShaderStage.push_back(stage);
 				uniformBuffer.Size = (uint32_t)compiler.get_declared_struct_size(bufferType);
-				uniformBuffer.Name = resource.name;
-				uniformBuffer.Count = typeID.array[0] == 0 ? 1 : typeID.array[0];
+				uniformBuffer.Count = typeID.array[0] == 0 ? 1 : typeID.array[0]; // If the member is an array
+
+				// Members
+				for (uint32_t i = 0; i < bufferType.member_types.size(); i++)
+				{
+					const spirv_cross::SPIRType& spvType = compiler.get_type(bufferType.member_types[i]);
+
+					ShaderBufferData::Member bufferMember;
+					std::string memberName = resource.name + '.' + compiler.get_member_name(bufferType.self, i);
+					bufferMember.MemoryOffset = compiler.type_struct_member_offset(bufferType, i); // In bytes
+					bufferMember.DataType = Utils::SPVTypeToShaderDataType(spvType);
+					uniformBuffer.Members[memberName] = bufferMember;
+				}
+
+				// Push back to a vector
+				m_BufferVectorData.push_back(std::make_pair(resource.name, uniformBuffer));
 			}
 
 			// Storage buffers
 			for (const auto& resource : resources.storage_buffers)
 			{
-				ShaderBufferData& storageBuffer = m_BufferData.emplace_back();
+				//ShaderBufferData& storageBuffer = m_BufferData[resource.name];
+				ShaderBufferData storageBuffer;
 				const auto& bufferType = compiler.get_type(resource.base_type_id);
 				const auto& typeID = compiler.get_type(resource.type_id);
 
@@ -113,8 +135,21 @@ namespace Frost
 				storageBuffer.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 				storageBuffer.ShaderStage.push_back(stage);
 				storageBuffer.Size = (uint32_t)compiler.get_declared_struct_size(bufferType);
-				storageBuffer.Name = resource.name;
-				storageBuffer.Count = typeID.array[0] == 0 ? 1 : typeID.array[0];
+				storageBuffer.Count = typeID.array[0] == 0 ? 1 : typeID.array[0]; // If the member is an array
+
+				// Members
+				for (uint32_t i = 0; i < bufferType.member_types.size(); i++)
+				{
+					const spirv_cross::SPIRType& spvType = compiler.get_type(bufferType.member_types[i]);
+
+					ShaderBufferData::Member bufferMember;
+					std::string memberName = resource.name + '.' + compiler.get_member_name(bufferType.self, i);
+					bufferMember.MemoryOffset = compiler.type_struct_member_offset(bufferType, i); // In bytes
+					bufferMember.DataType = Utils::SPVTypeToShaderDataType(spvType);
+					storageBuffer.Members[memberName] = bufferMember;
+				}
+
+				m_BufferVectorData.push_back(std::make_pair(resource.name, storageBuffer));
 			}
 
 			// Sampler Textures
@@ -172,7 +207,6 @@ namespace Frost
 				storageTexture.Count = typeID.array[0] == 0 ? 1 : typeID.array[0];
 				storageTexture.Name = resource.name;
 			}
-
 		}
 
 		SetDescriptorSetsCount();
@@ -185,8 +219,8 @@ namespace Frost
 		for (auto& buffer : m_BufferData)
 		{
 			// Check if the number of the set is already mentioned in the vector
-			if (std::find(m_DescriptorSetsCount.begin(), m_DescriptorSetsCount.end(), buffer.Set) == m_DescriptorSetsCount.end())
-				m_DescriptorSetsCount.push_back(buffer.Set);
+			if (std::find(m_DescriptorSetsCount.begin(), m_DescriptorSetsCount.end(), buffer.second.Set) == m_DescriptorSetsCount.end())
+				m_DescriptorSetsCount.push_back(buffer.second.Set);
 		}
 
 		for (auto& texture : m_TextureData)
@@ -208,12 +242,14 @@ namespace Frost
 	{
 		// Just a simple O(n^2) algorithm to find the repeated members
 
-		for (uint32_t i = 0; i < m_BufferData.size(); i++)
+
+		// Buffers
+		for (uint32_t i = 0; i < m_BufferVectorData.size(); i++)
 		{
 			for (uint32_t j = i + 1; j < m_BufferData.size(); j++)
 			{
-				auto& bufferData1 = m_BufferData[i];
-				auto& bufferData2 = m_BufferData[j];
+				auto& bufferData1 = m_BufferVectorData[i].second;
+				auto& bufferData2 = m_BufferVectorData[j].second;
 
 				// Check if the binding and set of the buffers is the same
 				if (bufferData1.Set == bufferData2.Set && bufferData1.Binding == bufferData2.Binding)
@@ -223,12 +259,19 @@ namespace Frost
 					bufferData1.ShaderStage.push_back(bufferData2.ShaderStage[0]);
 
 					// Deleting the second copy of the same member
-					m_BufferData.erase(m_BufferData.begin() + j);
+					m_BufferVectorData.erase(m_BufferVectorData.begin() + j);
 				}
 			}
 		}
 
+		// Hashing the buffer data
+		for (auto&& [name, buffer] : m_BufferVectorData)
+		{
+			m_BufferData[name] = buffer;
+		}
 
+
+		// Textures
 		for (uint32_t i = 0; i < m_TextureData.size(); i++)
 		{
 			for (uint32_t j = i + 1; j < m_TextureData.size(); j++)
@@ -294,5 +337,62 @@ namespace Frost
 
 	}
 
+	namespace Utils
+	{
+		ShaderBufferData::Member::Type SPVTypeToShaderDataType(const spirv_cross::SPIRType& spvType)
+		{
+			if (spvType.basetype == spirv_cross::SPIRType::Float && spvType.vecsize == 1 && spvType.columns == 1)
+			{
+				return ShaderBufferData::Member::Type::Float;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::Float && spvType.vecsize == 2 && spvType.columns == 1)
+			{
+				return ShaderBufferData::Member::Type::Float2;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::Float && spvType.vecsize == 3 && spvType.columns == 1)
+			{
+				return ShaderBufferData::Member::Type::Float3;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::Float && spvType.vecsize == 4 && spvType.columns == 1)
+			{
+				return ShaderBufferData::Member::Type::Float4;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::Float && spvType.vecsize == 2 && spvType.columns == 2)
+			{
+				return ShaderBufferData::Member::Type::Mat2;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::Float && spvType.vecsize == 3 && spvType.columns == 3)
+			{
+				return ShaderBufferData::Member::Type::Mat3;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::Float && spvType.vecsize == 4 && spvType.columns == 4)
+			{
+				return ShaderBufferData::Member::Type::Mat4;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::UInt && spvType.vecsize == 1 && spvType.columns == 1)
+			{
+				return ShaderBufferData::Member::Type::UInt;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::UInt64 && spvType.vecsize == 1 && spvType.columns == 1)
+			{
+				return ShaderBufferData::Member::Type::UInt64;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::Int && spvType.vecsize == 1 && spvType.columns == 1)
+			{
+				return ShaderBufferData::Member::Type::Int;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::Boolean)
+			{
+				return ShaderBufferData::Member::Type::Bool;
+			}
+			if (spvType.basetype == spirv_cross::SPIRType::Struct)
+			{
+				return ShaderBufferData::Member::Type::Struct;
+			}
+
+			FROST_ASSERT_MSG("No spirv_cross::SPIRType matches Surge::ShaderDataType!");
+			return ShaderBufferData::Member::Type::None;
+		}
+	};
 
 }

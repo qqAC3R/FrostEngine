@@ -38,7 +38,8 @@ namespace Frost
 		imageSpec.Usage = ImageUsage::Storage;
 		imageSpec.Format = ImageFormat::RGBA16F;
 
-		auto cubeMapTexture = m_RenderPassPipeline->GetRenderPassData<VulkanComputeRenderPass>()->CubeMap;
+		//auto cubeMapTexture = m_RenderPassPipeline->GetRenderPassData<VulkanComputeRenderPass>()->CubeMap;
+		auto hdrCubeMapTexture = Renderer::GetSceneEnvironmentMap()->GetPrefilteredMap();
 
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
@@ -55,7 +56,8 @@ namespace Frost
 
 			m_Data->Descriptor[i] = Material::Create(m_Data->Shader, "RayTracingDescriptor");
 			m_Data->Descriptor[i]->Set("u_Image", m_Data->DisplayTexture[i]);
-			m_Data->Descriptor[i]->Set("u_CubeMapSky", cubeMapTexture);
+			//m_Data->Descriptor[i]->Set("u_CubeMapSky", cubeMapTexture);
+			m_Data->Descriptor[i]->Set("u_CubeMapSky", hdrCubeMapTexture);
 			m_Data->Descriptor[i]->Set("VertexPointers", m_Data->SceneVertexData[i]);
 			m_Data->Descriptor[i]->Set("IndexPointers", m_Data->SceneIndexData[i]);
 			m_Data->Descriptor[i]->Set("TransformInstancePointers", m_Data->SceneTransformData[i]);
@@ -193,10 +195,13 @@ namespace Frost
 		imageSpec.Usage = ImageUsage::Storage;
 		imageSpec.Format = ImageFormat::RGBA16F;
 
+		//auto hdrCubeMapTexture = Renderer::GetSceneEnvironmentMap()->GetPrefilteredMap();
+
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
 			m_Data->DisplayTexture[i] = Image2D::Create(imageSpec);
 			m_Data->Descriptor[i]->Set("u_Image", m_Data->DisplayTexture[i]);
+			//m_Data->Descriptor[i]->Set("u_CubeMapSky", hdrCubeMapTexture);
 
 			auto vulkanMaterial = m_Data->Descriptor[i].As<VulkanMaterial>();
 			vulkanMaterial->UpdateVulkanDescriptorIfNeeded();

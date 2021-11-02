@@ -176,31 +176,29 @@ namespace Frost
 
 	void VulkanImage2D::GenerateMipMaps(VkCommandBuffer cmdBuffer, VkImageLayout newImageLayout)
 	{
+		VkImageAspectFlags imageAspectFlags;
+		if (m_ImageSpecification.Format == ImageFormat::Depth24Stencil8 || m_ImageSpecification.Format == ImageFormat::Depth32)
+			imageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
+		else
+			imageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
+
 		int32_t mipWidth = m_ImageSpecification.Width;
 		int32_t mipHeight = m_ImageSpecification.Height;
-
-		VkImageSubresourceRange subresourceRange{};
-		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		subresourceRange.baseArrayLayer = 0;
-		subresourceRange.layerCount = 1;
-		subresourceRange.levelCount = 1;
-
+		
 		for (uint32_t i = 1; i < m_ImageSpecification.Mips; i++)
 		{
+			VkImageSubresourceRange subresourceRange{};
+			subresourceRange.aspectMask = imageAspectFlags;
+			subresourceRange.baseArrayLayer = 0;
+			subresourceRange.layerCount = 1;
+			subresourceRange.levelCount = 1;
 			subresourceRange.baseMipLevel = i - 1;
-
-			Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
-				Utils::GetAccessFlagsFromLayout(m_ImageLayout), Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-				m_ImageLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout), Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-				subresourceRange
-			);
 
 
 			VkImageBlit blit{};
 
 			// Src
-			blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.srcSubresource.aspectMask = imageAspectFlags;
 			blit.srcOffsets[0] = { 0, 0, 0 };
 			blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
 			blit.srcSubresource.mipLevel = i - 1;
@@ -208,12 +206,21 @@ namespace Frost
 			blit.srcSubresource.layerCount = 1;
 
 			// Dst
-			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.dstSubresource.aspectMask = imageAspectFlags;
 			blit.dstOffsets[0] = { 0, 0, 0 };
 			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
 			blit.dstSubresource.mipLevel = i;
 			blit.dstSubresource.baseArrayLayer = 0;
 			blit.dstSubresource.layerCount = 1;
+
+
+			// Transition from `VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL` to `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL`
+			Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
+				Utils::GetAccessFlagsFromLayout(m_ImageLayout), Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+				m_ImageLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout), Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+				subresourceRange
+			);
 
 			vkCmdBlitImage(cmdBuffer,
 				m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -222,6 +229,7 @@ namespace Frost
 				VK_FILTER_LINEAR
 			);
 
+			// Transition from `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL` to "newImageLayout"
 			Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
 				Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL), Utils::GetAccessFlagsFromLayout(newImageLayout),
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, newImageLayout,
@@ -233,6 +241,11 @@ namespace Frost
 			if (mipHeight > 1) mipHeight /= 2;
 		}
 
+		VkImageSubresourceRange subresourceRange{};
+		subresourceRange.aspectMask = imageAspectFlags;
+		subresourceRange.baseArrayLayer = 0;
+		subresourceRange.layerCount = 1;
+		subresourceRange.levelCount = 1;
 		subresourceRange.baseMipLevel = m_ImageSpecification.Mips - 1;
 
 		Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,

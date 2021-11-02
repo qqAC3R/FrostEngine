@@ -96,7 +96,7 @@ namespace Frost
 		Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
 		VkPipelineLayout pipelineLayout = vulkanPipeline->GetVulkanPipelineLayout();
 
-		Vector<VkDescriptorSet> descriptorSets = m_VectorDescriptorSets;
+		Vector<VkDescriptorSet> descriptorSets = m_CachedDescriptorSets;
 		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 	}
 
@@ -112,7 +112,7 @@ namespace Frost
 		Ref<VulkanComputePipeline> vulkanComputePipeline = computePipeline.As<VulkanComputePipeline>();
 		VkPipelineLayout pipelineLayout = vulkanComputePipeline->GetVulkanPipelineLayout();
 
-		Vector<VkDescriptorSet> descriptorSets = m_VectorDescriptorSets;
+		Vector<VkDescriptorSet> descriptorSets = m_CachedDescriptorSets;
 		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 	}
 
@@ -126,7 +126,7 @@ namespace Frost
 		Ref<VulkanRayTracingPipeline> vulkanPipeline = rayTracingPipeline.As<VulkanRayTracingPipeline>();
 		VkPipelineLayout pipelineLayout = vulkanPipeline->GetVulkanPipelineLayout();
 
-		Vector<VkDescriptorSet> descriptorSets = m_VectorDescriptorSets;
+		Vector<VkDescriptorSet> descriptorSets = m_CachedDescriptorSets;
 		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 	}
 
@@ -154,7 +154,7 @@ namespace Frost
 			std::string descriptorSetName = "VulkanShader-DescriptorSet[" + m_Shader->GetName() + "]";
 			VulkanContext::SetStructDebugName(descriptorSetName, VK_OBJECT_TYPE_DESCRIPTOR_SET, m_DescriptorSets[descriptorSetNumber]);
 
-			m_VectorDescriptorSets.push_back(m_DescriptorSets[descriptorSetNumber]);
+			m_CachedDescriptorSets.push_back(m_DescriptorSets[descriptorSetNumber]);
 		}
 
 	}
@@ -163,44 +163,94 @@ namespace Frost
 	{
 		for (auto& buffer : m_ReflectedData.GetBuffersData())
 		{
-			m_MaterialData[buffer.Name].Pointer = nullptr;
-			m_MaterialData[buffer.Name].Type = DataPointer::DataType::BUFFER;
+			std::string bufferName = buffer.first;
+			ShaderBufferData bufferData = buffer.second;
+
+			m_MaterialData[bufferName].Pointer = nullptr;
+			m_MaterialData[bufferName].Type = DataPointer::DataType::BUFFER;
+			
+			if (bufferData.Type == ShaderBufferData::BufferType::Uniform)
+			{
+				Ref<UniformBufferData> uniformBufferData = Ref<UniformBufferData>::Create();
+
+				// Create a uniform buffer with the needed size
+				uniformBufferData->UniformBuffer = UniformBuffer::Create(bufferData.Size);
+
+				// Allocate a buffer (in the cpu) with the needed size
+				BufferPointer bufferPointer;
+				bufferPointer.Allocate(bufferData.Size);
+				uniformBufferData->Buffer = bufferPointer;
+
+				// Add the uniform buffer into a vector (not to lose the ref count)
+				m_UniformBuffers.push_back(uniformBufferData);
+
+				// Hash the ubo, for the getter functions
+				m_MaterialData[bufferName].Pointer = uniformBufferData.As<void*>();
+
+
+				// Update the descriptor set with the uniform buffer
+				VkDescriptorBufferInfo* bufferInfo = &uniformBufferData->UniformBuffer.As<VulkanUniformBuffer>()->GetVulkanDescriptorInfo();
+				VkWriteDescriptorSet writeDescriptorSet{};
+				writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				writeDescriptorSet.dstBinding = bufferData.Binding;
+				writeDescriptorSet.dstArrayElement = 0;
+				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+				writeDescriptorSet.pBufferInfo = bufferInfo;
+				writeDescriptorSet.descriptorCount = 1;
+				writeDescriptorSet.dstSet = m_DescriptorSets[bufferData.Set];
+
+				VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+				vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+			}
+
+			m_ShaderLocations[bufferName] = { bufferData.Set, bufferData.Binding };
 		}
 
 		for (auto& texture : m_ReflectedData.GetTextureData())
 		{
 			m_MaterialData[texture.Name].Pointer = nullptr;
 			m_MaterialData[texture.Name].Type = DataPointer::DataType::TEXTURE;
+
+			m_ShaderLocations[texture.Name] = { texture.Set, texture.Binding };
 		}
 
 		for (auto& accelerationStructure : m_ReflectedData.GetAccelerationStructureData())
 		{
 			m_MaterialData[accelerationStructure.Name].Pointer = nullptr;
 			m_MaterialData[accelerationStructure.Name].Type = DataPointer::DataType::ACCELERATION_STRUCTURE;
+
+			m_ShaderLocations[accelerationStructure.Name] = { accelerationStructure.Set, accelerationStructure.Binding };
 		}
 	}
 
 	VulkanMaterial::ShaderLocation VulkanMaterial::GetShaderLocationFromString(const std::string& name)
 	{
-		auto bufferData = m_ReflectedData.GetBuffersData();
-		auto textureData = m_ReflectedData.GetTextureData();
-		auto asData = m_ReflectedData.GetAccelerationStructureData();
-
-		// TODO: Hash this
-		for (auto& buffer : bufferData)
-			if (buffer.Name == name)
-				return { buffer.Set, buffer.Binding };
-
-		for (auto& texture : textureData)
-			if (texture.Name == name)
-				return { texture.Set, texture.Binding };
-
-		for (auto& as : asData)
-			if(as.Name == name)
-				return { as.Set, as.Binding };
+		if (m_ShaderLocations.find(name) != m_ShaderLocations.end())
+			return m_ShaderLocations[name];
 
 		FROST_ASSERT_MSG("Couldn't find the location of the member");
 		return { UINT_MAX, UINT_MAX };
+	}
+
+	VulkanMaterial::UniformLocation VulkanMaterial::GetUniformLocation(const std::string& name)
+	{
+		// Split the string in 2 parts (struct name/ member name)
+		std::string structName = name.substr(0, name.find("."));
+		std::string memberName = name.substr(name.find(".") + 1, name.size());
+
+		// Get the hashmaps for the buffer info
+		auto bufferData = m_ReflectedData.GetBuffersData();
+		FROST_ASSERT(bool(bufferData.find(structName) != bufferData.end()), "Struct has not been found!");
+		FROST_ASSERT(bool(bufferData[structName].Members.find(name) != bufferData[structName].Members.end()), "Member variable has not been found!");
+		ShaderBufferData::Member member = bufferData[structName].Members[name];
+		
+		// Set the struct data
+		UniformLocation uniformLocation;
+		uniformLocation.Offset = member.MemoryOffset;
+		uniformLocation.Size = (uint32_t)member.DataType;
+		uniformLocation.StructName = structName;
+		uniformLocation.MemberName = memberName;
+		return uniformLocation;
 	}
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<Buffer>& storageBuffer)
@@ -400,6 +450,21 @@ namespace Frost
 		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];
 	}
 
+	void VulkanMaterial::Set(const std::string& name, const glm::vec3& value)
+	{
+		Set<glm::vec3>(name, value);
+	}
+
+	void VulkanMaterial::Set(const std::string& name, uint32_t value)
+	{
+		Set<uint32_t>(name, value);
+	}
+
+	void VulkanMaterial::Set(const std::string& name, float value)
+	{
+		Set<float>(name, value);
+	}
+
 	Ref<Buffer> VulkanMaterial::GetBuffer(const std::string& name)
 	{
 		FROST_ASSERT(bool(m_MaterialData.find(name) != m_MaterialData.end()), "Couldn't find the member");
@@ -428,6 +493,21 @@ namespace Frost
 	{
 		FROST_ASSERT(bool(m_MaterialData.find(name) != m_MaterialData.end()), "Couldn't find the member");
 		return m_MaterialData[name].Pointer.AsRef<TopLevelAccelertionStructure>();
+	}
+
+	float& VulkanMaterial::GetFloat(const std::string& name)
+	{
+		return Get<float>(name);
+	}
+
+	uint32_t& VulkanMaterial::GetUint(const std::string& name)
+	{
+		return Get<uint32_t>(name);
+	}
+
+	glm::vec3& VulkanMaterial::GetVector3(const std::string& name)
+	{
+		return Get<glm::vec3>(name);
 	}
 
 	void VulkanMaterial::Destroy()

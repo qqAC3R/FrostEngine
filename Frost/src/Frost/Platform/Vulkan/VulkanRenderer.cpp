@@ -56,14 +56,6 @@ namespace Frost
 		Application::Get().GetImGuiLayer()->OnInit(VulkanContext::GetSwapChain()->GetRenderPass());
 		VulkanMaterial::AllocateDescriptorPool();
 
-
-		// Scene render passes
-		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
-		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputeRenderPass>::Create());
-		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
-		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
-		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
-
 		// Creating the semaphores and fences
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
@@ -103,6 +95,16 @@ namespace Frost
 			pool_info.pPoolSizes = pool_sizes;
 			FROST_VKCHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool));
 		}
+	}
+
+	void VulkanRenderer::InitRenderPasses()
+	{
+		// Scene render passes
+		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputeRenderPass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
 	}
 
 	void VulkanRenderer::BeginFrame()
@@ -299,8 +301,21 @@ namespace Frost
 			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL: return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:		   return VK_ACCESS_SHADER_READ_BIT;
 		}
-
 		return VkAccessFlags();
+	}
+
+	static VkAccessFlags2KHR AccessFlagsToImageLayout2(VkImageLayout layout)
+	{
+		switch (layout)
+		{
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:				   return VK_ACCESS_2_HOST_READ_BIT_KHR;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:			   return VK_ACCESS_2_TRANSFER_WRITE_BIT_KHR;
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:			   return VK_ACCESS_2_TRANSFER_READ_BIT_KHR;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:		   return VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT_KHR;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL: return VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT_KHR;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:		   return VK_ACCESS_2_SHADER_READ_BIT_KHR;
+		}
+		return VkAccessFlags2KHR();
 	}
 
 	void Utils::InsertImageMemoryBarrier(VkCommandBuffer cmdbuffer,
@@ -362,6 +377,34 @@ namespace Frost
 			0, nullptr,
 			1, &imageMemoryBarrier
 		);
+
+
+#if 0
+		VkImageMemoryBarrier2KHR imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+		imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageMemoryBarrier.oldLayout = oldImageLayout;
+		imageMemoryBarrier.newLayout = newImageLayout;
+		imageMemoryBarrier.image = image;
+		imageMemoryBarrier.subresourceRange = subresourceRange;
+		imageMemoryBarrier.srcAccessMask = AccessFlagsToImageLayout2(oldImageLayout);
+		imageMemoryBarrier.dstAccessMask = AccessFlagsToImageLayout2(newImageLayout);
+
+
+		VkDependencyInfoKHR depencyInfo{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR };
+		depencyInfo.pNext = nullptr;
+		depencyInfo.dependencyFlags = 0;
+
+		depencyInfo.bufferMemoryBarrierCount = 0;
+		depencyInfo.pBufferMemoryBarriers = nullptr;
+		depencyInfo.memoryBarrierCount = 0;
+		depencyInfo.pMemoryBarriers = nullptr;
+
+		depencyInfo.imageMemoryBarrierCount = 1;
+		depencyInfo.pImageMemoryBarriers = &imageMemoryBarrier;
+
+		vkCmdPipelineBarrier2KHR(cmdbuffer, &depencyInfo);
+#endif
 	}
 
 	void Utils::SetImageLayout(VkCommandBuffer cmdbuffer,

@@ -29,4 +29,10 @@ namespace Frost
 		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
+
+	uint32_t Utils::CalculateMipMapLevels(uint32_t width, uint32_t height)
+	{
+		return (uint32_t)std::floor(std::log2(std::max(width, height))) + 1;
+	}
+
 }

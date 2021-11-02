@@ -9,6 +9,7 @@ namespace Frost
 	{
 	public:
 		virtual void Init() override;
+		virtual void InitRenderPasses() override;
 		virtual void Render() override;
 		virtual void ShutDown() override;
 

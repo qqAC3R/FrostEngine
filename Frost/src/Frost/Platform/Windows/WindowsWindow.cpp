@@ -28,7 +28,6 @@ namespace Frost
 	void WindowsWindow::OnUpdate()
 	{
 		glfwPollEvents();
-		m_Context->SwapBuffers();
 	}
 
 	void WindowsWindow::EnableCursour()

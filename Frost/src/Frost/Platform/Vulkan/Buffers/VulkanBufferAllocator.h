@@ -8,6 +8,7 @@ enum VmaMemoryUsage;
 
 namespace Frost
 {
+	struct GPUMemoryStats;
 
 	struct VulkanMemoryInfo
 	{
@@ -47,6 +48,8 @@ namespace Frost
 
 		static void DeleteBuffer(VkBuffer& buffer, VulkanMemoryInfo& memory);
 		static void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+
+		static GPUMemoryStats GetMemoryStats();
 	private:
 		friend class VulkanContext;
 	};

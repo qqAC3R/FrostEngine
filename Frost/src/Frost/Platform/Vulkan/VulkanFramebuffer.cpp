@@ -106,7 +106,6 @@ namespace Frost
 				spec.Usage = ImageUsage::DepthStencil;
 			else
 				spec.Usage = ImageUsage::Storage;
-				//spec.Usage = { TextureSpecs::UsageSpec::ColorAttachment, TextureSpecs::UsageSpec::Storage };
 
 			Ref<Image2D> texture = Image2D::Create(spec);
 			m_Attachments.push_back(texture);

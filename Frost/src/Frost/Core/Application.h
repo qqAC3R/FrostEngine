@@ -11,8 +11,6 @@
 
 namespace Frost
 {
-
-
 	class Application
 	{
 	public:
@@ -28,29 +26,27 @@ namespace Frost
 		bool IsMinimized() { return m_Minimized; }
 
 		inline Window& GetWindow() { return *m_Window; }
-
 		ImGuiLayer* GetImGuiLayer() { return m_ImGuiLayer; }
 
 		void PushLayer(Layer* layer);
 		void PushOverlay(Layer* layer);
-	
-		inline static Application& Get() { return *s_Instance; }
 
+		inline static Application& Get() { return *s_Instance; }
+		inline static const std::string& GetVersion() { return m_ApplicationVersion; }
 	private:
 		bool OnWindowClose(WindowCloseEvent& e);
 		bool OnWindowResize(WindowResizeEvent& e);
 	private:
 		Scope<Window> m_Window;
-
 		LayerStack m_LayerStack;
 		ImGuiLayer* m_ImGuiLayer;
 
 		bool m_Running = true;
 		bool m_Minimized = false;
 		float m_LastFrameTime = 0.0f;
-
 	private:
 		static Application* s_Instance;
+		static std::string m_ApplicationVersion;
 	};
 
 	Application* CreateApplication();

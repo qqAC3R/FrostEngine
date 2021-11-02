@@ -37,6 +37,9 @@
 #include "Frost/ImGui/ImGuiLayer.h"
 /* ------------------------------------------------------ */
 
+/* ---------------------- Math ---------------------- */
+#include "Frost/Math/FrustumCamera.h"
+/* ------------------------------------------------------ */
 
 /* -------------------- Ray Tracing --------------------- */
 #include "Frost/Renderer/RayTracing/RayTracingPipeline.h"

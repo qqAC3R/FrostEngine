@@ -147,7 +147,15 @@ namespace Frost
 			}
 			ImGui::Text(vendor);
 			ImGui::Text(deviceName);
-			ImGui::Text("Frametime: %.1f ms", 1000.0f / ImGui::GetIO().Framerate);
+			ImGui::Text("Frametime: %.2f ms", 1000.0f / ImGui::GetIO().Framerate);
+
+			ImGui::Separator();
+
+			GPUMemoryStats memoryStats = Application::Get().GetWindow().GetGraphicsContext()->GetGPUMemoryStats();
+			float used = memoryStats.UsedMemory / 1000000.0f;
+			float free = memoryStats.FreeMemory / 1000000.0f;
+			ImGui::Text("Used Memory: %.2f MB", used);
+			ImGui::Text("Free Memory: %.2f MB", free);
 		}
 		ImGui::End();
 	}
@@ -286,6 +294,14 @@ namespace Frost
 	void UI::CheckMark(const std::string& name, bool& value)
 	{
 		ImGui::Checkbox(name.c_str(), &value);
+	}
+
+	void UI::SetMouseEnabled(bool enable)
+	{
+		if (enable)
+			ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
+		else
+			ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
 	}
 
 }

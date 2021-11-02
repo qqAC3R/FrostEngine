@@ -17,9 +17,6 @@ namespace Frost
 		virtual void Init() override;
 		virtual void Resize(uint32_t width, uint32_t height) override;
 
-		/* OpenGL Specific */
-		virtual void SwapBuffers() override {}
-
 		/* Vulkan Specific */
 		virtual WindowDimension GetWindowDimension() override { return WindowDimension(); }
 
@@ -29,6 +26,8 @@ namespace Frost
 		static VkPipelineBindPoint GetVulkanGraphicsType(GraphicsType type);
 
 		virtual void WaitDevice() override;
+
+		virtual GPUMemoryStats GetGPUMemoryStats() const override;
 
 		template <typename T>
 		static void SetStructDebugName(const std::string& name, VkObjectType type, T handle)

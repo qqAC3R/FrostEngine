@@ -64,6 +64,7 @@ namespace Frost
 		VkImage GetVulkanImage() const { return m_Image; }
 		VkImageView GetVulkanImageView() const { return m_ImageView; }
 		VkImageLayout GetVulkanImageLayout() const { return m_ImageLayout; }
+		VkImageView GetVulkanImageViewMip(uint32_t mip) { return m_Mips[mip]; }
 
 		VkDescriptorImageInfo& GetVulkanDescriptorInfo(DescriptorImageType imageType) {
 			FROST_ASSERT_INTERNAL((m_DescriptorInfo.find(imageType) != m_DescriptorInfo.end()));
@@ -78,6 +79,8 @@ namespace Frost
 		VkImageView m_ImageView;
 		VkSampler m_ImageSampler;
 		VkImageLayout m_ImageLayout;
+
+		std::unordered_map<uint32_t, VkImageView> m_Mips;
 
 		ImageSpecification m_ImageSpecification;
 		HashMap<DescriptorImageType, VkDescriptorImageInfo> m_DescriptorInfo;

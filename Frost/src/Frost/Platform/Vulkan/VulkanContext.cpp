@@ -2,6 +2,7 @@
 #include "VulkanContext.h"
 
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferAllocator.h"
+#include "Frost/Renderer/Renderer.h"
 
 #include <GLFW/glfw3.h>
 
@@ -355,136 +356,27 @@ namespace Frost
 	{
 		VkDevice device = m_Device->GetVulkanDevice();
 		vkDeviceWaitIdle(device);
-
 		m_SwapChain->Resize(width, height);
+		vkDeviceWaitIdle(device);
 	}
-
-#if 0
-	std::tuple<VkResult, uint32_t> VulkanContext::AcquireNextSwapChainImage(VulkanSemaphore availableSemaphore)
-	{
-		VkDevice device = m_Device->GetVulkanDevice();
-		uint32_t imageIndex;
-		VkResult result;
-
-		result = vkAcquireNextImageKHR(device, m_SwapChain->GetVulkanSwapChain(), UINT64_MAX, availableSemaphore.GetSemaphore(), VK_NULL_HANDLE, &imageIndex);
-
-		switch (result)
-		{
-			case VK_ERROR_OUT_OF_DATE_KHR:				m_SwapChain->Resize(0, 0); break;
-			case VK_SUCCESS: case VK_SUBOPTIMAL_KHR:	break;
-			default:									FROST_ASSERT(false, "Failed to acquire swap chain image!");
-		}
-
-		return std::make_tuple(result, imageIndex);
-	}
-
-
-	void VulkanContext::BeginFrame(VkCommandBuffer cmdBuf, uint32_t imageIndex)
-	{
-#if 0
-		VkRenderPass vkRenderPass = m_RenderPass->GetVulkanRenderPass();
-		VkImageView swapChainImageView = m_SwapChain->GetSwapChainImageViews()[imageIndex];
-		VkExtent2D extent = m_SwapChain->GetExtent();
-
-		VkRenderPassAttachmentBeginInfo attachmentInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO };
-		attachmentInfo.attachmentCount = 1;
-		attachmentInfo.pAttachments = &swapChainImageView;
-
-		VkRenderPassBeginInfo renderPassInfo{};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = vkRenderPass;
-		renderPassInfo.framebuffer = m_SwapChain->GetVulkanFramebuffer();
-		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = { extent.width, extent.height };
-		renderPassInfo.pNext = &attachmentInfo; // Imageless framebuffer
-
-
-		std::array<VkClearValue, 2> vkClearValues;
-		vkClearValues[0].color = { 0.05f, 0.05f, 0.05f, 0.05f };
-		vkClearValues[1].depthStencil = { 1.0f, 0 };
-
-
-		renderPassInfo.clearValueCount = static_cast<uint32_t>(vkClearValues.size());
-		renderPassInfo.pClearValues = vkClearValues.data();
-
-
-		vkCmdBeginRenderPass(cmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-
-		VkViewport viewport{};
-		viewport.width = (float)extent.width;
-		viewport.height = (float)extent.height;
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-		vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
-
-		VkRect2D scissor{};
-		scissor.extent = extent;
-		scissor.offset = { 0, 0 };
-		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
-#endif
-
-
-	}
-
-	void VulkanContext::EndFrame(VkCommandBuffer cmdbuf)
-	{
-#if 0
-		vkCmdEndRenderPass(cmdbuf);
-#endif
-	}
-
-	void VulkanContext::Present(VkSemaphore waitSemaphore, uint32_t imageIndex)
-	{
-		m_SwapChain->Present(waitSemaphore, imageIndex);
-#if 0
-		VkQueue presentQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().PresentFamily.Queue;
-
-		// Start Presenting
-		auto swapChain = VulkanContext::GetSwapChain()->GetVulkanSwapChain();
-		VkPresentInfoKHR presentInfo{};
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &waitSemaphore;
-		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = &swapChain;
-		presentInfo.pImageIndices = &imageIndex;
-
-		auto result = vkQueuePresentKHR(presentQueue, &presentInfo);
-
-		FROST_VKCHECK(result, "Failed to present swapchain image!");
-#endif
-
-
-#if 0
-		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-		{
-			// TODO: window resizing
-		}
-		else if (result != VK_SUCCESS)
-		{
-			FROST_ASSERT(0, "Failed to present swap chain image!");
-		}
-#endif
-	}
-#endif
 
 	void VulkanContext::WaitDevice()
 	{
 		vkDeviceWaitIdle(m_Device->GetVulkanDevice());
 	}
 
+	GPUMemoryStats VulkanContext::GetGPUMemoryStats() const
+	{
+		return VulkanAllocator::GetMemoryStats();
+	}
+
 	void VulkanContext::InitFunctionPointers()
 	{
-
-
 		//vk::DynamicLoader dl;
 		//PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
 		//PFN_vkGetDeviceProcAddr vkGetDeviceProcAddr = dl.getProcAddress<PFN_vkGetDeviceProcAddr>("vkGetInstanceProcAddr");
 
 		//load_VK_EXTENSION_SUBSET(m_Instance, vkGetInstanceProcAddr, m_Device->GetVulkanDevice(), vkGetDeviceProcAddr);
-
-
 	}
 
 	VkPipelineBindPoint VulkanContext::GetVulkanGraphicsType(GraphicsType type)

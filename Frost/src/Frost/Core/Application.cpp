@@ -7,20 +7,21 @@
 
 #include "Frost/Core/Input.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
+#include "Frost/Utils/Timer.h"
 
 #include <GLFW/glfw3.h>
 
 namespace Frost
 {
-	
 	Application* Application::s_Instance = nullptr;
+	std::string Application::m_ApplicationVersion = "0.3a";
 
 	Application::Application()
 	{
 		FROST_ASSERT(!s_Instance, "Application already exists!");
 		s_Instance = this;
 		
-		FROST_CORE_INFO("Frost Engine v{0} (Beta aka 'im dying send help') ", 0.2f);
+		FROST_CORE_INFO("Frost Engine v{0}", Application::GetVersion());
 
 		m_Window = Scope<Window>(Window::Create({"Frost Engine", 1600, 900}));
 		m_Window->SetEventCallback(FROST_BIND_EVENT_FN(Application::OnEvent));
@@ -38,7 +39,6 @@ namespace Frost
 		{
 			layer->OnDetach();
 		}
-
 		Renderer::ShutDown();
 	}
 
@@ -72,16 +72,14 @@ namespace Frost
 
 				Renderer::EndFrame();
 
+				// Execute the RenderCommandBuffers (pointer functions)
 				Renderer::ExecuteCommandBuffer();
 			}
 
 			// Poll Events
 			m_Window->OnUpdate();
-
 		}
-
 		m_Window->GetGraphicsContext()->WaitDevice();
-
 	}
 
 	void Application::OnEvent(Event& e)
@@ -112,16 +110,16 @@ namespace Frost
 
 	bool Application::OnWindowResize(WindowResizeEvent& e)
 	{
-		if (e.GetWidth() == 0 || e.GetHeight() == 0)
+		const uint32_t width = e.GetWidth(), height = e.GetHeight();
+		if (width == 0 || height == 0)
 		{
 			m_Minimized = true;
 			return false;
 		}
 		m_Minimized = false;
 		
-		m_Window->Resize(e.GetWidth(), e.GetHeight());
-		Renderer::Resize(e.GetWidth(), e.GetHeight());
-		m_ImGuiLayer->OnResize(e.GetWidth(), e.GetHeight());
+		m_Window->Resize(width, height);
+		m_ImGuiLayer->OnResize(width, height);
 
 		return false;
 	}

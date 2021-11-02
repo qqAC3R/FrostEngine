@@ -198,7 +198,9 @@ namespace Frost
 
 			// Get the size result back
 			Vector<VkDeviceSize> compactSize(1);
-			vkGetQueryPoolResults(device, queryPool, 0, compactSize.size(), compactSize.size() * sizeof(VkDeviceSize), compactSize.data(), sizeof(VkDeviceSize), VK_QUERY_RESULT_WAIT_BIT);
+			vkGetQueryPoolResults(device, queryPool, 0,
+								  static_cast<uint32_t>(compactSize.size()), static_cast<uint32_t>(compactSize.size() * sizeof(VkDeviceSize)), compactSize.data(),
+								  sizeof(VkDeviceSize), VK_QUERY_RESULT_WAIT_BIT);
 
 
 			// Compacting

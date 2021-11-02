@@ -86,11 +86,18 @@ namespace Frost
 			Ref<Image2D> normalTexture =    m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
 			Ref<Image2D> albedoTexture =    m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
 			Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
+			Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironmentMap()->GetPrefilteredMap();
+			Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironmentMap()->GetIrradianceMap();
+			Ref<Texture2D> brdfLut = Renderer::GetBRDFLut();
 			
 			descriptor->Set("u_PositionTexture", positionTexture);
 			descriptor->Set("u_NormalTexture", normalTexture);
 			descriptor->Set("u_AlbedoTexture", albedoTexture);
 			descriptor->Set("u_CompositeTexture", compositeTexture);
+			descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
+			descriptor->Set("u_IrradianceMap", irradianceMap);
+			descriptor->Set("u_BRDFLut", brdfLut);
+
 			//descriptor->Set("LightData", m_PointLightUniformBuffer);
 
 			descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();

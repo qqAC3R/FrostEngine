@@ -16,6 +16,15 @@ namespace Frost
 		Graphics, Compute, Raytracing
 	};
 
+	struct GPUMemoryStats
+	{
+		GPUMemoryStats() = default;
+		GPUMemoryStats(uint64_t used, uint64_t free) : UsedMemory(used), FreeMemory(free) {}
+
+		uint64_t UsedMemory = 0;
+		uint64_t FreeMemory = 0;
+	};
+
 	class GraphicsContext
 	{
 	public:
@@ -24,15 +33,11 @@ namespace Frost
 		virtual void Init() = 0;
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
 
-		/* OpenGL Specific */
-		virtual void SwapBuffers() = 0;
-
-		/* Vulkan Specific */
 		virtual WindowDimension GetWindowDimension() = 0;
 		virtual void WaitDevice() = 0;
+		virtual GPUMemoryStats GetGPUMemoryStats() const = 0;
 
 		static Scope<GraphicsContext> Create(GLFWwindow* window);
-
 	};
 
 }

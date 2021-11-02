@@ -96,7 +96,7 @@ namespace Frost
 		VkPresentModeKHR pickedPresentMode = VK_PRESENT_MODE_FIFO_KHR; // Default one
 		for (const auto& availablePresentMode : avaialbePresentModes)
 		{
-			if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+			if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR && !m_VSync)
 			{
 				pickedPresentMode = availablePresentMode;
 			}

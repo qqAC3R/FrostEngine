@@ -77,7 +77,7 @@ void main()
     vec3 curWeight = vec3(1);
     vec3 hitValue  = vec3(0);
 
-    for(; g_RaySpec.RayDepth < 4; g_RaySpec.RayDepth++)
+    for(; g_RaySpec.RayDepth < 3; g_RaySpec.RayDepth++)
     {
         traceRayEXT(u_TopLevelAS,             // acceleration structure
                     rayFlags,                 // rayFlags
@@ -96,7 +96,7 @@ void main()
     }
     
     // Do accumulation over time
-    //if(ps_Camera.rayAccumulation > 0)
+    //if(ps_Camera.RayAccumulation > 0)
     if(false)
     {
         float a         = 1.0f / float(ps_Camera.RayAccumulation + 1);
@@ -146,7 +146,7 @@ void main()
 // -------------------------------------------------- CLOSEST HIT SHADER ----------------------------------------------
 #version 460
 #extension GL_EXT_ray_tracing : require
-//#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_buffer_reference : enable
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
@@ -233,8 +233,8 @@ float RND(inout uint prev)
 // Calculate the PrimitiveIndex for getting the indices from the indexbuffer (very complicated procress)
 void InitPrimitiveID()
 {
-    uint instanceMaxIndex = u_GeometrySubmeshCount.offsets[gl_InstanceCustomIndexEXT];
-    uint instanceIndex = u_GeometrySubmeshOffsets.offsets[(instanceMaxIndex + gl_GeometryIndexEXT)];
+    uint instanceMaxIndex = u_GeometrySubmeshCount.offsets[nonuniformEXT(gl_InstanceCustomIndexEXT)];
+    uint instanceIndex = u_GeometrySubmeshOffsets.offsets[nonuniformEXT(instanceMaxIndex + gl_GeometryIndexEXT)];
     g_PrimitiveID = instanceIndex + gl_PrimitiveID;
 }
 

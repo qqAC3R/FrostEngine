@@ -37,7 +37,6 @@ namespace Frost
 			FROST_ASSERT(bool(index < (uint32_t)m_RenderCommandBuffer.size()), "Index is invalid!");
 			return m_RenderCommandBuffer[index];
 		}
-
 	private:
 		void PickPresentQueue();
 		void CreateSwapChain();
@@ -66,6 +65,7 @@ namespace Frost
 
 		uint32_t m_CurrentFrameIndex = 0;
 		uint32_t m_CurrentBufferIndex = 0;
+		bool m_VSync = true;
 
 		friend class VulkanRenderer;
 		friend class VulkanContext;

@@ -11,7 +11,6 @@
 
 namespace Frost
 {
-
 	class RendererAPI
 	{
 	public:
@@ -24,6 +23,7 @@ namespace Frost
 		virtual ~RendererAPI() {}
 
 		virtual void Init() = 0;
+		virtual void InitRenderPasses() = 0; // TODO: This is temporary
 		virtual void Render() = 0;
 		virtual void ShutDown() = 0;
 
@@ -56,6 +56,7 @@ namespace Frost
 
 		void SetCamera(const EditorCamera& camera)
 		{
+			Camera = camera;
 			CameraViewMatrix = camera.GetViewMatrix();
 			CameraProjectionMatrix = camera.GetProjectionMatrix();
 			CameraPosition = camera.GetPosition();
@@ -92,9 +93,8 @@ namespace Frost
 		};
 
 		Vector<RenderQueue::RenderData> m_Data;
-		//std::array<RenderQueue::RenderData, 128> m_Data;
-		//uint32_t m_DataSize = 0;
 
+		EditorCamera Camera;
 		glm::mat4 CameraViewMatrix;
 		glm::mat4 CameraProjectionMatrix;
 		glm::vec3 CameraPosition;

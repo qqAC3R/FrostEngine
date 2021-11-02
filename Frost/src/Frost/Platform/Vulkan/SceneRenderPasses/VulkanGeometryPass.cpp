@@ -130,14 +130,18 @@ namespace Frost
 
 			for (auto& submesh : mesh->GetSubMeshes())
 			{
+				glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
+				if (!submesh.BoundingBox.IsOnFrustum(renderQueue.Camera.GetFrustum(), modelMatrix)) continue;
+
+
 				Ref<VulkanMaterial> material = mesh->GetVulkanMaterial()[submesh.MaterialIndex].As<VulkanMaterial>();
 				material->Bind(m_Data->Pipeline);
 
 				PushConstant pushConstant;
-				pushConstant.TransformMatrix = viewProjectionMatrix * submesh.Transform * renderQueue.m_Data[i].Transform;
-				pushConstant.ModelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
+				pushConstant.TransformMatrix = viewProjectionMatrix * modelMatrix;
+				pushConstant.ModelMatrix = modelMatrix;
 				vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
-
+				
 				vkCmdDrawIndexed(cmdBuf, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
 			}
 		}

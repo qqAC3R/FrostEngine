@@ -228,6 +228,19 @@ namespace Frost
 		{
 		}
 
+		WeakRef& operator=(Ref<T> ref)
+		{
+			m_Instance = ref.Raw();
+			m_RefCount = ref.m_RefCount;
+
+			return *this;
+		}
+
+		WeakRef& operator=(std::nullptr_t ptr)
+		{
+			return *this;
+		}
+
 		template<typename T2>
 		[[nodiscard]] Ref<T2> AsRef() const
 		{

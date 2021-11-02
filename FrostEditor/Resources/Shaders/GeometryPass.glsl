@@ -60,7 +60,7 @@ layout(location = 3) in mat3 v_TBN;
 layout(set = 0, binding = 0) uniform u_MaterialUniform
 {
 	vec3 AlbedoColor;
-	vec3 Emission;
+	float Emission;
 	float Roughness;
 	float Metalness;
 	bool UseNormalMap;
@@ -115,7 +115,8 @@ void main()
 	o_Normals = vec4((MaterialUniform.UseNormalMap ? GetVec3FromNormalMap(u_NormalTexture, v_Normal) : v_Normal), 1.0f);
 
 	// Albedo color
-	o_Albedo = vec4(GetVec3ValueFromTexture(u_AlbedoTexture, MaterialUniform.AlbedoColor), 1.0f);
+	o_Albedo = vec4((texture(u_AlbedoTexture, v_TexCoord).rgb * MaterialUniform.AlbedoColor), 1.0f);
+	//o_Albedo = vec4(GetVec3ValueFromTexture(u_AlbedoTexture, MaterialUniform.AlbedoColor), 1.0f);
 
 	// Composite (roughness and metalness)
 	float metalness = GetFloatValueFromTexture(u_MetalnessTexture, MaterialUniform.Metalness);

@@ -77,7 +77,8 @@ namespace Frost
 			FROST_ASSERT(mesh->HasPositions(), "Meshes require positions.");
 			FROST_ASSERT(mesh->HasNormals(), "Meshes require normals.");
 
-			auto& aabb = submesh.BoundingBox;
+			//auto aabb = submesh.BoundingBox;
+			Math::BoundingBox aabb;
 			aabb.Min = { FLT_MAX, FLT_MAX, FLT_MAX };
 			aabb.Max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 			for (size_t i = 0; i < mesh->mNumVertices; i++)
@@ -93,6 +94,9 @@ namespace Frost
 				aabb.Max.x = glm::max(vertex.Position.x, aabb.Max.x);
 				aabb.Max.y = glm::max(vertex.Position.y, aabb.Max.y);
 				aabb.Max.z = glm::max(vertex.Position.z, aabb.Max.z);
+
+				// Setting up the bounding box into the submesh
+				submesh.BoundingBox = Math::BoundingBox(aabb.Min, aabb.Max);
 
 				if (mesh->HasTangentsAndBitangents())
 				{
@@ -113,7 +117,7 @@ namespace Frost
 			// Indices
 			for (size_t i = 0; i < mesh->mNumFaces; i++)
 			{
-				FROST_ASSERT(mesh->mFaces[i].mNumIndices == 3, "Must have 3 indices.");
+				FROST_ASSERT(bool(mesh->mFaces[i].mNumIndices == 3), "Must have 3 indices.");
 				Index index = { mesh->mFaces[i].mIndices[0], mesh->mFaces[i].mIndices[1], mesh->mFaces[i].mIndices[2] };
 				m_Indices.push_back(index);
 
@@ -139,7 +143,7 @@ namespace Frost
 			maxIndex = subMeshLastIndex + 1;
 
 		}
-		m_SubmeshIndexBuffers = IndexBuffer::Create(submeshIndices.data(), submeshIndices.size() * sizeof(Index));
+		m_SubmeshIndexBuffers = IndexBuffer::Create(submeshIndices.data(), (uint32_t)submeshIndices.size() * sizeof(Index));
 
 
 		// Traverse over every mesh to get the transforms
@@ -164,7 +168,7 @@ namespace Frost
 			Timer timer("Mesh's buffers creation");
 
 			m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
-			m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), m_Indices.size() * sizeof(Index));
+			m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)m_Indices.size() * sizeof(Index));
 
 			MeshASInfo meshInfo{};
 			meshInfo.MeshVertexBuffer = m_VertexBuffer;
@@ -187,8 +191,6 @@ namespace Frost
 
 			for (uint32_t i = 0; i < scene->mNumMaterials; i++)
 			{
-				MaterialUniform materialInfo{};
-
 				auto aiMaterial = scene->mMaterials[i];
 				auto aiMaterialName = aiMaterial->GetName();
 
@@ -200,11 +202,15 @@ namespace Frost
 				aiColor3D aiColor, aiEmission;
 				// Getting the albedo color
 				if (aiMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, aiColor) == AI_SUCCESS)
-					materialInfo.AlbedoColor = { aiColor.r, aiColor.g, aiColor.b };
+				{
+					mi->Set("u_MaterialUniform.AlbedoColor", { aiColor.r, aiColor.g, aiColor.b });
+				}
 
 				// Geting the emission factor
 				if (aiMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, aiEmission) == AI_SUCCESS)
-					materialInfo.Emission = aiEmission.r;
+				{
+					mi->Set("u_MaterialUniform.Emission", aiEmission.r);
+				}
 
 
 				float shininess, metalness;
@@ -216,13 +222,12 @@ namespace Frost
 				if (aiMaterial->Get(AI_MATKEY_REFLECTIVITY, metalness) != aiReturn_SUCCESS)
 					metalness = 0.0f;
 
+				// Clamping the values
 				float roughness = 1.0f - glm::sqrt(shininess / 100.0f);
 				if (roughness == 1.0f) roughness = 0.99f;
 
-				//roughness = 0.99f;
-
-				materialInfo.Roughness = roughness;
-				materialInfo.Metalness = metalness;
+				mi->Set("u_MaterialUniform.Roughness", roughness);
+				mi->Set("u_MaterialUniform.Metalness", metalness);
 
 
 				// Albedo Map
@@ -242,9 +247,10 @@ namespace Frost
 					auto texture = Texture2D::Create(texturePath, textureSpec);
 					if (texture->Loaded())
 					{
+						//texture->GenerateMipMaps();
 						m_Textures.push_back(texture);
 						mi->Set("u_AlbedoTexture", texture);
-						materialInfo.AlbedoColor = glm::vec3(1.0f);
+						mi->Set("u_MaterialUniform.AlbedoColor", glm::vec3(1.0f));
 					}
 					else
 					{
@@ -274,17 +280,19 @@ namespace Frost
 					{
 						m_Textures.push_back(texture);
 						mi->Set("u_NormalTexture", texture);
-						materialInfo.UseNormalMap = true;
+						mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(1));
 					}
 					else
 					{
 						FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
 						mi->Set("u_NormalTexture", whiteTexture);
+						mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
 					}
 				}
 				else
 				{
 					mi->Set("u_NormalTexture", whiteTexture);
+					mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
 				}
 
 
@@ -305,7 +313,7 @@ namespace Frost
 					{
 						m_Textures.push_back(texture);
 						mi->Set("u_RoughnessTexture", texture);
-						materialInfo.Roughness = 1.0f;
+						//materialInfo.Roughness = 1.0f;
 					}
 					else
 					{
@@ -346,7 +354,7 @@ namespace Frost
 								metalnessTextureFound = true;
 								m_Textures.push_back(texture);
 								mi->Set("u_MetalnessTexture", texture);
-								materialInfo.Metalness = 1.0f;
+								//materialInfo.Metalness = 1.0f;
 							}
 							else
 							{
@@ -362,22 +370,20 @@ namespace Frost
 					}
 
 				}
-
-				// If material factor is 1.0f, then use the texture (the limit should be 0.99f)
-				m_MaterialUniforms->SetData(&materialInfo);
-				mi->Set("u_MaterialUniform", m_MaterialUniforms);
 			}
 		}
 		else
 		{
-			MaterialUniform materialInfo{};
 			auto mi = Material::Create(m_MeshShader, "MeshShader-Default");
 			mi->Set("u_AlbedoTexture", whiteTexture);
 			mi->Set("u_NormalTexture", whiteTexture);
 			mi->Set("u_MetalnessTexture", whiteTexture);
 
-			m_MaterialUniforms->SetData(&materialInfo);
-			mi->Set("u_MaterialUniform", m_MaterialUniforms);
+			mi->Set("u_MaterialUniform.AlbedoColor", glm::vec3(0.8f));
+			mi->Set("u_MaterialUniform.Emission", 0.0f);
+			mi->Set("u_MaterialUniform.Roughness", 0.0f);
+			mi->Set("u_MaterialUniform.Metalness", 0.0f);
+			mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
 		}
 
 		return;
@@ -406,19 +412,5 @@ namespace Frost
 
 	void Mesh::Destroy()
 	{
-		//m_VertexBuffer->Destroy();
-		//m_IndexBuffer->Destroy();
-		//m_SubmeshIndexBuffers->Destroy();
-		//m_MaterialUniforms->Destroy();
-
-		//m_AccelerationStructure->Destroy();
-
-		//for (auto& material : m_Materials)
-		//	material->Destroy();
-
-	
-		//for (auto& texture : m_Textures)
-		//	texture->Destroy();
-
 	}
 }

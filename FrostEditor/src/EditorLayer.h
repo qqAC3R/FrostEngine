@@ -17,7 +17,7 @@ namespace Frost
 	{
 	public:
 		EditorLayer()
-			: Layer("Example"), m_Camera(70, 16.0f / 9.0f, 0.1f, 1000.0f, Frost::CameraMode::ORBIT)
+			: Layer("Example"), m_Camera(70.0f, 1600.0f / 900.0f, 0.1f, 1000.0f)
 		{
 		}
 
@@ -38,6 +38,8 @@ namespace Frost
 
 			Renderer::BeginScene(m_Camera);
 
+			m_SphereMesh->GetVulkanMaterial()[1]->Set("u_MaterialUniform.Metalness", m_Metalness);
+			m_SphereMesh->GetVulkanMaterial()[1]->Set("u_MaterialUniform.Roughness", m_Roughness);
 
 			glm::mat4 sphereTransform = glm::translate(glm::mat4(1.0f), m_VikingMeshPosition) * glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));;
 			Renderer::Submit(m_SphereMesh, sphereTransform);
@@ -52,10 +54,6 @@ namespace Frost
 			Renderer::EndScene();
 		}
 
-		virtual void OnDetach()
-		{
-			this->~EditorLayer();
-		}
 
 		virtual void OnEvent(Event& event)
 		{
@@ -96,7 +94,7 @@ namespace Frost
 
 
 				ImGui::Begin("DockSpace", &dockSpaceOpen, window_flags);
-			
+
 				if (!opt_padding)
 					ImGui::PopStyleVar();
 
@@ -137,11 +135,12 @@ namespace Frost
 				{
 					Renderer::Resize(viewPortSizePanel.x, viewPortSizePanel.y);
 					m_Camera.SetViewportSize(viewPortSizePanel.x, viewPortSizePanel.y);
+					m_Camera.SetProjectionMatrix(glm::perspective(70.0f, viewPortSizePanel.x / viewPortSizePanel.y, 0.1f, 1000.0f));
 					m_ViewPortSize = viewPortSizePanel;
 				}
 
 				Ref<Image2D> texture;
-				if(m_UseRT)
+				if (m_UseRT)
 					texture = Renderer::GetFinalImage(0);
 				else
 					texture = Renderer::GetFinalImage(1);
@@ -155,8 +154,10 @@ namespace Frost
 
 				UI::Begin("Scene");
 				UI::Slider("Entity Position", m_VikingMeshPosition, -20, 20);
+				UI::Slider("Roughness", m_Roughness, 0.0f, 1.0f);
+				UI::Slider("Metalness", m_Metalness, 0.0f, 1.0f);
 				UI::End();
-				
+
 				UI::Begin("Settings");
 				UI::CheckMark("RayTracing", m_UseRT);
 				UI::End();
@@ -169,15 +170,23 @@ namespace Frost
 		{
 		}
 
+		virtual void OnDetach()
+		{
+			this->~EditorLayer();
+		}
+
 	private:
 
 		EditorCamera m_Camera;
 
-		glm::vec3 m_CameraPos{ 1.0f, 1.0f, 1.0f };
+		glm::vec3 m_CameraPos{ 0.0f, 2.0f, -0.2f };
 		glm::vec3 m_LightPos{ 1.0f, 1.0f, 1.0f };
 		float m_SphereRoughness = 0.0f;
 
-		glm::vec3 m_VikingMeshPosition{ 2.0f };
+		float m_Roughness = 0.0f;
+		float m_Metalness = 1.0f;
+
+		glm::vec3 m_VikingMeshPosition{ 0.5f, 2.0f, -0.2f };
 		ImVec2 m_ViewPortSize{};
 
 		Ref<Mesh> m_PlaneMesh;

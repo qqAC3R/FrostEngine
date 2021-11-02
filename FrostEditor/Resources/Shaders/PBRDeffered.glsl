@@ -15,6 +15,7 @@ void main()
     gl_Position = vec4(v_Position.x, -v_Position.y, 0.0f, 1.0f);
 }
 
+
 #type fragment
 #version 450
 
@@ -57,6 +58,10 @@ layout(binding = 4) uniform LightData {
     uint u_LightCount;
     PointLight u_PointLights[1];
 };
+
+layout(binding = 6) uniform samplerCube u_RadianceFilteredMap;
+layout(binding = 7) uniform samplerCube u_IrradianceMap;
+layout(binding = 8) uniform sampler2D u_BRDFLut;
 
 layout(push_constant) uniform PushConstant {
     vec3 CameraPosition;
@@ -176,6 +181,39 @@ vec3 DirectionalLightContribution(DirectionalLight directionLight)
 	return result;
 }
 
+vec3 RotateVectorByY(float angle, vec3 vec)
+{
+	angle = radians(angle);
+	mat3x3 rotationMatrix = { vec3(cos(angle),0.0,sin(angle)),
+							vec3(0.0,1.0,0.0),
+							vec3(-sin(angle),0.0,cos(angle)) };
+	return rotationMatrix * vec;
+}
+
+vec3 IBL_Contribution()
+{
+	float NdotV = dot(m_Surface.Normal, m_Surface.ViewVector);
+	// Specular reflection vector
+	vec3 Lr = 2.0 * NdotV * m_Surface.Normal - m_Surface.ViewVector;
+
+
+	vec3 irradiance = texture(u_IrradianceMap, m_Surface.Normal).rgb;
+	vec3 F = FresnelSchlickRoughness(m_Surface.F0, NdotV, m_Surface.Roughness);
+	vec3 kd = (1.0 - F) * (1.0 - m_Surface.Metalness);
+	vec3 diffuseIBL = m_Surface.Albedo * irradiance;
+
+	int envRadianceTexLevels = textureQueryLevels(u_RadianceFilteredMap);
+	float NoV = clamp(NdotV, 0.0, 1.0);
+	vec3 R = 2.0 * dot(m_Surface.ViewVector, m_Surface.Normal) * m_Surface.Normal - m_Surface.ViewVector;
+	vec3 specularIrradiance = textureLod(u_RadianceFilteredMap, RotateVectorByY(0.0f, Lr), (m_Surface.Roughness) * envRadianceTexLevels).rgb;
+
+	// Sample BRDF Lut, 1.0 - roughness for y-coord because texture was generated (in Sparky) for gloss model
+	vec2 specularBRDF = texture(u_BRDFLut, vec2(NdotV, 1.0 - m_Surface.Roughness)).rg;
+	vec3 specularIBL = specularIrradiance * (m_Surface.F0 * specularBRDF.x + specularBRDF.y);
+
+	return kd * diffuseIBL + specularIBL;
+}
+
 void main()
 {
     // Calculating the normals and worldPos
@@ -207,6 +245,9 @@ void main()
 	vec3 Ld = DirectionalLightContribution(dirLight);
 
     vec3 result = Lo + Ld;
+
+	float IBLIntensity = 0.4f;
+	result += IBL_Contribution() * IBLIntensity;
 
     o_Color = vec4(result, 1.0f);
 }

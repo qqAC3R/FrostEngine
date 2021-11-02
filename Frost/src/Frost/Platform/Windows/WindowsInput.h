@@ -14,6 +14,9 @@ namespace Frost
 		virtual std::pair<float, float> GetMousePosImpl() override;
 		virtual float GetMouseXImpl() override;
 		virtual float GetMouseYImpl() override;
+
+		virtual void SetImplCursorMode(CursorMode mode) override;
+		virtual CursorMode GetImplCursorMode() override;
 	};
 
 }

@@ -1,5 +1,6 @@
 #include "frostpch.h"
 #include "WindowsInput.h"
+#include "WindowsWindow.h"
 
 #include "Frost/Core/Application.h"
 #include <GLFW/glfw3.h>
@@ -44,4 +45,15 @@ namespace Frost
 		return y;
 	}
 
+	void WindowsInput::SetImplCursorMode(CursorMode mode)
+	{
+		auto& window = static_cast<WindowsWindow&>(Application::Get().GetWindow());
+		glfwSetInputMode(static_cast<GLFWwindow*>(window.GetNativeWindow()), GLFW_CURSOR, GLFW_CURSOR_NORMAL + (int)mode);
+	}
+
+	CursorMode WindowsInput::GetImplCursorMode()
+	{
+		auto& window = static_cast<WindowsWindow&>(Application::Get().GetWindow());
+		return (CursorMode)(glfwGetInputMode(static_cast<GLFWwindow*>(window.GetNativeWindow()), GLFW_CURSOR) - GLFW_CURSOR_NORMAL);
+	}
 }

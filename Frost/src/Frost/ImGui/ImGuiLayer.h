@@ -52,6 +52,8 @@ namespace Frost
 		static void Slider(const std::string& name, float& value, float min, float max);
 		static void Slider(const std::string& name, int& value, int min, int max);
 		static void CheckMark(const std::string& name, bool& value);
+
+		static void SetMouseEnabled(bool enable);
 	};
 
 

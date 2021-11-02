@@ -4,6 +4,12 @@
 
 namespace Frost
 {
+	enum class CursorMode
+	{
+		Normal = 0,
+		Hidden = 1,
+		Locked = 2
+	};
 
 	class Input
 	{
@@ -14,6 +20,9 @@ namespace Frost
 		inline static std::pair<float, float> GetMousePosition() { return s_Instance->GetMousePosImpl(); }
 		inline static float GetMouseX() { return s_Instance->GetMouseXImpl(); }
 		inline static float GetMouseY() { return s_Instance->GetMouseYImpl(); }
+
+		static void SetCursorMode(CursorMode mode) { return s_Instance->SetImplCursorMode(mode); }
+		static CursorMode GetCursorMode() { return s_Instance->GetImplCursorMode(); }
 	protected:
 		virtual bool IsKeyPressedImpl(int keycode) = 0;
 
@@ -21,8 +30,10 @@ namespace Frost
 		virtual std::pair<float, float> GetMousePosImpl() = 0;
 		virtual float GetMouseXImpl() = 0;
 		virtual float GetMouseYImpl() = 0;
+
+		virtual void SetImplCursorMode(CursorMode mode) = 0;
+		virtual CursorMode GetImplCursorMode() = 0;
 	private:
 		static Input* s_Instance;
 	};
-
 }

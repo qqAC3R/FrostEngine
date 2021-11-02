@@ -1,6 +1,7 @@
 #pragma once
 
-#include "RendererAPI.h"
+#include "Frost/Renderer/RendererAPI.h"
+#include "Frost/Renderer/SceneEnvironment.h"
 #define FRAMES_IN_FLIGHT 3
 
 namespace Frost
@@ -8,6 +9,11 @@ namespace Frost
 	struct RendererConfig
 	{
 		uint32_t FramesInFlight = 3;
+		
+		uint32_t EnvironmentMapResolution = 1024;
+		
+		uint32_t IrradianceMapResolution = 32;
+		uint32_t IrradianceMapSamples = 512;
 	};
 
 	class Renderer
@@ -41,8 +47,10 @@ namespace Frost
 		static void Resize(uint32_t width, uint32_t height) { s_RendererAPI->Resize(width, height); }
 		static Ref<Image2D> GetFinalImage(uint32_t id) { return s_RendererAPI->GetFinalImage(id); }
 		static Ref<Texture2D> GetWhiteLUT();
+		static Ref<Texture2D> GetBRDFLut();
 
 		static Ref<ShaderLibrary> GetShaderLibrary();
+		static Ref<SceneEnvironment> GetSceneEnvironmentMap();
 		static RendererConfig GetRendererConfig() { return RendererConfig(); }
 		static RendererAPI::API GetAPI() { return s_RendererAPI->s_API; }
 

@@ -71,18 +71,31 @@ namespace Frost
 		HashMap<std::string, Ref<Shader>> m_Shaders;
 	};
 
+
 	struct ShaderBufferData
 	{
 		enum class BufferType {
 			Uniform, Storage
 		};
 		BufferType Type;
+
+		struct Member
+		{
+			enum class Type
+			{
+				None, Int = 4, UInt = 4, UInt64 = 8, Float = 4, Float2 = 8, Float3 = 12, Float4 = 16, Mat2 = 16, Mat3 = 36, Mat4 = 64, Bool = 4, Struct
+			};
+			uint32_t MemoryOffset = 0;
+			Type DataType = Type::None;
+		};
+		HashMap<std::string, Member> Members;
+
 		uint32_t Set;
 		uint32_t Binding;
 		uint32_t Size;
 		uint32_t Count;
 		Vector<ShaderType> ShaderStage;
-		std::string Name;
+		//std::string Name;
 	};
 
 	struct ShaderTextureData
@@ -122,21 +135,22 @@ namespace Frost
 
 		void SetReflectionData(std::unordered_map<ShaderType, std::vector<uint32_t>> reflectionData);
 
-		const Vector<ShaderBufferData>& GetBuffersData() const { return m_BufferData; }
+		const HashMap<std::string, ShaderBufferData>& GetBuffersData() const { return m_BufferData; }
 		const Vector<ShaderTextureData>& GetTextureData() const { return m_TextureData; }
 		const Vector<ShaderAccelerationStructureData>& GetAccelerationStructureData() const { return m_AccelerationStructureData; }
 		const Vector<PushConstantData>& GetPushConstantData() const { return m_PushConstantData; }
 
 		const Vector<uint32_t> GetDescriptorSetsCount() const { return m_DescriptorSetsCount; }
-
 	private:
 		void SetDescriptorSetsCount();
 		void ClearRepeatedMembers();
 	private:
-		Vector<ShaderBufferData> m_BufferData;
+		HashMap<std::string, ShaderBufferData> m_BufferData;
 		Vector<ShaderTextureData> m_TextureData;
 		Vector<ShaderAccelerationStructureData> m_AccelerationStructureData;
 		Vector<PushConstantData> m_PushConstantData;
+
+		Vector<std::pair<std::string, ShaderBufferData>> m_BufferVectorData;
 
 		Vector<uint32_t> m_DescriptorSetsCount;
 	};

@@ -9,6 +9,7 @@
 namespace Frost
 {
 	static VmaAllocator s_Allocator;
+	static bool s_AllocatorDestroyed = true;
 
 	namespace Utils
 	{
@@ -31,11 +32,13 @@ namespace Frost
 		allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;
 
 		vmaCreateAllocator(&allocatorInfo, &s_Allocator);
+		s_AllocatorDestroyed = false;
 	}
 
 	void VulkanAllocator::ShutDown()
 	{
 		vmaDestroyAllocator(s_Allocator);
+		s_AllocatorDestroyed = true;
 	}
 
 	void VulkanAllocator::AllocateBuffer(VkDeviceSize size, std::vector<BufferType> usage, MemoryUsage memoryFlags,
@@ -151,6 +154,19 @@ namespace Frost
 	void VulkanAllocator::UnbindBuffer(VulkanMemoryInfo& memory)
 	{
 		vmaUnmapMemory(s_Allocator, memory.allocation);
+	}
+
+	GPUMemoryStats VulkanAllocator::GetMemoryStats()
+	{
+		if (s_AllocatorDestroyed) return GPUMemoryStats(UINT64_MAX, UINT64_MAX);
+
+		VmaStats stats;
+		vmaCalculateStats(s_Allocator, &stats);
+
+		uint64_t usedMemory = stats.total.usedBytes;
+		uint64_t freeMemory = stats.total.unusedBytes;
+
+		return GPUMemoryStats(usedMemory, freeMemory);
 	}
 
 	namespace Utils

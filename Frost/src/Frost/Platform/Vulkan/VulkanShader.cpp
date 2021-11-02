@@ -49,7 +49,6 @@ namespace Frost
 
 		m_ReflectionData.SetReflectionData(m_VulkanSPIRV);
 		CreateVulkanDescriptorSetLayout();
-
 	}
 
 	VulkanShader::~VulkanShader()
@@ -152,13 +151,14 @@ namespace Frost
 
 			for (auto& buffer : reflectedData.GetBuffersData())
 			{
-				if (buffer.Set != descriptorSetNumber) continue;
+				auto& bufferData = buffer.second;
+				if (bufferData.Set != descriptorSetNumber) continue;
 
 				VkDescriptorSetLayoutBinding& LayoutBinding = layoutBindings.emplace_back();
-				LayoutBinding.binding = buffer.Binding;
-				LayoutBinding.descriptorCount = buffer.Count;
-				LayoutBinding.descriptorType = Utils::BufferTypeToVulkan(buffer.Type);
-				LayoutBinding.stageFlags = Utils::GetShaderStagesFlagsFromShaderTypes(buffer.ShaderStage);
+				LayoutBinding.binding = bufferData.Binding;
+				LayoutBinding.descriptorCount = bufferData.Count;
+				LayoutBinding.descriptorType = Utils::BufferTypeToVulkan(bufferData.Type);
+				LayoutBinding.stageFlags = Utils::GetShaderStagesFlagsFromShaderTypes(bufferData.ShaderStage);
 			}
 
 			for (auto& texture : reflectedData.GetTextureData())
@@ -199,7 +199,7 @@ namespace Frost
 
 	bool VulkanShader::IsFiledChanged()
 	{
-		uint32_t hashCode = 0;
+		uint64_t hashCode = 0;
 
 		{
 			// Hashing the new shader

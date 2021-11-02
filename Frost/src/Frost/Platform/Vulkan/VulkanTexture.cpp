@@ -10,14 +10,6 @@
 
 namespace Frost
 {
-	namespace Utils
-	{
-		uint32_t CalculateMipMapLevels(uint32_t width, uint32_t height)
-		{
-			return (uint32_t)std::floor(std::log2(std::max(width, height))) + 1;
-		}
-	}
-
 	/////////////////////////////////////////////////////
 	// VULKAN TEXTURE 2D
 	/////////////////////////////////////////////////////
@@ -72,14 +64,16 @@ namespace Frost
 
 	void VulkanTexture2D::Destroy()
 	{
-		m_Image->Destroy();
+		if (m_IsLoaded)
+		{
+			m_Image->Destroy();
+		}
 	}
 
 	VulkanTexture2D::~VulkanTexture2D()
 	{
 		Destroy();
 	}
-
 
 	/////////////////////////////////////////////////////
 	// VULKAN TEXTURE CUBEMAP
@@ -92,10 +86,17 @@ namespace Frost
 		VkFormat textureFormat = Utils::GetImageFormat(imageSpecification.Format);
 		VkImageUsageFlags usageFlags = Utils::GetImageUsageFlags(imageSpecification.Usage);
 
-		Utils::CreateImage(imageSpecification.Width, imageSpecification.Height, 6, 1,
+		//  TODO: Change this
+		if (imageSpecification.Mips == UINT32_MAX)
+			m_ImageSpecification.Mips = Utils::CalculateMipMapLevels(imageSpecification.Width, imageSpecification.Height);
+		else
+			m_ImageSpecification.Mips = 1;
+
+
+		Utils::CreateImage(imageSpecification.Width, imageSpecification.Height, 6, m_ImageSpecification.Mips,
 			VK_IMAGE_TYPE_2D, textureFormat,
 			VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_SAMPLED_BIT | usageFlags,
+			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | usageFlags,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			m_Image, m_ImageMemory
 		);
@@ -106,6 +107,8 @@ namespace Frost
 		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 
 		// Generating mip maps if necessary and changing the layout to SHADER_READ_ONLY_OPTIMAL
+		TransitionLayout(cmdBuf, textureLayout, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(textureLayout));
+#if 0
 		if (imageSpecification.Mips > 1)
 		{
 			m_ImageSpecification.Mips = Utils::CalculateMipMapLevels(imageSpecification.Width, imageSpecification.Height);
@@ -118,12 +121,40 @@ namespace Frost
 		{
 			TransitionLayout(cmdBuf, textureLayout, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(textureLayout));
 		}
+#endif
 
 		// Ending the temporary commandbuffer for transitioning
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
 
 
-		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, 1, 6);
+		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, m_ImageSpecification.Mips, 6);
+
+		// Creating the imageView mips
+		for (uint32_t i = 0; i < m_ImageSpecification.Mips; i++)
+		{
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+			VkImageViewCreateInfo createInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+			createInfo.image = m_Image;
+			createInfo.format = textureFormat;
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+
+			createInfo.subresourceRange.baseMipLevel = i;
+			createInfo.subresourceRange.levelCount = 1;
+
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 6;
+			switch (textureFormat)
+			{
+			case VK_FORMAT_D32_SFLOAT:
+			case VK_FORMAT_D24_UNORM_S8_UINT:
+				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; break;
+			default:
+				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			}
+
+			FROST_VKCHECK(vkCreateImageView(device, &createInfo, nullptr, &m_Mips[i]));
+		}
 
 		// Creating the sampler
 		VkFilter filtering = Utils::GetImageFiltering(imageSpecification.Sampler.SamplerFilter);
@@ -151,6 +182,9 @@ namespace Frost
 		vkDestroyImageView(device, m_ImageView, nullptr);
 		vkDestroySampler(device, m_ImageSampler, nullptr);
 
+		for (auto& [mipLevel, imageView] : m_Mips)
+			vkDestroyImageView(device, imageView, nullptr);
+
 		m_Image = VK_NULL_HANDLE;
 	}
 
@@ -159,7 +193,6 @@ namespace Frost
 	{
 		VkImageSubresourceRange subresourceRange{};
 		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		subresourceRange.baseMipLevel = 0;
 		subresourceRange.levelCount = m_ImageSpecification.Mips;
 		subresourceRange.layerCount = 6; // 6 for cubemaps
 		Utils::SetImageLayout(cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
@@ -172,65 +205,97 @@ namespace Frost
 		int32_t mipWidth = m_ImageSpecification.Width;
 		int32_t mipHeight = m_ImageSpecification.Height;
 
-		VkImageSubresourceRange subresourceRange{};
-		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		subresourceRange.baseArrayLayer = 0;
-		subresourceRange.layerCount = 6;
-		subresourceRange.levelCount = 1;
+		TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+		);
 
 		for (uint32_t i = 1; i < m_ImageSpecification.Mips; i++)
 		{
-			subresourceRange.baseMipLevel = i - 1;
+			for (uint32_t face = 0; face < 6; face++)
+			{
+				VkImageSubresourceRange subresourceRange{};
+				subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				subresourceRange.baseArrayLayer = face;
+				subresourceRange.layerCount = 1;
+				subresourceRange.levelCount = 1;
+				subresourceRange.baseMipLevel = i - 1;
 
-			Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
-				Utils::GetAccessFlagsFromLayout(m_ImageLayout), Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-				m_ImageLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout), Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-				subresourceRange
-			);
 
+				VkImageBlit blit{};
 
-			VkImageBlit blit{};
-			blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			blit.srcOffsets[0] = { 0, 0, 0 };
-			blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
-			blit.srcSubresource.mipLevel = i - 1;
-			blit.srcSubresource.baseArrayLayer = 0;
-			blit.srcSubresource.layerCount = 6;
+				// Src
+				blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				blit.srcOffsets[0] = { 0, 0, 0 };
+				blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+				blit.srcSubresource.baseArrayLayer = face;
+				blit.srcSubresource.layerCount = 1;
+				blit.srcSubresource.mipLevel = i - 1;
 
-			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			blit.dstOffsets[0] = { 0, 0, 0 };
-			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
-			blit.dstSubresource.mipLevel = i;
-			blit.dstSubresource.baseArrayLayer = 0;
-			blit.dstSubresource.layerCount = 6;
+				// Dst
+				blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				blit.dstOffsets[0] = { 0, 0, 0 };
+				blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+				blit.dstSubresource.baseArrayLayer = face;
+				blit.dstSubresource.layerCount = 1;
+				blit.dstSubresource.mipLevel = i;
 
-			vkCmdBlitImage(cmdBuffer,
-				m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				1, &blit,
-				VK_FILTER_LINEAR
-			);
+				// Transition from `VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL` to `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL`
+				Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
+					Utils::GetAccessFlagsFromLayout(m_ImageLayout),
+					Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+					m_ImageLayout,
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
+					Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+					subresourceRange
+				);
 
-			Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
-				Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL), Utils::GetAccessFlagsFromLayout(newImageLayout),
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, newImageLayout,
-				Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL), Utils::GetPipelineStageFlagsFromLayout(newImageLayout),
-				subresourceRange
-			);
+				vkCmdBlitImage(cmdBuffer,
+					m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					1, &blit,
+					VK_FILTER_LINEAR
+				);
+
+				// Transition from `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL` to "newImageLayout"
+				Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
+					Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+					Utils::GetAccessFlagsFromLayout(newImageLayout),
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					newImageLayout,
+					Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+					Utils::GetPipelineStageFlagsFromLayout(newImageLayout),
+					subresourceRange
+				);
+
+			}
 
 			if (mipWidth > 1) mipWidth /= 2;
 			if (mipHeight > 1) mipHeight /= 2;
 		}
 
-		subresourceRange.baseMipLevel = m_ImageSpecification.Mips - 1;
+		
+		for (uint32_t face = 0; face < 6; face++)
+		{
+			VkImageSubresourceRange subresourceRange{};
+			subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			subresourceRange.baseMipLevel = m_ImageSpecification.Mips - 1;
+			subresourceRange.levelCount = 1;
 
-		Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
-			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), Utils::GetAccessFlagsFromLayout(newImageLayout),
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, newImageLayout,
-			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), Utils::GetPipelineStageFlagsFromLayout(newImageLayout),
-			subresourceRange
-		);
+			subresourceRange.baseArrayLayer = face;
+			subresourceRange.layerCount = 1;
+
+			Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
+				Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+				Utils::GetAccessFlagsFromLayout(newImageLayout),
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				newImageLayout,
+				Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+				Utils::GetPipelineStageFlagsFromLayout(newImageLayout),
+				subresourceRange
+			);
+		}
 
 		m_ImageLayout = newImageLayout;
 	}

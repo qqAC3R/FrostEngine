@@ -69,4 +69,9 @@ namespace Frost
 		static Ref<Image2D> Create(const ImageSpecification& specification, const void* data);
 	};
 
+	namespace Utils
+	{
+		uint32_t CalculateMipMapLevels(uint32_t width, uint32_t height);
+	}
+
 }
