@@ -49,7 +49,6 @@ namespace Frost
 			
 			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
 			Renderer::Submit(m_PlaneMesh, planeTransform);
-			
 
 			Renderer::EndScene();
 		}

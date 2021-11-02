@@ -6,6 +6,8 @@
 #include "Frost/Renderer/RayTracing/ShaderBindingTable.h"
 #include "Frost/Renderer/RayTracing/RayTracingPipeline.h"
 
+#include "Frost/Core/BufferPointer.h"
+
 namespace Frost
 {
 
@@ -36,8 +38,14 @@ namespace Frost
 			Ref<Buffer> SceneVertexData[FRAMES_IN_FLIGHT];
 			Ref<Buffer> SceneIndexData[FRAMES_IN_FLIGHT];
 			Ref<Buffer> SceneTransformData[FRAMES_IN_FLIGHT];
-			Ref<Buffer> SceneGeometryOffsets[FRAMES_IN_FLIGHT];
-			Ref<Buffer> SceneGeometrySubmeshCount[FRAMES_IN_FLIGHT];
+
+			struct RenderBuffer
+			{
+				Ref<Buffer> BufferDeviceLocal;
+				BufferPointer BufferHost;
+			};
+			RenderBuffer SceneGeometryOffsets[FRAMES_IN_FLIGHT];
+			RenderBuffer SceneGeometrySubmeshCount[FRAMES_IN_FLIGHT];
 
 			Ref<Image2D> DisplayTexture[FRAMES_IN_FLIGHT];;
 			

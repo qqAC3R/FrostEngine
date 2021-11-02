@@ -38,6 +38,9 @@ namespace Frost
 
 	VulkanMaterial::~VulkanMaterial()
 	{
+		for (auto& uniformBuffer : m_UniformBuffers)
+			uniformBuffer->Buffer.Release();
+
 		m_MaterialData.clear();
 	}
 
