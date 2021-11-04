@@ -2,7 +2,7 @@
 #include "VulkanVertexBuffer.h"
 
 #include "Frost/Renderer/Buffers/BufferLayout.h"
-#include "Frost/Platform/Vulkan/Buffers/VulkanBuffer.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 
@@ -12,10 +12,10 @@ namespace Frost
 	VulkanVertexBuffer::VulkanVertexBuffer(void* verticies, uint64_t size)
 		: m_BufferSize(size)
 	{
-		m_VertexBuffer = Buffer::Create(size, verticies, { BufferType::Vertex, BufferType::AccelerationStructureReadOnly });
+		m_VertexBuffer = BufferDevice::Create(size, verticies, { BufferUsage::Vertex, BufferUsage::AccelerationStructureReadOnly });
 	
 		// Getting the buffer and buffer address
-		Ref<VulkanBuffer> vertexBuffer = m_VertexBuffer.As<VulkanBuffer>();
+		Ref<VulkanBufferDevice> vertexBuffer = m_VertexBuffer.As<VulkanBufferDevice>();
 		m_BufferAddress = vertexBuffer->GetVulkanBufferAddress();
 		m_Buffer = vertexBuffer->GetVulkanBuffer();
 

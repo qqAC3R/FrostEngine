@@ -69,7 +69,7 @@ namespace Frost
 		// Making a staging buffer to copy the data
 		VkBuffer stagingBuffer;
 		VulkanMemoryInfo stagingBufferMemory;
-		VulkanAllocator::AllocateBuffer(imageSize, { BufferType::TransferSrc }, MemoryUsage::CPU_AND_GPU, stagingBuffer, stagingBufferMemory);
+		VulkanAllocator::AllocateBuffer(imageSize, { BufferUsage::TransferSrc }, MemoryUsage::CPU_AND_GPU, stagingBuffer, stagingBufferMemory);
 
 		// Copying the data
 		void* copyData;

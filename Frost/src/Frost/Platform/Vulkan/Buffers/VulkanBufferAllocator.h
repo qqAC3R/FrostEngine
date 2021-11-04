@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Frost/Platform/Vulkan/Vulkan.h"
-#include "Frost/Renderer/Buffers/Buffer.h"
+#include "Frost/Renderer/Buffers/BufferDevice.h"
 
 using VmaAllocation = struct VmaAllocation_T*;
 enum VmaMemoryUsage;
@@ -36,8 +36,8 @@ namespace Frost
 		static void ShutDown();
 
 	public:
-		static void AllocateBuffer(VkDeviceSize size, std::vector<BufferType> usage, MemoryUsage memoryFlags, VkBuffer& buffer, VulkanMemoryInfo& bufferMemory);
-		static void AllocateBuffer(VkDeviceSize size, std::vector<BufferType> usage, VkBuffer& buffer, VulkanMemoryInfo& bufferMemory, void* data);
+		static void AllocateBuffer(VkDeviceSize size, std::vector<BufferUsage> usage, MemoryUsage memoryFlags, VkBuffer& buffer, VulkanMemoryInfo& bufferMemory);
+		static void AllocateBuffer(VkDeviceSize size, std::vector<BufferUsage> usage, VkBuffer& buffer, VulkanMemoryInfo& bufferMemory, void* data);
 
 		static void BindBuffer(VkBuffer& buffer, VulkanMemoryInfo& memory, void** data);
 		static void UnbindBuffer(VulkanMemoryInfo& memory);

@@ -5,7 +5,7 @@
 #include "Frost/Platform/Vulkan/VulkanShader.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
 #include "Frost/Platform/Vulkan/VulkanImage.h"
-#include "Frost/Platform/Vulkan/Buffers/VulkanBuffer.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanUniformBuffer.h"
 #include "Frost/Platform/Vulkan/RayTracing/VulkanAccelerationStructure.h"
 
@@ -180,7 +180,7 @@ namespace Frost
 				uniformBufferData->UniformBuffer = UniformBuffer::Create(bufferData.Size);
 
 				// Allocate a buffer (in the cpu) with the needed size
-				BufferPointer bufferPointer;
+				Buffer bufferPointer;
 				bufferPointer.Allocate(bufferData.Size);
 				uniformBufferData->Buffer = bufferPointer;
 
@@ -256,7 +256,7 @@ namespace Frost
 		return uniformLocation;
 	}
 
-	void VulkanMaterial::Set(const std::string& name, const Ref<Buffer>& storageBuffer)
+	void VulkanMaterial::Set(const std::string& name, const Ref<BufferDevice>& storageBuffer)
 	{
 		// Allocate a PendingDescriptor and find the location (in the shader) of the member
 		PendingDescriptor& pendingDescriptor = m_PendingDescriptor.emplace_back();
@@ -271,7 +271,7 @@ namespace Frost
 		pendingDescriptor.Pointer = storageBufferPointer;
 
 		// Get the descriptor info
-		VkDescriptorBufferInfo* bufferInfo = &storageBuffer.As<VulkanBuffer>()->GetVulkanDescriptorInfo();
+		VkDescriptorBufferInfo* bufferInfo = &storageBuffer.As<VulkanBufferDevice>()->GetVulkanDescriptorInfo();
 
 		// Push a WDS into pending descriptors
 		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
@@ -468,10 +468,10 @@ namespace Frost
 		Set<float>(name, value);
 	}
 
-	Ref<Buffer> VulkanMaterial::GetBuffer(const std::string& name)
+	Ref<BufferDevice> VulkanMaterial::GetBuffer(const std::string& name)
 	{
 		FROST_ASSERT(bool(m_MaterialData.find(name) != m_MaterialData.end()), "Couldn't find the member");
-		return m_MaterialData[name].Pointer.AsRef<Buffer>();
+		return m_MaterialData[name].Pointer.AsRef<BufferDevice>();
 	}
 
 	Ref<UniformBuffer> VulkanMaterial::GetUniformBuffer(const std::string& name)

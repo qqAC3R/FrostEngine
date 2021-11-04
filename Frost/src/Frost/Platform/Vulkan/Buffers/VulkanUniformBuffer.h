@@ -26,7 +26,7 @@ namespace Frost
 		VkDeviceAddress m_BufferAddress;
 		VkDescriptorBufferInfo m_DescriptorInfo;
 
-		Ref<Buffer> m_UniformBuffer;
+		Ref<BufferDevice> m_UniformBuffer;
 		uint32_t m_BufferSize;
 	};
 

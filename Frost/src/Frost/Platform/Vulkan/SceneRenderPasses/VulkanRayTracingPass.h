@@ -6,7 +6,7 @@
 #include "Frost/Renderer/RayTracing/ShaderBindingTable.h"
 #include "Frost/Renderer/RayTracing/RayTracingPipeline.h"
 
-#include "Frost/Core/BufferPointer.h"
+#include "Frost/Core/Buffer.h"
 
 namespace Frost
 {
@@ -35,14 +35,14 @@ namespace Frost
 			Ref<ShaderBindingTable> SBT;
 			Ref<RayTracingPipeline> Pipeline;
 
-			Ref<Buffer> SceneVertexData[FRAMES_IN_FLIGHT];
-			Ref<Buffer> SceneIndexData[FRAMES_IN_FLIGHT];
-			Ref<Buffer> SceneTransformData[FRAMES_IN_FLIGHT];
+			Ref<BufferDevice> SceneVertexData[FRAMES_IN_FLIGHT];
+			Ref<BufferDevice> SceneIndexData[FRAMES_IN_FLIGHT];
+			Ref<BufferDevice> SceneTransformData[FRAMES_IN_FLIGHT];
 
 			struct RenderBuffer
 			{
-				Ref<Buffer> BufferDeviceLocal;
-				BufferPointer BufferHost;
+				Ref<BufferDevice> BufferDeviceLocal;
+				Buffer BufferHost;
 			};
 			RenderBuffer SceneGeometryOffsets[FRAMES_IN_FLIGHT];
 			RenderBuffer SceneGeometrySubmeshCount[FRAMES_IN_FLIGHT];

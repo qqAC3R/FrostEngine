@@ -13,7 +13,7 @@ namespace Frost
 
 	namespace Utils
 	{
-		static VkBufferUsageFlagBits BufferTypeToVk(BufferType usage);
+		static VkBufferUsageFlagBits BufferTypeToVk(BufferUsage usage);
 		static VmaMemoryUsage GetVmaMemoryUsage(MemoryUsage usage);
 		static uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	}
@@ -41,7 +41,7 @@ namespace Frost
 		s_AllocatorDestroyed = true;
 	}
 
-	void VulkanAllocator::AllocateBuffer(VkDeviceSize size, std::vector<BufferType> usage, MemoryUsage memoryFlags,
+	void VulkanAllocator::AllocateBuffer(VkDeviceSize size, std::vector<BufferUsage> usage, MemoryUsage memoryFlags,
 										 VkBuffer& buffer, VulkanMemoryInfo& bufferMemory)
 	{
 
@@ -61,18 +61,18 @@ namespace Frost
 		vmaCreateBuffer(s_Allocator, &bufferInfo, &allocCreateInfo, &buffer, &bufferMemory.allocation, nullptr);
 	}
 
-	void VulkanAllocator::AllocateBuffer(VkDeviceSize size, std::vector<BufferType> usage,
+	void VulkanAllocator::AllocateBuffer(VkDeviceSize size, std::vector<BufferUsage> usage,
 										 VkBuffer& buffer, VulkanMemoryInfo& bufferMemory, void* data)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-		usage.push_back(BufferType::TransferDst);
+		usage.push_back(BufferUsage::TransferDst);
 
 
 		// Initializating the staging buffer
 		VkBuffer stagingBuffer;
 		VulkanMemoryInfo stagingBufferMemory;
-		AllocateBuffer(size, { BufferType::TransferSrc }, MemoryUsage::CPU_ONLY, stagingBuffer, stagingBufferMemory);
+		AllocateBuffer(size, { BufferUsage::TransferSrc }, MemoryUsage::CPU_ONLY, stagingBuffer, stagingBufferMemory);
 
 		// Binding the data to the staging buffer
 		void* stageData;
@@ -172,20 +172,20 @@ namespace Frost
 	namespace Utils
 	{
 
-		static VkBufferUsageFlagBits BufferTypeToVk(BufferType usage)
+		static VkBufferUsageFlagBits BufferTypeToVk(BufferUsage usage)
 		{
 			switch (usage)
 			{
-			case BufferType::Uniform:						return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-			case BufferType::Storage:						return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-			case BufferType::Vertex:						return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-			case BufferType::Index:							return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-			case BufferType::AccelerationStructure:			return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
-			case BufferType::AccelerationStructureReadOnly:	return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-			case BufferType::TransferSrc:					return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-			case BufferType::TransferDst:					return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			case BufferType::ShaderAddress:					return VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-			case BufferType::ShaderBindingTable:			return VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
+			case BufferUsage::Uniform:						return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+			case BufferUsage::Storage:						return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+			case BufferUsage::Vertex:						return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			case BufferUsage::Index:							return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+			case BufferUsage::AccelerationStructure:			return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
+			case BufferUsage::AccelerationStructureReadOnly:	return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+			case BufferUsage::TransferSrc:					return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			case BufferUsage::TransferDst:					return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			case BufferUsage::ShaderAddress:					return VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+			case BufferUsage::ShaderBindingTable:			return VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
 			}
 
 			FROST_ASSERT(0, "Couldn't find the buffer usgae flag bits");

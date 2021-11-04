@@ -5,7 +5,7 @@
 
 #include "Frost/Platform/Vulkan/Buffers/VulkanVertexBuffer.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanIndexBuffer.h"
-#include "Frost/Platform/Vulkan/Buffers/VulkanBuffer.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 
 namespace Frost
 {
@@ -107,10 +107,10 @@ namespace Frost
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 			m_ASBufferSize = (uint32_t)sizeInfo.accelerationStructureSize;
 
-			Vector<BufferType> usages;
-			usages.push_back(BufferType::AccelerationStructure);
-			usages.push_back(BufferType::ShaderAddress);
-			usages.push_back(BufferType::Storage);
+			Vector<BufferUsage> usages;
+			usages.push_back(BufferUsage::AccelerationStructure);
+			usages.push_back(BufferUsage::ShaderAddress);
+			usages.push_back(BufferUsage::Storage);
 
 			VulkanAllocator::AllocateBuffer(m_ASBufferSize, usages, MemoryUsage::GPU_ONLY, m_ASBuffer, m_ASBufferMemory);
 
@@ -133,7 +133,7 @@ namespace Frost
 		VkBuffer scratchBuffer;
 		VulkanMemoryInfo scratchMemoryBuffer;
 		VulkanAllocator::AllocateBuffer(scratchBufferSize,
-			{ BufferType::Storage, BufferType::ShaderAddress },
+			{ BufferUsage::Storage, BufferUsage::ShaderAddress },
 			MemoryUsage::GPU_ONLY,
 			scratchBuffer, scratchMemoryBuffer);
 
@@ -214,7 +214,7 @@ namespace Frost
 				VkBuffer compactedASBuffer;
 				VulkanMemoryInfo compactedASBufferMemory;
 
-				Vector<BufferType> usages = { BufferType::AccelerationStructure, BufferType::ShaderAddress };
+				Vector<BufferUsage> usages = { BufferUsage::AccelerationStructure, BufferUsage::ShaderAddress };
 				VulkanAllocator::AllocateBuffer(compactSize[0], usages, MemoryUsage::GPU_ONLY, compactedASBuffer, compactedASBufferMemory);
 
 				VkAccelerationStructureCreateInfoKHR asInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
@@ -381,8 +381,8 @@ namespace Frost
 		
 		if (!m_AccelerationStructure)
 		{
-			m_InstanceBuffer = Buffer::Create(1000 * sizeof(VkAccelerationStructureInstanceKHR),
-											 { BufferType::ShaderAddress, BufferType::AccelerationStructureReadOnly } );
+			m_InstanceBuffer = BufferDevice::Create(1000 * sizeof(VkAccelerationStructureInstanceKHR),
+											 { BufferUsage::ShaderAddress, BufferUsage::AccelerationStructureReadOnly } );
 		}
 
 
@@ -404,7 +404,7 @@ namespace Frost
 		// Getting the device address of the created buffer (m_InstanceBuffer) with the mesh instances wrapped in VkAccelerationStructureInstanceKHR
 		VkBufferDeviceAddressInfo bufferInfo{};
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-		bufferInfo.buffer = m_InstanceBuffer.As<VulkanBuffer>()->GetVulkanBuffer();
+		bufferInfo.buffer = m_InstanceBuffer.As<VulkanBufferDevice>()->GetVulkanBuffer();
 		VkDeviceAddress instanceAddress = vkGetBufferDeviceAddress(device, &bufferInfo);
 
 
@@ -447,9 +447,9 @@ namespace Frost
 			updateTlas = false;
 			m_ASBufferSize = (uint32_t)sizeInfo.accelerationStructureSize;
 
-			Vector<BufferType> usages;
-			usages.push_back(BufferType::AccelerationStructure);
-			usages.push_back(BufferType::ShaderAddress);
+			Vector<BufferUsage> usages;
+			usages.push_back(BufferUsage::AccelerationStructure);
+			usages.push_back(BufferUsage::ShaderAddress);
 
 			VulkanAllocator::AllocateBuffer(m_ASBufferSize, usages, MemoryUsage::GPU_ONLY, m_ASBuffer, m_ASBufferMemory);
 
@@ -468,7 +468,7 @@ namespace Frost
 		VkBuffer scratchBuffer;
 		VulkanMemoryInfo scratchMemoryBuffer;
 		VulkanAllocator::AllocateBuffer(sizeInfo.buildScratchSize,
-											{ BufferType::ShaderAddress, BufferType::AccelerationStructure, BufferType::Storage },
+											{ BufferUsage::ShaderAddress, BufferUsage::AccelerationStructure, BufferUsage::Storage },
 											MemoryUsage::GPU_ONLY,
 											scratchBuffer, scratchMemoryBuffer);
 		

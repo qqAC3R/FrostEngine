@@ -4,7 +4,7 @@ namespace Frost
 {
 	enum class ShaderType;
 
-	enum class BufferType
+	enum class BufferUsage
 	{
 		None = 0,
 		Vertex, Index,
@@ -25,10 +25,10 @@ namespace Frost
 		uint64_t Size = 0;
 	};
 
-	class Buffer
+	class BufferDevice
 	{
 	public:
-		virtual ~Buffer() {}
+		virtual ~BufferDevice() {}
 
 		virtual uint64_t GetBufferSize() const = 0;
 		virtual BufferData GetBufferData() const = 0;
@@ -40,8 +40,8 @@ namespace Frost
 		
 		virtual void Destroy() = 0;
 
-		static Ref<Buffer> Create(uint64_t size, std::initializer_list<BufferType> types = {});
-		static Ref<Buffer> Create(uint64_t size, void* data, std::initializer_list<BufferType> types = {});
+		static Ref<BufferDevice> Create(uint64_t size, std::initializer_list<BufferUsage> types = {});
+		static Ref<BufferDevice> Create(uint64_t size, void* data, std::initializer_list<BufferUsage> types = {});
 	};
 
 }

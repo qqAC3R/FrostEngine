@@ -3,7 +3,7 @@
 namespace Frost
 {
 	class BufferLayout;
-	class Buffer;
+	class BufferDevice;
 
 	class VertexBuffer
 	{
@@ -14,7 +14,7 @@ namespace Frost
 		virtual void SetLayout(const BufferLayout& layout) = 0;
 
 		virtual uint64_t GetBufferSize() const = 0;
-		virtual Ref<Buffer> GetBuffer() const = 0;
+		virtual Ref<BufferDevice> GetBuffer() const = 0;
 
 		virtual void Bind() const = 0;
 		virtual void Unbind() const = 0;

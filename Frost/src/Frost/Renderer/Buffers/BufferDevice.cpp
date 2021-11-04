@@ -1,30 +1,30 @@
 #include "frostpch.h"
-#include "Buffer.h"
+#include "BufferDevice.h"
 
 #include "Frost/Renderer/Renderer.h"
-#include "Frost/Platform/Vulkan/Buffers/VulkanBuffer.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 
 namespace Frost
 {
 
-	Ref<Buffer> Buffer::Create(uint64_t size, std::initializer_list<BufferType> types)
+	Ref<BufferDevice> BufferDevice::Create(uint64_t size, std::initializer_list<BufferUsage> types)
 	{
 		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-			case RendererAPI::API::Vulkan: return CreateRef<VulkanBuffer>(size, types);
+			case RendererAPI::API::Vulkan: return CreateRef<VulkanBufferDevice>(size, types);
 		}
 
 		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
 
-	Ref<Buffer> Buffer::Create(uint64_t size, void* data, std::initializer_list<BufferType> types)
+	Ref<BufferDevice> BufferDevice::Create(uint64_t size, void* data, std::initializer_list<BufferUsage> types)
 	{
 		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-			case RendererAPI::API::Vulkan: return CreateRef<VulkanBuffer>(size, data, types);
+			case RendererAPI::API::Vulkan: return CreateRef<VulkanBufferDevice>(size, data, types);
 		}
 
 		FROST_ASSERT_MSG("Unknown RendererAPI!");

@@ -2,7 +2,7 @@
 #include "VulkanUniformBuffer.h"
 
 #include "Frost/Platform/Vulkan/VulkanContext.h"
-#include "Frost/Platform/Vulkan/Buffers/VulkanBuffer.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 
 namespace Frost
 {
@@ -10,10 +10,10 @@ namespace Frost
 	VulkanUniformBuffer::VulkanUniformBuffer(uint32_t size)
 		: m_BufferSize(size)
 	{
-		m_UniformBuffer = Buffer::Create(size, { BufferType::Uniform, BufferType::AccelerationStructureReadOnly });
+		m_UniformBuffer = BufferDevice::Create(size, { BufferUsage::Uniform, BufferUsage::AccelerationStructureReadOnly });
 
 		// Getting the buffer and buffer address
-		Ref<VulkanBuffer> uniformBuffer = m_UniformBuffer.As<VulkanBuffer>();
+		Ref<VulkanBufferDevice> uniformBuffer = m_UniformBuffer.As<VulkanBufferDevice>();
 		m_Buffer = uniformBuffer->GetVulkanBuffer();
 		m_BufferAddress = uniformBuffer->GetVulkanBufferAddress();
 		m_DescriptorInfo = uniformBuffer->GetVulkanDescriptorInfo();

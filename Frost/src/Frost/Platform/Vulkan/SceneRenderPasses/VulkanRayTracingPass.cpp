@@ -46,20 +46,20 @@ namespace Frost
 			m_Data->TopLevelAS[i] = TopLevelAccelertionStructure::Create();
 
 			// Scene data
-			m_Data->SceneVertexData[i] = Buffer::Create(sizeof(uint64_t) * 1000, { BufferType::Storage, BufferType::AccelerationStructureReadOnly });
-			m_Data->SceneIndexData[i] = Buffer::Create(sizeof(uint64_t) * 1000, { BufferType::Storage, BufferType::AccelerationStructureReadOnly });
-			m_Data->SceneTransformData[i] = Buffer::Create(sizeof(InstanceInfo) * 1000, { BufferType::Storage, BufferType::AccelerationStructureReadOnly });
+			m_Data->SceneVertexData[i] = BufferDevice::Create(sizeof(uint64_t) * 1000, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
+			m_Data->SceneIndexData[i] = BufferDevice::Create(sizeof(uint64_t) * 1000, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
+			m_Data->SceneTransformData[i] = BufferDevice::Create(sizeof(InstanceInfo) * 1000, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
 
 			// Scene geometry offsets
-			m_Data->SceneGeometryOffsets[i].BufferDeviceLocal = Buffer::Create(
-				sizeof(uint32_t) * 10000, { BufferType::Storage, BufferType::AccelerationStructureReadOnly }
+			m_Data->SceneGeometryOffsets[i].BufferDeviceLocal = BufferDevice::Create(
+				sizeof(uint32_t) * 10000, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly }
 			);
 			m_Data->SceneGeometryOffsets[i].BufferHost.Allocate(sizeof(uint32_t) * 10000);
 			m_Data->SceneGeometryOffsets[i].BufferHost.Initialize();
 
 			// Scene geometry submesh count
-			m_Data->SceneGeometrySubmeshCount[i].BufferDeviceLocal = Buffer::Create(
-				sizeof(uint32_t) * 1000, { BufferType::Storage, BufferType::AccelerationStructureReadOnly }
+			m_Data->SceneGeometrySubmeshCount[i].BufferDeviceLocal = BufferDevice::Create(
+				sizeof(uint32_t) * 1000, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly }
 			);
 			m_Data->SceneGeometrySubmeshCount[i].BufferHost.Allocate(sizeof(uint32_t) * 1000);
 			m_Data->SceneGeometrySubmeshCount[i].BufferHost.Initialize();

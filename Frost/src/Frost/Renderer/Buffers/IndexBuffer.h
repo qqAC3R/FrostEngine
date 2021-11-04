@@ -2,7 +2,7 @@
 
 namespace Frost
 {
-	class Buffer;
+	class BufferDevice;
 
 	class IndexBuffer
 	{
@@ -11,7 +11,7 @@ namespace Frost
 
 		virtual uint32_t GetCount() const = 0;
 		virtual uint32_t GetBufferSize() const = 0;
-		virtual Ref<Buffer> GetBuffer() const = 0;
+		virtual Ref<BufferDevice> GetBuffer() const = 0;
 
 		virtual void Bind() const = 0;
 		virtual void Unbind() const = 0;

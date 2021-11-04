@@ -1,5 +1,5 @@
 #include "frostpch.h"
-#include "VulkanBuffer.h"
+#include "VulkanBufferDevice.h"
 
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanShader.h"
@@ -7,14 +7,14 @@
 namespace Frost
 {
 
-	VulkanBuffer::VulkanBuffer(uint64_t size, std::initializer_list<BufferType> types)
+	VulkanBufferDevice::VulkanBufferDevice(uint64_t size, std::initializer_list<BufferUsage> types)
 		: m_BufferData{ nullptr, size }
 	{
 		// Every buffer MUST be accesed by the shader
-		std::vector<BufferType> usages;
+		std::vector<BufferUsage> usages;
 		for (auto& type : types)
 			usages.push_back(type);
-		usages.push_back(BufferType::ShaderAddress);
+		usages.push_back(BufferUsage::ShaderAddress);
 		
 
 		VulkanAllocator::AllocateBuffer(size, usages, MemoryUsage::CPU_AND_GPU, m_Buffer, m_BufferMemory);
@@ -24,15 +24,15 @@ namespace Frost
 	}
 
 
-	VulkanBuffer::VulkanBuffer(uint64_t size, void* data, std::initializer_list<BufferType> types)
+	VulkanBufferDevice::VulkanBufferDevice(uint64_t size, void* data, std::initializer_list<BufferUsage> types)
 		: m_Types(types), m_BufferData{ data, size }
 	{
-		std::vector<BufferType> usages;
+		std::vector<BufferUsage> usages;
 		for (auto& type : types)
 			usages.push_back(type);
 
 		// Every buffer MUST be accesed by the shader (BufferType::ShaderAddress)
-		usages.push_back(BufferType::ShaderAddress);
+		usages.push_back(BufferUsage::ShaderAddress);
 
 		VulkanAllocator::AllocateBuffer(size, usages, m_Buffer, m_BufferMemory, data);
 		VulkanContext::SetStructDebugName("Buffer", VK_OBJECT_TYPE_BUFFER, m_Buffer);
@@ -40,12 +40,12 @@ namespace Frost
 		UpdateDescriptor();
 	}
 
-	VulkanBuffer::~VulkanBuffer()
+	VulkanBufferDevice::~VulkanBufferDevice()
 	{
 		Destroy();
 	}
 
-	void VulkanBuffer::SetData(void* data)
+	void VulkanBufferDevice::SetData(void* data)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -55,7 +55,7 @@ namespace Frost
 		VulkanAllocator::UnbindBuffer(m_BufferMemory);
 	}
 
-	void VulkanBuffer::SetData(uint64_t size, void* data)
+	void VulkanBufferDevice::SetData(uint64_t size, void* data)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -65,7 +65,7 @@ namespace Frost
 		VulkanAllocator::UnbindBuffer(m_BufferMemory);
 	}
 
-	void VulkanBuffer::GetBufferAddress()
+	void VulkanBufferDevice::GetBufferAddress()
 	{
 		// Getting the buffer address
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -74,14 +74,14 @@ namespace Frost
 		m_BufferAddress = vkGetBufferDeviceAddress(device, &bufferInfo);
 	}
 
-	void VulkanBuffer::UpdateDescriptor()
+	void VulkanBufferDevice::UpdateDescriptor()
 	{
 		m_DescriptorInfo.buffer = m_Buffer;
 		m_DescriptorInfo.offset = 0;
 		m_DescriptorInfo.range = m_BufferData.Size;
 	}
 
-	void VulkanBuffer::Destroy()
+	void VulkanBufferDevice::Destroy()
 	{
 		if (m_Buffer == VK_NULL_HANDLE) return;
 

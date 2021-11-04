@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Frost/Core/BufferPointer.h"
+#include "Frost/Core/Buffer.h"
 #include "Frost/Renderer/Material.h"
 #include "Frost/Platform/Vulkan/Vulkan.h"
 
@@ -31,11 +31,11 @@ namespace Frost
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) override;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) override;
 		virtual void Set(const std::string& name, const Ref<TextureCubeMap>& cubeMap) override;
-		virtual void Set(const std::string& name, const Ref<Buffer>& storageBuffer) override;
+		virtual void Set(const std::string& name, const Ref<BufferDevice>& storageBuffer) override;
 		virtual void Set(const std::string& name, const Ref<UniformBuffer>& uniformBuffer) override;
 		virtual void Set(const std::string& name, const Ref<TopLevelAccelertionStructure>& accelerationStructure) override;
 
-		virtual Ref<Buffer> GetBuffer(const std::string& name) override;
+		virtual Ref<BufferDevice> GetBuffer(const std::string& name) override;
 		virtual Ref<UniformBuffer> GetUniformBuffer(const std::string& name) override;
 		virtual Ref<Texture2D> GetTexture2D(const std::string& name) override;
 		virtual Ref<Image2D> GetImage2D(const std::string& name) override;
@@ -56,7 +56,7 @@ namespace Frost
 			Ref<UniformBufferData> ubData = m_MaterialData[ul.StructName].Pointer.AsRef<UniformBufferData>();
 
 			// Writting to the cpu buffer
-			BufferPointer& buffer = ubData->Buffer;
+			Buffer& buffer = ubData->Buffer;
 			buffer.Write((Byte*)&value, ul.Size, ul.Offset);
 
 			// Copying the cpu buffer into the gpu uniform buffer
@@ -73,7 +73,7 @@ namespace Frost
 			Ref<UniformBufferData> ubData = m_MaterialData[ul.StructName].Pointer.AsRef<UniformBufferData>();
 
 			// Read from the cpu buffer
-			BufferPointer& buffer = ubData->Buffer;
+			Buffer& buffer = ubData->Buffer;
 			return buffer.Read<T>(ul.Offset);
 		}
 
@@ -103,7 +103,7 @@ namespace Frost
 
 		struct UniformBufferData
 		{
-			BufferPointer Buffer;
+			Buffer Buffer;
 			Ref<UniformBuffer> UniformBuffer;
 		};
 		Vector<Ref<UniformBufferData>> m_UniformBuffers;

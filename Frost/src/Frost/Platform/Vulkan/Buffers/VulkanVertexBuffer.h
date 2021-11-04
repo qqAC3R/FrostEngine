@@ -24,14 +24,14 @@ namespace Frost
 		
 		VkBuffer GetVulkanBuffer() const { return m_Buffer; }
 		VkDeviceAddress GetVulkanBufferAddress() const { return m_BufferAddress; }
-		virtual Ref<Buffer> GetBuffer() const override { return m_VertexBuffer; }
+		virtual Ref<BufferDevice> GetBuffer() const override { return m_VertexBuffer; }
 
 		virtual void Destroy() override;
 	private:
 		VkBuffer m_Buffer;
 		VkDeviceAddress m_BufferAddress;
 		
-		Ref<Buffer> m_VertexBuffer;
+		Ref<BufferDevice> m_VertexBuffer;
 		uint64_t m_BufferSize;
 	};
 

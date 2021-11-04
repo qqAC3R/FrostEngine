@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Frost/Renderer/Buffers/Buffer.h"
+#include "Frost/Renderer/Buffers/BufferDevice.h"
 
 #include "VulkanBufferAllocator.h"
 
@@ -9,12 +9,12 @@ namespace Frost
 	enum class ShaderType;
 	struct VulkanMemoryInfo;
 
-	class VulkanBuffer : public Buffer
+	class VulkanBufferDevice : public BufferDevice
 	{
 	public:
-		VulkanBuffer(uint64_t size, std::initializer_list<BufferType> types);
-		VulkanBuffer(uint64_t size, void* data, std::initializer_list<BufferType> types);
-		virtual ~VulkanBuffer();
+		VulkanBufferDevice(uint64_t size, std::initializer_list<BufferUsage> types);
+		VulkanBufferDevice(uint64_t size, void* data, std::initializer_list<BufferUsage> types);
+		virtual ~VulkanBufferDevice();
 
 		virtual uint64_t GetBufferSize() const override { return m_BufferData.Size; }
 		virtual BufferData GetBufferData() const override { return m_BufferData; }
@@ -37,7 +37,7 @@ namespace Frost
 		VkDescriptorBufferInfo m_DescriptorInfo;
 
 		BufferData m_BufferData;
-		Vector<BufferType> m_Types;
+		Vector<BufferUsage> m_Types;
 	public:
 		// Functions that are useless
 		virtual void Bind() const override {}

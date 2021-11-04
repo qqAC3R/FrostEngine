@@ -68,7 +68,7 @@ namespace Frost
 		VkWriteDescriptorSetAccelerationStructureKHR m_DescriptorInfo;
 		uint32_t m_ASBufferSize;
 
-		Ref<Buffer> m_InstanceBuffer;
+		Ref<BufferDevice> m_InstanceBuffer;
 	};
 
 }

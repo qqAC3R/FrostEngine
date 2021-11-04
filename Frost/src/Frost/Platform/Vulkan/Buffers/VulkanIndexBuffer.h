@@ -19,7 +19,7 @@ namespace Frost
 
 		virtual uint32_t GetCount() const override { return m_BufferSize / sizeof(Index); }
 		virtual uint32_t GetBufferSize() const override { return m_BufferSize; }
-		virtual Ref<Buffer> GetBuffer() const override { return m_IndexBuffer; }
+		virtual Ref<BufferDevice> GetBuffer() const override { return m_IndexBuffer; }
 
 		virtual void Bind() const override;
 		virtual void Unbind() const override {}
@@ -31,7 +31,7 @@ namespace Frost
 		VkBuffer m_Buffer;
 		VkDeviceAddress m_BufferAddress;
 
-		Ref<Buffer> m_IndexBuffer;
+		Ref<BufferDevice> m_IndexBuffer;
 		uint32_t m_BufferSize;
 	};
 

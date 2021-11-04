@@ -246,7 +246,7 @@ void main()
 
     vec3 result = Lo + Ld;
 
-	float IBLIntensity = 0.4f;
+	float IBLIntensity = 1.0f;
 	result += IBL_Contribution() * IBLIntensity;
 
     o_Color = vec4(result, 1.0f);

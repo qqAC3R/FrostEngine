@@ -2,7 +2,7 @@
 #include "VulkanIndexBuffer.h"
 
 #include "Frost/Platform/Vulkan/VulkanContext.h"
-#include "Frost/Platform/Vulkan/Buffers/VulkanBuffer.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 
 namespace Frost
 {
@@ -10,10 +10,10 @@ namespace Frost
 		: m_BufferSize(count)
 	{
 
-		m_IndexBuffer = Buffer::Create(m_BufferSize, indicies, { BufferType::Index, BufferType::AccelerationStructureReadOnly });
+		m_IndexBuffer = BufferDevice::Create(m_BufferSize, indicies, { BufferUsage::Index, BufferUsage::AccelerationStructureReadOnly });
 
 		// Getting the buffer and buffer address
-		Ref<VulkanBuffer> indexBuffer = m_IndexBuffer.As<VulkanBuffer>();
+		Ref<VulkanBufferDevice> indexBuffer = m_IndexBuffer.As<VulkanBufferDevice>();
 		m_BufferAddress = indexBuffer->GetVulkanBufferAddress();
 		m_Buffer = indexBuffer->GetVulkanBuffer();
 

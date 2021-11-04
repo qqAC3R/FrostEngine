@@ -87,7 +87,7 @@ namespace Frost
 			vkGetRayTracingShaderGroupHandlesKHR(device, pipeline, 0, groupCount, sbtSize, shaderHandleStorage.data());
 
 			VulkanAllocator::AllocateBuffer(sbtSize,
-											{ BufferType::TransferSrc, BufferType::ShaderAddress, BufferType::ShaderBindingTable },
+											{ BufferUsage::TransferSrc, BufferUsage::ShaderAddress, BufferUsage::ShaderBindingTable },
 											MemoryUsage::CPU_AND_GPU,
 											buffer, memory);
 

@@ -5,17 +5,17 @@
 namespace Frost
 {
 
-	struct BufferPointer
+	struct Buffer
 	{
 		void* Data;
 		uint32_t Size;
 
-		BufferPointer()
+		Buffer()
 			: Data(nullptr), Size(0)
 		{
 		}
 
-		BufferPointer(void* data, uint32_t size)
+		Buffer(void* data, uint32_t size)
 			: Data(data), Size(size)
 		{
 		}

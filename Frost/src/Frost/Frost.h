@@ -24,7 +24,7 @@
 #include "Frost/Renderer/RenderPass.h"
 #include "Frost/Renderer/Renderer.h"
 
-#include "Frost/Renderer/Buffers/Buffer.h"
+#include "Frost/Renderer/Buffers/BufferDevice.h"
 #include "Frost/Renderer/Buffers/VertexBuffer.h"
 #include "Frost/Renderer/Buffers/IndexBuffer.h"
 #include "Frost/Renderer/Buffers/UniformBuffer.h"
