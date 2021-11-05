@@ -105,6 +105,7 @@ namespace Frost
 			spec.Width = m_Specification.Width;
 			spec.Height = m_Specification.Height;
 			spec.Format = Utils::GetImageFormat(attachment.TextureFormat);
+			spec.UseMipChain = false;
 
 			if (attachment.TextureFormat == FramebufferTextureFormat::Depth || attachment.TextureFormat == FramebufferTextureFormat::DepthStencil)
 				spec.Usage = ImageUsage::DepthStencil;

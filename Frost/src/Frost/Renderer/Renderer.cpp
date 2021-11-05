@@ -47,8 +47,10 @@ namespace Frost
 		s_Data->m_Environment->Load("Resources/EnvironmentMaps/pink_sunrise_4k.hdr");
 
 		// LUTS
-		s_Data->m_WhiteTexture = Texture2D::Create("Resources/LUT/White.jpg");
-		s_Data->m_BRDFLut = Texture2D::Create("Resources/LUT/BRDF_LUT.tga");
+		TextureSpecification textureSpec{};
+		textureSpec.UseMips = false;
+		s_Data->m_WhiteTexture = Texture2D::Create("Resources/LUT/White.jpg", textureSpec);
+		s_Data->m_BRDFLut = Texture2D::Create("Resources/LUT/BRDF_LUT.tga", textureSpec);
 
 		// Init the renderpasses
 		s_RendererAPI->InitRenderPasses();

@@ -46,7 +46,8 @@ namespace Frost
 		SamplerProperties Sampler{};
 		uint32_t Width = 0;
 		uint32_t Height = 0;
-		uint32_t Mips = 1;
+		bool UseMipChain = true;
+		//uint32_t Mips = 1;
 	};
 
 	class Image
@@ -58,6 +59,7 @@ namespace Frost
 
 		virtual uint32_t GetWidth() const = 0;
 		virtual uint32_t GetHeight() const = 0;
+		virtual uint32_t GetMipChainLevels() const = 0;
 
 		virtual ImageSpecification& GetSpecification() = 0;
 		virtual const ImageSpecification& GetSpecification() const = 0;

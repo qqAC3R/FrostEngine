@@ -187,6 +187,12 @@ namespace Frost
 			}
 		}
 
+		m_Data->PreviousDepthbuffer.resize(Renderer::GetRendererConfig().FramesInFlight);
+		for (auto& depthbuffer : m_Data->PreviousDepthbuffer)
+		{
+
+		}
+
 	}
 
 	void VulkanCompositePass::OnUpdate(const RenderQueue& renderQueue)

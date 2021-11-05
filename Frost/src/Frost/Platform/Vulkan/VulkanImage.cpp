@@ -14,9 +14,15 @@ namespace Frost
 		VkImageUsageFlags usageFlags = Utils::GetImageUsageFlags(specification.Usage);
 		VkImageLayout newImageLayout = Utils::GetImageLayout(specification.Usage);
 
+		// Calculate the mip chain levels
+		if (specification.UseMipChain)
+			m_MipLevelCount = Utils::CalculateMipMapLevels(specification.Width, specification.Height);
+		else
+			m_MipLevelCount = 1;
+
 		// Creating the image and allocating the needed buffer
 		// (for creation we use `VK_IMAGE_LAYOUT_UNDEFINED` layout, which will be later changed to the user's input")
-		Utils::CreateImage(specification.Width, specification.Height, 1, specification.Mips,
+		Utils::CreateImage(specification.Width, specification.Height, 1, m_MipLevelCount,
 			VK_IMAGE_TYPE_2D, textureFormat,
 			VK_IMAGE_TILING_OPTIMAL,
 			usageFlags | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, // Need the trasnfer src/dst bits for generating the mips
@@ -27,6 +33,8 @@ namespace Frost
 		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics ,true);
 
 		// Generating mip maps if the mip count is higher than 1, else just transition to user's input `VkImageLayout`
+		TransitionLayout(cmdBuf, newImageLayout, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(newImageLayout));
+#if 0
 		if (specification.Mips > 1)
 		{
 			TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -40,18 +48,46 @@ namespace Frost
 		{
 			TransitionLayout(cmdBuf, newImageLayout, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(newImageLayout));
 		}
+#endif
 
 		// Ending the temporary commandbuffer for transitioning
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
 
 
 		// Creating the image view
-		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, specification.Mips, 1);
+		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, m_MipLevelCount, 1);
+
+		// Creating the imageView mips
+		for (uint32_t i = 0; i < m_MipLevelCount; i++)
+		{
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+			VkImageViewCreateInfo createInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+			createInfo.image = m_Image;
+			createInfo.format = textureFormat;
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
+			createInfo.subresourceRange.baseMipLevel = i;
+			createInfo.subresourceRange.levelCount = 1;
+
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 1;
+			switch (textureFormat)
+			{
+			case VK_FORMAT_D32_SFLOAT:
+			case VK_FORMAT_D24_UNORM_S8_UINT:
+				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; break;
+			default:
+				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			}
+
+			FROST_VKCHECK(vkCreateImageView(device, &createInfo, nullptr, &m_Mips[i]));
+		}
 
 		// Creating the sampler
 		VkFilter filtering = Utils::GetImageFiltering(specification.Sampler.SamplerFilter);
 		VkSamplerAddressMode addressMode = Utils::GetImageWrap(specification.Sampler.SamplerWrap);
-		Utils::CreateImageSampler(m_ImageSampler, filtering, addressMode, specification.Mips);
+		Utils::CreateImageSampler(m_ImageSampler, filtering, addressMode, m_MipLevelCount);
 
 		// Updating the descriptor
 		UpdateDescriptor();
@@ -65,6 +101,12 @@ namespace Frost
 		VkImageLayout newImageLayout = Utils::GetImageLayout(specification.Usage);
 
 		uint32_t imageSize = Utils::CalculateImageBufferSize(specification.Width, specification.Height, specification.Format);
+
+		// Calculate the mip chain levels
+		if (specification.UseMipChain)
+			m_MipLevelCount = Utils::CalculateMipMapLevels(specification.Width, specification.Height);
+		else
+			m_MipLevelCount = 1;
 
 		// Making a staging buffer to copy the data
 		VkBuffer stagingBuffer;
@@ -80,7 +122,7 @@ namespace Frost
 
 		// Creating the image and allocating the needed buffer
 		// (for creation we use `VK_IMAGE_LAYOUT_UNDEFINED` layout, which will be later changed to the user's input")
-		Utils::CreateImage(specification.Width, specification.Height, 1, specification.Mips,
+		Utils::CreateImage(specification.Width, specification.Height, 1, m_MipLevelCount,
 			VK_IMAGE_TYPE_2D, textureFormat,
 			VK_IMAGE_TILING_OPTIMAL,
 			usageFlags | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, // Need the trasnfer src/dst bits for generating the mips
@@ -99,6 +141,10 @@ namespace Frost
 
 
 		// Generating mip maps if the mip count is higher than 1, else just transition to user's input `VkImageLayout`
+		auto srcPipelineStageMask = Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		auto dstPipelineStageMask = Utils::GetPipelineStageFlagsFromLayout(newImageLayout);
+		TransitionLayout(cmdBuf, newImageLayout, srcPipelineStageMask, dstPipelineStageMask);
+#if 0
 		if (specification.Mips > 1)
 		{
 			//TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -114,18 +160,46 @@ namespace Frost
 			auto dstPipelineStageMask = Utils::GetPipelineStageFlagsFromLayout(newImageLayout);
 			TransitionLayout(cmdBuf, newImageLayout, srcPipelineStageMask, dstPipelineStageMask);
 		}
+#endif
 
 		// Ending the temporary commandbuffer for transitioning
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
 
 
 		// Creating the image view
-		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, specification.Mips, 1);
+		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, m_MipLevelCount, 1);
+
+		// Creating the imageView mips
+		for (uint32_t i = 0; i < m_MipLevelCount; i++)
+		{
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+			VkImageViewCreateInfo createInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+			createInfo.image = m_Image;
+			createInfo.format = textureFormat;
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
+			createInfo.subresourceRange.baseMipLevel = i;
+			createInfo.subresourceRange.levelCount = 1;
+
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 1;
+			switch (textureFormat)
+			{
+			case VK_FORMAT_D32_SFLOAT:
+			case VK_FORMAT_D24_UNORM_S8_UINT:
+				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; break;
+			default:
+				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			}
+
+			FROST_VKCHECK(vkCreateImageView(device, &createInfo, nullptr, &m_Mips[i]));
+		}
 
 		// Creating the sampler
 		VkFilter filtering = Utils::GetImageFiltering(specification.Sampler.SamplerFilter);
 		VkSamplerAddressMode addressMode = Utils::GetImageWrap(specification.Sampler.SamplerWrap);
-		Utils::CreateImageSampler(m_ImageSampler, filtering, addressMode, specification.Mips);
+		Utils::CreateImageSampler(m_ImageSampler, filtering, addressMode, m_MipLevelCount);
 
 		// Setting the debug names for the structs
 		VulkanContext::SetStructDebugName("Image2D-Image", VK_OBJECT_TYPE_IMAGE, m_Image);
@@ -152,6 +226,11 @@ namespace Frost
 		VulkanAllocator::DestroyImage(m_Image, m_ImageMemory);
 		vkDestroyImageView(device, m_ImageView, nullptr);
 		vkDestroySampler(device, m_ImageSampler, nullptr);
+
+		// Delete the image view mips
+		for (auto& imaveView : m_Mips)
+			vkDestroyImageView(device, imaveView.second, nullptr);
+
 		m_Image = VK_NULL_HANDLE;
 	}
 
@@ -167,7 +246,8 @@ namespace Frost
 		VkImageSubresourceRange subresourceRange{};
 		subresourceRange.aspectMask = imageAspectFlags;
 		subresourceRange.baseMipLevel = 0;
-		subresourceRange.levelCount = m_ImageSpecification.Mips;
+		subresourceRange.levelCount = m_MipLevelCount;
+		subresourceRange.baseMipLevel = 0;
 		subresourceRange.layerCount = 1;
 		Utils::SetImageLayout(cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
 
@@ -184,8 +264,11 @@ namespace Frost
 
 		int32_t mipWidth = m_ImageSpecification.Width;
 		int32_t mipHeight = m_ImageSpecification.Height;
+
+		TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 		
-		for (uint32_t i = 1; i < m_ImageSpecification.Mips; i++)
+		for (uint32_t i = 1; i < m_MipLevelCount; i++)
 		{
 			VkImageSubresourceRange subresourceRange{};
 			subresourceRange.aspectMask = imageAspectFlags;
@@ -246,7 +329,7 @@ namespace Frost
 		subresourceRange.baseArrayLayer = 0;
 		subresourceRange.layerCount = 1;
 		subresourceRange.levelCount = 1;
-		subresourceRange.baseMipLevel = m_ImageSpecification.Mips - 1;
+		subresourceRange.baseMipLevel = m_MipLevelCount - 1;
 
 		Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
 			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), Utils::GetAccessFlagsFromLayout(newImageLayout),

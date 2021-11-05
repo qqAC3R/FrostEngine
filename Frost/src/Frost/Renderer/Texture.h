@@ -21,9 +21,12 @@ namespace Frost
 
 		virtual uint32_t GetWidth() const = 0;
 		virtual uint32_t GetHeight() const = 0;
+		virtual uint32_t GetMipChainLevels() const = 0;
 
 		virtual TextureSpecification& GetSpecification() = 0;
 		virtual const TextureSpecification& GetSpecification() const = 0;
+
+		virtual void GenerateMipMaps() = 0;
 
 		virtual bool Loaded() const = 0;
 	};

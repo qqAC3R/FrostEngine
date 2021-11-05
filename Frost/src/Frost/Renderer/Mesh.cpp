@@ -247,7 +247,7 @@ namespace Frost
 					auto texture = Texture2D::Create(texturePath, textureSpec);
 					if (texture->Loaded())
 					{
-						//texture->GenerateMipMaps();
+						texture->GenerateMipMaps();
 						m_Textures.push_back(texture);
 						mi->Set("u_AlbedoTexture", texture);
 						mi->Set("u_MaterialUniform.AlbedoColor", glm::vec3(1.0f));

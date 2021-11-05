@@ -28,6 +28,7 @@ namespace Frost
 
 		virtual uint32_t GetWidth() const override { return m_ImageSpecification.Width; }
 		virtual uint32_t GetHeight() const override { return m_ImageSpecification.Height; }
+		virtual uint32_t GetMipChainLevels() const override { return m_MipLevelCount; }
 
 		virtual ImageSpecification& GetSpecification() override { return m_ImageSpecification; }
 		virtual const ImageSpecification& GetSpecification() const override { return m_ImageSpecification; }
@@ -50,6 +51,9 @@ namespace Frost
 		VkImageView m_ImageView;
 		VkSampler m_ImageSampler;
 		VkImageLayout m_ImageLayout;
+
+		uint32_t m_MipLevelCount;
+		std::unordered_map<uint32_t, VkImageView> m_Mips;
 
 		ImageSpecification m_ImageSpecification;
 		HashMap<DescriptorImageType, VkDescriptorImageInfo> m_DescriptorInfo;

@@ -31,7 +31,7 @@ namespace Frost
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.Width = envCubeMapSize;
 			imageSpec.Height = envCubeMapSize;
-			imageSpec.Mips = UINT32_MAX;
+			//imageSpec.Mips = UINT32_MAX;
 			m_RadianceMap = TextureCubeMap::Create(imageSpec);
 
 			// Recording a cmdbuf for the compute shader
@@ -73,7 +73,6 @@ namespace Frost
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.Width = irradianceCubeMapSize;
 			imageSpec.Height = irradianceCubeMapSize;
-			imageSpec.Mips = UINT32_MAX;
 			m_IrradianceMap = TextureCubeMap::Create(imageSpec);
 
 			// Recording a cmdbuf for the compute shader
@@ -117,10 +116,9 @@ namespace Frost
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.Width = prefilteredCubeMapSize;
 			imageSpec.Height = prefilteredCubeMapSize;
-			imageSpec.Mips = UINT32_MAX;
 			m_PrefilteredMap = TextureCubeMap::Create(imageSpec);
 
-			const float deltaRoughness = 1.0f / glm::max((float)m_PrefilteredMap->GetSpecification().Mips - 1.0f, 1.0f);
+			const float deltaRoughness = 1.0f / glm::max((float)m_PrefilteredMap->GetMipChainLevels() - 1.0f, 1.0f);
 
 			// Setting up the textures
 			auto vulkanMaterial = m_PrefilteredShaderDescriptor.As<VulkanMaterial>();
@@ -134,7 +132,7 @@ namespace Frost
 			VkDescriptorSet descriptorSet = vulkanMaterial->GetVulkanDescriptorSet(0);
 			auto prefilteredMap = m_PrefilteredMap.As<VulkanTextureCubeMap>();
 
-			for (uint32_t i = 0; i < m_PrefilteredMap->GetSpecification().Mips; i++)
+			for (uint32_t i = 0; i < m_PrefilteredMap->GetMipChainLevels(); i++)
 			{
 				// Recording a cmdbuf for the compute shader
 				VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Compute, true);

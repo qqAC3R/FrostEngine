@@ -49,7 +49,7 @@ namespace Frost
 		ImageSpecification imageSpec{};
 		imageSpec.Width = width;
 		imageSpec.Height = height;
-		imageSpec.Mips = m_MipMapLevels;
+		imageSpec.UseMipChain = textureSpec.UseMips;
 		imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 		imageSpec.Sampler.SamplerWrap = ImageWrap::Repeat;
 		imageSpec.Usage = ImageUsage::Storage;
@@ -61,6 +61,15 @@ namespace Frost
 		m_DescriptorInfo[DescriptorImageType::Storage] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
 
 		stbi_image_free(textureData);
+	}
+
+	void VulkanTexture2D::GenerateMipMaps()
+	{
+		// TODO: Im not sure if this works while another command buffer is being recorded
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
+		auto vulkanImage = m_Image.As<VulkanImage2D>();
+		vulkanImage->GenerateMipMaps(cmdBuf, vulkanImage->GetVulkanImageLayout());
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
 	}
 
 	void VulkanTexture2D::Destroy()
@@ -87,14 +96,14 @@ namespace Frost
 		VkFormat textureFormat = Utils::GetImageFormat(imageSpecification.Format);
 		VkImageUsageFlags usageFlags = Utils::GetImageUsageFlags(imageSpecification.Usage);
 
-		//  TODO: Change this
-		if (imageSpecification.Mips == UINT32_MAX)
-			m_ImageSpecification.Mips = Utils::CalculateMipMapLevels(imageSpecification.Width, imageSpecification.Height);
+		// Calculate the mip chain levels
+		if (imageSpecification.UseMipChain)
+			m_MipLevelCount = Utils::CalculateMipMapLevels(imageSpecification.Width, imageSpecification.Height);
 		else
-			m_ImageSpecification.Mips = 1;
+			m_MipLevelCount = 1;
 
 
-		Utils::CreateImage(imageSpecification.Width, imageSpecification.Height, 6, m_ImageSpecification.Mips,
+		Utils::CreateImage(imageSpecification.Width, imageSpecification.Height, 6, m_MipLevelCount,
 			VK_IMAGE_TYPE_2D, textureFormat,
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | usageFlags,
@@ -128,10 +137,10 @@ namespace Frost
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
 
 
-		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, m_ImageSpecification.Mips, 6);
+		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, m_MipLevelCount, 6);
 
 		// Creating the imageView mips
-		for (uint32_t i = 0; i < m_ImageSpecification.Mips; i++)
+		for (uint32_t i = 0; i < m_MipLevelCount; i++)
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -160,7 +169,7 @@ namespace Frost
 		// Creating the sampler
 		VkFilter filtering = Utils::GetImageFiltering(imageSpecification.Sampler.SamplerFilter);
 		VkSamplerAddressMode wrap = Utils::GetImageWrap(imageSpecification.Sampler.SamplerWrap);
-		Utils::CreateImageSampler(m_ImageSampler, filtering, wrap, m_ImageSpecification.Mips);
+		Utils::CreateImageSampler(m_ImageSampler, filtering, wrap, m_MipLevelCount);
 
 		VulkanContext::SetStructDebugName("TextureCubeMap-Image", VK_OBJECT_TYPE_IMAGE, m_Image);
 		VulkanContext::SetStructDebugName("TextureCubeMap-ImageView", VK_OBJECT_TYPE_IMAGE_VIEW, m_ImageView);
@@ -194,7 +203,7 @@ namespace Frost
 	{
 		VkImageSubresourceRange subresourceRange{};
 		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		subresourceRange.levelCount = m_ImageSpecification.Mips;
+		subresourceRange.levelCount = m_MipLevelCount;
 		subresourceRange.layerCount = 6; // 6 for cubemaps
 		Utils::SetImageLayout(cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
 
@@ -211,7 +220,7 @@ namespace Frost
 			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
 		);
 
-		for (uint32_t i = 1; i < m_ImageSpecification.Mips; i++)
+		for (uint32_t i = 1; i < m_MipLevelCount; i++)
 		{
 			for (uint32_t face = 0; face < 6; face++)
 			{
@@ -281,7 +290,7 @@ namespace Frost
 		{
 			VkImageSubresourceRange subresourceRange{};
 			subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			subresourceRange.baseMipLevel = m_ImageSpecification.Mips - 1;
+			subresourceRange.baseMipLevel = m_MipLevelCount - 1;
 			subresourceRange.levelCount = 1;
 
 			subresourceRange.baseArrayLayer = face;

@@ -47,8 +47,8 @@ namespace Frost
 			glm::mat4 bunnyTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
 			Renderer::Submit(m_BunnyMesh, bunnyTransform);
 			
-			//glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
-			//Renderer::Submit(m_PlaneMesh, planeTransform);
+			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
+			Renderer::Submit(m_PlaneMesh, planeTransform);
 
 			Renderer::EndScene();
 

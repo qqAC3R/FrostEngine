@@ -33,6 +33,8 @@ namespace Frost
 			Ref<Shader> CompositeShader;
 			Ref<UniformBuffer> m_PointLightUniformBuffer;
 
+			Vector<Ref<Image2D>> PreviousDepthbuffer;
+
 			Ref<Shader> SkyboxShader;
 			Ref<Pipeline> SkyboxPipeline;
 			Ref<Material> SkyboxDescriptor;
