@@ -28,7 +28,8 @@ namespace Frost
 		m_RenderPassPipeline = renderPassPipeline;
 		m_Data = new InternalData();
 
-		m_Data->Shader = Renderer::GetShaderLibrary()->Get("PBRDeffered");
+		m_Data->CompositeShader = Renderer::GetShaderLibrary()->Get("PBRDeffered");
+		m_Data->SkyboxShader = Renderer::GetShaderLibrary()->Get("RenderSkybox");
 
 		RenderPassSpecification renderPassSpec =
 		{
@@ -37,30 +38,95 @@ namespace Frost
 				// Color Attachment
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
-					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
-					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+					OperationLoad::Clear,  OperationStore::Store,
+					OperationLoad::Load,   OperationStore::DontCare,
 				},
-
 				// Depth Attachment
 				{
-					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
-					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
-					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+					FramebufferTextureFormat::DepthStencil, ImageUsage::DepthStencil,
+					OperationLoad::Load,        OperationStore::Store,
+					OperationLoad::DontCare,    OperationStore::DontCare,
 				}
 			}
 		};
 		m_Data->RenderPass = RenderPass::Create(renderPassSpec);
 
-		BufferLayout bufferLayout = {};
-		Pipeline::CreateInfo pipelineCreateInfo{};
-		pipelineCreateInfo.Shader = m_Data->Shader;
-		pipelineCreateInfo.UseDepth = true;
-		pipelineCreateInfo.RenderPass = m_Data->RenderPass;
-		pipelineCreateInfo.VertexBufferLayout = bufferLayout;
-		pipelineCreateInfo.Topology = PrimitiveTopology::TriangleStrip;
-		m_Data->Pipeline = Pipeline::Create(pipelineCreateInfo);
+
+		{
+
+			// Skybox pipeline/descriptors
+			BufferLayout bufferLayout = {
+				{ "a_Position",      ShaderDataType::Float3 },
+			};
+			Pipeline::CreateInfo pipelineCreateInfo{};
+			pipelineCreateInfo.Shader = m_Data->SkyboxShader;
+			pipelineCreateInfo.RenderPass = m_Data->RenderPass;
+			pipelineCreateInfo.VertexBufferLayout = bufferLayout;
+			pipelineCreateInfo.UseDepthTest = true;
+			pipelineCreateInfo.UseDepthWrite = true;
+			pipelineCreateInfo.Topology = PrimitiveTopology::Triangles;
+			pipelineCreateInfo.DepthCompareOperation = DepthCompare::LessOrEqual;
+			m_Data->SkyboxPipeline = Pipeline::Create(pipelineCreateInfo);
+			m_Data->SkyboxDescriptor = Material::Create(m_Data->SkyboxShader);
+
+			auto envCubeMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
+			m_Data->SkyboxDescriptor->Set("u_EnvTexture", envCubeMap);
+			m_Data->SkyboxDescriptor->Set("CameraData.Gamma", 2.2f);
+			m_Data->SkyboxDescriptor->Set("CameraData.Exposure", 0.1f);
+			m_Data->SkyboxDescriptor->Set("CameraData.Lod", 3.0f);
 
 
+			// Skybox vertex buffer
+			float vertices[] = {
+					-1.0f, -1.0f, -1.0f,
+					 1.0f,  1.0f, -1.0f,
+					 1.0f, -1.0f, -1.0f,
+					 1.0f,  1.0f, -1.0f,
+					-1.0f, -1.0f, -1.0f,
+					-1.0f,  1.0f, -1.0f,
+					// front face		
+					-1.0f, -1.0f,  1.0f,
+					 1.0f, -1.0f,  1.0f,
+					 1.0f,  1.0f,  1.0f,
+					 1.0f,  1.0f,  1.0f,
+					-1.0f,  1.0f,  1.0f,
+					-1.0f, -1.0f,  1.0f,
+					// left face		
+					-1.0f,  1.0f,  1.0f,
+					-1.0f,  1.0f, -1.0f,
+					-1.0f, -1.0f, -1.0f,
+					-1.0f, -1.0f, -1.0f,
+					-1.0f, -1.0f,  1.0f,
+					-1.0f,  1.0f,  1.0f,
+					// right face		
+					 1.0f,  1.0f,  1.0f,
+					 1.0f, -1.0f, -1.0f,
+					 1.0f,  1.0f, -1.0f,
+					 1.0f, -1.0f, -1.0f,
+					 1.0f,  1.0f,  1.0f,
+					 1.0f, -1.0f,  1.0f,
+					 // bottom face		
+					 -1.0f, -1.0f, -1.0f,
+					  1.0f, -1.0f, -1.0f,
+					  1.0f, -1.0f,  1.0f,
+					  1.0f, -1.0f,  1.0f,
+					 -1.0f, -1.0f,  1.0f,
+					 -1.0f, -1.0f, -1.0f,
+					 // top face			
+					 -1.0f,  1.0f, -1.0f,
+					  1.0f,  1.0f , 1.0f,
+					  1.0f,  1.0f, -1.0f,
+					  1.0f,  1.0f,  1.0f,
+					 -1.0f,  1.0f, -1.0f,
+					 -1.0f,  1.0f,  1.0f,
+			};
+			m_Data->SkyBoxVertexBuffer = VertexBuffer::Create(&vertices, sizeof(vertices));
+		}
+
+
+
+
+		// Light data into a uniform buffer
 		m_PointLightData = new PointLightData();
 		m_PointLightData->LightCount = 1;
 		m_PointLightData->PointLights.resize(1);
@@ -76,33 +142,49 @@ namespace Frost
 		m_Data->m_PointLightUniformBuffer->SetData(&m_PointLightData);
 
 
-		uint32_t index = 0;
-		m_Data->Descriptor.resize(Renderer::GetRendererConfig().FramesInFlight);
-		for (auto& descriptor : m_Data->Descriptor)
+
 		{
-			descriptor = Material::Create(m_Data->Shader, "CompositePass-Material");
+			// Composite pipeline
+			BufferLayout bufferLayout = {};
+			Pipeline::CreateInfo pipelineCreateInfo{};
+			pipelineCreateInfo.Shader = m_Data->CompositeShader;
+			pipelineCreateInfo.UseDepthTest = false;
+			pipelineCreateInfo.UseDepthWrite = false;
+			pipelineCreateInfo.RenderPass = m_Data->RenderPass;
+			pipelineCreateInfo.VertexBufferLayout = bufferLayout;
+			pipelineCreateInfo.Topology = PrimitiveTopology::TriangleStrip;
+			m_Data->CompositePipeline = Pipeline::Create(pipelineCreateInfo);
 
-			Ref<Image2D> positionTexture =  m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, index);
-			Ref<Image2D> normalTexture =    m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
-			Ref<Image2D> albedoTexture =    m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
-			Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
-			Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironmentMap()->GetPrefilteredMap();
-			Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironmentMap()->GetIrradianceMap();
-			Ref<Texture2D> brdfLut = Renderer::GetBRDFLut();
-			
-			descriptor->Set("u_PositionTexture", positionTexture);
-			descriptor->Set("u_NormalTexture", normalTexture);
-			descriptor->Set("u_AlbedoTexture", albedoTexture);
-			descriptor->Set("u_CompositeTexture", compositeTexture);
-			descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
-			descriptor->Set("u_IrradianceMap", irradianceMap);
-			descriptor->Set("u_BRDFLut", brdfLut);
+			// Composite pipeline descriptor
+			uint32_t index = 0;
+			m_Data->Descriptor.resize(Renderer::GetRendererConfig().FramesInFlight);
+			for (auto& descriptor : m_Data->Descriptor)
+			{
+				descriptor = Material::Create(m_Data->CompositeShader, "CompositePass-Material");
 
-			//descriptor->Set("LightData", m_PointLightUniformBuffer);
+				Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, index);
+				Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
+				Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
+				Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
+				Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
+				Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment()->GetIrradianceMap();
+				Ref<Texture2D> brdfLut = Renderer::GetBRDFLut();
 
-			descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
+				descriptor->Set("CameraData.Gamma", 2.2f);
+				descriptor->Set("u_PositionTexture", positionTexture);
+				descriptor->Set("u_NormalTexture", normalTexture);
+				descriptor->Set("u_AlbedoTexture", albedoTexture);
+				descriptor->Set("u_CompositeTexture", compositeTexture);
+				descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
+				descriptor->Set("u_IrradianceMap", irradianceMap);
+				descriptor->Set("u_BRDFLut", brdfLut);
 
-			index++;
+				//descriptor->Set("LightData", m_PointLightUniformBuffer);
+
+				descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
+
+				index++;
+			}
 		}
 
 	}
@@ -115,14 +197,20 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		Ref<Framebuffer> framebuffer = m_Data->RenderPass->GetFramebuffer(currentFrameIndex);
-		Ref<VulkanPipeline> vulkanPipeline = m_Data->Pipeline.As<VulkanPipeline>();
-
-		Ref<VulkanImage2D> texture = framebuffer->GetColorAttachment(0).As<VulkanImage2D>();
+		Ref<VulkanPipeline> vulkanPipeline = m_Data->CompositePipeline.As<VulkanPipeline>();
+		Ref<VulkanPipeline> vulkanSkyboxPipeline = m_Data->SkyboxPipeline.As<VulkanPipeline>();
 
 		// Updating the push constant data from the renderQueue
 		m_PushConstantData.CameraPosition = renderQueue.CameraPosition;
 
-		m_Data->RenderPass->Bind(); 
+
+		// From the gbuffer blit the depth texture to render the environment cubemap
+		auto vulkanSrcDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(5, currentFrameIndex);
+		auto vulkanDstDepthImage = m_Data->RenderPass->GetColorAttachment(1, currentFrameIndex).As<VulkanImage2D>();
+		vulkanDstDepthImage->BlitImage(cmdBuf, vulkanSrcDepthImage);
+
+
+		m_Data->RenderPass->Bind();
 		vulkanPipeline->Bind();
 		vulkanPipeline->BindVulkanPushConstant("u_PushConstant", &m_PushConstantData);
 
@@ -138,17 +226,38 @@ namespace Frost
 		scissor.offset = { 0, 0 };
 		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
+		// Camera information
+		m_Data->Descriptor[currentFrameIndex]->Set("CameraData.Exposure", renderQueue.Camera.GetExposure());
+
 		// Drawing a quad
-		m_Data->Descriptor[currentFrameIndex]->Bind(m_Data->Pipeline);
+		m_Data->Descriptor[currentFrameIndex]->Bind(m_Data->CompositePipeline);
 		vkCmdDraw(cmdBuf, 3, 1, 0, 0);
 
+
+		// Drawing the skybox
+		m_Data->SkyboxDescriptor->Set("CameraData.Exposure", renderQueue.Camera.GetExposure());
+		m_Data->SkyboxDescriptor->Set("CameraData.Lod", renderQueue.Camera.GetDOF());
+
+		vulkanSkyboxPipeline->Bind();
+
+		m_Data->SkyboxDescriptor->Bind(m_Data->SkyboxPipeline);
+		m_Data->SkyBoxVertexBuffer->Bind();
+		Vector<glm::mat4> pushConstant(2);
+		pushConstant[0] = renderQueue.Camera.GetProjectionMatrix();
+		pushConstant[1] = renderQueue.Camera.GetViewMatrix();
+
+		vulkanSkyboxPipeline->BindVulkanPushConstant("u_PushConstant", pushConstant.data());
+
+		vkCmdDraw(cmdBuf, 36, 1, 0, 0);
+
+
+
 		m_Data->RenderPass->Unbind();
+
 	}
 
 	void VulkanCompositePass::OnResize(uint32_t width, uint32_t height)
 	{
-		//m_Data->RenderPass->Destroy();
-
 		RenderPassSpecification renderPassSpec =
 		{
 			width, height, 3,
@@ -156,15 +265,15 @@ namespace Frost
 				// Color Attachment
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
-					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
-					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+					OperationLoad::Clear,    OperationStore::Store,
+					OperationLoad::DontCare, OperationStore::DontCare,
 				},
 
 				// Depth Attachment
 				{
-					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
-					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
-					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+					FramebufferTextureFormat::DepthStencil, ImageUsage::DepthStencil,
+					OperationLoad::Load,      OperationStore::Store,        
+					OperationLoad::DontCare,  OperationStore::DontCare, 
 				}
 			}
 		};
@@ -174,9 +283,9 @@ namespace Frost
 		uint32_t index = 0;
 		for (auto& descriptor : m_Data->Descriptor)
 		{
-			Ref<Image2D> positionTexture =  m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, index);
-			Ref<Image2D> normalTexture =    m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
-			Ref<Image2D> albedoTexture =    m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
+			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, index);
+			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
+			Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
 			Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
 
 			descriptor->Set("u_PositionTexture", positionTexture);

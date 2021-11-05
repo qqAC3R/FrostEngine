@@ -37,13 +37,14 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EquirectangularToCubeMap.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentIrradiance.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentMipFilter.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/RenderSkybox.glsl");
 		
 		// Init the pools
 		s_RendererAPI->Init();
 
 		// Environment cubemaps
 		s_Data->m_Environment = SceneEnvironment::Create();
-		s_Data->m_Environment->Load("Resources/EnvironmentMaps/dikhololo_night_4k.hdr");
+		s_Data->m_Environment->Load("Resources/EnvironmentMaps/pink_sunrise_4k.hdr");
 
 		// LUTS
 		s_Data->m_WhiteTexture = Texture2D::Create("Resources/LUT/White.jpg");
@@ -70,12 +71,21 @@ namespace Frost
 		s_RendererAPI->Submit(mesh, material, transform);
 	}
 
+	void Renderer::LoadEnvironmentMap(const std::string& filepath)
+	{
+		// TODO: Add some function for the SceneRenderpasses to update the env texture with the new ones
+		Renderer::Submit([&, filepath]() mutable
+		{
+			s_Data->m_Environment->Load(filepath);
+		});
+	}
+
 	Ref<ShaderLibrary> Renderer::GetShaderLibrary()
 	{
 		return s_Data->m_ShaderLibrary;
 	}
 
-	Ref<SceneEnvironment> Renderer::GetSceneEnvironmentMap()
+	Ref<SceneEnvironment> Renderer::GetSceneEnvironment()
 	{
 		return s_Data->m_Environment;
 	}

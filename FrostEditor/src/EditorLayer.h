@@ -47,10 +47,16 @@ namespace Frost
 			glm::mat4 bunnyTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
 			Renderer::Submit(m_BunnyMesh, bunnyTransform);
 			
-			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
-			Renderer::Submit(m_PlaneMesh, planeTransform);
+			//glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
+			//Renderer::Submit(m_PlaneMesh, planeTransform);
 
 			Renderer::EndScene();
+
+			if (m_LoadCubemap)
+			{
+				Renderer::LoadEnvironmentMap("Resources/EnvironmentMaps/hilly_terrain_01_4k.hdr");
+				m_LoadCubemap = false;
+			}
 		}
 
 
@@ -159,6 +165,12 @@ namespace Frost
 
 				UI::Begin("Settings");
 				UI::CheckMark("RayTracing", m_UseRT);
+				UI::CheckMark("LoadCubemap", m_LoadCubemap);
+
+				ImGui::Separator();
+				ImGui::Text("Camera Properties");
+				UI::Slider("Exposure", m_Camera.GetExposure(), 0.0f, 5.0f);
+				UI::Slider("DOF", m_Camera.GetDOF(), 0.0f, 5.0f);
 				UI::End();
 
 				ImGui::End();
@@ -193,6 +205,7 @@ namespace Frost
 		Ref<Mesh> m_SphereMesh;
 
 		bool m_UseRT = true;
+		bool m_LoadCubemap = false;
 
 	};
 

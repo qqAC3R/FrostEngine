@@ -15,77 +15,12 @@ namespace Frost
 	// TODO: Add functions for the pipeline
 	namespace Utils
 	{
-		Vector<VkDescriptorSetLayout> GetDescriptorSetLayoutFromHashMap(const std::unordered_map<uint32_t, VkDescriptorSetLayout>& hashMapped_descriptorLayouts)
-		{
-			Vector<VkDescriptorSetLayout> descriptorLayouts;
-			for (auto& descriptorLayout : hashMapped_descriptorLayouts)
-			{
-				descriptorLayouts.push_back(descriptorLayout.second);
-			}
-			return descriptorLayouts;
-		}
-
-		Vector<VkPushConstantRange> GetPushConstantRangesFromVector(const Vector<PushConstantData>& pushConstantData)
-		{
-			Vector<VkPushConstantRange> pushConstants;
-			for (auto& pushConstant : pushConstantData)
-			{
-				VkShaderStageFlags shaderStageBits{};
-				for (auto& shaderStange : pushConstant.ShaderStage)
-					shaderStageBits |= VulkanShader::GetShaderStageBits(shaderStange);
-
-				VkPushConstantRange& pushConstantRange = pushConstants.emplace_back();
-				pushConstantRange.offset = 0;
-				pushConstantRange.size = pushConstant.Size;
-				pushConstantRange.stageFlags = shaderStageBits;
-			}
-			return pushConstants;
-		}
-
-		std::unordered_map<std::string, VkPushConstantRange> GetPushConstantCacheFromVector(const Vector<PushConstantData>& pushConstantData)
-		{
-			std::unordered_map<std::string, VkPushConstantRange> pushConstants;
-			for (auto& pushConstant : pushConstantData)
-			{
-				VkShaderStageFlags shaderStageBits{};
-				for (auto& shaderStange : pushConstant.ShaderStage)
-					shaderStageBits |= VulkanShader::GetShaderStageBits(shaderStange);
-
-				VkPushConstantRange& pushConstantRange = pushConstants[pushConstant.Name];
-				pushConstantRange.offset = 0;
-				pushConstantRange.size = pushConstant.Size;
-				pushConstantRange.stageFlags = shaderStageBits;
-			}
-			return pushConstants;
-		}
-
-		VkPrimitiveTopology GetVulkanPrimitiveTopology(PrimitiveTopology primitive)
-		{
-			switch (primitive)
-			{
-				case PrimitiveTopology::Points:         return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-				case PrimitiveTopology::Lines:          return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-				case PrimitiveTopology::LineStrip:      return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-				case PrimitiveTopology::Triangles:      return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-				case PrimitiveTopology::TriangleStrip:  return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-				case PrimitiveTopology::None:           FROST_ASSERT(false, "PrimitiveType::None is invalid!");
-			}
-			return VkPrimitiveTopology();
-		}
-
-		VkCullModeFlags GetVulkanCullMode(CullMode cullMode)
-		{
-			switch (cullMode)
-			{
-				case CullMode::None:          return VK_CULL_MODE_NONE;
-				case CullMode::Front:         return VK_CULL_MODE_FRONT_BIT;
-				case CullMode::Back:          return VK_CULL_MODE_BACK_BIT;
-				case CullMode::FrontAndBack:  return VK_CULL_MODE_FRONT_AND_BACK;
-			}
-
-			FROST_ASSERT(false, "CullMode is invalid!");
-			return VkCullModeFlags();
-		}
+		Vector<VkDescriptorSetLayout> GetDescriptorSetLayoutFromHashMap(const std::unordered_map<uint32_t, VkDescriptorSetLayout>& hashMapped_descriptorLayouts);
+		Vector<VkPushConstantRange> GetPushConstantRangesFromVector(const Vector<PushConstantData>& pushConstantData);
+		std::unordered_map<std::string, VkPushConstantRange> GetPushConstantCacheFromVector(const Vector<PushConstantData>& pushConstantData);
+		VkPrimitiveTopology GetVulkanPrimitiveTopology(PrimitiveTopology primitive);
+		VkCullModeFlags GetVulkanCullMode(CullMode cullMode);
+		VkCompareOp GetVulkanDepthCompare(DepthCompare depthCompare);
 	}
 
 	VulkanPipeline::VulkanPipeline(Pipeline::CreateInfo& createInfo)
@@ -142,6 +77,8 @@ namespace Frost
 
 
 
+		Vector<VkPipelineColorBlendAttachmentState> colorBlendAttachment;
+
 		Vector<Ref<Image2D>> attachments = createInfo.RenderPass->GetFramebuffer(0).As<VulkanFramebuffer>()->GetColorAttachments();
 		uint32_t colorAttachmentCount = 0;
 		uint32_t depthAttachmentCount = 0;
@@ -150,35 +87,35 @@ namespace Frost
 
 			switch (attachment->GetSpecification().Format)
 			{
-			case ImageFormat::RGBA8:
-			case ImageFormat::RGBA16F:
-			case ImageFormat::RGBA32F: colorAttachmentCount++; break;
-
-			case ImageFormat::Depth24Stencil8:
-			case ImageFormat::Depth32: depthAttachmentCount++; break;
+				case ImageFormat::R8:
+				{
+					auto& colorAttachment = colorBlendAttachment.emplace_back();
+					colorAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT;
+					colorAttachment.blendEnable = VK_FALSE;
+					colorAttachmentCount++;
+					break;
+				}
+				case ImageFormat::RGBA8:
+				case ImageFormat::RGBA16F:
+				case ImageFormat::RGBA32F:
+				{
+					auto& colorAttachment = colorBlendAttachment.emplace_back();
+					colorAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+					colorAttachment.blendEnable = VK_FALSE;
+					colorAttachmentCount++;
+					break;
+				}
+				case ImageFormat::Depth24Stencil8:
+				case ImageFormat::Depth32:
+				{
+					depthAttachmentCount++;
+					break;
+				}
 			}
 		}
 		if (depthAttachmentCount > 1) FROST_ASSERT_MSG("Graphics pipeline supports a maximum of 1 depth attachment");
 
 
-		VkPipelineMultisampleStateCreateInfo multisampling{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-		multisampling.sampleShadingEnable = VK_FALSE;
-		multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-		VkPipelineDepthStencilStateCreateInfo depthStencil{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-		depthStencil.depthTestEnable = createInfo.UseDepth ? true : false;
-		depthStencil.depthWriteEnable = createInfo.UseDepth ? true : false;;
-		depthStencil.stencilTestEnable = createInfo.UseStencil ? true : false;;
-		depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-		depthStencil.depthBoundsTestEnable = VK_FALSE;
-
-		Vector<VkPipelineColorBlendAttachmentState> colorBlendAttachment(colorAttachmentCount);
-		for (auto& colorAttachment : colorBlendAttachment)
-		{
-			colorAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-			colorAttachment.blendEnable = VK_FALSE;
-		}
-		
 		VkPipelineColorBlendStateCreateInfo colorBlending{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
 		colorBlending.logicOpEnable = VK_FALSE;
 		colorBlending.logicOp = VK_LOGIC_OP_COPY;
@@ -188,6 +125,19 @@ namespace Frost
 		colorBlending.blendConstants[1] = 0.0f;
 		colorBlending.blendConstants[2] = 0.0f;
 		colorBlending.blendConstants[3] = 0.0f;
+
+
+
+		VkPipelineMultisampleStateCreateInfo multisampling{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+		multisampling.sampleShadingEnable = VK_FALSE;
+		multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+		VkPipelineDepthStencilStateCreateInfo depthStencil{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+		depthStencil.depthTestEnable = createInfo.UseDepthTest;
+		depthStencil.depthWriteEnable = createInfo.UseDepthWrite;
+		depthStencil.stencilTestEnable = createInfo.UseStencil;
+		depthStencil.depthCompareOp = Utils::GetVulkanDepthCompare(createInfo.DepthCompareOperation);
+		depthStencil.depthBoundsTestEnable = VK_FALSE;
 
 		{
 			// Setting up the pipeline layout
@@ -264,4 +214,95 @@ namespace Frost
 		m_Pipeline = VK_NULL_HANDLE;
 	}
 
+	namespace Utils
+	{
+		Vector<VkDescriptorSetLayout> GetDescriptorSetLayoutFromHashMap(const std::unordered_map<uint32_t, VkDescriptorSetLayout>& hashMapped_descriptorLayouts)
+		{
+			Vector<VkDescriptorSetLayout> descriptorLayouts;
+			for (auto& descriptorLayout : hashMapped_descriptorLayouts)
+			{
+				descriptorLayouts.push_back(descriptorLayout.second);
+			}
+			return descriptorLayouts;
+		}
+
+		Vector<VkPushConstantRange> GetPushConstantRangesFromVector(const Vector<PushConstantData>& pushConstantData)
+		{
+			Vector<VkPushConstantRange> pushConstants;
+			for (auto& pushConstant : pushConstantData)
+			{
+				VkShaderStageFlags shaderStageBits{};
+				for (auto& shaderStange : pushConstant.ShaderStage)
+					shaderStageBits |= VulkanShader::GetShaderStageBits(shaderStange);
+
+				VkPushConstantRange& pushConstantRange = pushConstants.emplace_back();
+				pushConstantRange.offset = 0;
+				pushConstantRange.size = pushConstant.Size;
+				pushConstantRange.stageFlags = shaderStageBits;
+			}
+			return pushConstants;
+		}
+
+		std::unordered_map<std::string, VkPushConstantRange> GetPushConstantCacheFromVector(const Vector<PushConstantData>& pushConstantData)
+		{
+			std::unordered_map<std::string, VkPushConstantRange> pushConstants;
+			for (auto& pushConstant : pushConstantData)
+			{
+				VkShaderStageFlags shaderStageBits{};
+				for (auto& shaderStange : pushConstant.ShaderStage)
+					shaderStageBits |= VulkanShader::GetShaderStageBits(shaderStange);
+
+				VkPushConstantRange& pushConstantRange = pushConstants[pushConstant.Name];
+				pushConstantRange.offset = 0;
+				pushConstantRange.size = pushConstant.Size;
+				pushConstantRange.stageFlags = shaderStageBits;
+			}
+			return pushConstants;
+		}
+
+		VkPrimitiveTopology GetVulkanPrimitiveTopology(PrimitiveTopology primitive)
+		{
+			switch (primitive)
+			{
+			case PrimitiveTopology::Points:         return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+			case PrimitiveTopology::Lines:          return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+			case PrimitiveTopology::LineStrip:      return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+			case PrimitiveTopology::Triangles:      return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+			case PrimitiveTopology::TriangleStrip:  return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+			case PrimitiveTopology::None:           FROST_ASSERT_MSG("PrimitiveType::None is invalid!");
+			}
+			return VkPrimitiveTopology();
+		}
+
+		VkCullModeFlags GetVulkanCullMode(CullMode cullMode)
+		{
+			switch (cullMode)
+			{
+			case CullMode::None:          return VK_CULL_MODE_NONE;
+			case CullMode::Front:         return VK_CULL_MODE_FRONT_BIT;
+			case CullMode::Back:          return VK_CULL_MODE_BACK_BIT;
+			case CullMode::FrontAndBack:  return VK_CULL_MODE_FRONT_AND_BACK;
+			}
+
+			FROST_ASSERT_MSG("CullMode is invalid!");
+			return VkCullModeFlags();
+		}
+
+		VkCompareOp GetVulkanDepthCompare(DepthCompare depthCompare)
+		{
+			switch (depthCompare)
+			{
+			case DepthCompare::Less:           return VK_COMPARE_OP_LESS;
+			case DepthCompare::Equal:          return VK_COMPARE_OP_EQUAL;
+			case DepthCompare::LessOrEqual:    return VK_COMPARE_OP_LESS_OR_EQUAL;
+			case DepthCompare::Greater:        return VK_COMPARE_OP_GREATER;
+			case DepthCompare::NotEqual:       return VK_COMPARE_OP_NOT_EQUAL;
+			case DepthCompare::GreaterOrEqual: return VK_COMPARE_OP_GREATER_OR_EQUAL;
+			case DepthCompare::Never:          return VK_COMPARE_OP_NEVER;
+			case DepthCompare::Always:         return VK_COMPARE_OP_ALWAYS;
+			}
+			FROST_ASSERT_MSG("DepthCompare is invalid!");
+			return VkCompareOp();
+		}
+	}
 }

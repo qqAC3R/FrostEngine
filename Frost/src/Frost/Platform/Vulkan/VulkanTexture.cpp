@@ -35,6 +35,7 @@ namespace Frost
 
 		if (textureData == nullptr)
 		{
+			FROST_CORE_WARN("Texture with filepath '{0}' hasn't been found", filepath);
 			m_IsLoaded = false;
 			return;
 		}

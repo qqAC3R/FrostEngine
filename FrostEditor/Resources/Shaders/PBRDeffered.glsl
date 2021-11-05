@@ -63,6 +63,12 @@ layout(binding = 6) uniform samplerCube u_RadianceFilteredMap;
 layout(binding = 7) uniform samplerCube u_IrradianceMap;
 layout(binding = 8) uniform sampler2D u_BRDFLut;
 
+layout(binding = 9) uniform CameraData {
+	float Gamma;
+	float Exposure;
+} m_CameraData;
+
+
 layout(push_constant) uniform PushConstant {
     vec3 CameraPosition;
 } u_PushConstant;
@@ -214,6 +220,18 @@ vec3 IBL_Contribution()
 	return kd * diffuseIBL + specularIBL;
 }
 
+// From https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+vec3 AcesApprox(vec3 v)
+{
+    v *= 0.6f;
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((v*(a*v+b))/(v*(c*v+d)+e), 0.0f, 1.0f);
+}
+
 void main()
 {
     // Calculating the normals and worldPos
@@ -249,5 +267,12 @@ void main()
 	float IBLIntensity = 1.0f;
 	result += IBL_Contribution() * IBLIntensity;
 
+	// Tonemapping
+	result = AcesApprox(result * m_CameraData.Exposure);
+
+	// Gamma correction
+	result = pow(result, vec3(1.0f / m_CameraData.Gamma));
+
+	// Outputting the result
     o_Color = vec4(result, 1.0f);
 }

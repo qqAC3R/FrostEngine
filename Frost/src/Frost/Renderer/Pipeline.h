@@ -27,6 +27,11 @@ namespace Frost
 		FrontAndBack
 	};
 
+	enum class DepthCompare
+	{
+		Less, Equal, LessOrEqual, Greater, NotEqual, GreaterOrEqual, Never, Always
+	};
+
 	class Pipeline
 	{
 	public:
@@ -40,8 +45,10 @@ namespace Frost
 
 			PrimitiveTopology Topology = PrimitiveTopology::Triangles;
 			CullMode Cull = CullMode::None;
+			DepthCompare DepthCompareOperation = DepthCompare::Less;
 			float LineWidth = 1.0f;
-			bool UseDepth = true;
+			bool UseDepthTest = true;
+			bool UseDepthWrite = true;
 			bool UseStencil = false;
 		};
 

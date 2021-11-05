@@ -258,6 +258,116 @@ namespace Frost
 		m_ImageLayout = newImageLayout;
 	}
 
+	void VulkanImage2D::BlitImage(VkCommandBuffer cmdBuf, const Ref<Image2D>& srcImage, uint32_t mipLevel)
+	{
+		VkImageBlit blit{};
+
+		VkFilter blitFilter{};
+		VkImageAspectFlags imageAspectMask{};
+		switch (m_ImageSpecification.Format)
+		{
+		case ImageFormat::Depth32:
+		case ImageFormat::Depth24Stencil8:
+			imageAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			blitFilter = VK_FILTER_NEAREST;
+			break;
+		default:
+			imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blitFilter = VK_FILTER_LINEAR;
+		}
+
+		VkImageSubresourceRange subresourceRange{};
+		subresourceRange.aspectMask = imageAspectMask;
+		subresourceRange.baseArrayLayer = 0;
+		subresourceRange.layerCount = 1;
+		subresourceRange.levelCount = 1;
+		subresourceRange.baseMipLevel = mipLevel;
+
+
+		// #SOURCE
+		// Getting all the information neccesary
+		Ref<VulkanImage2D> vulkanSrcImage = srcImage.As<VulkanImage2D>();
+		int32_t blitImageWidth = vulkanSrcImage->m_ImageSpecification.Width;
+		int32_t blitImageHeight = vulkanSrcImage->m_ImageSpecification.Height;
+		VkImage vulkanSrcRawImage = vulkanSrcImage->GetVulkanImage();
+		VkImageLayout initialSrcImageLayout = vulkanSrcImage->GetVulkanImageLayout();
+
+		// Calculate the area of the mip level
+		if (mipLevel != 0)
+		{
+			blitImageWidth /= mipLevel;
+			blitImageHeight /= mipLevel;
+		}
+
+		blit.srcSubresource.aspectMask = imageAspectMask;
+		blit.srcOffsets[0] = { 0, 0, 0 };
+		blit.srcOffsets[1] = { blitImageWidth, blitImageHeight, 1 };
+		blit.srcSubresource.baseArrayLayer = 0;
+		blit.srcSubresource.layerCount = 1;
+		blit.srcSubresource.mipLevel = mipLevel;
+
+		// Transition the src image to `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL`
+		Utils::InsertImageMemoryBarrier(cmdBuf, vulkanSrcRawImage,
+			Utils::GetAccessFlagsFromLayout(initialSrcImageLayout),
+			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+			initialSrcImageLayout,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			Utils::GetPipelineStageFlagsFromLayout(initialSrcImageLayout),
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+			subresourceRange
+		);
+
+
+
+
+		// #DESTIONATION
+		// Transition the dst (this class) image to `VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL`
+		Utils::InsertImageMemoryBarrier(cmdBuf, m_Image,
+			Utils::GetAccessFlagsFromLayout(m_ImageLayout),
+			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			m_ImageLayout,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			subresourceRange
+		);
+		blit.dstSubresource.aspectMask = imageAspectMask;
+		blit.dstOffsets[0] = { 0, 0, 0 };
+		blit.dstOffsets[1] = { blitImageWidth, blitImageHeight, 1 };
+		blit.dstSubresource.baseArrayLayer = 0;
+		blit.dstSubresource.layerCount = 1;
+		blit.dstSubresource.mipLevel = mipLevel;
+
+		vkCmdBlitImage(cmdBuf,
+			vulkanSrcRawImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			m_Image,		   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			1, &blit,
+			blitFilter
+		);
+
+
+		// Transition both images to the layouts they had before the blit
+		Utils::InsertImageMemoryBarrier(cmdBuf, vulkanSrcRawImage,
+			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+			Utils::GetAccessFlagsFromLayout(initialSrcImageLayout),
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			initialSrcImageLayout,
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+			Utils::GetPipelineStageFlagsFromLayout(initialSrcImageLayout),
+			subresourceRange
+		);
+
+		Utils::InsertImageMemoryBarrier(cmdBuf, m_Image,
+			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			Utils::GetAccessFlagsFromLayout(m_ImageLayout),
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			m_ImageLayout,
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
+			subresourceRange
+		);
+	}
+
 	void VulkanImage2D::UpdateDescriptor()
 	{
 		m_DescriptorInfo[DescriptorImageType::Sampled].imageView = m_ImageView;
@@ -388,6 +498,7 @@ namespace Frost
 		{
 			switch (imageFormat)
 			{
+				case ImageFormat::R8:               return VK_FORMAT_R8_UNORM;
 				case ImageFormat::RGBA8:            return VK_FORMAT_R8G8B8A8_UNORM;
 				case ImageFormat::RGBA16F:          return VK_FORMAT_R16G16B16A16_SFLOAT;
 				case ImageFormat::RGBA32F:          return VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -423,11 +534,11 @@ namespace Frost
 		{
 			switch (imageUsage)
 			{
-				case ImageUsage::Storage:       return VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+				case ImageUsage::Storage:         return VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 													   VK_IMAGE_USAGE_SAMPLED_BIT;
-				case ImageUsage::Attachment:    return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-				case ImageUsage::DepthStencil:  return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-				case ImageUsage::None:          FROST_ASSERT_MSG("ImageUsage::None is invalid!");
+				case ImageUsage::ColorAttachment: return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+				case ImageUsage::DepthStencil:    return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+				case ImageUsage::None:            FROST_ASSERT_MSG("ImageUsage::None is invalid!");
 			}
 			return VkImageUsageFlags();
 		}
@@ -436,10 +547,10 @@ namespace Frost
 		{
 			switch (imageUsage)
 			{
-				case ImageUsage::Storage:       return VK_IMAGE_LAYOUT_GENERAL;
-				case ImageUsage::Attachment:    return VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
-				case ImageUsage::DepthStencil:  return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
-				case ImageUsage::None:          FROST_ASSERT_MSG("ImageUsage::None is invalid!");
+				case ImageUsage::Storage:            return VK_IMAGE_LAYOUT_GENERAL;
+				case ImageUsage::ColorAttachment:    return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				case ImageUsage::DepthStencil:       return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
+				case ImageUsage::None:               FROST_ASSERT_MSG("ImageUsage::None is invalid!");
 			}
 			return VkImageLayout();
 		}

@@ -8,6 +8,7 @@ namespace Frost
 		None = 0,
 
 		// Color
+		R8,
 		RGBA8, RGBA16F, RGBA32F,
 
 		// Depth/Stencil
@@ -18,7 +19,7 @@ namespace Frost
 	{
 		None = 0,
 		Storage,
-		Attachment,
+		ColorAttachment,
 		DepthStencil
 	};
 

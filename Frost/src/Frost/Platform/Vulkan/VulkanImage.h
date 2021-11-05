@@ -24,6 +24,7 @@ namespace Frost
 			VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 
 		void GenerateMipMaps(VkCommandBuffer cmdBuffer, VkImageLayout newImageLayout);
+		void BlitImage(VkCommandBuffer cmdBuf, const Ref<Image2D>& srcImage, uint32_t mipLevel = 0);
 
 		virtual uint32_t GetWidth() const override { return m_ImageSpecification.Width; }
 		virtual uint32_t GetHeight() const override { return m_ImageSpecification.Height; }

@@ -45,12 +45,14 @@ namespace Frost
 		}
 
 		static void Resize(uint32_t width, uint32_t height) { s_RendererAPI->Resize(width, height); }
+		static void LoadEnvironmentMap(const std::string& filepath);
+
 		static Ref<Image2D> GetFinalImage(uint32_t id) { return s_RendererAPI->GetFinalImage(id); }
 		static Ref<Texture2D> GetWhiteLUT();
 		static Ref<Texture2D> GetBRDFLut();
 
 		static Ref<ShaderLibrary> GetShaderLibrary();
-		static Ref<SceneEnvironment> GetSceneEnvironmentMap();
+		static Ref<SceneEnvironment> GetSceneEnvironment();
 		static RendererConfig GetRendererConfig() { return RendererConfig(); }
 		static RendererAPI::API GetAPI() { return s_RendererAPI->s_API; }
 

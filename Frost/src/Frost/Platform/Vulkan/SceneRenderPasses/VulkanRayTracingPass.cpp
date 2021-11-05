@@ -205,9 +205,6 @@ namespace Frost
 		auto bufferGeometrySubmeshCount = m_Data->SceneGeometrySubmeshCount[currentFrameIndex].BufferHost;
 		m_Data->SceneGeometrySubmeshCount[currentFrameIndex].BufferDeviceLocal->SetData(subMeshCount_offset, bufferGeometrySubmeshCount.Data);
 
-		//m_Data->SceneGeometrySubmeshCount[currentFrameIndex].BufferDeviceLocal->SetData(subMeshCount.size() * sizeof(uint32_t), subMeshCount.data());
-		//m_Data->SceneGeometryOffsets[currentFrameIndex].BufferDeviceLocal->SetData(subMeshOffsets.size() * sizeof(uint32_t), subMeshOffsets.data());
-
 		// Camera info
 		m_CameraInfo.InverseProjection = glm::inverse(renderQueue.CameraProjectionMatrix);
 		m_CameraInfo.InverseView = glm::inverse(renderQueue.CameraViewMatrix);

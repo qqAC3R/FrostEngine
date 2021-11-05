@@ -51,6 +51,7 @@ layout(location = 0) out vec4 o_WoldPos;
 layout(location = 1) out vec4 o_Normals;
 layout(location = 2) out vec4 o_Albedo;
 layout(location = 3) out vec4 o_Composite;
+layout(location = 4) out vec4 o_EntitiyID;
 
 layout(location = 0) in vec3 v_FragmentPos;
 layout(location = 1) in vec3 v_Normal;
@@ -122,4 +123,7 @@ void main()
 	float metalness = GetFloatValueFromTexture(u_MetalnessTexture, MaterialUniform.Metalness);
 	float roughness = GetFloatValueFromTexture(u_RoughnessTexture, MaterialUniform.Roughness);
 	o_Composite = vec4(metalness, roughness, 1.0f, 1.0f);
+
+	//TODO:
+	o_EntitiyID = vec4(1.0f);
 }

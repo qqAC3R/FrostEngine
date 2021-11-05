@@ -15,6 +15,9 @@ namespace Frost
 		{
 			switch (format)
 			{
+				case FramebufferTextureFormat::R8:	 
+					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R8_UNORM);
+
 				case FramebufferTextureFormat::RGBA8:	 
 					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R8G8B8A8_UNORM);
 
@@ -23,6 +26,9 @@ namespace Frost
 
 				case FramebufferTextureFormat::DEPTH32: 
 					return std::make_pair(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_D32_SFLOAT);
+
+				case FramebufferTextureFormat::DEPTH24STENCIL8:
+					return std::make_pair(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_D24_UNORM_S8_UINT);
 			}
 
 			FROST_ASSERT_MSG("FramebufferTextureFormat is invalid!")
@@ -33,7 +39,9 @@ namespace Frost
 		{
 			switch (format)
 			{
-				case FramebufferTextureFormat::DEPTH32:  return true;
+				case FramebufferTextureFormat::DEPTH24STENCIL8:
+				case FramebufferTextureFormat::DEPTH32:
+					return true;
 			}
 			return false;
 		}
@@ -42,10 +50,12 @@ namespace Frost
 		{
 			switch (framebufferFormat)
 			{
-			case FramebufferTextureFormat::RGBA8:    return ImageFormat::RGBA8;
-			case FramebufferTextureFormat::RGBA16F:  return ImageFormat::RGBA16F;
-			case FramebufferTextureFormat::Depth:    return ImageFormat::Depth32;
-			case FramebufferTextureFormat::None:     FROST_ASSERT_MSG("FramebufferTextureFormat::None is invalid!");
+				case FramebufferTextureFormat::R8:				 return ImageFormat::R8;
+				case FramebufferTextureFormat::RGBA8:            return ImageFormat::RGBA8;
+				case FramebufferTextureFormat::RGBA16F:          return ImageFormat::RGBA16F;
+				case FramebufferTextureFormat::DEPTH32:          return ImageFormat::Depth32;
+				case FramebufferTextureFormat::DEPTH24STENCIL8:  return ImageFormat::Depth24Stencil8;
+				case FramebufferTextureFormat::None:             FROST_ASSERT_MSG("FramebufferTextureFormat::None is invalid!");
 			}
 			return ImageFormat::None;
 		}
@@ -73,10 +83,6 @@ namespace Frost
 		if (m_Framebuffer == VK_NULL_HANDLE) return;
 
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		//for (auto& attachment : m_Attachments)
-		//{
-		//	attachment->Destroy();
-		//}
 		vkDestroyFramebuffer(device, m_Framebuffer, nullptr);
 		m_Framebuffer = VK_NULL_HANDLE;
 	}
@@ -89,8 +95,6 @@ namespace Frost
 				m_ColorAttachmentSpecifications.emplace_back(spec);
 			else
 				m_DepthAttachmentSpecification = spec;
-
-
 		}
 
 		for (uint32_t i = 0; i < m_Specification.Attachments.Attachments.size(); i++)
@@ -102,7 +106,7 @@ namespace Frost
 			spec.Height = m_Specification.Height;
 			spec.Format = Utils::GetImageFormat(attachment.TextureFormat);
 
-			if (attachment.TextureFormat == FramebufferTextureFormat::Depth)
+			if (attachment.TextureFormat == FramebufferTextureFormat::Depth || attachment.TextureFormat == FramebufferTextureFormat::DepthStencil)
 				spec.Usage = ImageUsage::DepthStencil;
 			else
 				spec.Usage = ImageUsage::Storage;
@@ -123,8 +127,7 @@ namespace Frost
 			attachments.push_back(attachment.As<VulkanImage2D>()->GetVulkanImageView());
 		}
 
-		VkFramebufferCreateInfo framebufferInfo{};
-		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		VkFramebufferCreateInfo framebufferInfo{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
 		framebufferInfo.renderPass = renderPass;
 		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 		framebufferInfo.pAttachments = attachments.data();

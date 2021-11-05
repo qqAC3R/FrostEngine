@@ -62,9 +62,16 @@ namespace Frost
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
+				// ECS Attachment
+				{
+					FramebufferTextureFormat::R8, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
 				// Depth Attachment
 				{
-					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
+					FramebufferTextureFormat::DepthStencil, ImageUsage::DepthStencil,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				}
@@ -74,20 +81,21 @@ namespace Frost
 
 
 		BufferLayout bufferLayout = {
-			{ "a_Position",  ShaderDataType::Float3 },
-			{ "a_TexCoord",	 ShaderDataType::Float2 },
-			{ "a_Normal",	 ShaderDataType::Float3 },
-			{ "a_Tangent",	 ShaderDataType::Float3 },
-			{ "a_Bitangent", ShaderDataType::Float3 },
-			{ "a_MeshIndex", ShaderDataType::Float }
+			{ "a_Position",      ShaderDataType::Float3 },
+			{ "a_TexCoord",	     ShaderDataType::Float2 },
+			{ "a_Normal",	     ShaderDataType::Float3 },
+			{ "a_Tangent",	     ShaderDataType::Float3 },
+			{ "a_Bitangent",     ShaderDataType::Float3 },
+			{ "a_MaterialIndex", ShaderDataType::Float }
 		};
 		Pipeline::CreateInfo pipelineCreateInfo{};
 		pipelineCreateInfo.Shader = m_Data->Shader;
-		pipelineCreateInfo.UseDepth = true;
+		pipelineCreateInfo.UseDepthTest = true;
+		pipelineCreateInfo.UseDepthWrite = true;
+		pipelineCreateInfo.UseStencil = false;
 		pipelineCreateInfo.RenderPass = m_Data->RenderPass;
 		pipelineCreateInfo.VertexBufferLayout = bufferLayout;
 		m_Data->Pipeline = Pipeline::Create(pipelineCreateInfo);
-
 	}
 
 	void VulkanGeometryPass::OnUpdate(const RenderQueue& renderQueue)
@@ -185,9 +193,17 @@ namespace Frost
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
+				// ECS Attachment
+				{
+					FramebufferTextureFormat::R8, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
+
 				// Depth Attachment
 				{
-					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
+					FramebufferTextureFormat::DepthStencil, ImageUsage::DepthStencil,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				}

@@ -27,11 +27,16 @@ namespace Frost
 
 		struct InternalData
 		{
-			Ref<Pipeline> Pipeline;
+			Ref<Pipeline> CompositePipeline;
 			Ref<RenderPass> RenderPass;
 			Vector<Ref<Material>> Descriptor;
-			Ref<Shader> Shader;
+			Ref<Shader> CompositeShader;
 			Ref<UniformBuffer> m_PointLightUniformBuffer;
+
+			Ref<Shader> SkyboxShader;
+			Ref<Pipeline> SkyboxPipeline;
+			Ref<Material> SkyboxDescriptor;
+			Ref<VertexBuffer> SkyBoxVertexBuffer;
 		};
 		InternalData* m_Data;
 		std::string m_Name;
