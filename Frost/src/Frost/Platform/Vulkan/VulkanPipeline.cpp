@@ -42,14 +42,15 @@ namespace Frost
 			shaderStages.push_back(shaderStageInfo);
 		}
 
-		auto bindingDescriptions = Utils::GetVertexBindingDescription(bufferLayout, VK_VERTEX_INPUT_RATE_VERTEX);
+		auto bindingDescriptions = Utils::GetVertexBindingDescription(bufferLayout);
 		auto attributeDescriptions = Utils::GetVertexAttributeDescriptions(bufferLayout);
+		bool vertexInputUsage = bufferLayout.m_BufferElements.size();
 
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
-		vertexInputInfo.vertexBindingDescriptionCount = 1;
+		vertexInputInfo.vertexBindingDescriptionCount = vertexInputUsage ? 1 : 0;
 		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-		vertexInputInfo.pVertexBindingDescriptions = &bindingDescriptions;
-		vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();;
+		vertexInputInfo.pVertexBindingDescriptions = vertexInputUsage ? &bindingDescriptions : nullptr;
+		vertexInputInfo.pVertexAttributeDescriptions = vertexInputUsage ? attributeDescriptions.data(): nullptr;
 
 
 		// Define how vulkan draws (triangles, lines, etc.)

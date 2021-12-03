@@ -65,7 +65,7 @@ namespace Frost
 
 		uint32_t m_CurrentFrameIndex = 0;
 		uint32_t m_CurrentBufferIndex = 0;
-		bool m_VSync = true;
+		bool m_VSync = false;
 
 		friend class VulkanRenderer;
 		friend class VulkanContext;

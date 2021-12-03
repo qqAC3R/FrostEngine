@@ -51,6 +51,29 @@ namespace Frost
 		CreateVulkanDescriptorSetLayout();
 	}
 
+	VulkanShader::VulkanShader(const std::string& filepath, const Vector<ShaderArray>& customMemberArraySizes)
+	{
+		m_Name = Utils::GetNameFromFilepath(filepath);
+
+		Utils::CreateCacheDirectoryIfNeeded();
+		std::string source = Utils::ReadFile(filepath);
+		auto shaderSources = Utils::PreProccesShaders(source);
+		m_ShaderSources = shaderSources;
+
+		{
+			Timer shaderCompileTimer("VulkanShader");
+			CompileVulkanBinaries(shaderSources);
+			CreateShaderModules();
+		}
+
+		// Creating a hashmap for the custom sized members
+		for (auto& memberArraySize : customMemberArraySizes)
+			m_CustomMemberArraySizes[memberArraySize.Name] = memberArraySize.Size;
+
+		m_ReflectionData.SetReflectionData(m_VulkanSPIRV);
+		CreateVulkanDescriptorSetLayout();
+	}
+
 	VulkanShader::~VulkanShader()
 	{
 		Destroy();
@@ -111,7 +134,7 @@ namespace Frost
 				if (module.GetCompilationStatus() != shaderc_compilation_status_success)
 				{
 					FROST_CORE_ERROR("Error in {0} shader:\n {1}", Utils::ShaderTypeToString(stage), module.GetErrorMessage());
-					FROST_ASSERT(false, "Assertion requested!");
+					FROST_ASSERT_MSG("Assertion requested!");
 				}
 
 				shaderData[stage] = std::vector<uint32_t>(module.cbegin(), module.cend());
@@ -148,15 +171,40 @@ namespace Frost
 			///////////////////////////////////////////////////////////
 
 			Vector<VkDescriptorSetLayoutBinding> layoutBindings;
+			VkDescriptorSetLayoutBindingFlagsCreateInfo* layoutBindingsEXT = nullptr;
 
 			for (auto& buffer : reflectedData.GetBuffersData())
 			{
 				auto& bufferData = buffer.second;
 				if (bufferData.Set != descriptorSetNumber) continue;
 
+				// Check if we want to use a custom array size for the shader member
+				uint32_t descriptorCount = bufferData.Count;
+				if (m_CustomMemberArraySizes.find(bufferData.Name) != m_CustomMemberArraySizes.end())
+				{
+					descriptorCount = m_CustomMemberArraySizes[bufferData.Name];
+
+#if 0
+					if (layoutBindingsEXT == nullptr)
+					{
+
+						layoutBindingsEXT = new VkDescriptorSetLayoutBindingFlagsCreateInfo();
+						layoutBindingsEXT->sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+
+						std::vector<VkDescriptorBindingFlagsEXT> descriptorBindingFlags = {
+							0,
+							VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT
+						};
+
+						layoutBindingsEXT->bindingCount = descriptorBindingFlags.size();
+						layoutBindingsEXT->pBindingFlags = descriptorBindingFlags.data();
+					}
+#endif
+				}
+
 				VkDescriptorSetLayoutBinding& LayoutBinding = layoutBindings.emplace_back();
 				LayoutBinding.binding = bufferData.Binding;
-				LayoutBinding.descriptorCount = bufferData.Count;
+				LayoutBinding.descriptorCount = descriptorCount;
 				LayoutBinding.descriptorType = Utils::BufferTypeToVulkan(bufferData.Type);
 				LayoutBinding.stageFlags = Utils::GetShaderStagesFlagsFromShaderTypes(bufferData.ShaderStage);
 			}
@@ -165,9 +213,35 @@ namespace Frost
 			{
 				if (texture.Set != descriptorSetNumber) continue;
 
+
+
+				// Check if we want to use a custom array size for the shader member
+				uint32_t descriptorCount = texture.Count;
+				if (m_CustomMemberArraySizes.find(texture.Name) != m_CustomMemberArraySizes.end())
+				{
+					descriptorCount = m_CustomMemberArraySizes[texture.Name];
+
+#if 0
+					if (layoutBindingsEXT == nullptr)
+					{
+
+						layoutBindingsEXT = new VkDescriptorSetLayoutBindingFlagsCreateInfo();
+						layoutBindingsEXT->sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+
+						std::vector<VkDescriptorBindingFlagsEXT> descriptorBindingFlags = {
+							0,
+							VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT
+						};
+
+						layoutBindingsEXT->bindingCount = descriptorBindingFlags.size();
+						layoutBindingsEXT->pBindingFlags = descriptorBindingFlags.data();
+					}
+#endif
+				}
+
 				VkDescriptorSetLayoutBinding& LayoutBinding = layoutBindings.emplace_back();
 				LayoutBinding.binding = texture.Binding;
-				LayoutBinding.descriptorCount = texture.Count;
+				LayoutBinding.descriptorCount = descriptorCount;
 				LayoutBinding.descriptorType = Utils::TextureTypeToVulkan(texture.Type);
 				LayoutBinding.stageFlags = Utils::GetShaderStagesFlagsFromShaderTypes(texture.ShaderStage);
 			}
@@ -185,6 +259,7 @@ namespace Frost
 
 			VkDescriptorSetLayoutCreateInfo layoutInfo{};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			//layoutInfo.pNext = &layoutBindingsEXT;
 			layoutInfo.flags = 0;
 			layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
 			layoutInfo.pBindings = layoutBindings.data();
@@ -192,7 +267,6 @@ namespace Frost
 			FROST_VKCHECK(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &m_DescriptorSetLayouts[descriptorSetNumber]));
 			VulkanContext::SetStructDebugName("VulkanShader-DescriptorSetLayout", VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
 											   m_DescriptorSetLayouts[descriptorSetNumber]);
-
 		}
 
 	}

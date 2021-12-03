@@ -256,11 +256,19 @@ namespace Frost
 
 	void VulkanImage2D::GenerateMipMaps(VkCommandBuffer cmdBuffer, VkImageLayout newImageLayout)
 	{
-		VkImageAspectFlags imageAspectFlags;
-		if (m_ImageSpecification.Format == ImageFormat::Depth24Stencil8 || m_ImageSpecification.Format == ImageFormat::Depth32)
-			imageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
-		else
-			imageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
+		VkFilter blitFilter{};
+		VkImageAspectFlags imageAspectMask{};
+		switch (m_ImageSpecification.Format)
+		{
+		case ImageFormat::Depth32:
+		case ImageFormat::Depth24Stencil8:
+			imageAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			blitFilter = VK_FILTER_NEAREST;
+			break;
+		default:
+			imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blitFilter = VK_FILTER_LINEAR;
+		}
 
 		int32_t mipWidth = m_ImageSpecification.Width;
 		int32_t mipHeight = m_ImageSpecification.Height;
@@ -271,7 +279,7 @@ namespace Frost
 		for (uint32_t i = 1; i < m_MipLevelCount; i++)
 		{
 			VkImageSubresourceRange subresourceRange{};
-			subresourceRange.aspectMask = imageAspectFlags;
+			subresourceRange.aspectMask = imageAspectMask;
 			subresourceRange.baseArrayLayer = 0;
 			subresourceRange.layerCount = 1;
 			subresourceRange.levelCount = 1;
@@ -281,7 +289,7 @@ namespace Frost
 			VkImageBlit blit{};
 
 			// Src
-			blit.srcSubresource.aspectMask = imageAspectFlags;
+			blit.srcSubresource.aspectMask = imageAspectMask;
 			blit.srcOffsets[0] = { 0, 0, 0 };
 			blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
 			blit.srcSubresource.mipLevel = i - 1;
@@ -289,7 +297,7 @@ namespace Frost
 			blit.srcSubresource.layerCount = 1;
 
 			// Dst
-			blit.dstSubresource.aspectMask = imageAspectFlags;
+			blit.dstSubresource.aspectMask = imageAspectMask;
 			blit.dstOffsets[0] = { 0, 0, 0 };
 			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
 			blit.dstSubresource.mipLevel = i;
@@ -309,7 +317,7 @@ namespace Frost
 				m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				1, &blit,
-				VK_FILTER_LINEAR
+				blitFilter
 			);
 
 			// Transition from `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL` to "newImageLayout"
@@ -325,7 +333,7 @@ namespace Frost
 		}
 
 		VkImageSubresourceRange subresourceRange{};
-		subresourceRange.aspectMask = imageAspectFlags;
+		subresourceRange.aspectMask = imageAspectMask;
 		subresourceRange.baseArrayLayer = 0;
 		subresourceRange.layerCount = 1;
 		subresourceRange.levelCount = 1;

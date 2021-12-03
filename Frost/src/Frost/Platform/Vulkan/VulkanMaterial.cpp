@@ -48,19 +48,21 @@ namespace Frost
 	{
 		if (s_DescriptorPool != VK_NULL_HANDLE) return;
 
+		uint32_t descriptorCount = std::pow(2, 16);
+
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		Vector<VkDescriptorPoolSize> poolSizes =
 		{
-			{ VK_DESCRIPTOR_TYPE_SAMPLER, 10000 },
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10000 },
-			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 10000 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 10000 },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10000 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10000 },
-			{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 10000 }
+			{ VK_DESCRIPTOR_TYPE_SAMPLER,                    descriptorCount },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,     descriptorCount },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,              descriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,              descriptorCount },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             descriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,             descriptorCount },
+			{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, descriptorCount }
 		};
 		VkDescriptorPoolCreateInfo poolCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-		poolCreateInfo.maxSets = 10000 * poolSizes.size();
+		poolCreateInfo.maxSets = descriptorCount * poolSizes.size();
 		poolCreateInfo.poolSizeCount = (uint32_t)poolSizes.size();
 		poolCreateInfo.pPoolSizes = poolSizes.data();
 		FROST_VKCHECK(vkCreateDescriptorPool(device, &poolCreateInfo, nullptr, &s_DescriptorPool));
@@ -146,8 +148,7 @@ namespace Frost
 			// Descriptor Set
 			///////////////////////////////////////////////////////////
 
-			VkDescriptorSetAllocateInfo allocInfo{};
-			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 			allocInfo.descriptorPool = s_DescriptorPool;
 			allocInfo.descriptorSetCount = 1;
 			allocInfo.pSetLayouts = &m_DescriptorSetLayouts[descriptorSetNumber];
@@ -319,6 +320,8 @@ namespace Frost
 		PendingDescriptor& pendingDescriptor = m_PendingDescriptor.emplace_back();
 		auto location = GetShaderLocationFromString(name);
 
+
+		// TODO: Add texture arrays to the hash table
 		// Set the data in the hash table
 		if (m_MaterialData[name].Type != DataPointer::DataType::TEXTURE) FROST_ASSERT_MSG("Wrong data type!");
 		Ref<void*> texturePointer = texture.As<void*>();
@@ -336,6 +339,35 @@ namespace Frost
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writeDescriptorSet.dstBinding = location.Binding;
 		writeDescriptorSet.dstArrayElement = 0;
+		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writeDescriptorSet.pImageInfo = imageDescriptorInfo;
+		writeDescriptorSet.descriptorCount = 1;
+		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];
+	}
+
+	void VulkanMaterial::Set(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex)
+	{
+		// Allocate a PendingDescriptor and find the location (in the shader) of the member
+		PendingDescriptor& pendingDescriptor = m_PendingDescriptor.emplace_back();
+		auto location = GetShaderLocationFromString(name);
+
+		// Set the data in the hash table
+		if (m_MaterialData[name].Type != DataPointer::DataType::TEXTURE) FROST_ASSERT_MSG("Wrong data type!");
+		Ref<void*> texturePointer = texture.As<void*>();
+		m_MaterialData[name].Pointer = texturePointer;
+
+		// Set a pointer to the PendingDescriptor so when we update the descriptor set, we check if it is still valid
+		pendingDescriptor.Pointer = texturePointer;
+
+		// Get the descriptor info
+		Ref<VulkanTexture2D> vulkanImage2d = texture.As<VulkanTexture2D>();
+		VkDescriptorImageInfo* imageDescriptorInfo = &vulkanImage2d->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
+
+		// Push a WDS into pending descriptors
+		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.dstBinding = location.Binding;
+		writeDescriptorSet.dstArrayElement = arrayIndex;
 		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writeDescriptorSet.pImageInfo = imageDescriptorInfo;
 		writeDescriptorSet.descriptorCount = 1;

@@ -2,6 +2,8 @@
 #include "VulkanRenderer.h"
 
 #include "Frost/Core/Application.h"
+
+#include "Frost/Renderer/Mesh.h"
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/Renderer/Pipeline.h"
 #include "Frost/Renderer/SceneRenderPass.h"
@@ -103,8 +105,8 @@ namespace Frost
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
-		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputeRenderPass>::Create());
-		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
+		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputeRenderPass>::Create());
+		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
 	}
 
 	void VulkanRenderer::BeginFrame()
@@ -278,6 +280,7 @@ namespace Frost
 			return s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[currentFrameIndex];
 		
 		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
+		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, currentFrameIndex);
 	}
 
 	VkDescriptorSet VulkanRenderer::AllocateDescriptorSet(VkDescriptorSetAllocateInfo allocInfo)
