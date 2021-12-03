@@ -204,11 +204,11 @@ struct InstanceInfo
 layout(buffer_reference, scalar) buffer Vertices { Vertex v[]; }; // Positions of an object
 layout(buffer_reference, scalar) buffer Indices { ivec3 i[]; }; // Triangle indices
 
-layout(set = 0, binding = 3, scalar) readonly buffer VertexPointers { uint64_t vertexPointer[1000]; } u_VertexPointers;
-layout(set = 0, binding = 4, scalar) readonly buffer IndexPointers { uint64_t indexPointer[1000]; } u_IndexPointers;
-layout(set = 0, binding = 5, scalar) readonly buffer TransformInstancePointers { InstanceInfo mat[1000];  } u_TransformPointers;
-layout(set = 0, binding = 7) readonly buffer GeometrySubmeshOffsets { uint offsets[10000];  } u_GeometrySubmeshOffsets;
-layout(set = 0, binding = 8) readonly buffer GeometrySubmeshCount { uint offsets[1000];  } u_GeometrySubmeshCount;
+layout(set = 0, binding = 3, scalar) readonly buffer VertexPointers { uint64_t vertexPointer[1024]; } u_VertexPointers;
+layout(set = 0, binding = 4, scalar) readonly buffer IndexPointers { uint64_t indexPointer[1024]; } u_IndexPointers;
+layout(set = 0, binding = 5, scalar) readonly buffer TransformInstancePointers { InstanceInfo mat[1024];  } u_TransformPointers;
+layout(set = 0, binding = 7) readonly buffer GeometrySubmeshOffsets { uint offsets[4096];  } u_GeometrySubmeshOffsets;
+layout(set = 0, binding = 8) readonly buffer GeometrySubmeshCount { uint offsets[1024];  } u_GeometrySubmeshCount;
 
 
 #define M_PI 3.141592

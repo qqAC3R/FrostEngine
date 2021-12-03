@@ -14,11 +14,13 @@ layout(location = 1) out vec3 v_Normal;
 layout(location = 2) out vec2 v_TexCoord;
 layout(location = 3) out mat3 v_TBN;
 layout(location = 6) out vec3 v_ViewPosition;
+layout(location = 7) out flat int v_MaterialIndex;
 
 layout(push_constant) uniform Constants
 {
 	mat4 TransformMatrix;
 	mat4 ModelMatrix;
+	uint MaterialIndex;
 } u_PushConstant;
 
 void main()
@@ -35,9 +37,7 @@ void main()
 	// World position
 	v_FragmentPos = vec3(u_PushConstant.ModelMatrix * vec4(a_Position, 1.0f));
 
-	// View position
-	//vec4 viewPosition = u_PushConstant.ViewMatrix * u_PushConstant.ModelMatrix * vec4(a_Position, 1.0f);
-	//v_ViewPosition = viewPosition.xyz;
+	v_MaterialIndex = int(u_PushConstant.MaterialIndex + a_MaterialIndex);
 
 	// Calculating the TBN matrix for normal maps
 	vec3 N = normalize(v_Normal);
@@ -48,9 +48,11 @@ void main()
 	gl_Position = worldPos;
 }
 
+
 #type fragment
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
+#extension GL_EXT_nonuniform_qualifier : enable
 
 layout(location = 0) out vec4 o_WoldPos;
 layout(location = 1) out vec4 o_Normals;
@@ -63,7 +65,9 @@ layout(location = 1) in vec3 v_Normal;
 layout(location = 2) in vec2 v_TexCoord;
 layout(location = 3) in mat3 v_TBN;
 layout(location = 6) in vec3 v_ViewPosition;
+layout(location = 7) in flat int v_MaterialIndex;
 
+/*
 layout(set = 0, binding = 0) uniform u_MaterialUniform
 {
 	vec3 AlbedoColor;
@@ -72,11 +76,29 @@ layout(set = 0, binding = 0) uniform u_MaterialUniform
 	float Metalness;
 	bool UseNormalMap;
 } MaterialUniform;
+*/
 
-layout(set = 0, binding = 1) uniform sampler2D u_AlbedoTexture;
-layout(set = 0, binding = 2) uniform sampler2D u_NormalTexture;
-layout(set = 0, binding = 3) uniform sampler2D u_MetalnessTexture;
-layout(set = 0, binding = 4) uniform sampler2D u_RoughnessTexture;
+
+struct MaterialData
+{
+	vec3 AlbedoColor;
+	float Emission;
+	float Roughness;
+	float Metalness;
+	uint UseNormalMap;
+};
+
+/*
+layout(set = 0, binding = 0) readonly buffer u_MaterialUniform
+{
+	MaterialData Data[];
+} MaterialUniform;
+*/
+
+layout(set = 0, binding = 1) uniform sampler2D u_AlbedoTexture[];
+layout(set = 0, binding = 2) uniform sampler2D u_NormalTexture[64];
+layout(set = 0, binding = 3) uniform sampler2D u_MetalnessTexture[64];
+layout(set = 0, binding = 4) uniform sampler2D u_RoughnessTexture[64];
 
 vec3 GetVec3FromNormalMap(sampler2D normalMap, vec3 value)
 {
@@ -115,19 +137,47 @@ float GetFloatValueFromTexture(sampler2D textureSample, float value)
 
 void main()
 {
+	uint materialIndex = uint(v_MaterialIndex);
+	
+	/*
+	//MaterialData materialData = MaterialUniform.Data[materialIndex];
+	MaterialData materialData;
+	materialData.UseNormalMap = 0;
+	materialData.AlbedoColor = vec3(0.8f);
+	materialData.Metalness = 0.0f;
+	materialData.Roughness = 0.0f;
+
 	// World Pos
 	o_WoldPos = vec4(v_FragmentPos, 1.0f);
-
+	
 	// Normals
-	o_Normals = vec4((MaterialUniform.UseNormalMap ? GetVec3FromNormalMap(u_NormalTexture, v_Normal) : v_Normal), 1.0f);
-
+	o_Normals = vec4((materialData.UseNormalMap == 1 ? GetVec3FromNormalMap(u_NormalTexture[materialIndex], v_Normal) : v_Normal), 1.0f);
+	
 	// Albedo color
-	o_Albedo = vec4((texture(u_AlbedoTexture, v_TexCoord).rgb * MaterialUniform.AlbedoColor), 1.0f);
-
+	o_Albedo = vec4((texture(u_AlbedoTexture[materialIndex], v_TexCoord).rgb * materialData.AlbedoColor), 1.0f);
+	//o_Albedo = vec4(vec3(float(v_MaterialIndex) / 2.0f), 1.0f);
+	
 	// Composite (roughness and metalness)
-	float metalness = GetFloatValueFromTexture(u_MetalnessTexture, MaterialUniform.Metalness);
-	float roughness = GetFloatValueFromTexture(u_RoughnessTexture, MaterialUniform.Roughness);
+	float metalness = GetFloatValueFromTexture(u_MetalnessTexture[materialIndex], materialData.Metalness);
+	float roughness = GetFloatValueFromTexture(u_RoughnessTexture[materialIndex], materialData.Roughness);
 	o_Composite = vec4(metalness, roughness, 1.0f, 1.0f);
+	
+	o_ViewPosition = vec4(v_ViewPosition, 1.0f);
+	*/
 
+	// World Pos
+	o_WoldPos = vec4(v_FragmentPos, 1.0f);
+	
+	// Normals
+	o_Normals = vec4(v_Normal, 1.0f);
+	
+	// Albedo color
+	o_Albedo = vec4(1.0f);
+	
+	// Composite (roughness and metalness)
+	//float metalness = GetFloatValueFromTexture(u_MetalnessTexture[materialIndex], materialData.Metalness);
+	//float roughness = GetFloatValueFromTexture(u_RoughnessTexture[materialIndex], materialData.Roughness);
+	o_Composite = vec4(1.0f);
+	
 	o_ViewPosition = vec4(v_ViewPosition, 1.0f);
 }

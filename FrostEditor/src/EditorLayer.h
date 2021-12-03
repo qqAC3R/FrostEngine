@@ -28,8 +28,9 @@ namespace Frost
 		virtual void OnAttach()
 		{
 			m_BunnyMesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(0.0f), 0.3f, 1.0f });
+			//m_BunnyMesh = Mesh::Load("Resources/Meshes/BistroExterior.fbx", { glm::vec3(1.0f), glm::vec3(0.0f), 1.0f, 1.0f });
 			m_PlaneMesh = Mesh::Load("Resources/Meshes/plane.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 1.0f, 1.0f });
-			m_SphereMesh = Mesh::Load("Resources/Meshes/Sphere.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
+			m_SphereMesh = Mesh::Load("Resources/Meshes/Sphere.fbx", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
 		}
 
 		virtual void OnUpdate(Frost::Timestep ts)
@@ -38,17 +39,21 @@ namespace Frost
 
 			Renderer::BeginScene(m_Camera);
 
-			m_SphereMesh->GetVulkanMaterial()[1]->Set("u_MaterialUniform.Metalness", m_Metalness);
-			m_SphereMesh->GetVulkanMaterial()[1]->Set("u_MaterialUniform.Roughness", m_Roughness);
+			m_SphereMesh->GetVulkanMaterial()[0]->Set("u_MaterialUniform.Metalness", m_Metalness);
+			m_SphereMesh->GetVulkanMaterial()[0]->Set("u_MaterialUniform.Roughness", m_Roughness);
 
-			glm::mat4 sphereTransform = glm::translate(glm::mat4(1.0f), m_VikingMeshPosition) * glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));;
-			Renderer::Submit(m_SphereMesh, sphereTransform);
+			
+			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
+			//Renderer::Submit(m_PlaneMesh, planeTransform);
 
 			glm::mat4 bunnyTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
 			Renderer::Submit(m_BunnyMesh, bunnyTransform);
 			
-			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
-			Renderer::Submit(m_PlaneMesh, planeTransform);
+			//bunnyTransform = bunnyTransform * glm::rotate(glm::mat4(1.0f), glm::radians(270.0f), glm::vec3(1, 0, 0));
+			//Renderer::Submit(m_BunnyMesh, bunnyTransform);
+
+			glm::mat4 sphereTransform = glm::translate(glm::mat4(1.0f), m_VikingMeshPosition) * glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));;
+			Renderer::Submit(m_SphereMesh, sphereTransform);
 
 			Renderer::EndScene();
 
@@ -159,13 +164,13 @@ namespace Frost
 
 				UI::Begin("Scene");
 				UI::Slider("Entity Position", m_VikingMeshPosition, -20, 20);
-				UI::Slider("Roughness", m_Roughness, 0.0f, 1.0f);
-				UI::Slider("Metalness", m_Metalness, 0.0f, 1.0f);
+				UI::Slider("Roughness", m_Roughness, 0.0f, 0.99f);
+				UI::Slider("Metalness", m_Metalness, 0.0f, 0.99f);
 				UI::End();
 
 				UI::Begin("Settings");
 				UI::CheckMark("RayTracing", m_UseRT);
-				UI::CheckMark("LoadCubemap", m_LoadCubemap);
+				//UI::CheckMark("LoadCubemap", m_LoadCubemap);
 
 				ImGui::Separator();
 				ImGui::Text("Camera Properties");
@@ -204,7 +209,7 @@ namespace Frost
 		Ref<Mesh> m_BunnyMesh;
 		Ref<Mesh> m_SphereMesh;
 
-		bool m_UseRT = true;
+		bool m_UseRT = false;
 		bool m_LoadCubemap = false;
 
 	};

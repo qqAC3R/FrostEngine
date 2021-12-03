@@ -1,13 +1,41 @@
 #type vertex
-#version 450
-#extension GL_ARB_separate_shader_objects : enable
 
-layout(location = 0) in vec3  a_Position;
-layout(location = 1) in vec2  a_TexCoord;
-layout(location = 2) in vec3  a_Normal;
-layout(location = 3) in vec3  a_Tangent;
-layout(location = 4) in vec3  a_Bitangent;
-layout(location = 5) in float a_MaterialIndex;
+////////////////////////////////////////////////////////////////////////////////
+//// WARNING!!!: This works only if the device supports multi-draw feature  ////
+////////////////////////////////////////////////////////////////////////////////
+
+#version 450
+
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_nonuniform_qualifier : enable
+
+struct Vertex
+{
+	 vec3  Position;
+	 vec2  TexCoord;
+	 vec3  Normal;
+	 vec3  Tangent;
+	 vec3  Bitangent;
+	 float MaterialIndex;
+};
+
+// Using buffer references instead of typical attributes
+layout(buffer_reference, scalar) buffer Vertices { Vertex v[]; }; // Positions of an object
+
+// Using a storage buffer where we store the buffer pointers of the vertex buffers is more efficent
+// because now we can batch together more meshes into a single draw call, without needing to copy the entire vertex buffer into a single one,
+// only the index buffer is needed to copy, which is takes less more memory (index buffer uses 1 uint32_t per index
+// while vertex buffer uses 1 'Vertex' struct per vertex (which is like 60 bytes, unlike the index buffer which is only 4 bytes).
+// Making things into a larger scale, we'd approximately want around ~ 8-10 mil. vertices/indices into a draw call (this number
+// can be changed depending on the performance) until we flush the buffer for the next draw call (if needed)
+// NOTE: Now we dont need to bind a vertex buffer. Only the index buffer is needed in the pipeline
+layout(set = 0, binding = 5, scalar) readonly buffer VertexPointer
+{
+	uint64_t pointer;
+} u_VertexPointer;
 
 layout(location = 0) out vec3 v_FragmentPos;
 layout(location = 1) out vec3 v_Normal;
@@ -23,26 +51,29 @@ layout(push_constant) uniform Constants
 
 void main()
 {
-	vec4 worldPos = u_PushConstant.TransformMatrix * vec4(a_Position, 1.0);
+	Vertices verticies = Vertices(u_VertexPointer.pointer);
+	Vertex vertex = verticies.v[gl_VertexIndex];
+
+	vec4 worldPos = u_PushConstant.TransformMatrix * vec4(vertex.Position, 1.0);
 
 	// Calculating the normals with the model matrix
 	mat3 normalMatrix = transpose(inverse(mat3(u_PushConstant.ModelMatrix)));
-	v_Normal = normalMatrix * a_Normal;
+	v_Normal = normalMatrix * vertex.Normal;
 
 	// Texture Coords
-	v_TexCoord = a_TexCoord;
+	v_TexCoord = vertex.TexCoord;
 
 	// World position
-	v_FragmentPos = vec3(u_PushConstant.ModelMatrix * vec4(a_Position, 1.0f));
+	v_FragmentPos = vec3(u_PushConstant.ModelMatrix * vec4(vertex.Position, 1.0f));
 
 	// View position
 	//vec4 viewPosition = u_PushConstant.ViewMatrix * u_PushConstant.ModelMatrix * vec4(a_Position, 1.0f);
 	//v_ViewPosition = viewPosition.xyz;
 
 	// Calculating the TBN matrix for normal maps
-	vec3 N = normalize(v_Normal);
-	vec3 T = normalize(a_Tangent);
-	vec3 B = normalize(a_Bitangent);
+	vec3 N = normalize(vertex.Normal);
+	vec3 T = normalize(vertex.Tangent);
+	vec3 B = normalize(vertex.Bitangent);
 	v_TBN = mat3(T, B, N);
 	
 	gl_Position = worldPos;

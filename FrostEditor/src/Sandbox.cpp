@@ -5,7 +5,6 @@
 
 namespace Frost
 {
-
 	class Sandbox : public Application
 	{
 	public:
