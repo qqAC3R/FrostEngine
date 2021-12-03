@@ -2,8 +2,8 @@
 
 #include "Frost/Renderer/RenderPass.h"
 #include "Frost/Renderer/RenderCommandQueue.h"
-
 #include "Frost/Renderer/Mesh.h"
+
 #include "Frost/Renderer/Material.h"
 #include "Frost/Renderer/EditorCamera.h"
 
@@ -18,7 +18,6 @@ namespace Frost
 		{
 			None = 0, Vulkan = 1, OpenGL = 2
 		};
-
 	public:
 		virtual ~RendererAPI() {}
 
@@ -46,45 +45,18 @@ namespace Frost
 	class RenderQueue
 	{
 	public:
-		RenderQueue()
-		{
-			m_Data.reserve(1024);
-		}
-		~RenderQueue()
-		{
-		}
+		RenderQueue();
+		~RenderQueue();
 
-		void SetCamera(const EditorCamera& camera)
-		{
-			Camera = camera;
-			CameraViewMatrix = camera.GetViewMatrix();
-			CameraProjectionMatrix = camera.GetProjectionMatrix();
-			CameraPosition = camera.GetPosition();
-			ViewPortWidth = (uint32_t)camera.m_ViewportWidth;
-			ViewPortHeight = (uint32_t)camera.m_ViewportHeight;
-		}
+		void SetCamera(const EditorCamera& camera);
 
-		void Add(Ref<Mesh> mesh, const glm::mat4& transform)
-		{
-			RenderQueue::RenderData data{};
-			data.Mesh = mesh;
-			data.Transform = transform;
-
-			m_Data.push_back(data);
-		}
+		void Add(Ref<Mesh> mesh, const glm::mat4& transform);
 
 		// TODO: Need a way to handle materials around different sceneRenderPasses
 		void Add(const Ref<Mesh>& mesh, const Ref<Material>& material, const glm::mat4& transform) {}
 
-		void Reset()
-		{
-			m_Data.clear();
-			CameraViewMatrix = glm::mat4(1.0f);
-			CameraProjectionMatrix = glm::mat4(1.0f);
-		}
-
+		void Reset();
 		uint32_t GetQueueSize() const { return (uint32_t)m_Data.size(); }
-
 	public:
 		struct RenderData
 		{
@@ -102,6 +74,4 @@ namespace Frost
 		uint32_t ViewPortWidth;
 		uint32_t ViewPortHeight;
 	};
-
-
 }

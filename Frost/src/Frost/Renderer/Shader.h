@@ -20,6 +20,25 @@ namespace Frost
 		RayGen, AnyHit, ClosestHit, Miss, Intersection
 	};
 
+	struct ShaderArray
+	{
+		ShaderArray() = default;
+		ShaderArray(const std::string& name, uint32_t size)
+			: Name(name), Size(size)
+		{
+		}
+
+		// If the size is UINT32_MAX that means the descriptor doesn't have a size
+		// For example:  `layout(set = 0, binding = 0) sampler2D textures[];`
+		ShaderArray(const std::string& name)
+			: Name(name), Size(UINT32_MAX)
+		{
+		}
+
+		std::string Name;
+		uint32_t Size = 0;
+	};
+
 	class ShaderReflectionData;
 
 	class Shader
@@ -34,21 +53,12 @@ namespace Frost
 		/* OpenGL Specific API */
 		virtual void Bind() const = 0;
 		virtual void Unbind() const = 0;
-
-		virtual void UploadUniformInt(const std::string& name, int values) = 0;
-
-		virtual void UploadUniformFloat(const std::string& name, float values) = 0;
-		virtual void UploadUniformFloat2(const std::string& name, const glm::vec2& values) = 0;
-		virtual void UploadUniformFloat3(const std::string& name, const glm::vec3& values) = 0;
-		virtual void UploadUniformFloat4(const std::string& name, const glm::vec4& values) = 0;
-
-		virtual void UploadUniformMat3(const std::string& name, const glm::mat3& matrix) = 0;
-		virtual void UploadUniformMat4(const std::string& name, const glm::mat4& matrix) = 0;
 		
-		/* Vulkan Specific API */
+		/* Vulkan Specific API */ //TODO: This should be inside the vk implemetation
 		virtual std::unordered_map<uint32_t, VkDescriptorSetLayout> GetVulkanDescriptorSetLayout() const = 0;
 		
 		static Ref<Shader> Create(const std::string& filepath);
+		static Ref<Shader> Create(const std::string& filepath, const Vector<ShaderArray>& customMemberArraySizes);
 	};
 
 
@@ -61,6 +71,7 @@ namespace Frost
 		void Add(const Ref<Shader>& shader);
 		void Add(const std::string& name, const Ref<Shader>& shader);
 		void Load(const std::string& filepath);
+		void Load(const std::string& filepath, const Vector<ShaderArray>& customMemberArraySizes);
 
 		Ref<Shader> Get(const std::string& name);
 
@@ -95,7 +106,7 @@ namespace Frost
 		uint32_t Size;
 		uint32_t Count;
 		Vector<ShaderType> ShaderStage;
-		//std::string Name;
+		std::string Name;
 	};
 
 	struct ShaderTextureData

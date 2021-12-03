@@ -1,15 +1,15 @@
 #include "frostpch.h"
-#include "mesh.h"
-
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-
-#include <cmath>
-#include <filesystem>
+#include "Mesh.h"
 
 #include "Frost/Utils/Timer.h"
 #include "Frost/Renderer/Renderer.h"
+
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+#include <assimp/Importer.hpp>
+
+#include <cmath>
+#include <filesystem>
 
 namespace Frost
 {
@@ -46,7 +46,7 @@ namespace Frost
 	Mesh::Mesh(const std::string& filepath, MaterialInstance material)
 		: m_Material(material)
 	{
-		m_Importer = new Assimp::Importer;
+		Assimp::Importer* m_Importer = new Assimp::Importer;
 
 		const aiScene* scene = m_Importer->ReadFile(filepath, Utils::s_MeshImportFlags);
 		FROST_ASSERT(!(!scene || !scene->HasMeshes()), m_Importer->GetErrorString());
@@ -86,7 +86,7 @@ namespace Frost
 				Vertex vertex;
 				vertex.Position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
 				vertex.Normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
-				vertex.MeshIndex = mesh->mMaterialIndex;
+				vertex.MeshIndex = (float)mesh->mMaterialIndex;
 
 				aabb.Min.x = glm::min(vertex.Position.x, aabb.Min.x);
 				aabb.Min.y = glm::min(vertex.Position.y, aabb.Min.y);
@@ -170,6 +170,13 @@ namespace Frost
 			m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
 			m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)m_Indices.size() * sizeof(Index));
 
+#if 0
+			uint64_t vertexBufferBDA = m_VertexBuffer.As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
+
+			m_VertexBufferPointerBD = BufferDevice::Create(sizeof(uint64_t), { BufferUsage::Storage });
+			m_VertexBufferPointerBD->SetData((void*) &vertexBufferBDA);
+#endif
+
 			MeshASInfo meshInfo{};
 			meshInfo.MeshVertexBuffer = m_VertexBuffer;
 			meshInfo.MeshIndexBuffer = m_IndexBuffer;
@@ -179,9 +186,6 @@ namespace Frost
 			m_AccelerationStructure = BottomLevelAccelerationStructure::Create(meshInfo);
 		}
 
-
-		// Materials
-		m_MaterialUniforms = UniformBuffer::Create(sizeof(MaterialUniform));
 
 		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
 		if (scene->HasMaterials())
@@ -326,6 +330,7 @@ namespace Frost
 					mi->Set("u_RoughnessTexture", whiteTexture);
 				}
 
+
 				bool metalnessTextureFound = false;
 				for (uint32_t p = 0; p < aiMaterial->mNumProperties; p++)
 				{
@@ -368,6 +373,11 @@ namespace Frost
 					{
 						mi->Set("u_MetalnessTexture", whiteTexture);
 					}
+
+#if 0
+					// Setting the vbo buffer device address (for not binding the vertex buffer all the time)
+					mi->Set("VertexPointer", m_VertexBufferPointerBD);
+#endif
 
 				}
 			}

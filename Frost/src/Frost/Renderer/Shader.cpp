@@ -22,6 +22,19 @@ namespace Frost
 		return nullptr;
 	}
 
+	Ref<Shader> Shader::Create(const std::string& filepath, const Vector<ShaderArray>& customMemberArraySizes)
+	{
+		switch (Renderer::GetAPI())
+		{
+			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
+			case RendererAPI::API::Vulkan: return CreateRef<VulkanShader>(filepath, customMemberArraySizes);
+			case RendererAPI::API::OpenGL: FROST_ASSERT(false, "Haven't added OpenGL yet!"); return nullptr;
+		}
+
+		FROST_ASSERT_MSG("Unknown RendererAPI!");
+		return nullptr;
+	}
+
 	ShaderLibrary::ShaderLibrary()
 	{
 	}
@@ -47,8 +60,16 @@ namespace Frost
 	void ShaderLibrary::Load(const std::string& filepath)
 	{
 		auto shader = Shader::Create(filepath);
-
 		Add(shader);
+	}
+
+	void ShaderLibrary::Load(const std::string& filepath, const Vector<ShaderArray>& customMemberArraySizes)
+	{
+		auto shader = Shader::Create(filepath, customMemberArraySizes);
+		auto& name = shader->GetName();
+
+		FROST_ASSERT(!Exists(name), "Shader already exists!");
+		m_Shaders[name] = shader;
 	}
 
 	Ref<Shader> ShaderLibrary::Get(const std::string& name)
@@ -104,6 +125,7 @@ namespace Frost
 				uniformBuffer.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 				uniformBuffer.ShaderStage.push_back(stage);
 				uniformBuffer.Size = (uint32_t)compiler.get_declared_struct_size(bufferType);
+				uniformBuffer.Name = resource.name;
 				uniformBuffer.Count = typeID.array[0] == 0 ? 1 : typeID.array[0]; // If the member is an array
 
 				// Members
@@ -135,6 +157,7 @@ namespace Frost
 				storageBuffer.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 				storageBuffer.ShaderStage.push_back(stage);
 				storageBuffer.Size = (uint32_t)compiler.get_declared_struct_size(bufferType);
+				storageBuffer.Name = resource.name;
 				storageBuffer.Count = typeID.array[0] == 0 ? 1 : typeID.array[0]; // If the member is an array
 
 				// Members

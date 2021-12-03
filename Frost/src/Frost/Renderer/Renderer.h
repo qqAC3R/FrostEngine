@@ -6,6 +6,15 @@
 
 namespace Frost
 {
+	// Renderer Specs:
+	//     Indirect drawing:
+	//		   Maximum instances:        1,024
+	//         Maximum submeshes:		10,240
+	//     Ray Tracing:
+	//		   Maximum instances:        1,024
+	//         Maximum submeshes:		10,240
+	//         Maximum submeshes Count:  1,024
+
 	struct RendererConfig
 	{
 		uint32_t FramesInFlight = 3;
@@ -14,6 +23,15 @@ namespace Frost
 		
 		uint32_t IrradianceMapResolution = 32;
 		uint32_t IrradianceMapSamples = 512;
+
+
+		uint32_t MaxMesh = static_cast<uint32_t>(std::pow(2, 12)); // 4096
+
+		struct RayTracingSettings
+		{
+			uint32_t MaxInstance = static_cast<uint32_t>(std::pow(2, 10));
+		} RayTracing;
+
 	};
 
 	class Renderer

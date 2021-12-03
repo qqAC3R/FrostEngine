@@ -15,8 +15,6 @@ struct aiAnimation;
 struct aiNodeAnim;
 struct aiScene;
 
-namespace Assimp { class Importer; }
-
 namespace Frost
 {
 	struct Vertex
@@ -26,7 +24,7 @@ namespace Frost
 		glm::vec3 Normal;
 		glm::vec3 Tangent;
 		glm::vec3 Bitangent;
-		uint32_t  MeshIndex;
+		float     MeshIndex;
 	};
 
 	struct Index
@@ -84,12 +82,20 @@ namespace Frost
 		const Ref<VertexBuffer>& GetVertexBuffer() const { return m_VertexBuffer; }
 		const Ref<IndexBuffer>& GetIndexBuffer() const { return m_IndexBuffer; }
 		const Ref<IndexBuffer>& GetSubmeshIndexBuffer() const { return m_SubmeshIndexBuffers; }
+
+		const Vector<Vertex>& GetVertices() const { return m_Vertices; }
+		Vector<Vertex>& GetVertices() { return m_Vertices; }
+		
+		const Vector<Index>& GetIndices() const { return m_Indices; }
+		Vector<Index>& GetIndices() { return m_Indices; }
+		
+
 		Ref<BottomLevelAccelerationStructure> GetAccelerationStructure() const { return m_AccelerationStructure; }
 		const MaterialInstance& GetMaterial() const { return m_Material; }
 		MaterialInstance& GetMaterial() { return m_Material; }
 		Vector<Ref<Material>> GetVulkanMaterial() { return m_Materials; }
 
-		const Vector<Submesh> GetSubMeshes() const { return m_Submeshes; }
+		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
 
 		const Math::BoundingBox& GetBoundingBox() const { return m_BoundingBox; }
 
@@ -99,7 +105,6 @@ namespace Frost
 	private:
 		void TraverseNodes(aiNode* node, const glm::mat4& parentTransform = glm::mat4(1.0f), uint32_t level = 0);
 	private:
-		Assimp::Importer* m_Importer;
 		Ref<Shader> m_MeshShader;
 		
 		Math::BoundingBox m_BoundingBox;
@@ -112,7 +117,6 @@ namespace Frost
 		Ref<IndexBuffer> m_IndexBuffer;
 		Ref<IndexBuffer> m_SubmeshIndexBuffers;
 
-		Ref<UniformBuffer> m_MaterialUniforms;
 		Vector<Ref<Texture2D>> m_Textures;
 		Vector<Ref<Material>> m_Materials;
 
