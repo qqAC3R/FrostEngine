@@ -3,6 +3,8 @@
 #include "Frost/Renderer/SceneRenderPass.h"
 #include "Frost/Renderer/Renderer.h"
 
+#include "Frost/Renderer/Buffers/BufferDevice.h"
+
 #include "Frost/Renderer/RayTracing/ShaderBindingTable.h"
 #include "Frost/Renderer/RayTracing/RayTracingPipeline.h"
 
@@ -39,13 +41,8 @@ namespace Frost
 			Ref<BufferDevice> SceneIndexData[FRAMES_IN_FLIGHT];
 			Ref<BufferDevice> SceneTransformData[FRAMES_IN_FLIGHT];
 
-			struct RenderBuffer
-			{
-				Ref<BufferDevice> BufferDeviceLocal;
-				Buffer BufferHost;
-			};
-			RenderBuffer SceneGeometryOffsets[FRAMES_IN_FLIGHT];
-			RenderBuffer SceneGeometrySubmeshCount[FRAMES_IN_FLIGHT];
+			HeapBlock SceneGeometryOffsets[FRAMES_IN_FLIGHT];
+			HeapBlock SceneGeometrySubmeshCount[FRAMES_IN_FLIGHT];
 
 			Ref<Image2D> DisplayTexture[FRAMES_IN_FLIGHT];;
 			

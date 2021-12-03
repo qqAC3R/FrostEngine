@@ -7,7 +7,7 @@
 namespace Frost
 {
 
-	Ref<IndexBuffer> IndexBuffer::Create(void* indicies, uint32_t count)
+	Ref<IndexBuffer> IndexBuffer::Create(void* indicies, uint64_t count)
 	{
 		switch (Renderer::GetAPI())
 		{

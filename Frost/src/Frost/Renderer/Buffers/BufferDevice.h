@@ -1,8 +1,11 @@
 #pragma once
 
+#include "Frost/Core/Buffer.h"
+
 namespace Frost
 {
 	enum class ShaderType;
+	class BufferDevice;
 
 	enum class BufferUsage
 	{
@@ -11,18 +14,27 @@ namespace Frost
 
 		Storage, Uniform,
 
-
-		/* Vulkan Specific */
-		AccelerationStructure, AccelerationStructureReadOnly,
+		// RT Specific
+		AccelerationStructure, AccelerationStructureReadOnly, ShaderBindingTable,
 
 		// Transfer
-		TransferSrc, TransferDst, ShaderAddress, ShaderBindingTable
+		TransferSrc, TransferDst, ShaderAddress,
+
+		// Indirect Drawing
+		Indirect
 	};
 
 	struct BufferData
 	{
 		void* Data = nullptr;
 		uint64_t Size = 0;
+	};
+
+	// A block of memory both on cpu/gpu memory
+	struct HeapBlock
+	{
+		Ref<BufferDevice> DeviceBuffer; // GPU Memory
+		Buffer HostBuffer;              // CPU Memory
 	};
 
 	class BufferDevice
@@ -43,5 +55,4 @@ namespace Frost
 		static Ref<BufferDevice> Create(uint64_t size, std::initializer_list<BufferUsage> types = {});
 		static Ref<BufferDevice> Create(uint64_t size, void* data, std::initializer_list<BufferUsage> types = {});
 	};
-
 }

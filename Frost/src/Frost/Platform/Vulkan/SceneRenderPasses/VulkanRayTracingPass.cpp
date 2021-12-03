@@ -39,6 +39,9 @@ namespace Frost
 		imageSpec.Format = ImageFormat::RGBA16F;
 
 		auto cubeMapTexture = m_RenderPassPipeline->GetRenderPassData<VulkanComputeRenderPass>()->CubeMap;
+		uint32_t maxInstances = Renderer::GetRendererConfig().RayTracing.MaxInstance;
+		uint32_t maxMeshes = Renderer::GetRendererConfig().MaxMesh;
+
 
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
@@ -46,23 +49,25 @@ namespace Frost
 			m_Data->TopLevelAS[i] = TopLevelAccelertionStructure::Create();
 
 			// Scene data
-			m_Data->SceneVertexData[i] = BufferDevice::Create(sizeof(uint64_t) * 1000, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
-			m_Data->SceneIndexData[i] = BufferDevice::Create(sizeof(uint64_t) * 1000, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
-			m_Data->SceneTransformData[i] = BufferDevice::Create(sizeof(InstanceInfo) * 1000, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
+			m_Data->SceneVertexData[i] = BufferDevice::Create(sizeof(uint64_t) * maxInstances, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
+			m_Data->SceneIndexData[i] = BufferDevice::Create(sizeof(uint64_t) * maxInstances, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
+			m_Data->SceneTransformData[i] = BufferDevice::Create(sizeof(InstanceInfo) * maxInstances, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
+
+
 
 			// Scene geometry offsets
-			m_Data->SceneGeometryOffsets[i].BufferDeviceLocal = BufferDevice::Create(
-				sizeof(uint32_t) * 10000, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly }
+			m_Data->SceneGeometryOffsets[i].DeviceBuffer = BufferDevice::Create(
+				sizeof(uint32_t) * maxMeshes, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly }
 			);
-			m_Data->SceneGeometryOffsets[i].BufferHost.Allocate(sizeof(uint32_t) * 10000);
-			m_Data->SceneGeometryOffsets[i].BufferHost.Initialize();
+			m_Data->SceneGeometryOffsets[i].HostBuffer.Allocate(sizeof(uint32_t) * maxMeshes);
+			m_Data->SceneGeometryOffsets[i].HostBuffer.Initialize();
 
 			// Scene geometry submesh count
-			m_Data->SceneGeometrySubmeshCount[i].BufferDeviceLocal = BufferDevice::Create(
-				sizeof(uint32_t) * 1000, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly }
+			m_Data->SceneGeometrySubmeshCount[i].DeviceBuffer = BufferDevice::Create(
+				sizeof(uint32_t) * maxMeshes, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly }
 			);
-			m_Data->SceneGeometrySubmeshCount[i].BufferHost.Allocate(sizeof(uint32_t) * 1000);
-			m_Data->SceneGeometrySubmeshCount[i].BufferHost.Initialize();
+			m_Data->SceneGeometrySubmeshCount[i].HostBuffer.Allocate(sizeof(uint32_t) * maxMeshes);
+			m_Data->SceneGeometrySubmeshCount[i].HostBuffer.Initialize();
 
 
 			// Final image
@@ -83,8 +88,8 @@ namespace Frost
 			m_Data->Descriptor[i]->Set("TransformInstancePointers", m_Data->SceneTransformData[i]);
 
 			// Geometry additional information
-			m_Data->Descriptor[i]->Set("GeometrySubmeshOffsets", m_Data->SceneGeometryOffsets[i].BufferDeviceLocal);
-			m_Data->Descriptor[i]->Set("GeometrySubmeshCount", m_Data->SceneGeometrySubmeshCount[i].BufferDeviceLocal);
+			m_Data->Descriptor[i]->Set("GeometrySubmeshOffsets", m_Data->SceneGeometryOffsets[i].DeviceBuffer);
+			m_Data->Descriptor[i]->Set("GeometrySubmeshCount", m_Data->SceneGeometrySubmeshCount[i].DeviceBuffer);
 
 			auto vulkanMaterial = m_Data->Descriptor[i].As<VulkanMaterial>();
 		}
@@ -141,7 +146,7 @@ namespace Frost
 
 				// Write into the scene buffers
 				uint32_t submeshOffsetBufferSize = blas->m_GeometryOffset.size() * sizeof(uint32_t);
-				m_Data->SceneGeometryOffsets[currentFrameIndex].BufferHost.Write(blas->m_GeometryOffset.data(), submeshOffsetBufferSize, subMeshOffsets_offset);
+				m_Data->SceneGeometryOffsets[currentFrameIndex].HostBuffer.Write(blas->m_GeometryOffset.data(), submeshOffsetBufferSize, subMeshOffsets_offset);
 
 				// Add up the offsets from the mesh data
 				subMeshOffsets_offset += submeshOffsetBufferSize;
@@ -150,7 +155,7 @@ namespace Frost
 				if (subMeshCount_offset == 0)
 				{
 					uint32_t submeshCount = 0;
-					m_Data->SceneGeometrySubmeshCount[currentFrameIndex].BufferHost.Write(&submeshCount, (uint32_t)sizeof(uint32_t), subMeshCount_offset);
+					m_Data->SceneGeometrySubmeshCount[currentFrameIndex].HostBuffer.Write(&submeshCount, (uint32_t)sizeof(uint32_t), subMeshCount_offset);
 
 					subMeshCount_offset += sizeof(uint32_t);
 				}
@@ -160,17 +165,18 @@ namespace Frost
 					Ref<VulkanBottomLevelAccelerationStructure> oldBlas = oldMesh.Mesh->GetAccelerationStructure().As<VulkanBottomLevelAccelerationStructure>();
 
 					// Getting the last submesh count
-					uint32_t lastSubmeshCount = m_Data->SceneGeometrySubmeshCount[currentFrameIndex].BufferHost.Read<uint32_t>(subMeshCount_offset - sizeof(uint32_t));
+					uint32_t lastSubmeshCount = m_Data->SceneGeometrySubmeshCount[currentFrameIndex].HostBuffer.Read<uint32_t>(subMeshCount_offset - sizeof(uint32_t));
 
 					// Calculating the next offset
 					uint32_t submeshCount = oldBlas->m_GeometryMaxOffset + lastSubmeshCount;
 
 					// Setting the buffer with the `submeshCount` data
-					m_Data->SceneGeometrySubmeshCount[currentFrameIndex].BufferHost.Write(&submeshCount, (uint32_t)sizeof(uint32_t), subMeshCount_offset);
+					m_Data->SceneGeometrySubmeshCount[currentFrameIndex].HostBuffer.Write(&submeshCount, (uint32_t)sizeof(uint32_t), subMeshCount_offset);
 
 					subMeshCount_offset += sizeof(uint32_t);
 				}
-
+				
+				// TODO: This should use materials
 				InstanceInfo instanceInfo{};
 				instanceInfo.Transform = mesh.Transform;
 				instanceInfo.InverseTransform = glm::inverse(mesh.Transform);
@@ -199,11 +205,11 @@ namespace Frost
 		);
 
 		// Geometry offsets
-		auto bufferGeometryOffsets = m_Data->SceneGeometryOffsets[currentFrameIndex].BufferHost;
-		m_Data->SceneGeometryOffsets[currentFrameIndex].BufferDeviceLocal->SetData(subMeshOffsets_offset, bufferGeometryOffsets.Data);
+		auto bufferGeometryOffsets = m_Data->SceneGeometryOffsets[currentFrameIndex].HostBuffer;
+		m_Data->SceneGeometryOffsets[currentFrameIndex].DeviceBuffer->SetData(subMeshOffsets_offset, bufferGeometryOffsets.Data);
 
-		auto bufferGeometrySubmeshCount = m_Data->SceneGeometrySubmeshCount[currentFrameIndex].BufferHost;
-		m_Data->SceneGeometrySubmeshCount[currentFrameIndex].BufferDeviceLocal->SetData(subMeshCount_offset, bufferGeometrySubmeshCount.Data);
+		auto bufferGeometrySubmeshCount = m_Data->SceneGeometrySubmeshCount[currentFrameIndex].HostBuffer;
+		m_Data->SceneGeometrySubmeshCount[currentFrameIndex].DeviceBuffer->SetData(subMeshCount_offset, bufferGeometrySubmeshCount.Data);
 
 		// Camera info
 		m_CameraInfo.InverseProjection = glm::inverse(renderQueue.CameraProjectionMatrix);
@@ -241,7 +247,8 @@ namespace Frost
 			&strideAddresses[1],
 			&strideAddresses[2],
 			&strideAddresses[3],
-			renderQueue.ViewPortWidth, renderQueue.ViewPortHeight, 1);
+			renderQueue.ViewPortWidth, renderQueue.ViewPortHeight, 1
+		);
 
 		// Clear the data
 		bufferGeometryOffsets.Initialize();
@@ -270,8 +277,8 @@ namespace Frost
 	{
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
-			m_Data->SceneGeometryOffsets[i].BufferHost.Release();
-			m_Data->SceneGeometrySubmeshCount[i].BufferHost.Release();
+			m_Data->SceneGeometryOffsets[i].HostBuffer.Release();
+			m_Data->SceneGeometrySubmeshCount[i].HostBuffer.Release();
 		}
 
 		delete m_Data;

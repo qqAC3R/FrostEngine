@@ -43,6 +43,11 @@ namespace Frost
 
 	};
 
+	enum class InputType
+	{
+		None, Vertex, Instanced
+	};
+
 	class BufferLayout
 	{
 	public:
@@ -67,7 +72,7 @@ namespace Frost
 
 		std::vector<BufferElement> m_BufferElements;
 		uint32_t m_Size;
-
+		InputType m_InputType = InputType::Vertex;
 	};
 
 }

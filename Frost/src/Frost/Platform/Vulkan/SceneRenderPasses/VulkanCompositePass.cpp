@@ -190,7 +190,13 @@ namespace Frost
 		m_Data->PreviousDepthbuffer.resize(Renderer::GetRendererConfig().FramesInFlight);
 		for (auto& depthbuffer : m_Data->PreviousDepthbuffer)
 		{
-
+			ImageSpecification imageSpec{};
+			imageSpec.Width = 1600;
+			imageSpec.Height = 900;
+			imageSpec.Format = ImageFormat::Depth24Stencil8;
+			imageSpec.Usage = ImageUsage::DepthStencil;
+			imageSpec.UseMipChain = true;
+			depthbuffer = Image2D::Create(imageSpec);
 		}
 
 	}
@@ -210,10 +216,32 @@ namespace Frost
 		m_PushConstantData.CameraPosition = renderQueue.CameraPosition;
 
 
-		// From the gbuffer blit the depth texture to render the environment cubemap
-		auto vulkanSrcDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(5, currentFrameIndex);
-		auto vulkanDstDepthImage = m_Data->RenderPass->GetColorAttachment(1, currentFrameIndex).As<VulkanImage2D>();
-		vulkanDstDepthImage->BlitImage(cmdBuf, vulkanSrcDepthImage);
+		{
+			// From the gbuffer blit the depth texture to render the environment cubemap
+			auto vulkanSrcDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(5, currentFrameIndex);
+			auto vulkanDstDepthImage = m_Data->RenderPass->GetColorAttachment(1, currentFrameIndex).As<VulkanImage2D>();
+			vulkanDstDepthImage->BlitImage(cmdBuf, vulkanSrcDepthImage);
+		}
+
+#if 0
+		{
+			// Create the depth pyramid
+			// Steps:
+			// 1) Blit the depth buffer from the previous frame into a new texture
+			// 2) Generate the mips for that texture
+			int32_t previousFrameIndex = (int32_t)currentFrameIndex - 1;
+			if (previousFrameIndex < 0)
+				previousFrameIndex = Renderer::GetRendererConfig().FramesInFlight - 1;
+
+			auto vulkanSrcDepthImage = m_Data->RenderPass->GetColorAttachment(1, currentFrameIndex);
+			auto vulkanDstDepthImage = m_Data->PreviousDepthbuffer[previousFrameIndex].As<VulkanImage2D>();
+			vulkanDstDepthImage->BlitImage(cmdBuf, vulkanSrcDepthImage);
+
+			vulkanDstDepthImage->GenerateMipMaps(cmdBuf, vulkanDstDepthImage->GetVulkanImageLayout());
+		}
+#endif
+
+
 
 
 		m_Data->RenderPass->Bind();
@@ -284,6 +312,18 @@ namespace Frost
 			}
 		};
 		m_Data->RenderPass = RenderPass::Create(renderPassSpec);
+
+		m_Data->PreviousDepthbuffer.resize(Renderer::GetRendererConfig().FramesInFlight);
+		for (auto& depthbuffer : m_Data->PreviousDepthbuffer)
+		{
+			ImageSpecification imageSpec{};
+			imageSpec.Width = width;
+			imageSpec.Height = height;
+			imageSpec.Format = ImageFormat::Depth24Stencil8;
+			imageSpec.Usage = ImageUsage::DepthStencil;
+			imageSpec.UseMipChain = true;
+			depthbuffer = Image2D::Create(imageSpec);
+		}
 
 
 		uint32_t index = 0;
