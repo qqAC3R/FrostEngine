@@ -19,3 +19,6 @@
 [submodule "Frost/vendor/yaml-cpp"]
 	path = Frost/vendor/yaml-cpp
 	url = https://github.com/qqAC3R/yaml-cpp
+[submodule "Frost/vendor/VkBootstrap"]
+	path = Frost/vendor/VkBootstrap
+	url = https://github.com/charles-lunarg/vk-bootstrap
