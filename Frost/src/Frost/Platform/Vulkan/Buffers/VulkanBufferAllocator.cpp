@@ -176,19 +176,20 @@ namespace Frost
 		{
 			switch (usage)
 			{
-			case BufferUsage::Uniform:						return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-			case BufferUsage::Storage:						return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-			case BufferUsage::Vertex:						return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			case BufferUsage::Uniform:							return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+			case BufferUsage::Storage:							return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+			case BufferUsage::Vertex:							return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 			case BufferUsage::Index:							return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 			case BufferUsage::AccelerationStructure:			return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
 			case BufferUsage::AccelerationStructureReadOnly:	return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-			case BufferUsage::TransferSrc:					return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-			case BufferUsage::TransferDst:					return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			case BufferUsage::TransferSrc:						return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			case BufferUsage::TransferDst:						return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 			case BufferUsage::ShaderAddress:					return VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-			case BufferUsage::ShaderBindingTable:			return VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
+			case BufferUsage::ShaderBindingTable:				return VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
+			case BufferUsage::Indirect:							return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
 			}
 
-			FROST_ASSERT(0, "Couldn't find the buffer usgae flag bits");
+			FROST_ASSERT_MSG("Couldn't find the buffer usgae flag bits");
 			return VkBufferUsageFlagBits();
 		}
 
@@ -216,9 +217,8 @@ namespace Frost
 				}
 			}
 
-			FROST_ASSERT(false, "Failed to find suitable memory type!");
+			FROST_ASSERT_MSG("Failed to find suitable memory type!");
 			return 0;
 		}
 	}
-
 }

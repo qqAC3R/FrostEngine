@@ -14,11 +14,11 @@ namespace Frost
 	class VulkanIndexBuffer : public IndexBuffer
 	{
 	public:
-		VulkanIndexBuffer(void* indicies, uint32_t count);
+		VulkanIndexBuffer(void* indicies, uint64_t count);
 		virtual ~VulkanIndexBuffer();
 
-		virtual uint32_t GetCount() const override { return m_BufferSize / sizeof(Index); }
-		virtual uint32_t GetBufferSize() const override { return m_BufferSize; }
+		virtual uint64_t GetCount() const override { return m_BufferSize / sizeof(Index); }
+		virtual uint64_t GetBufferSize() const override { return m_BufferSize; }
 		virtual Ref<BufferDevice> GetBuffer() const override { return m_IndexBuffer; }
 
 		virtual void Bind() const override;
@@ -32,7 +32,7 @@ namespace Frost
 		VkDeviceAddress m_BufferAddress;
 
 		Ref<BufferDevice> m_IndexBuffer;
-		uint32_t m_BufferSize;
+		uint64_t m_BufferSize;
 	};
 
 }

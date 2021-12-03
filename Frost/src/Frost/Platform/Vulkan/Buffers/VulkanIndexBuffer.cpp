@@ -6,7 +6,7 @@
 
 namespace Frost
 {
-	VulkanIndexBuffer::VulkanIndexBuffer(void* indicies, uint32_t count)
+	VulkanIndexBuffer::VulkanIndexBuffer(void* indicies, uint64_t count)
 		: m_BufferSize(count)
 	{
 

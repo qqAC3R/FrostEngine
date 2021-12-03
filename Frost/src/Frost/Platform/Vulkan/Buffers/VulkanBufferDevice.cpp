@@ -16,8 +16,9 @@ namespace Frost
 			usages.push_back(type);
 		usages.push_back(BufferUsage::ShaderAddress);
 		
-
-		VulkanAllocator::AllocateBuffer(size, usages, MemoryUsage::CPU_AND_GPU, m_Buffer, m_BufferMemory);
+		// CPU_ONLY means that the memory is preferably fast to access by GPU and fast to be mapped by the host (tho it is uncached).
+		// This fits the best for uniform/storage buffers that are used everyframe.
+		VulkanAllocator::AllocateBuffer(size, usages, MemoryUsage::CPU_ONLY, m_Buffer, m_BufferMemory);
 		VulkanContext::SetStructDebugName("Buffer", VK_OBJECT_TYPE_BUFFER, m_Buffer);
 		GetBufferAddress();
 		UpdateDescriptor();

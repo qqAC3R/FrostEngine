@@ -32,12 +32,17 @@ namespace Frost
 	namespace Utils
 	{
 
-		VkVertexInputBindingDescription GetVertexBindingDescription(const BufferLayout& bufferLayout, VkVertexInputRate inputStage)
+		VkVertexInputBindingDescription GetVertexBindingDescription(const BufferLayout& bufferLayout)
 		{
 			VkVertexInputBindingDescription bidingDescription{};
 			bidingDescription.binding = 0;
 			bidingDescription.stride = bufferLayout.m_Size;
-			bidingDescription.inputRate = inputStage;
+			switch (bufferLayout.m_InputType)
+			{
+				case InputType::Vertex:     bidingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;   break;
+				case InputType::Instanced:  bidingDescription.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; break;
+				case InputType::None:       bidingDescription.inputRate = VK_VERTEX_INPUT_RATE_MAX_ENUM; break;
+			}
 
 			return bidingDescription;
 		}
