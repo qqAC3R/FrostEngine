@@ -8,8 +8,6 @@
 #include "Frost/Math/BoundingBox.h"
 #include <glm/glm.hpp>
 
-#include "Frost/Renderer/RayTracing/AccelerationStructures.h"
-
 struct aiNode;
 struct aiAnimation;
 struct aiNodeAnim;
@@ -119,6 +117,8 @@ namespace Frost
 
 		Vector<Ref<Texture2D>> m_Textures;
 		Vector<Ref<Material>> m_Materials;
+
+		HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots;
 
 		MaterialInstance m_Material;
 		Ref<BottomLevelAccelerationStructure> m_AccelerationStructure;

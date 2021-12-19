@@ -627,6 +627,7 @@ namespace Frost
 			{
 				case ImageUsage::Storage:         return VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 													   VK_IMAGE_USAGE_SAMPLED_BIT;
+				case ImageUsage::ReadOnly:		  return VK_IMAGE_USAGE_SAMPLED_BIT;
 				case ImageUsage::ColorAttachment: return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 				case ImageUsage::DepthStencil:    return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 				case ImageUsage::None:            FROST_ASSERT_MSG("ImageUsage::None is invalid!");
@@ -639,6 +640,7 @@ namespace Frost
 			switch (imageUsage)
 			{
 				case ImageUsage::Storage:            return VK_IMAGE_LAYOUT_GENERAL;
+				case ImageUsage::ReadOnly:           return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				case ImageUsage::ColorAttachment:    return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 				case ImageUsage::DepthStencil:       return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
 				case ImageUsage::None:               FROST_ASSERT_MSG("ImageUsage::None is invalid!");

@@ -238,27 +238,57 @@ namespace Frost
 
 	void ShaderReflectionData::SetDescriptorSetsCount()
 	{
+		int maxDescriptorSetNr = -1;
+
 		// Adding all the sets used in the shader needed to make the amount of descriptor sets
 		for (auto& buffer : m_BufferData)
 		{
 			// Check if the number of the set is already mentioned in the vector
 			if (std::find(m_DescriptorSetsCount.begin(), m_DescriptorSetsCount.end(), buffer.second.Set) == m_DescriptorSetsCount.end())
+			{
+				// Getting the highest descriptor set number from the whole shader (checking every type member: buffers, textures, acceleration structures)
+				int bufferSet = static_cast<int>(buffer.second.Set);
+				if (bufferSet > maxDescriptorSetNr) maxDescriptorSetNr = buffer.second.Set;
+
 				m_DescriptorSetsCount.push_back(buffer.second.Set);
+			}
 		}
 
 		for (auto& texture : m_TextureData)
 		{
 			// Check if the number of the set is already mentioned in the vector
 			if (std::find(m_DescriptorSetsCount.begin(), m_DescriptorSetsCount.end(), texture.Set) == m_DescriptorSetsCount.end())
+			{
+				// Getting the highest descriptor set number from the whole shader (checking every type member: buffers, textures, acceleration structures)
+				int textureSet = static_cast<int>(texture.Set);
+				if (textureSet > maxDescriptorSetNr) maxDescriptorSetNr = texture.Set;
+
 				m_DescriptorSetsCount.push_back(texture.Set);
+			}
 		}
 
 		for (auto& accelerationStructure : m_AccelerationStructureData)
 		{
 			// Check if the number of the set is already mentioned in the vector
 			if (std::find(m_DescriptorSetsCount.begin(), m_DescriptorSetsCount.end(), accelerationStructure.Set) == m_DescriptorSetsCount.end())
+			{
+				// Getting the highest descriptor set number from the whole shader (checking every type member: buffers, textures, acceleration structures)
+				int accelerationStructureSet = static_cast<int>(accelerationStructure.Set);
+				if (accelerationStructureSet > maxDescriptorSetNr) maxDescriptorSetNr = accelerationStructure.Set;
+
 				m_DescriptorSetsCount.push_back(accelerationStructure.Set);
+			}
 		}
+
+		if (maxDescriptorSetNr >= 0)
+		{
+			m_DescriptorSetMax = maxDescriptorSetNr;
+		}
+		else
+		{
+			m_DescriptorSetMax = UINT32_MAX;
+		}
+
 	}
 
 	void ShaderReflectionData::ClearRepeatedMembers()

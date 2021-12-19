@@ -17,12 +17,6 @@ namespace Frost
 {
 	enum class GraphicsType;
 
-	struct MaterialSpecification
-	{
-		uint32_t MaxTextures = 0;
-		uint32_t MaxImages = 0;
-	};
-
 	class Material
 	{
 	public:

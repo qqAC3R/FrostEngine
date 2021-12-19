@@ -17,29 +17,14 @@ namespace Frost
 		Compute,
 
 		// Ray Tracing
-		RayGen, AnyHit, ClosestHit, Miss, Intersection
-	};
+		RayGen, AnyHit, ClosestHit, Miss, Intersection,
 
-	struct ShaderArray
-	{
-		ShaderArray() = default;
-		ShaderArray(const std::string& name, uint32_t size)
-			: Name(name), Size(size)
-		{
-		}
-
-		// If the size is UINT32_MAX that means the descriptor doesn't have a size
-		// For example:  `layout(set = 0, binding = 0) sampler2D textures[];`
-		ShaderArray(const std::string& name)
-			: Name(name), Size(UINT32_MAX)
-		{
-		}
-
-		std::string Name;
-		uint32_t Size = 0;
+		// Additional gpu driven shaders
+		Fragment_Bindless, Compute_Bindless, ClosestHit_Bindless
 	};
 
 	class ShaderReflectionData;
+	struct ShaderArray;
 
 	class Shader
 	{
@@ -61,7 +46,6 @@ namespace Frost
 		static Ref<Shader> Create(const std::string& filepath, const Vector<ShaderArray>& customMemberArraySizes);
 	};
 
-
 	class ShaderLibrary
 	{
 	public:
@@ -82,6 +66,24 @@ namespace Frost
 		HashMap<std::string, Ref<Shader>> m_Shaders;
 	};
 
+	struct ShaderArray
+	{
+		ShaderArray() = default;
+		ShaderArray(const std::string& name, uint32_t size)
+			: Name(name), Size(size)
+		{
+		}
+
+		// If the size is UINT32_MAX that means the descriptor doesn't have a size
+		// For example:  `layout(set = 0, binding = 0) sampler2D textures[];`
+		ShaderArray(const std::string& name)
+			: Name(name), Size(UINT32_MAX)
+		{
+		}
+
+		std::string Name;
+		uint32_t Size = 0;
+	};
 
 	struct ShaderBufferData
 	{
@@ -152,6 +154,7 @@ namespace Frost
 		const Vector<PushConstantData>& GetPushConstantData() const { return m_PushConstantData; }
 
 		const Vector<uint32_t> GetDescriptorSetsCount() const { return m_DescriptorSetsCount; }
+		const uint32_t GetDescriptorSetMax() const { return m_DescriptorSetMax; }
 	private:
 		void SetDescriptorSetsCount();
 		void ClearRepeatedMembers();
@@ -164,5 +167,6 @@ namespace Frost
 		Vector<std::pair<std::string, ShaderBufferData>> m_BufferVectorData;
 
 		Vector<uint32_t> m_DescriptorSetsCount;
+		uint32_t m_DescriptorSetMax;
 	};
 }

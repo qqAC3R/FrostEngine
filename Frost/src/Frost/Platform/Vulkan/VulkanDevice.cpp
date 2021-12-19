@@ -2,17 +2,31 @@
 #include "VulkanDevice.h"
 #include "Frost/Core/Engine.h"
 
-//#include "Frost/Core/StaticFunctions.h"
 #include "VulkanContext.h"
+#include "VkBootstrap.h"
 
 namespace Frost
 {
 
-	VulkanDevice::VulkanDevice()
+	static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+		VkDebugUtilsMessageTypeFlagsEXT messageType,
+		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+		void* pUserData)
 	{
 
+		if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+			FROST_CORE_WARN("[WARNING] Validation layer : {0}", pCallbackData->pMessage);
+		else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+			FROST_CORE_ERROR("[ERROR] Validation layer : {0}", pCallbackData->pMessage);
+		else if (!(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT))
+			FROST_CORE_INFO("[IFNO] Validation layer : {0}", pCallbackData->pMessage);
+
+		return VK_FALSE;
 	}
 
+	VulkanDevice::VulkanDevice()
+	{
+	}
 
 	VulkanDevice::~VulkanDevice()
 	{
@@ -28,23 +42,6 @@ namespace Frost
 		vkDestroyCommandPool(m_LogicalDevice, m_ComputeCommandPool, nullptr);
 		vkctx.deinit();
 	}
-
-	static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-														VkDebugUtilsMessageTypeFlagsEXT messageType,
-														const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-														void* pUserData)
-	{
-
-		if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-			FROST_CORE_WARN("[WARNING] Validation layer : {0}", pCallbackData->pMessage);
-		else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-			FROST_CORE_ERROR("[ERROR] Validation layer : {0}", pCallbackData->pMessage);
-		else if (!(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT))
-			FROST_CORE_INFO("[IFNO] Validation layer : {0}", pCallbackData->pMessage);
-
-		return VK_FALSE;
-	}
-
 
 	namespace Utils
 	{
@@ -578,5 +575,103 @@ namespace Frost
 		}
 	}
 
+	static vkb::PhysicalDevice s_Handle;
+
+	void VulkanDevice::Init(const Scope<VulkanPhysicalDevice>& physicalDevice)
+	{
+		vkb::DeviceBuilder deviceBuilder(s_Handle);
+		
+		auto device = deviceBuilder.build();
+
+		m_LogicalDevice = device.value().device;
+		m_PhysicalDevice = physicalDevice->m_PhysicalDevice;
+
+
+	}
+
+	VulkanPhysicalDevice::VulkanPhysicalDevice(vkb::Instance vkbInstance)
+	{
+
+		m_RequiredPhysicalDeviceExtensions =
+		{
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
+			VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+			VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME,
+			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+
+			VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+			VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+			VK_KHR_MAINTENANCE3_EXTENSION_NAME,
+			VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
+			VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+			VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
+			VK_KHR_SHADER_CLOCK_EXTENSION_NAME
+		};
+
+		vkb::PhysicalDeviceSelector physicalDeviceSelector { vkbInstance };
+		//physicalDeviceSelector.set_minimum_version(1, 2);
+		//physicalDeviceSelector.prefer_gpu_device_type(vkb::PreferredDeviceType::discrete);
+		//
+		//physicalDeviceSelector.require_dedicated_compute_queue();
+		//physicalDeviceSelector.require_dedicated_transfer_queue();
+		//physicalDeviceSelector.require_present();
+		
+		// Should conditionally add these feature, but heck, who's going to use this besides me.
+		{
+			VkPhysicalDeviceFeatures deviceFeatures;
+			deviceFeatures.shaderInt64 = true,
+			physicalDeviceSelector.set_required_features(deviceFeatures);
+
+
+			VkPhysicalDeviceBufferDeviceAddressFeatures deviceAddressFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+			deviceAddressFeatures.bufferDeviceAddress = true,
+			physicalDeviceSelector.add_required_extension_features(deviceAddressFeatures);
+
+
+			VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+			rayTracingPipelineFeatures.rayTracingPipeline = true,
+			physicalDeviceSelector.add_required_extension_features(rayTracingPipelineFeatures);
+
+
+			VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+			accelerationStructureFeatures.accelerationStructure = true,
+			physicalDeviceSelector.add_required_extension_features(accelerationStructureFeatures);
+
+			VkPhysicalDeviceDiagnosticsConfigFeaturesNV diagnosticsConfigFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DIAGNOSTICS_CONFIG_FEATURES_NV };
+			diagnosticsConfigFeatures.diagnosticsConfig = true,
+			physicalDeviceSelector.add_required_extension_features(diagnosticsConfigFeatures);
+
+			VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphoreFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES };
+			timelineSemaphoreFeatures.timelineSemaphore = true,
+			physicalDeviceSelector.add_required_extension_features(timelineSemaphoreFeatures);
+
+			VkPhysicalDeviceScalarBlockLayoutFeatures scalarBlockLayoutFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES };
+			scalarBlockLayoutFeatures.scalarBlockLayout = true,
+			physicalDeviceSelector.add_required_extension_features(scalarBlockLayoutFeatures);
+
+			VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES };
+			descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = true,
+			descriptorIndexingFeatures.runtimeDescriptorArray = true,
+			physicalDeviceSelector.add_required_extension_features(descriptorIndexingFeatures);
+
+			VkPhysicalDeviceShaderClockFeaturesKHR shaderClockFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR };
+			shaderClockFeatures.shaderSubgroupClock = true;
+			shaderClockFeatures.shaderDeviceClock = true;
+			physicalDeviceSelector.add_required_extension_features(shaderClockFeatures);
+		}
+
+		// Let vk-bootstrap select our physical device.
+		//m_Handle = physicalDeviceSelector.select().result();
+		auto physicalDevice = physicalDeviceSelector.select();
+		//s_Handle = physicalDevice.value();
+
+		m_PhysicalDevice = physicalDevice.value().physical_device;;
+	}
+
+	VulkanPhysicalDevice::~VulkanPhysicalDevice()
+	{
+		// TODO: Deletion?
+	}
 
 }

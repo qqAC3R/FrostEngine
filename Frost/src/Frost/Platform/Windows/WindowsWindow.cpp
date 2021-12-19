@@ -1,6 +1,7 @@
 #include "frostpch.h"
 #include "WindowsWindow.h"
 
+#include "Frost/Core/Application.h"
 #include "Frost/Events/ApplicationEvent.h"
 #include "Frost/Events/KeyEvent.h"
 #include "Frost/Events/MouseEvent.h"
@@ -83,6 +84,9 @@ namespace Frost
 #elif FROST_RELEASE
 		m_Data.Name += "Release";
 #endif
+
+		std::string version = Application::GetVersion();
+		m_Data.Name += " | Version: " + version;
 
 		glfwInit();
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);

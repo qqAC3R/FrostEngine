@@ -5,6 +5,7 @@
 #include "Frost/Platform/Vulkan/VulkanShader.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
 #include "Frost/Platform/Vulkan/VulkanImage.h"
+#include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanUniformBuffer.h"
 #include "Frost/Platform/Vulkan/RayTracing/VulkanAccelerationStructure.h"
@@ -140,10 +141,12 @@ namespace Frost
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		auto reflectedData = m_ReflectedData;
 
-		if (reflectedData.GetDescriptorSetsCount().size() == 0) return;
+		if (reflectedData.GetDescriptorSetMax() == UINT32_MAX) return;
 
-		for (auto& descriptorSetNumber : reflectedData.GetDescriptorSetsCount())
+		for (uint32_t i = 0; i <= reflectedData.GetDescriptorSetMax(); i++)
 		{
+			uint32_t descriptorSetNumber = i;
+
 			///////////////////////////////////////////////////////////
 			// Descriptor Set
 			///////////////////////////////////////////////////////////
@@ -160,7 +163,6 @@ namespace Frost
 
 			m_CachedDescriptorSets.push_back(m_DescriptorSets[descriptorSetNumber]);
 		}
-
 	}
 
 	void VulkanMaterial::CreateMaterialData()

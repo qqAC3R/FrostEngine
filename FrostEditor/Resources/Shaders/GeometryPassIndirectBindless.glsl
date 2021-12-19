@@ -14,7 +14,8 @@ layout(location = 1) out vec3 v_Normal;
 layout(location = 2) out vec2 v_TexCoord;
 layout(location = 3) out mat3 v_TBN;
 layout(location = 6) out vec3 v_ViewPosition;
-layout(location = 7) out flat int v_MaterialIndex;
+layout(location = 7) out flat int v_BufferIndex;
+layout(location = 8) out flat int v_TextureIndex;
 
 layout(push_constant) uniform Constants
 {
@@ -37,7 +38,8 @@ void main()
 	// World position
 	v_FragmentPos = vec3(u_PushConstant.ModelMatrix * vec4(a_Position, 1.0f));
 
-	v_MaterialIndex = int(u_PushConstant.MaterialIndex + a_MaterialIndex);
+	v_BufferIndex = int(u_PushConstant.MaterialIndex + a_MaterialIndex);
+	v_TextureIndex = int(a_MaterialIndex);
 
 	// Calculating the TBN matrix for normal maps
 	vec3 N = normalize(v_Normal);
@@ -49,10 +51,11 @@ void main()
 }
 
 
-#type fragment
+#type fragment(Frost_Bindless)
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_nonuniform_qualifier : enable
+
 
 layout(location = 0) out vec4 o_WoldPos;
 layout(location = 1) out vec4 o_Normals;
@@ -65,7 +68,8 @@ layout(location = 1) in vec3 v_Normal;
 layout(location = 2) in vec2 v_TexCoord;
 layout(location = 3) in mat3 v_TBN;
 layout(location = 6) in vec3 v_ViewPosition;
-layout(location = 7) in flat int v_MaterialIndex;
+layout(location = 7) in flat int v_BufferIndex;
+layout(location = 8) in flat int v_TextureIndex;
 
 /*
 layout(set = 0, binding = 0) uniform u_MaterialUniform
@@ -99,6 +103,9 @@ layout(set = 0, binding = 1) uniform sampler2D u_AlbedoTexture[];
 layout(set = 0, binding = 2) uniform sampler2D u_NormalTexture[64];
 layout(set = 0, binding = 3) uniform sampler2D u_MetalnessTexture[64];
 layout(set = 0, binding = 4) uniform sampler2D u_RoughnessTexture[64];
+
+layout(set = 1, binding = 0) uniform sampler2D u_Textures[];
+
 
 vec3 GetVec3FromNormalMap(sampler2D normalMap, vec3 value)
 {
@@ -137,7 +144,7 @@ float GetFloatValueFromTexture(sampler2D textureSample, float value)
 
 void main()
 {
-	uint materialIndex = uint(v_MaterialIndex);
+	uint materialIndex = uint(v_BufferIndex);
 	
 	/*
 	//MaterialData materialData = MaterialUniform.Data[materialIndex];
@@ -172,12 +179,13 @@ void main()
 	o_Normals = vec4(v_Normal, 1.0f);
 	
 	// Albedo color
-	o_Albedo = vec4(1.0f);
+	vec3 albedoColor = texture(u_Textures[nonuniformEXT(v_TextureIndex)], v_TexCoord).rgb;
+	o_Albedo = vec4(albedoColor, 1.0f);
 	
 	// Composite (roughness and metalness)
 	//float metalness = GetFloatValueFromTexture(u_MetalnessTexture[materialIndex], materialData.Metalness);
 	//float roughness = GetFloatValueFromTexture(u_RoughnessTexture[materialIndex], materialData.Roughness);
-	o_Composite = vec4(1.0f);
+	o_Composite = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 	
 	o_ViewPosition = vec4(v_ViewPosition, 1.0f);
 }

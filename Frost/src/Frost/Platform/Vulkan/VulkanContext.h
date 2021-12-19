@@ -20,10 +20,10 @@ namespace Frost
 		/* Vulkan Specific */
 		virtual WindowDimension GetWindowDimension() override { return WindowDimension(); }
 
-		static const Scope<VulkanDevice>&	 GetCurrentDevice() { return m_Device; }
-		static VkInstance					 GetInstance() { return m_Instance; }
 		static const Scope<VulkanSwapChain>& GetSwapChain() { return m_SwapChain; }
+		static const Scope<VulkanDevice>& GetCurrentDevice() { return m_Device; }
 		static VkPipelineBindPoint GetVulkanGraphicsType(GraphicsType type);
+		static VkInstance GetInstance() { return m_Instance; }
 
 		virtual void WaitDevice() override;
 
@@ -52,6 +52,7 @@ namespace Frost
 		static uint32_t m_VulkanAPIVersion;
 
 		static Scope<VulkanDevice> m_Device;
+		static Scope<VulkanPhysicalDevice> m_PhysicalDevice;
 		static Scope<VulkanSwapChain> m_SwapChain;
 
 		Vector<const char*> m_SupportedInstanceExtensions;

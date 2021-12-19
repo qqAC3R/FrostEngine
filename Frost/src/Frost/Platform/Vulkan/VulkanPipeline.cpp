@@ -35,7 +35,7 @@ namespace Frost
 		for (const auto& shader : shaders->m_ShaderModules)
 		{
 			VkPipelineShaderStageCreateInfo shaderStageInfo{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-			shaderStageInfo.stage = shader.first;;
+			shaderStageInfo.stage = shader.first;
 			shaderStageInfo.module = shader.second;
 			shaderStageInfo.pName = "main";
 			shaderStageInfo.pSpecializationInfo = nullptr;

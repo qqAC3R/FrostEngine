@@ -19,4 +19,5 @@ namespace Frost
 		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
+
 }

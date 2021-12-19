@@ -17,6 +17,8 @@
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanCompositePass.h"
 
+#include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
+
 #include <imgui.h>
 #include <backends/imgui_impl_vulkan.h>
 
@@ -57,7 +59,7 @@ namespace Frost
 		// Initilization
 		Application::Get().GetImGuiLayer()->OnInit(VulkanContext::GetSwapChain()->GetRenderPass());
 		VulkanMaterial::AllocateDescriptorPool();
-
+	
 		// Creating the semaphores and fences
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
@@ -97,6 +99,8 @@ namespace Frost
 			pool_info.pPoolSizes = pool_sizes;
 			FROST_VKCHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool));
 		}
+
+
 	}
 
 	void VulkanRenderer::InitRenderPasses()

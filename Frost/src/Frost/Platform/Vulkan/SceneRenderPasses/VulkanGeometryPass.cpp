@@ -11,6 +11,7 @@
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
 #include "Frost/Platform/Vulkan/VulkanImage.h"
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
+#include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 
 namespace Frost
@@ -106,13 +107,13 @@ namespace Frost
 
 
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		auto whiteTexture = Renderer::GetWhiteLUT();
 
 		m_Data->Descriptor.resize(framesInFlight);
 		for (auto& material : m_Data->Descriptor)
 		{
 			material = Material::Create(m_Data->Shader, "GeometryPassIndirectBindless");
 
-			auto whiteTexture = Renderer::GetWhiteLUT();
 			for (uint32_t i = 0; i < 64; i++)
 			{
 				material->Set("u_AlbedoTexture", whiteTexture, i);
@@ -120,8 +121,8 @@ namespace Frost
 				material->Set("u_MetalnessTexture", whiteTexture, i);
 				material->Set("u_RoughnessTexture", whiteTexture, i);
 			}
-
 		}
+
 
 		// Indirect drawing buffer
 		m_Data->IndirectCmdBuffer.resize(framesInFlight);
@@ -152,7 +153,7 @@ namespace Frost
 		// Bind the pipeline and renderpass
 		m_Data->RenderPass->Bind();
 		m_Data->Pipeline->Bind();
-
+		
 		// Set the viewport and scrissors
 		VkViewport viewport{};
 		viewport.width = (float)framebuffer->GetSpecification().Width;
@@ -228,7 +229,6 @@ namespace Frost
 				uint32_t previousSubmeshCount = previousSubmeshes.size();
 				submeshOffsets.push_back(submeshOffsets[submeshOffsets.size() - 1] + previousSubmeshCount);
 			}
-
 		}
 
 		// Sending the data into the gpu buffer
@@ -236,7 +236,18 @@ namespace Frost
 		vulkanIndirectCmdBuffer->SetData(indirectCmds.size() * sizeof(VkDrawIndexedIndirectCommand), indirectCmds.data());
 
 
-		m_Data->Descriptor[currentFrameIndex]->Bind(m_Data->Pipeline);
+		// TODO: This is so bad, pls fix this
+		VkPipelineLayout pipelineLayout = m_Data->Pipeline.As<VulkanPipeline>()->GetVulkanPipelineLayout();
+
+		auto vulkanDescriptor = m_Data->Descriptor[currentFrameIndex].As<VulkanMaterial>();
+		vulkanDescriptor->UpdateVulkanDescriptorIfNeeded();
+		Vector<VkDescriptorSet> descriptorSets = vulkanDescriptor->GetVulkanDescriptorSets();
+		descriptorSets[1] = VulkanBindlessAllocator::GetVulkanDescriptorSet(currentFrameIndex);
+		
+		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+		//m_Data->Descriptor[currentFrameIndex]->Bind(m_Data->Pipeline);
+
+
 
 		uint32_t materialOffset = 0;
 		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)

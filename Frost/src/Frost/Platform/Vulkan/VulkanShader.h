@@ -41,6 +41,8 @@ namespace Frost
 
 		ShaderReflectionData m_ReflectionData;
 
+		bool m_UseBindless = false;
+
 		friend class VulkanPipeline;
 		friend class VulkanRayTracingPipeline;
 		friend class VulkanComputePipeline;

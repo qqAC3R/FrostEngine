@@ -4,6 +4,12 @@
 
 #include "nvvk/context_vk.hpp"
 
+namespace vkb
+{
+	struct Instance;
+	struct PhysicalDevice;
+}
+
 namespace Frost
 {
 
@@ -30,7 +36,6 @@ namespace Frost
 		uint32_t m_ComputeIndex;
 	};
 
-
 	struct QueueFamilies
 	{
 		struct QueueFamily
@@ -49,6 +54,20 @@ namespace Frost
 		Graphics, Compute
 	};
 
+	class VulkanPhysicalDevice
+	{
+	public:
+		VulkanPhysicalDevice(vkb::Instance vkbInstance);
+		virtual ~VulkanPhysicalDevice();
+
+	private:
+		VkPhysicalDevice m_PhysicalDevice;
+		//vkb::PhysicalDevice m_Handle;
+		std::vector<const char*> m_RequiredPhysicalDeviceExtensions;
+
+		friend class VulkanDevice;
+	};
+
 	class VulkanDevice
 	{
 	public:
@@ -56,6 +75,7 @@ namespace Frost
 		virtual ~VulkanDevice();
 
 		void Init(VkInstance& instance, VkDebugUtilsMessengerEXT& dbMessenger);
+		void Init(const Scope<VulkanPhysicalDevice>& physicalDevice);
 		void ShutDown();
 
 		VkDevice GetVulkanDevice() const { return m_LogicalDevice; }

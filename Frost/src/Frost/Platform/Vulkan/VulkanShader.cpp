@@ -1,7 +1,8 @@
 #include "frostpch.h"
 #include "VulkanShader.h"
 
-#include "VulkanContext.h"
+#include "Frost/Platform/Vulkan/VulkanContext.h"
+#include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 
 #include <filesystem>
 #include <shaderc/shaderc.hpp>
@@ -41,6 +42,24 @@ namespace Frost
 		auto shaderSources = Utils::PreProccesShaders(source);
 		m_ShaderSources = shaderSources;
 
+		// Check if we use bindless in a shader
+		{
+			for (auto& shaderSource : m_ShaderSources)
+			{
+				switch (shaderSource.first)
+				{
+				case ShaderType::Fragment_Bindless:
+				case ShaderType::Compute_Bindless:
+				case ShaderType::ClosestHit_Bindless:
+					m_UseBindless = true; break;
+				default:
+					m_UseBindless = false;
+				}
+
+				if (m_UseBindless) break;
+			}
+		}
+
 		{
 			Timer shaderCompileTimer("VulkanShader");
 			CompileVulkanBinaries(shaderSources);
@@ -60,6 +79,25 @@ namespace Frost
 		auto shaderSources = Utils::PreProccesShaders(source);
 		m_ShaderSources = shaderSources;
 
+		// Check if we use bindless in a shader
+		{
+			for (auto& shaderSource : m_ShaderSources)
+			{
+				switch (shaderSource.first)
+				{
+				case ShaderType::Fragment_Bindless:
+				case ShaderType::Compute_Bindless:
+				case ShaderType::ClosestHit_Bindless:
+					m_UseBindless = true; break;
+				default:
+					m_UseBindless = false;
+				}
+
+				if (m_UseBindless) break;
+			}
+		}
+
+		// Creating the shader binaries and the vulkan shader module
 		{
 			Timer shaderCompileTimer("VulkanShader");
 			CompileVulkanBinaries(shaderSources);
@@ -156,15 +194,27 @@ namespace Frost
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		auto reflectedData = GetShaderReflectionData();
+		uint32_t bindlessDescriptorSetNumber = VulkanBindlessAllocator::GetDescriptorSetNumber();
 
-		if (reflectedData.GetDescriptorSetsCount().size() == 0) return;
+		if (reflectedData.GetDescriptorSetMax() == UINT32_MAX) return;
 
-
-
-		for (auto& descriptorSetNumber : reflectedData.GetDescriptorSetsCount())
+		for(uint32_t i = 0; i <= reflectedData.GetDescriptorSetMax(); i++)
 		{
+			uint32_t descriptorSetNumber = i;
+
+			// Get the reflection data from the shader
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 			auto reflectedData = GetShaderReflectionData();
+
+			if (m_UseBindless)
+			{
+				if (descriptorSetNumber == bindlessDescriptorSetNumber)
+				{
+					m_DescriptorSetLayouts[descriptorSetNumber] = VulkanBindlessAllocator::GetVulkanDescriptorSetLayout();
+					continue;
+				}
+			}
+
 
 			///////////////////////////////////////////////////////////
 			// Descriptor Set Layout
@@ -466,12 +516,15 @@ namespace Frost
 			switch (type)
 			{
 			case ShaderType::Vertex:		  return VK_SHADER_STAGE_VERTEX_BIT;
+			case ShaderType::Fragment_Bindless:
 			case ShaderType::Fragment:		  return VK_SHADER_STAGE_FRAGMENT_BIT;
 			case ShaderType::Geometry:		  return VK_SHADER_STAGE_GEOMETRY_BIT;
 			case ShaderType::Tessalation:	  return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+			case ShaderType::Compute_Bindless:
 			case ShaderType::Compute:		  return VK_SHADER_STAGE_COMPUTE_BIT;
 			case ShaderType::RayGen:		  return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 			case ShaderType::AnyHit:		  return VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+			case ShaderType::ClosestHit_Bindless:
 			case ShaderType::ClosestHit:	  return VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 			case ShaderType::Miss:			  return VK_SHADER_STAGE_MISS_BIT_KHR;
 			case ShaderType::Intersection:	  return VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
@@ -485,12 +538,15 @@ namespace Frost
 			switch (type)
 			{
 			case ShaderType::Vertex:		  return "Vertex";
+			case ShaderType::Fragment_Bindless:
 			case ShaderType::Fragment:		  return "Fragment";
 			case ShaderType::Geometry:		  return "Geometry";
 			case ShaderType::Tessalation:	  return "Tessalation";
+			case ShaderType::Compute_Bindless:
 			case ShaderType::Compute:		  return "Compute";
 			case ShaderType::RayGen:		  return "RayGen";
 			case ShaderType::AnyHit:		  return "AnyHit";
+			case ShaderType::ClosestHit_Bindless:
 			case ShaderType::ClosestHit:	  return "ClosestHit";
 			case ShaderType::Miss:			  return "Miss";
 			case ShaderType::Intersection:	  return "Intersection";
@@ -504,12 +560,15 @@ namespace Frost
 			switch (stage)
 			{
 			case ShaderType::Vertex:		  return ".cached_vulkan.vert";
+			case ShaderType::Fragment_Bindless:
 			case ShaderType::Fragment:		  return ".cached_vulkan.frag";
 			case ShaderType::Geometry:		  return ".cached_vulkan.geom";
 			case ShaderType::Tessalation:	  return ".cached_vulkan.tess";
+			case ShaderType::Compute_Bindless:
 			case ShaderType::Compute:		  return ".cached_vulkan.comp";
 			case ShaderType::RayGen:		  return ".cached_vulkan.rgen";
 			case ShaderType::AnyHit:		  return ".cached_vulkan.ahit";
+			case ShaderType::ClosestHit_Bindless:
 			case ShaderType::ClosestHit:	  return ".cached_vulkan.rchit";
 			case ShaderType::Miss:			  return ".cached_vulkan.rmiss";
 			}
@@ -523,12 +582,15 @@ namespace Frost
 			switch (stage)
 			{
 			case ShaderType::Vertex:		  return shaderc_glsl_vertex_shader;
+			case ShaderType::Fragment_Bindless:
 			case ShaderType::Fragment:		  return shaderc_glsl_fragment_shader;
 			case ShaderType::Geometry:		  return shaderc_glsl_geometry_shader;
 			case ShaderType::Tessalation:	  return shaderc_glsl_tess_control_shader;
+			case ShaderType::Compute_Bindless:
 			case ShaderType::Compute:		  return shaderc_glsl_compute_shader;
 			case ShaderType::RayGen:		  return shaderc_glsl_raygen_shader;
 			case ShaderType::AnyHit:		  return shaderc_glsl_anyhit_shader;
+			case ShaderType::ClosestHit_Bindless:
 			case ShaderType::ClosestHit:	  return shaderc_glsl_closesthit_shader;
 			case ShaderType::Miss:			  return shaderc_glsl_miss_shader;
 			}
@@ -549,6 +611,10 @@ namespace Frost
 			if (type == "closesthit")					return ShaderType::ClosestHit;
 			if (type == "miss")							return ShaderType::Miss;
 
+			// Additional shaders
+			if (type == "fragment(Frost_Bindless)")     return ShaderType::Fragment_Bindless;
+			if (type == "compute(Frost_Bindless)")      return ShaderType::Compute_Bindless;
+			if (type == "closesthit(Frost_Bindless)")   return ShaderType::ClosestHit_Bindless;
 
 			return ShaderType::None;
 		}

@@ -43,7 +43,7 @@ namespace Frost
 			m_SphereMesh->GetVulkanMaterial()[0]->Set("u_MaterialUniform.Roughness", m_Roughness);
 
 			
-			glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
+			//glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
 			//Renderer::Submit(m_PlaneMesh, planeTransform);
 
 			glm::mat4 bunnyTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));

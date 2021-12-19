@@ -24,6 +24,7 @@ namespace Frost
 			return descriptorSetLayouts;
 		}
 		VkDescriptorSet GetVulkanDescriptorSet(uint32_t set) { return m_DescriptorSets[set]; }
+		Vector<VkDescriptorSet> GetVulkanDescriptorSets() { return m_CachedDescriptorSets; }
 
 		virtual void Set(const std::string& name, float value) override;
 		virtual void Set(const std::string& name, uint32_t value) override;

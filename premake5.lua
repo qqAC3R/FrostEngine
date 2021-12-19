@@ -30,6 +30,7 @@ IncludeDir["vma"] = "Frost/vendor/VulkanMemoryAllocator/include"
 IncludeDir["ImGui"] = "Frost/vendor/ImGui"
 IncludeDir["SPIRV_Cross"] = "Frost/vendor/VulkanSDK/SPIRV-Cross/include"
 IncludeDir["yaml_cpp"] = "Frost/vendor/yaml-cpp/include"
+IncludeDir["VkBootstrap"] = "Frost/vendor/VkBootstrap/src"
 
 LibraryDir = {}
 
@@ -52,8 +53,9 @@ Library["SPIRV_Cross_GLSL_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-glsl.
 group "Dependencies"
 	include "Frost/vendor/GLFW"
 	include "Frost/vendor/nvvk/shared_sources"
-	include "Frost/vendor/imgui"
+	include "Frost/vendor/ImGui"
 	include "Frost/vendor/yaml-cpp"
+	include "Frost/vendor/VkBootstrap"
 group ""
 
 group "Core"
@@ -105,6 +107,7 @@ project "Frost"
 		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.SPIRV_Cross}",
 		"%{IncludeDir.yaml_cpp}",
+		"%{IncludeDir.VkBootstrap}",
 		"%{IncludeDir.nvvk}"
 	}
 
@@ -116,10 +119,12 @@ project "Frost"
 	links
 	{
 		"GLFW",
-		"nvvk",
-		"assimp-vc142-mt.lib",
 		"ImGui",
+		"VkBootstrap",
+		"nvvk",
 		"yaml-cpp",
+
+		"assimp-vc142-mt.lib",
 		"vulkan-1.lib",
 	}
 

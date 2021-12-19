@@ -4,6 +4,8 @@
 #include "Frost/Utils/Timer.h"
 #include "Frost/Renderer/Renderer.h"
 
+#include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
+
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <assimp/Importer.hpp>
@@ -53,6 +55,15 @@ namespace Frost
 
 		m_MeshShader = Renderer::GetShaderLibrary()->Get("GeometryPass");
 
+
+		// Allocate texture slots before storing the vertex data, because we are using bindless
+		for (uint32_t i = 0; i < scene->mNumMaterials; i++)
+		{
+			uint32_t textureSlot = VulkanBindlessAllocator::AddTexture(nullptr);
+			m_TextureAllocatorSlots[i] = textureSlot;
+		}
+
+
 		uint32_t vertexCount = 0;
 		uint32_t indexCount = 0;
 
@@ -86,7 +97,10 @@ namespace Frost
 				Vertex vertex;
 				vertex.Position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
 				vertex.Normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
-				vertex.MeshIndex = (float)mesh->mMaterialIndex;
+				
+				//vertex.MeshIndex = (float)mesh->mMaterialIndex;
+				vertex.MeshIndex = (float)m_TextureAllocatorSlots[mesh->mMaterialIndex];
+
 
 				aabb.Min.x = glm::min(vertex.Position.x, aabb.Min.x);
 				aabb.Min.y = glm::min(vertex.Position.y, aabb.Min.y);
@@ -246,7 +260,7 @@ namespace Frost
 
 					TextureSpecification textureSpec{};
 					textureSpec.Format = ImageFormat::RGBA8;
-					textureSpec.Usage = ImageUsage::Storage;
+					textureSpec.Usage = ImageUsage::ReadOnly;
 					textureSpec.UseMips = true;
 					auto texture = Texture2D::Create(texturePath, textureSpec);
 					if (texture->Loaded())
@@ -255,16 +269,20 @@ namespace Frost
 						m_Textures.push_back(texture);
 						mi->Set("u_AlbedoTexture", texture);
 						mi->Set("u_MaterialUniform.AlbedoColor", glm::vec3(1.0f));
+
+						VulkanBindlessAllocator::AddTextureCustomSlot(texture, m_TextureAllocatorSlots[i]);
 					}
 					else
 					{
 						FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
 						mi->Set("u_AlbedoTexture", whiteTexture);
+						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[i]);
 					}
 				}
 				else
 				{
 					mi->Set("u_AlbedoTexture", whiteTexture);
+					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[i]);
 				}
 
 				// Normal map
@@ -278,7 +296,7 @@ namespace Frost
 
 					TextureSpecification textureSpec{};
 					textureSpec.Format = ImageFormat::RGBA8;
-					textureSpec.Usage = ImageUsage::Storage;
+					textureSpec.Usage = ImageUsage::ReadOnly;
 					auto texture = Texture2D::Create(texturePath, textureSpec);
 					if (texture->Loaded())
 					{
@@ -311,13 +329,12 @@ namespace Frost
 
 					TextureSpecification textureSpec{};
 					textureSpec.Format = ImageFormat::RGBA8;
-					textureSpec.Usage = ImageUsage::Storage;
+					textureSpec.Usage = ImageUsage::ReadOnly;
 					auto texture = Texture2D::Create(texturePath, textureSpec);
 					if (texture->Loaded())
 					{
 						m_Textures.push_back(texture);
 						mi->Set("u_RoughnessTexture", texture);
-						//materialInfo.Roughness = 1.0f;
 					}
 					else
 					{
@@ -351,7 +368,7 @@ namespace Frost
 
 							TextureSpecification textureSpec{};
 							textureSpec.Format = ImageFormat::RGBA8;
-							textureSpec.Usage = ImageUsage::Storage;
+							textureSpec.Usage = ImageUsage::ReadOnly;
 
 							auto texture = Texture2D::Create(texturePath, textureSpec);
 							if (texture->Loaded())
@@ -359,7 +376,6 @@ namespace Frost
 								metalnessTextureFound = true;
 								m_Textures.push_back(texture);
 								mi->Set("u_MetalnessTexture", texture);
-								//materialInfo.Metalness = 1.0f;
 							}
 							else
 							{

@@ -18,6 +18,7 @@ namespace Frost
 	enum class ImageUsage
 	{
 		None = 0,
+		ReadOnly,
 		Storage,
 		ColorAttachment,
 		DepthStencil
