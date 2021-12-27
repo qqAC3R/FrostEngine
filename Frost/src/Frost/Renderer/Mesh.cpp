@@ -56,10 +56,12 @@ namespace Frost
 		m_MeshShader = Renderer::GetShaderLibrary()->Get("GeometryPass");
 
 
+		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
 		// Allocate texture slots before storing the vertex data, because we are using bindless
-		for (uint32_t i = 0; i < scene->mNumMaterials; i++)
+		// We are using `scene->mNumMaterials * 4`, because each mesh has a albedo, roughness, metalness and normal map
+		for (uint32_t i = 0; i < scene->mNumMaterials * 4; i++)
 		{
-			uint32_t textureSlot = VulkanBindlessAllocator::AddTexture(nullptr);
+			uint32_t textureSlot = VulkanBindlessAllocator::AddTexture(whiteTexture);
 			m_TextureAllocatorSlots[i] = textureSlot;
 		}
 
@@ -98,8 +100,8 @@ namespace Frost
 				vertex.Position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
 				vertex.Normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
 				
-				//vertex.MeshIndex = (float)mesh->mMaterialIndex;
-				vertex.MeshIndex = (float)m_TextureAllocatorSlots[mesh->mMaterialIndex];
+				vertex.MeshIndex = (float)mesh->mMaterialIndex;
+				//vertex.MeshIndex = (float)m_TextureAllocatorSlots[mesh->mMaterialIndex * 4];
 
 
 				aabb.Min.x = glm::min(vertex.Position.x, aabb.Min.x);
@@ -184,6 +186,8 @@ namespace Frost
 			m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
 			m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)m_Indices.size() * sizeof(Index));
 
+
+			// TODO: Maybe remove vertex binding in the far future??
 #if 0
 			uint64_t vertexBufferBDA = m_VertexBuffer.As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 
@@ -201,14 +205,47 @@ namespace Frost
 		}
 
 
-		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
 		if (scene->HasMaterials())
 		{
 			m_Textures.reserve(scene->mNumMaterials);
 			m_Materials.resize(scene->mNumMaterials);
+			m_MaterialData.resize(scene->mNumMaterials);
 
 			for (uint32_t i = 0; i < scene->mNumMaterials; i++)
 			{
+				// Albedo -         vec3        (12 bytes)
+				// Roughness -      float       (4 bytes)
+				// Metalness -      float       (4 bytes)
+				// Emission -       float       (4 bytes)
+				// UseNormalMap -   uint32_t    (4 bytes)
+				// Texture IDs -    4 uint32_t  (16 bytes)
+				// Model matrix -   mat4        (64 bytes)
+				m_MaterialData[i].Allocate(108);
+
+
+				// Each mesh has 4 textures, and se we allocated numMaterials * 4 texture slots.
+				uint32_t albedoTextureIndex =    (i * 4) + 0;
+				uint32_t roughnessTextureIndex = (i * 4) + 1;
+				uint32_t metalnessTextureIndex = (i * 4) + 2;
+				uint32_t normalMapTextureIndex = (i * 4) + 3;
+
+
+				m_MaterialData[i].Add("AlbedoTexture", m_TextureAllocatorSlots[albedoTextureIndex]);
+				m_MaterialData[i].Add("NormalTexture", m_TextureAllocatorSlots[normalMapTextureIndex]);
+				m_MaterialData[i].Add("RoughnessTexture", m_TextureAllocatorSlots[roughnessTextureIndex]);
+				m_MaterialData[i].Add("MetalnessTexture", m_TextureAllocatorSlots[metalnessTextureIndex]);
+
+				// Sometimes there could be more materials then submeshes (for some odd reason)
+				if (i < m_Submeshes.size())
+				{
+					m_MaterialData[i].Add("ModelMatrix", m_Submeshes[i].Transform);
+				}
+				else
+				{
+					m_MaterialData[i].Add("ModelMatrix", glm::mat4(1.0f));
+				}
+
+
 				auto aiMaterial = scene->mMaterials[i];
 				auto aiMaterialName = aiMaterial->GetName();
 
@@ -221,13 +258,17 @@ namespace Frost
 				// Getting the albedo color
 				if (aiMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, aiColor) == AI_SUCCESS)
 				{
-					mi->Set("u_MaterialUniform.AlbedoColor", { aiColor.r, aiColor.g, aiColor.b });
+					glm::vec3 materialColor = { aiColor.r, aiColor.g, aiColor.b };
+
+					mi->Set("u_MaterialUniform.AlbedoColor", materialColor);
+					m_MaterialData[i].Add("AlbedoColor", materialColor);
 				}
 
 				// Geting the emission factor
 				if (aiMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, aiEmission) == AI_SUCCESS)
 				{
 					mi->Set("u_MaterialUniform.Emission", aiEmission.r);
+					m_MaterialData[i].Add("EmissionFactor", aiEmission.r);
 				}
 
 
@@ -246,6 +287,8 @@ namespace Frost
 
 				mi->Set("u_MaterialUniform.Roughness", roughness);
 				mi->Set("u_MaterialUniform.Metalness", metalness);
+				m_MaterialData[i].Add("RoughnessFactor", roughness);
+				m_MaterialData[i].Add("MetalnessFactor", metalness);
 
 
 				// Albedo Map
@@ -270,13 +313,13 @@ namespace Frost
 						mi->Set("u_AlbedoTexture", texture);
 						mi->Set("u_MaterialUniform.AlbedoColor", glm::vec3(1.0f));
 
-						VulkanBindlessAllocator::AddTextureCustomSlot(texture, m_TextureAllocatorSlots[i]);
+						VulkanBindlessAllocator::AddTextureCustomSlot(texture, m_TextureAllocatorSlots[albedoTextureIndex]);
 					}
 					else
 					{
 						FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
 						mi->Set("u_AlbedoTexture", whiteTexture);
-						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[i]);
+						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[albedoTextureIndex]);
 					}
 				}
 				else
@@ -284,6 +327,7 @@ namespace Frost
 					mi->Set("u_AlbedoTexture", whiteTexture);
 					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[i]);
 				}
+
 
 				// Normal map
 				bool hasNormalMap = aiMaterial->GetTexture(aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS;
@@ -303,18 +347,28 @@ namespace Frost
 						m_Textures.push_back(texture);
 						mi->Set("u_NormalTexture", texture);
 						mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(1));
+
+						m_MaterialData[i].Add("UseNormalMap", uint32_t(1));
+						VulkanBindlessAllocator::AddTextureCustomSlot(texture, m_TextureAllocatorSlots[normalMapTextureIndex]);
 					}
 					else
 					{
 						FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
 						mi->Set("u_NormalTexture", whiteTexture);
 						mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
+
+						m_MaterialData[i].Add("UseNormalMap", uint32_t(0));
+						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[normalMapTextureIndex]);
 					}
 				}
 				else
 				{
 					mi->Set("u_NormalTexture", whiteTexture);
 					mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
+
+					m_MaterialData[i].Add("UseNormalMap", uint32_t(0));
+					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[normalMapTextureIndex]);
+
 				}
 
 
@@ -335,16 +389,22 @@ namespace Frost
 					{
 						m_Textures.push_back(texture);
 						mi->Set("u_RoughnessTexture", texture);
+
+						VulkanBindlessAllocator::AddTextureCustomSlot(texture, m_TextureAllocatorSlots[roughnessTextureIndex]);
 					}
 					else
 					{
 						FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
 						mi->Set("u_RoughnessTexture", whiteTexture);
+
+						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[roughnessTextureIndex]);
 					}
 				}
 				else
 				{
 					mi->Set("u_RoughnessTexture", whiteTexture);
+
+					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[roughnessTextureIndex]);
 				}
 
 
@@ -376,6 +436,8 @@ namespace Frost
 								metalnessTextureFound = true;
 								m_Textures.push_back(texture);
 								mi->Set("u_MetalnessTexture", texture);
+
+								VulkanBindlessAllocator::AddTextureCustomSlot(texture, m_TextureAllocatorSlots[metalnessTextureFound]);
 							}
 							else
 							{
@@ -388,7 +450,9 @@ namespace Frost
 					if (!metalnessTextureFound)
 					{
 						mi->Set("u_MetalnessTexture", whiteTexture);
+						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[metalnessTextureIndex]);
 					}
+
 
 #if 0
 					// Setting the vbo buffer device address (for not binding the vertex buffer all the time)

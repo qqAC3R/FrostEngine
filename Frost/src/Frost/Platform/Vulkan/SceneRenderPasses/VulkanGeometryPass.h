@@ -29,11 +29,26 @@ namespace Frost
 
 		struct InstanceData
 		{
-			glm::vec3 AlbedoColor;
+			// PBR material values
+			glm::vec4 AlbedoColor; // Using a vec4 instead of vec3 because of vulkan's alignment (the offset should be a mutiple of 4)
 			float Emission;
 			float Roughness;
 			float Metalness;
 			uint32_t UseNormalMap;
+			
+			// Texture IDs
+			uint32_t AlbedoTextureID;
+			uint32_t RoughessTextureID;
+			uint32_t MetalnessTextureID;
+			uint32_t NormalTextureID;
+
+			// Matricies
+			glm::mat4 WorldSpaceMatrix;
+			glm::mat4 ModelMatrix;
+
+			// SubMesh indices
+			//uint32_t WorldMeshIndex;
+			//uint32_t SubmeshIndex;
 		};
 
 		struct InternalData
@@ -43,18 +58,17 @@ namespace Frost
 			Ref<Shader> Shader;
 			Vector<Ref<Material>> Descriptor;
 
-			Vector<HeapBlock> InstanceData;
+			//Vector<HeapBlock> VertexBuffer; // Vertex buffer of the scene
+			//Vector<HeapBlock> IndexBuffer; // Index buffer of the scene
 
-			Vector<HeapBlock> VertexBuffer; // Vertex buffer of the scene
-			Vector<HeapBlock> IndexBuffer; // Index buffer of the scene
+			Vector<HeapBlock> IndirectCmdBuffer;
+			Vector<HeapBlock> InstanceSpecs;
 
-			Vector<Ref<BufferDevice>> IndirectCmdBuffer;
+			//Vector<Ref<BufferDevice>> IndirectCmdBuffer;
 		};
 
 		struct PushConstant
 		{
-			glm::mat4 TransformMatrix;
-			glm::mat4 ModelMatrix;
 			uint32_t  MaterialIndex;
 		};
 

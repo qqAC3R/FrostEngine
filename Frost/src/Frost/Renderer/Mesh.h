@@ -30,6 +30,7 @@ namespace Frost
 		uint32_t V1, V2, V3;
 	};
 
+	// Used by RT for now, tho I'll need to change it
 	struct MaterialInstance
 	{
 		glm::vec3 ambient = glm::vec3(1.0f);
@@ -86,15 +87,14 @@ namespace Frost
 		
 		const Vector<Index>& GetIndices() const { return m_Indices; }
 		Vector<Index>& GetIndices() { return m_Indices; }
-		
 
-		Ref<BottomLevelAccelerationStructure> GetAccelerationStructure() const { return m_AccelerationStructure; }
-		const MaterialInstance& GetMaterial() const { return m_Material; }
+		DataStorage& GetMaterialData(uint32_t materialIndex) { return m_MaterialData[materialIndex]; }
 		MaterialInstance& GetMaterial() { return m_Material; }
+		const MaterialInstance& GetMaterial() const { return m_Material; }
 		Vector<Ref<Material>> GetVulkanMaterial() { return m_Materials; }
+		Ref<BottomLevelAccelerationStructure> GetAccelerationStructure() const { return m_AccelerationStructure; }
 
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
-
 		const Math::BoundingBox& GetBoundingBox() const { return m_BoundingBox; }
 
 		static Ref<Mesh> Load(const std::string& filepath, MaterialInstance material = {});
@@ -117,6 +117,7 @@ namespace Frost
 
 		Vector<Ref<Texture2D>> m_Textures;
 		Vector<Ref<Material>> m_Materials;
+		Vector<DataStorage> m_MaterialData;
 
 		HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots;
 

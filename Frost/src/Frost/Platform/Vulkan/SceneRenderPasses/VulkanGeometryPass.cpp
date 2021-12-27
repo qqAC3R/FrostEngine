@@ -28,10 +28,11 @@ namespace Frost
 	}
 
 	static RenderPassSpecification s_RenderPassSpec;
-	static uint64_t s_MaxCountSubmeshes = std::pow(2, 12); // 4096
 
 	void VulkanGeometryPass::Init(SceneRenderPassPipeline* renderPassPipeline)
 	{
+		uint64_t maxCountMeshes = Renderer::GetRendererConfig().GeometryPass_Mesh_Count;
+
 		m_RenderPassPipeline = renderPassPipeline;
 		m_Data = new InternalData();
 
@@ -113,14 +114,6 @@ namespace Frost
 		for (auto& material : m_Data->Descriptor)
 		{
 			material = Material::Create(m_Data->Shader, "GeometryPassIndirectBindless");
-
-			for (uint32_t i = 0; i < 64; i++)
-			{
-				material->Set("u_AlbedoTexture", whiteTexture, i);
-				material->Set("u_NormalTexture", whiteTexture, i);
-				material->Set("u_MetalnessTexture", whiteTexture, i);
-				material->Set("u_RoughnessTexture", whiteTexture, i);
-			}
 		}
 
 
@@ -128,14 +121,25 @@ namespace Frost
 		m_Data->IndirectCmdBuffer.resize(framesInFlight);
 		for (auto& indirectCmdBuffer : m_Data->IndirectCmdBuffer)
 		{
-			indirectCmdBuffer = BufferDevice::Create(sizeof(VkDrawIndexedIndirectCommand) * s_MaxCountSubmeshes, { BufferUsage::Storage, BufferUsage::Indirect });
+			// Allocating a heap block
+			indirectCmdBuffer.DeviceBuffer = BufferDevice::Create(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes,
+																 { BufferUsage::Storage, BufferUsage::Indirect });
+
+			indirectCmdBuffer.HostBuffer.Allocate(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes);
 		}
 
-		m_Data->InstanceData.resize(framesInFlight);
-		for (auto& instanceData : m_Data->InstanceData)
+		// Instance data storage buffer
+		m_Data->InstanceSpecs.resize(framesInFlight);
+		for (uint32_t i = 0; i < m_Data->InstanceSpecs.size(); i++)
 		{
-			instanceData.DeviceBuffer = BufferDevice::Create(sizeof(InstanceData) * s_MaxCountSubmeshes, { BufferUsage::Storage });
-			instanceData.HostBuffer.Allocate(sizeof(InstanceData) * s_MaxCountSubmeshes);
+			auto& instanceSpec = m_Data->InstanceSpecs[i];
+
+			// Allocating a heap block
+			instanceSpec.DeviceBuffer = BufferDevice::Create(sizeof(InstanceData) * maxCountMeshes, { BufferUsage::Storage });
+			instanceSpec.HostBuffer.Allocate(sizeof(InstanceData) * maxCountMeshes);
+
+			// Setting the storage buffer into the descriptor
+			m_Data->Descriptor[i]->Set("u_MaterialUniform", instanceSpec.DeviceBuffer);
 		}
 	}
 
@@ -175,65 +179,101 @@ namespace Frost
 
 
 
+		/*
+			Each mesh might have a set of submeshes which are sent to render individualy.
+			We dont need them when we render them indirectly (because the gpu renders all the submeshes automatically),
+			instead we just need to know the `start index` of every mesh in the `VkDrawIndexedIndirectCommand` buffer.
+		*/
+		Vector<uint32_t> meshOffsets;
 
-		Vector<uint32_t> submeshOffsets;
-		Vector<VkDrawIndexedIndirectCommand> indirectCmds;
+		// `Indirect draw commands` offset
+		uint32_t indirectCmdsOffset = 0;
+
+		// `Instance data` offset.
+		//  Allocating here the `InstanceData`, because if we allocate it for every submesh in the scene, it will be way more expensive
+		uint32_t instanceDataOffset = 0;
+		InstanceData instData{};
+
+		// Get all the indirect draw commands
 		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
 		{
 			// Get the mesh
 			auto mesh = renderQueue.m_Data[i].Mesh;
-			auto submeshes = mesh->GetSubMeshes();
+			const Vector<Submesh>& submeshes = mesh->GetSubMeshes();
 
 			// Set commands for the submeshes
-			for (auto& submesh : submeshes)
+			for (uint32_t k = 0; k < submeshes.size(); k++)
 			{
-				glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
+				const Submesh& submesh = submeshes[k];
 
+				// Submit the submesh into the cpu buffer
 				VkDrawIndexedIndirectCommand indirectCmdBuf{};
 				indirectCmdBuf.firstIndex = submesh.BaseIndex;
 				indirectCmdBuf.firstInstance = 0;
 				indirectCmdBuf.indexCount = submesh.IndexCount;
 				indirectCmdBuf.instanceCount = 1;
 				indirectCmdBuf.vertexOffset = submesh.BaseVertex;
-
-				indirectCmds.push_back(indirectCmdBuf);
-
-#if 0
-				auto meshMaterial = mesh->GetVulkanMaterial()[submesh.MaterialIndex].As<VulkanMaterial>();
+				m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
 
 
-				auto albedoTexture = meshMaterial->GetTexture2D("u_AlbedoTexture");
-				m_Data->Descriptor[currentFrameIndex]->Set("u_AlbedoTexture", albedoTexture, i + submesh.MaterialIndex);
+				// Setting up the material data into a storage buffer
+				DataStorage& materialData = mesh->GetMaterialData(k);
 
-				auto normalTexture = meshMaterial->GetTexture2D("u_NormalTexture");
-				m_Data->Descriptor[currentFrameIndex]->Set("u_NormalTexture", normalTexture, i + submesh.MaterialIndex);
+				// Textures
+				instData.AlbedoTextureID =     materialData.Get<uint32_t>("AlbedoTexture");
+				instData.RoughessTextureID =   materialData.Get<uint32_t>("RoughnessTexture");
+				instData.MetalnessTextureID =  materialData.Get<uint32_t>("MetalnessTexture");
+				instData.NormalTextureID =     materialData.Get<uint32_t>("NormalTexture");
 
-				auto metalnessTexture = meshMaterial->GetTexture2D("u_MetalnessTexture");
-				m_Data->Descriptor[currentFrameIndex]->Set("u_MetalnessTexture", metalnessTexture, i + submesh.MaterialIndex);
+				instData.UseNormalMap =		   materialData.Get<uint32_t>("UseNormalMap");
 
-				auto roughnessTexture = meshMaterial->GetTexture2D("u_RoughnessTexture");
-				m_Data->Descriptor[currentFrameIndex]->Set("u_RoughnessTexture", roughnessTexture, i + submesh.MaterialIndex);
-#endif
+				// PBR values
+				instData.AlbedoColor =         glm::vec4(materialData.Get<glm::vec3>("AlbedoColor"), 1.0f);
+				instData.Roughness =           materialData.Get<float>("RoughnessFactor");
+				instData.Metalness =           materialData.Get<float>("MetalnessFactor");
+				instData.Emission =            materialData.Get<float>("EmissionFactor");
+
+				// Matricies
+				instData.ModelMatrix =       renderQueue.m_Data[i].Transform * materialData.Get<glm::mat4>("ModelMatrix");
+				instData.WorldSpaceMatrix =  viewProjectionMatrix * instData.ModelMatrix;
+
+				// The data collected from the mesh, should be written into a cpu buffer, which will later be copied into a storage buffer
+				m_Data->InstanceSpecs[currentFrameIndex].HostBuffer.Write((void*)&instData, sizeof(InstanceData), instanceDataOffset);
+
+				// Adding up the offset
+				instanceDataOffset += sizeof(InstanceData);
+				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
 			}
 
 
-			if (submeshOffsets.size() == 0)
+			// If we are submitting the first mesh, we don't need any offset
+			if (meshOffsets.size() == 0)
 			{
-				submeshOffsets.push_back(0);
+				meshOffsets.push_back(0);
 			}
 			else
 			{
+				// If it is not the first mesh, then we set the offset as the last mesh's submesh count
 				auto previousMesh = renderQueue.m_Data[i - 1].Mesh;
 				auto previousSubmeshes = previousMesh->GetSubMeshes();
 
 				uint32_t previousSubmeshCount = previousSubmeshes.size();
-				submeshOffsets.push_back(submeshOffsets[submeshOffsets.size() - 1] + previousSubmeshCount);
+				meshOffsets.push_back(meshOffsets[meshOffsets.size() - 1] + previousSubmeshCount);
 			}
 		}
 
 		// Sending the data into the gpu buffer
-		auto vulkanIndirectCmdBuffer = m_Data->IndirectCmdBuffer[currentFrameIndex].As<VulkanBufferDevice>();
-		vulkanIndirectCmdBuffer->SetData(indirectCmds.size() * sizeof(VkDrawIndexedIndirectCommand), indirectCmds.data());
+		// Indirect draw commands
+		auto vulkanIndirectCmdBuffer = m_Data->IndirectCmdBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		void* indirectCmdsPointer = m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Data;
+		vulkanIndirectCmdBuffer->SetData(indirectCmdsOffset, indirectCmdsPointer);
+
+		// Instance data
+		auto vulkanInstanceDataBuffer = m_Data->InstanceSpecs[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		void* instanceDataPointer = m_Data->InstanceSpecs[currentFrameIndex].HostBuffer.Data;
+		vulkanInstanceDataBuffer->SetData(instanceDataOffset, instanceDataPointer);
+
+
 
 
 		// TODO: This is so bad, pls fix this
@@ -248,8 +288,7 @@ namespace Frost
 		//m_Data->Descriptor[currentFrameIndex]->Bind(m_Data->Pipeline);
 
 
-
-		uint32_t materialOffset = 0;
+		// Sending the indirect draw commands to the command buffer
 		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
 		{
 
@@ -260,40 +299,25 @@ namespace Frost
 			mesh->GetVertexBuffer()->Bind();
 			mesh->GetIndexBuffer()->Bind();
 
-			for (uint32_t j = 0; j < mesh->GetSubMeshes().size(); j++)
-			{
-				auto submesh = mesh->GetSubMeshes()[j];
-				glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
+			// Set the transform matrix and model matrix of the submesh into a constant buffer
+			PushConstant pushConstant;
+			pushConstant.MaterialIndex = meshOffsets[i];
+			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
 
-				// Get the submesh material and bind it
-				//Ref<VulkanMaterial> material = mesh->GetVulkanMaterial()[submesh.MaterialIndex].As<VulkanMaterial>();
-				//material->Bind(m_Data->Pipeline);
-
-				
-				// Set the transform matrix and model matrix of the submesh into a constant buffer
-				PushConstant pushConstant;
-				pushConstant.TransformMatrix = viewProjectionMatrix * modelMatrix;
-				pushConstant.ModelMatrix = modelMatrix;
-				pushConstant.MaterialIndex = submeshOffsets[i];
-				vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
-
-				uint32_t submeshCount = mesh->GetSubMeshes().size();
-				uint32_t offset = submeshOffsets[i] * sizeof(VkDrawIndexedIndirectCommand);
-				vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
+			uint32_t submeshCount = mesh->GetSubMeshes().size();
+			uint32_t offset = meshOffsets[i] * sizeof(VkDrawIndexedIndirectCommand);
+			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
 
 
 #if 0
-				// TODO: Do this if multi-draw isn't detected
-				uint32_t offset = (i + j) * sizeof(VkDrawIndexedIndirectCommand);
-				vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, 1, sizeof(VkDrawIndexedIndirectCommand));
+			// TODO: Do this if multi-draw isn't detected
+			uint32_t offset = (i + j) * sizeof(VkDrawIndexedIndirectCommand);
+			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, 1, sizeof(VkDrawIndexedIndirectCommand));
 #endif
-
-
-				break;
-			}
 		}
 
 
+		// DrawIndexed
 #if 0
 		{
 

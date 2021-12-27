@@ -53,4 +53,58 @@ namespace Frost
 		static Ref<Material> Create(const Ref<Shader>& shader, const std::string& name = "");
 	};
 
+	class DataStorage
+	{
+	public:
+		DataStorage() {}
+
+		void Allocate(uint32_t size)
+		{
+			m_Buffer.Allocate(size);
+		}
+
+		template <typename T>
+		void Add(const std::string& name, const T& data)
+		{
+			BufferSpecification bufferSpecs{};
+			bufferSpecs.Size = sizeof(T);
+			bufferSpecs.Offset = m_LastOffset;
+
+			m_Buffer.Write((void*)&data, sizeof(T), m_LastOffset);
+
+			m_LastOffset += sizeof(T);
+
+			m_HashMapData[name] = bufferSpecs;
+		}
+
+		template <typename T>
+		T& Get(const std::string& name)
+		{
+			// Removed assertion beucase it hurts the performance quite a bit (Maybe add it later)
+			//if (m_HashMapData.find(name) == m_HashMapData.end()) FROST_ASSERT_MSG("The value hasn't been found");
+
+			BufferSpecification& bufferSpecs = m_HashMapData[name];
+			return m_Buffer.Read<T>(bufferSpecs.Offset);
+		}
+
+		template <typename T>
+		void Set(const std::string& name, const T& data)
+		{
+			BufferSpecification& bufferSpecs = m_HashMapData[name];
+			m_Buffer.Write((void*)&data, sizeof(T), bufferSpecs.Offset);
+		}
+
+	public:
+		struct BufferSpecification
+		{
+			uint32_t Size = 0;
+			uint32_t Offset = 0;
+		};
+
+		uint32_t m_LastOffset = 0;
+
+		std::unordered_map<std::string, BufferSpecification> m_HashMapData;
+		Buffer m_Buffer;
+	};
+
 }

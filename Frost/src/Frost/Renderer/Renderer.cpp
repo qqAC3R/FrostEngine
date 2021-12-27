@@ -28,13 +28,15 @@ namespace Frost
 		s_CommandQueue = new RenderCommandQueue();
 		s_Data = new RendererData();
 
+		RendererConfig rendererConfig{};
+
 		// Init the shaders
 		s_Data->m_ShaderLibrary = Ref<ShaderLibrary>::Create();
 
-		Vector<ShaderArray> shaderArray;
-		shaderArray.emplace_back("u_AlbedoTexture", 1024);
+		//Vector<ShaderArray> shaderArray;
+		//shaderArray.emplace_back("u_AlbedoTexture", 1024);
 
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirectBindless.glsl", shaderArray);
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirectBindless.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPass.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PBRDeffered.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PreethamSky.glsl");

@@ -24,7 +24,8 @@ namespace Frost
 	VkDescriptorSetLayout VulkanBindlessAllocator::m_DescriptorSetLayout;
 	VkDescriptorPool VulkanBindlessAllocator::m_DescriptorPool;
 	uint32_t VulkanBindlessAllocator::m_DescriptorSetNumber = 1;
-	uint32_t VulkanBindlessAllocator::m_TextureMaxStorage = std::pow(2, 14); // 1024
+	uint32_t VulkanBindlessAllocator::m_DefaultTextureID = 0; // For white texture
+	uint32_t VulkanBindlessAllocator::m_TextureMaxStorage = std::pow(2, 11); // 1024
 
 	// std
 	static std::random_device s_RandomDevice;
@@ -42,7 +43,7 @@ namespace Frost
 	void VulkanBindlessAllocator::Init()
 	{
 		// Random generator initialization
-		s_UniformDistribution = std::uniform_int_distribution<uint64_t>(0, m_TextureMaxStorage);
+		s_UniformDistribution = std::uniform_int_distribution<uint64_t>(0, m_TextureMaxStorage - 1);
 
 		///////////////////////////////////////////////////////////
 		// Descriptor Pool
@@ -103,7 +104,6 @@ namespace Frost
 			std::string descriptorSetName = "VulkanShader-DescriptorSet-Bindless";
 			VulkanContext::SetStructDebugName(descriptorSetName, VK_OBJECT_TYPE_DESCRIPTOR_SET, m_DescriptorSet[descriptorSetNumber]);
 		}
-
 	}
 
 	uint32_t VulkanBindlessAllocator::AddTexture(const Ref<Texture2D>& texture2d)

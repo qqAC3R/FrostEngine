@@ -217,7 +217,7 @@ namespace Frost
 
 
 		{
-			// From the gbuffer blit the depth texture to render the environment cubemap
+			// From the GBuffer blit the depth texture to render the environment cubemap
 			auto vulkanSrcDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(5, currentFrameIndex);
 			auto vulkanDstDepthImage = m_Data->RenderPass->GetColorAttachment(1, currentFrameIndex).As<VulkanImage2D>();
 			vulkanDstDepthImage->BlitImage(cmdBuf, vulkanSrcDepthImage);
@@ -285,9 +285,7 @@ namespace Frost
 		vkCmdDraw(cmdBuf, 36, 1, 0, 0);
 
 
-
 		m_Data->RenderPass->Unbind();
-
 	}
 
 	void VulkanCompositePass::OnResize(uint32_t width, uint32_t height)

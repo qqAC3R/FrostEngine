@@ -49,9 +49,14 @@ namespace Frost
 			m_Data->TopLevelAS[i] = TopLevelAccelertionStructure::Create();
 
 			// Scene data
-			m_Data->SceneVertexData[i] = BufferDevice::Create(sizeof(uint64_t) * maxInstances, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
-			m_Data->SceneIndexData[i] = BufferDevice::Create(sizeof(uint64_t) * maxInstances, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
-			m_Data->SceneTransformData[i] = BufferDevice::Create(sizeof(InstanceInfo) * maxInstances, { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
+			m_Data->SceneVertexData[i] = BufferDevice::Create(sizeof(uint64_t) * maxInstances,
+															 { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
+
+			m_Data->SceneIndexData[i] = BufferDevice::Create(sizeof(uint64_t) * maxInstances,
+															 { BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
+
+			m_Data->SceneTransformData[i] = BufferDevice::Create(sizeof(InstanceInfo) * maxInstances,
+																{ BufferUsage::Storage, BufferUsage::AccelerationStructureReadOnly });
 
 
 
@@ -130,8 +135,8 @@ namespace Frost
 		// SUBMESH_COUNT:         ||     3     ||   2   ||        4	         ||
 		// SUBMESH_COUNT_OFFSET:  ||     0     ||   3   ||        5	         ||
 		//=====================================================================
-		uint32_t subMeshOffsets_offset = 0;
 		uint32_t subMeshCount_offset = 0;
+		uint32_t subMeshOffsets_offset = 0;
 		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
 		{
 			auto mesh = renderQueue.m_Data[i];

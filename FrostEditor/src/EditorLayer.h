@@ -29,7 +29,7 @@ namespace Frost
 		{
 			m_BunnyMesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(0.0f), 0.3f, 1.0f });
 			//m_BunnyMesh = Mesh::Load("Resources/Meshes/BistroExterior.fbx", { glm::vec3(1.0f), glm::vec3(0.0f), 1.0f, 1.0f });
-			m_PlaneMesh = Mesh::Load("Resources/Meshes/plane.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 1.0f, 1.0f });
+			//m_PlaneMesh = Mesh::Load("Resources/Meshes/plane.obj", { glm::vec3(1.0f), glm::vec3(0.0f), 1.0f, 1.0f });
 			m_SphereMesh = Mesh::Load("Resources/Meshes/Sphere.fbx", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
 		}
 
@@ -39,8 +39,8 @@ namespace Frost
 
 			Renderer::BeginScene(m_Camera);
 
-			m_SphereMesh->GetVulkanMaterial()[0]->Set("u_MaterialUniform.Metalness", m_Metalness);
-			m_SphereMesh->GetVulkanMaterial()[0]->Set("u_MaterialUniform.Roughness", m_Roughness);
+			m_SphereMesh->GetMaterialData(0).Set("MetalnessFactor", m_Metalness);
+			m_SphereMesh->GetMaterialData(0).Set("RoughnessFactor", m_Roughness);
 
 			
 			//glm::mat4 planeTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f));
@@ -164,8 +164,8 @@ namespace Frost
 
 				UI::Begin("Scene");
 				UI::Slider("Entity Position", m_VikingMeshPosition, -20, 20);
-				UI::Slider("Roughness", m_Roughness, 0.0f, 0.99f);
-				UI::Slider("Metalness", m_Metalness, 0.0f, 0.99f);
+				UI::Slider("Roughness", m_Roughness, 0.0f, 1.0f);
+				UI::Slider("Metalness", m_Metalness, 0.0f, 1.0f);
 				UI::End();
 
 				UI::Begin("Settings");

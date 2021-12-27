@@ -31,6 +31,7 @@ namespace Frost
 		data.Transform = transform;
 
 		m_Data.push_back(data);
+		m_SubmeshCount += mesh->GetSubMeshes().size();
 	}
 
 	void RenderQueue::Reset()

@@ -56,7 +56,8 @@ namespace Frost
 		void Add(const Ref<Mesh>& mesh, const Ref<Material>& material, const glm::mat4& transform) {}
 
 		void Reset();
-		uint32_t GetQueueSize() const { return (uint32_t)m_Data.size(); }
+		uint32_t GetQueueSize() const { return static_cast<uint32_t>(m_Data.size()); }
+		uint32_t GetSceneSubmeshCount() const { return m_SubmeshCount; }
 	public:
 		struct RenderData
 		{
@@ -65,6 +66,7 @@ namespace Frost
 		};
 
 		Vector<RenderQueue::RenderData> m_Data;
+		uint32_t m_SubmeshCount = 0;
 
 		EditorCamera Camera;
 		glm::mat4 CameraViewMatrix;

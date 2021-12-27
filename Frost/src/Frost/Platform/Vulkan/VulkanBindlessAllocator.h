@@ -22,10 +22,12 @@ namespace Frost
 		static void Bind(Ref<ComputePipeline> computePipeline);
 		static void Bind(Ref<RayTracingPipeline> rayTracingPipeline);
 
-		static uint32_t GetDescriptorSetNumber() { return m_DescriptorSetNumber; }
-		static uint32_t GetMaxTextureStorage() { return m_TextureMaxStorage; }
 		static VkDescriptorSetLayout GetVulkanDescriptorSetLayout() { return m_DescriptorSetLayout; }
 		static VkDescriptorSet GetVulkanDescriptorSet(uint32_t index) { return m_DescriptorSet[index]; }
+
+		static uint32_t GetDescriptorSetNumber() { return m_DescriptorSetNumber; }
+		static uint32_t GetMaxTextureStorage() { return m_TextureMaxStorage; }
+		static uint32_t GetWhiteTextureID() { return m_DefaultTextureID; }
 
 		static uint32_t AddTexture(const Ref<Texture2D>& texture2d);
 		static void AddTextureCustomSlot(const Ref<Texture2D>& texture2d, uint32_t slot);
@@ -40,6 +42,7 @@ namespace Frost
 
 		static uint32_t m_DescriptorSetNumber;
 		static uint32_t m_TextureMaxStorage;
+		static uint32_t m_DefaultTextureID;
 	};
 
 }

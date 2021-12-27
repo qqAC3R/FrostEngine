@@ -299,7 +299,7 @@ namespace Frost
 		// Buffers
 		for (uint32_t i = 0; i < m_BufferVectorData.size(); i++)
 		{
-			for (uint32_t j = i + 1; j < m_BufferData.size(); j++)
+			for (uint32_t j = i + 1; j < m_BufferVectorData.size(); j++)
 			{
 				auto& bufferData1 = m_BufferVectorData[i].second;
 				auto& bufferData2 = m_BufferVectorData[j].second;

@@ -31,6 +31,7 @@ IncludeDir["ImGui"] = "Frost/vendor/ImGui"
 IncludeDir["SPIRV_Cross"] = "Frost/vendor/VulkanSDK/SPIRV-Cross/include"
 IncludeDir["yaml_cpp"] = "Frost/vendor/yaml-cpp/include"
 IncludeDir["VkBootstrap"] = "Frost/vendor/VkBootstrap/src"
+IncludeDir["entt"] = "Frost/vendor/entt/include"
 
 LibraryDir = {}
 
@@ -108,6 +109,7 @@ project "Frost"
 		"%{IncludeDir.SPIRV_Cross}",
 		"%{IncludeDir.yaml_cpp}",
 		"%{IncludeDir.VkBootstrap}",
+		"%{IncludeDir.entt}",
 		"%{IncludeDir.nvvk}"
 	}
 

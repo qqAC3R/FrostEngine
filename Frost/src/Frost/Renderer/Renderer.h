@@ -27,11 +27,13 @@ namespace Frost
 
 		uint32_t MaxMesh = static_cast<uint32_t>(std::pow(2, 12)); // 4096
 
+		uint64_t GeometryPass_Mesh_Count = static_cast<uint64_t>(std::pow(2, 14)); // 16834
+
 		struct RayTracingSettings
 		{
-			uint32_t MaxInstance = static_cast<uint32_t>(std::pow(2, 10));
+			// TODO: The rasterizer and the rt should have the same number of instances support (currently the rt has 2k, rasterizer has 16k)
+			uint32_t MaxInstance = static_cast<uint32_t>(std::pow(2, 10)); // 1024
 		} RayTracing;
-
 	};
 
 	class Renderer
