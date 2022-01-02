@@ -24,37 +24,34 @@
 
 namespace Frost
 {
-
-	struct RenderData
+	namespace Vulkan
 	{
-		/* The engine can support multiple renderpasses */
-		Ref<SceneRenderPassPipeline> SceneRenderPasses;
 
-		/* Camera related */
-		glm::mat4 ProjectionMatrix;
-		glm::mat4 ViewMatrix;
+		struct RenderData
+		{
+			/* The engine can support multiple renderpasses */
+			Ref<SceneRenderPassPipeline> SceneRenderPasses;
 
-		Vector<VkFence> FencesInCheck;
-		VkFence FencesInFlight[FRAMES_IN_FLIGHT];
-		VkSemaphore AvailableSemapore[FRAMES_IN_FLIGHT], FinishedSemapore[FRAMES_IN_FLIGHT];
+			/* Camera related */
+			glm::mat4 ProjectionMatrix;
+			glm::mat4 ViewMatrix;
 
-		Vector<VkDescriptorPool> DescriptorPools;
-	};
+			Vector<VkFence> FencesInCheck;
+			VkFence FencesInFlight[FRAMES_IN_FLIGHT];
+			VkSemaphore AvailableSemapore[FRAMES_IN_FLIGHT], FinishedSemapore[FRAMES_IN_FLIGHT];
+
+			Vector<VkDescriptorPool> DescriptorPools;
+		};
+	}
 
 	static uint32_t s_ImageIndex = 0;
 	static RenderQueue s_RenderQueue[FRAMES_IN_FLIGHT];
-	static RenderData* s_Data;
-
-	struct PipelinePushConstant
-	{
-		glm::vec3 Color{ 1.0f };
-	};
-	static PipelinePushConstant s_PushConstant;
+	static Vulkan::RenderData* s_Data;
 
 	void VulkanRenderer::Init()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		s_Data = new RenderData;
+		s_Data = new Vulkan::RenderData;
 
 		// Initilization
 		Application::Get().GetImGuiLayer()->OnInit(VulkanContext::GetSwapChain()->GetRenderPass());
@@ -99,8 +96,6 @@ namespace Frost
 			pool_info.pPoolSizes = pool_sizes;
 			FROST_VKCHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool));
 		}
-
-
 	}
 
 	void VulkanRenderer::InitRenderPasses()
@@ -115,15 +110,15 @@ namespace Frost
 
 	void VulkanRenderer::BeginFrame()
 	{
-		Renderer::Submit([&]() mutable
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, currentFrameIndex]()
 		{
-			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 			/* Acquire the image */
 			VulkanContext::GetSwapChain()->BeginFrame(s_Data->AvailableSemapore[currentFrameIndex], &s_ImageIndex);
 
-			/* Checking if the fence is flight is already being used to render */
+			/* Checking if the fence in flight is already being used to render */
 			if (s_Data->FencesInCheck[currentFrameIndex] != VK_NULL_HANDLE)
 				vkWaitForFences(device, 1, &s_Data->FencesInCheck[currentFrameIndex], VK_TRUE, UINT64_MAX);
 
@@ -132,42 +127,16 @@ namespace Frost
 
 			/* Reset the descriptor pool */
 			FROST_VKCHECK(vkResetDescriptorPool(device, s_Data->DescriptorPools[currentFrameIndex], 0));
+
+			/* Resetting the render queue that was used the previous `currentFrameIndex` frame,
+			   because there may be chances of an mesh being deleted while it is being rendered  */
+			s_RenderQueue[currentFrameIndex].Reset();
 		});
-	}
-
-	static void SubmitToGraphicsQueue()
-	{
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
-
-		VkFence fenceInFlight = s_Data->FencesInFlight[currentFrameIndex];
-		VkSemaphore finishedSemaphore = s_Data->FinishedSemapore[currentFrameIndex];
-		VkSemaphore availableSemaphore = s_Data->AvailableSemapore[currentFrameIndex];
-
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		submitInfo.pWaitDstStageMask = waitStages;
-
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = &availableSemaphore;
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &finishedSemaphore;
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &cmdBuf;
-
-
-		vkResetFences(device, 1, &fenceInFlight);
-
-		VkQueue graphicsQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().GraphicsFamily.Queue;
-		FROST_VKCHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fenceInFlight));
 	}
 
 	void VulkanRenderer::EndFrame()
 	{
-		Renderer::Submit([&]() mutable
+		Renderer::Submit([&]()
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -185,7 +154,6 @@ namespace Frost
 
 			/* Updating all the graphics passes */
 			s_Data->SceneRenderPasses->UpdateRenderPasses(s_RenderQueue[currentFrameIndex]);
-			s_RenderQueue[currentFrameIndex].Reset();
 
 
 			/* Rendering a quad for the swap chain image */
@@ -211,15 +179,16 @@ namespace Frost
 			VkQueue graphicsQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().GraphicsFamily.Queue;
 			FROST_VKCHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fenceInFlight));
 
+
 			VulkanRenderer::Render();
 		});
 	}
 
 	void VulkanRenderer::BeginScene(const EditorCamera& camera)
 	{
-		Renderer::Submit([&, camera]() mutable
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, camera, currentFrameIndex]()
 		{
-			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 			s_Data->ViewMatrix = camera.GetViewMatrix();
 			s_Data->ProjectionMatrix = camera.GetProjectionMatrix();
 			s_RenderQueue[currentFrameIndex].SetCamera(camera);
@@ -232,9 +201,9 @@ namespace Frost
 
 	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform)
 	{
-		Renderer::Submit([&, mesh, transform]()
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, mesh, transform, currentFrameIndex]()
 		{
-			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 			s_RenderQueue[currentFrameIndex].Add(mesh, transform);
 		});
 	}
@@ -243,6 +212,15 @@ namespace Frost
 	{
 		// TODO: Materials dont acutally work
 		//s_RenderQueue.Add(mesh, material, transform);
+	}
+
+	void VulkanRenderer::Submit(const PointLightComponent& pointLight, const glm::vec3& position)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, pointLight, position, currentFrameIndex]()
+		{
+			s_RenderQueue[currentFrameIndex].AddPointLight(pointLight, position);
+		});
 	}
 
 	void VulkanRenderer::Resize(uint32_t width, uint32_t height)
@@ -267,6 +245,9 @@ namespace Frost
 			vkDestroySemaphore(device, s_Data->FinishedSemapore[i], nullptr);
 			vkDestroyFence(device, s_Data->FencesInFlight[i], nullptr);
 			vkDestroyDescriptorPool(device, s_Data->DescriptorPools[i], nullptr);
+
+			// Clear all the submitted data (from every frame remaning)
+			s_RenderQueue[i].Reset();
 		}
 		VulkanMaterial::DeallocateDescriptorPool();
 	}

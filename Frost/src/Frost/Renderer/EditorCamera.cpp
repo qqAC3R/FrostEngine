@@ -39,12 +39,12 @@ namespace Frost
 	static void DisableMouse()
 	{
 		Input::SetCursorMode(CursorMode::Locked);
-		UI::SetMouseEnabled(false);
+		//UI::SetMouseEnabled(false);
 	}
 	static void EnableMouse()
 	{
 		Input::SetCursorMode(CursorMode::Normal);
-		UI::SetMouseEnabled(true);
+		//UI::SetMouseEnabled(true);
 	}
 
 	void EditorCamera::OnUpdate(const Timestep ts)

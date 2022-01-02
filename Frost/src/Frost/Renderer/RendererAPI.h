@@ -3,9 +3,10 @@
 #include "Frost/Renderer/RenderPass.h"
 #include "Frost/Renderer/RenderCommandQueue.h"
 #include "Frost/Renderer/Mesh.h"
-
 #include "Frost/Renderer/Material.h"
 #include "Frost/Renderer/EditorCamera.h"
+
+#include "Frost/EntitySystem/Components.h"
 
 #include <glm/glm.hpp>
 
@@ -34,6 +35,7 @@ namespace Frost
 
 		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform) = 0;
 		virtual void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform) = 0;
+		virtual void Submit(const PointLightComponent& pointLight, const glm::vec3& position) = 0;
 
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const = 0;
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
@@ -51,9 +53,8 @@ namespace Frost
 		void SetCamera(const EditorCamera& camera);
 
 		void Add(Ref<Mesh> mesh, const glm::mat4& transform);
-
-		// TODO: Need a way to handle materials around different sceneRenderPasses
-		void Add(const Ref<Mesh>& mesh, const Ref<Material>& material, const glm::mat4& transform) {}
+		void AddPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
+		//void AddDirectionalLight(Ref<Mesh> mesh, const glm::mat4& transform);
 
 		void Reset();
 		uint32_t GetQueueSize() const { return static_cast<uint32_t>(m_Data.size()); }
@@ -64,11 +65,25 @@ namespace Frost
 			Ref<Mesh> Mesh = nullptr;
 			glm::mat4 Transform{};
 		};
-
 		Vector<RenderQueue::RenderData> m_Data;
+
+		struct LightData
+		{
+			// Packed them into a struct because the memory should be contiguous (for better performance)
+			struct PointLight
+			{
+				PointLightComponent Specification;
+				glm::vec3 Position;
+			};
+
+			Vector<PointLight> PointLights;
+		};
+		LightData m_LightData;
+
+		
 		uint32_t m_SubmeshCount = 0;
 
-		EditorCamera Camera;
+		EditorCamera m_Camera;
 		glm::mat4 CameraViewMatrix;
 		glm::mat4 CameraProjectionMatrix;
 		glm::vec3 CameraPosition;

@@ -17,10 +17,9 @@ namespace Frost
 
 	struct RendererConfig
 	{
-		uint32_t FramesInFlight = 3;
+		uint32_t FramesInFlight = FRAMES_IN_FLIGHT;
 		
 		uint32_t EnvironmentMapResolution = 1024;
-		
 		uint32_t IrradianceMapResolution = 32;
 		uint32_t IrradianceMapSamples = 512;
 
@@ -34,7 +33,12 @@ namespace Frost
 			// TODO: The rasterizer and the rt should have the same number of instances support (currently the rt has 2k, rasterizer has 16k)
 			uint32_t MaxInstance = static_cast<uint32_t>(std::pow(2, 10)); // 1024
 		} RayTracing;
+
+		uint32_t MaxPointLightCount = static_cast<uint32_t>(std::pow(2, 10)); // 1024
 	};
+
+	// Forward declaration
+	struct PointLightComponent;
 
 	class Renderer
 	{
@@ -50,6 +54,7 @@ namespace Frost
 
 		static void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform);
 		static void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform);
+		static void Submit(const PointLightComponent& pointLight, const glm::vec3& position);
 
 		template<typename FuncT>
 		static void Submit(FuncT&& func)

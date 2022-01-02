@@ -108,7 +108,6 @@ namespace Frost
 
 
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-		auto whiteTexture = Renderer::GetWhiteLUT();
 
 		m_Data->Descriptor.resize(framesInFlight);
 		for (auto& material : m_Data->Descriptor)

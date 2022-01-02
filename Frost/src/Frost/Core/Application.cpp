@@ -32,7 +32,6 @@ namespace Frost
 		Renderer::Init();
 	}
 
-
 	Application::~Application()
 	{
 		for (Layer* layer : m_LayerStack)
@@ -46,6 +45,7 @@ namespace Frost
 	{
 		while (m_Running)
 		{
+			// Poll Events
 			m_Window->OnUpdate();
 			
 			// Timestep
@@ -75,9 +75,6 @@ namespace Frost
 				// Execute the RenderCommandBuffers (pointer functions)
 				Renderer::ExecuteCommandBuffer();
 			}
-
-			// Poll Events
-			m_Window->OnUpdate();
 		}
 		m_Window->GetGraphicsContext()->WaitDevice();
 	}

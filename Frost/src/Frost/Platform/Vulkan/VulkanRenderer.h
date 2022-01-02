@@ -21,6 +21,7 @@ namespace Frost
 
 		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform) override;
 		virtual void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform) override;
+		virtual void Submit(const PointLightComponent& pointLight, const glm::vec3& position) override;
 
 		virtual void Resize(uint32_t width, uint32_t height) override;
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const override;

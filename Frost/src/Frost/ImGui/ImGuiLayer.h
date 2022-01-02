@@ -39,22 +39,4 @@ namespace Frost
 		VkDescriptorPool m_DescriptorPool;
 		VkPhysicalDeviceProperties m_RendererSpecs;
 	};
-
-	class UI
-	{
-	public:
-		static void Begin(const std::string& title);
-		static void End();
-
-		static void ColorEdit(const std::string& name, glm::vec3& value);
-		static void ColorEdit(const std::string& name, glm::vec4& value);
-		static void Slider(const std::string& name, glm::vec3& value, float min, float max);
-		static void Slider(const std::string& name, float& value, float min, float max);
-		static void Slider(const std::string& name, int& value, int min, int max);
-		static void CheckMark(const std::string& name, bool& value);
-
-		static void SetMouseEnabled(bool enable);
-	};
-
-
 }

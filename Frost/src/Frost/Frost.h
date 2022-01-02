@@ -1,6 +1,6 @@
 #pragma once
 
-/* ---------------------- Core -------------------------- */
+///* ---------------------- Core -------------------------- *///
 #include "Frost/Core/Application.h"
 #include "Frost/Core/Memory.h"
 #include "Frost/Core/Layer.h"
@@ -13,10 +13,15 @@
 
 
 
-/* ------------------------ ECS ------------------------- */
+///* ------------------------ ECS ------------------------- *///
+#include "Frost/EntitySystem/Scene.h"
+#include "Frost/EntitySystem/Entity.h"
+#include "Frost/EntitySystem/Components.h"
 /* ------------------------------------------------------ */
 
-/* ---------------------- Renderer ---------------------- */
+
+
+///* ---------------------- Renderer ---------------------- *///
 #include "Frost/Renderer/Framebuffer.h"
 #include "Frost/Renderer/Shader.h"
 #include "Frost/Renderer/Pipeline.h"
@@ -37,11 +42,15 @@
 #include "Frost/ImGui/ImGuiLayer.h"
 /* ------------------------------------------------------ */
 
-/* ---------------------- Math ---------------------- */
+
+
+///* ---------------------- Math ---------------------- *///
 #include "Frost/Math/FrustumCamera.h"
 /* ------------------------------------------------------ */
 
-/* -------------------- Ray Tracing --------------------- */
+
+
+///* -------------------- Ray Tracing --------------------- *///
 #include "Frost/Renderer/RayTracing/RayTracingPipeline.h"
 #include "Frost/Renderer/RayTracing/ShaderBindingTable.h"
 #include "Frost/Renderer/RayTracing/AccelerationStructures.h"
@@ -49,7 +58,6 @@
 
 
 
-
-/* -------------------- Entry Point --------------------- */
+///* -------------------- Entry Point --------------------- *///
 #include "Frost/Core/EntryPoint.h"
 /* ------------------------------------------------------ */

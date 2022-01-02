@@ -28,6 +28,7 @@ IncludeDir["assimpLib"] = "Frost/vendor/assimp/lib"
 IncludeDir["nvvk"] = "Frost/vendor/nvvk/shared_sources"
 IncludeDir["vma"] = "Frost/vendor/VulkanMemoryAllocator/include"
 IncludeDir["ImGui"] = "Frost/vendor/ImGui"
+IncludeDir["ImGuizmo"] = "Frost/vendor/ImGuizmo"
 IncludeDir["SPIRV_Cross"] = "Frost/vendor/VulkanSDK/SPIRV-Cross/include"
 IncludeDir["yaml_cpp"] = "Frost/vendor/yaml-cpp/include"
 IncludeDir["VkBootstrap"] = "Frost/vendor/VkBootstrap/src"
@@ -81,11 +82,16 @@ project "Frost"
 		"%{prj.name}/vendor/stb_image/**.cpp",
 		"%{prj.name}/vendor/glm/glm/**.hpp",
 		"%{prj.name}/vendor/glm/glm/**.inl",
+
+		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.h",
+		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.cpp",
 		
 		"%{prj.name}vendor/nvvk/shared_sources/nvvk/**.hpp",
 		"%{prj.name}vendor/nvvk/shared_sources/nvvk/**.cpp",
-
 	}
+
+	--filter "files:vendor/ImGuizmo/**.cpp"
+	--flags { "NoPCH" }
 
 	defines
 	{
@@ -106,6 +112,7 @@ project "Frost"
 		"%{IncludeDir.spdlog}",
 		"%{IncludeDir.vma}",
 		"%{IncludeDir.ImGui}",
+		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.SPIRV_Cross}",
 		"%{IncludeDir.yaml_cpp}",
 		"%{IncludeDir.VkBootstrap}",
@@ -183,9 +190,9 @@ project "FrostEditor"
 	
 	files
 	{
-		"%{prj.name}/src/**.h",
-		"%{prj.name}/src/**.cpp",
-		"%{prj.name}/assets/shader/**.glsl"
+		"%{prj.name}/Source/**.h",
+		"%{prj.name}/Source/**.cpp",
+		"%{prj.name}/Resources/Shaders/**.glsl"
 	}
 
 	includedirs
@@ -196,18 +203,21 @@ project "FrostEditor"
 		"%{IncludeDir.vma}",
 		"%{IncludeDir.nvvk}",
 		"%{IncludeDir.ImGui}",
+		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.spdlog}",
 		"%{IncludeDir.assimp}",
+		"%{IncludeDir.entt}",
 		
 		"Frost/vendor",
 		"Frost/src/Frost",
-		"Frost/src"
+		"Frost/src",
+
+		"FrostEditor/Source"
 	}
 
 	links 
 	{
-		"Frost",
-		"ImGui"
+		"Frost"
 	}
 
 	filter "system:windows"

@@ -28,6 +28,8 @@ namespace Frost
 		m_RenderPassPipeline = renderPassPipeline;
 		m_Data = new InternalData();
 
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+
 		m_Data->CompositeShader = Renderer::GetShaderLibrary()->Get("PBRDeffered");
 		m_Data->SkyboxShader = Renderer::GetShaderLibrary()->Get("RenderSkybox");
 
@@ -125,7 +127,7 @@ namespace Frost
 
 
 
-
+#if 0
 		// Light data into a uniform buffer
 		m_PointLightData = new PointLightData();
 		m_PointLightData->LightCount = 1;
@@ -140,7 +142,22 @@ namespace Frost
 
 		m_Data->m_PointLightUniformBuffer = UniformBuffer::Create(uboSize);
 		m_Data->m_PointLightUniformBuffer->SetData(&m_PointLightData);
+#endif
+		{
+			uint32_t maxPointLightCount = Renderer::GetRendererConfig().MaxPointLightCount;
 
+
+			m_Data->PointLightBufferData.resize(framesInFlight);
+			for (auto& pointLightBufferData : m_Data->PointLightBufferData)
+			{
+				// sizeof(uint32_t) - Number of point lights in the scene 
+				// (maxPointLightCount * sizeof(RenderQueue::LightData::PointLight) - Size of 1024 point lights
+				uint32_t lightDataSize = maxPointLightCount * sizeof(RenderQueue::LightData::PointLight);
+
+				pointLightBufferData.DeviceBuffer = BufferDevice::Create(lightDataSize, { BufferUsage::Storage });
+				pointLightBufferData.HostBuffer.Allocate(lightDataSize);
+			}
+		}
 
 
 		{
@@ -157,7 +174,7 @@ namespace Frost
 
 			// Composite pipeline descriptor
 			uint32_t index = 0;
-			m_Data->Descriptor.resize(Renderer::GetRendererConfig().FramesInFlight);
+			m_Data->Descriptor.resize(framesInFlight);
 			for (auto& descriptor : m_Data->Descriptor)
 			{
 				descriptor = Material::Create(m_Data->CompositeShader, "CompositePass-Material");
@@ -178,8 +195,7 @@ namespace Frost
 				descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
 				descriptor->Set("u_IrradianceMap", irradianceMap);
 				descriptor->Set("u_BRDFLut", brdfLut);
-
-				//descriptor->Set("LightData", m_PointLightUniformBuffer);
+				descriptor->Set("u_LightData", m_Data->PointLightBufferData[index].DeviceBuffer);
 
 				descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 
@@ -187,7 +203,7 @@ namespace Frost
 			}
 		}
 
-		m_Data->PreviousDepthbuffer.resize(Renderer::GetRendererConfig().FramesInFlight);
+		m_Data->PreviousDepthbuffer.resize(framesInFlight);
 		for (auto& depthbuffer : m_Data->PreviousDepthbuffer)
 		{
 			ImageSpecification imageSpec{};
@@ -213,7 +229,7 @@ namespace Frost
 		Ref<VulkanPipeline> vulkanSkyboxPipeline = m_Data->SkyboxPipeline.As<VulkanPipeline>();
 
 		// Updating the push constant data from the renderQueue
-		m_PushConstantData.CameraPosition = renderQueue.CameraPosition;
+		m_PushConstantData.CameraPosition = glm::vec4(renderQueue.CameraPosition, 1.0f);
 
 
 		{
@@ -241,7 +257,22 @@ namespace Frost
 		}
 #endif
 
+		// Setting up the light data
+		// Gathering the data
+		auto pointLightData = renderQueue.m_LightData.PointLights.data();
+		void* pointLightDataCPUPointer = m_Data->PointLightBufferData[currentFrameIndex].HostBuffer.Data;
+		uint32_t pointLightCount = static_cast<uint32_t>(renderQueue.m_LightData.PointLights.size());
+		uint32_t pointLightDataSize = (pointLightCount * sizeof(RenderQueue::LightData::PointLight));
 
+		// Writting into a cpu buffer
+		//m_Data->PointLightBufferData[currentFrameIndex].HostBuffer.Write((void*)&pointLightCount, sizeof(uint32_t), 0);
+		m_Data->PointLightBufferData[currentFrameIndex].HostBuffer.Write((void*)pointLightData, pointLightDataSize, 0);
+
+		// Copying the cpu buffer into the gpu
+		m_Data->PointLightBufferData[currentFrameIndex].DeviceBuffer->SetData(pointLightDataSize, pointLightDataCPUPointer);
+
+		m_PushConstantData.CameraPosition.w = static_cast<float>(pointLightCount);
+		// TODO: Shaders reading wrong values!!!
 
 
 		m_Data->RenderPass->Bind();
@@ -261,7 +292,7 @@ namespace Frost
 		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
 		// Camera information
-		m_Data->Descriptor[currentFrameIndex]->Set("CameraData.Exposure", renderQueue.Camera.GetExposure());
+		m_Data->Descriptor[currentFrameIndex]->Set("CameraData.Exposure", renderQueue.m_Camera.GetExposure());
 
 		// Drawing a quad
 		m_Data->Descriptor[currentFrameIndex]->Bind(m_Data->CompositePipeline);
@@ -269,16 +300,16 @@ namespace Frost
 
 
 		// Drawing the skybox
-		m_Data->SkyboxDescriptor->Set("CameraData.Exposure", renderQueue.Camera.GetExposure());
-		m_Data->SkyboxDescriptor->Set("CameraData.Lod", renderQueue.Camera.GetDOF());
+		m_Data->SkyboxDescriptor->Set("CameraData.Exposure", renderQueue.m_Camera.GetExposure());
+		m_Data->SkyboxDescriptor->Set("CameraData.Lod", renderQueue.m_Camera.GetDOF());
 
 		vulkanSkyboxPipeline->Bind();
 
 		m_Data->SkyboxDescriptor->Bind(m_Data->SkyboxPipeline);
 		m_Data->SkyBoxVertexBuffer->Bind();
 		Vector<glm::mat4> pushConstant(2);
-		pushConstant[0] = renderQueue.Camera.GetProjectionMatrix();
-		pushConstant[1] = renderQueue.Camera.GetViewMatrix();
+		pushConstant[0] = renderQueue.m_Camera.GetProjectionMatrix();
+		pushConstant[1] = renderQueue.m_Camera.GetViewMatrix();
 
 		vulkanSkyboxPipeline->BindVulkanPushConstant("u_PushConstant", pushConstant.data());
 
@@ -304,8 +335,8 @@ namespace Frost
 				// Depth Attachment
 				{
 					FramebufferTextureFormat::DepthStencil, ImageUsage::DepthStencil,
-					OperationLoad::Load,      OperationStore::Store,        
-					OperationLoad::DontCare,  OperationStore::DontCare, 
+					OperationLoad::Load,      OperationStore::Store,
+					OperationLoad::DontCare,  OperationStore::DontCare,
 				}
 			}
 		};
@@ -346,7 +377,6 @@ namespace Frost
 
 	void VulkanCompositePass::ShutDown()
 	{
-		delete m_PointLightData;
 		delete m_Data;
 	}
 }

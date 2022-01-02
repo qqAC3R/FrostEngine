@@ -81,6 +81,11 @@ namespace Frost
 		s_RendererAPI->Submit(mesh, material, transform);
 	}
 
+	void Renderer::Submit(const PointLightComponent& pointLight, const glm::vec3& position)
+	{
+		s_RendererAPI->Submit(pointLight, position);
+	}
+
 	void Renderer::LoadEnvironmentMap(const std::string& filepath)
 	{
 		// TODO: Add some function for the SceneRenderpasses to update the env texture with the new ones

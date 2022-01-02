@@ -72,15 +72,15 @@ namespace Frost
 		pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
 		pool_info.pPoolSizes = pool_sizes;
 		FROST_VKCHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &imguiPool));
-		
+
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
-		
+
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
-		io.FontDefault = io.Fonts->AddFontFromFileTTF("Resources/Fonts/san-francisco/SF-Regular.otf", 18.0f);
+		io.FontDefault = io.Fonts->AddFontFromFileTTF("Resources/Fonts/san-francisco/SF-Regular.otf", 17.0f);
 
 		ImGui::StyleColorsDark();
 		SetDarkThemeColors();
@@ -114,13 +114,13 @@ namespace Frost
 		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 		ImGui_ImplVulkan_CreateFontsTexture(cmdBuf);
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
-			
+
 		ImGui_ImplVulkan_DestroyFontUploadObjects();
 		m_DescriptorPool = imguiPool;
 
 		vkGetPhysicalDeviceProperties(physicalDevice, &m_RendererSpecs);
 	}
-	
+
 	void ImGuiLayer::OnDetach()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -141,9 +141,9 @@ namespace Frost
 			const char* vendor;
 			switch (m_RendererSpecs.vendorID)
 			{
-				case 0x1002: vendor = "AMD "; break;
-				case 0x10DE: vendor = "NVIDIA Corporation"; break;
-				case 0x8086: vendor = "Intel"; break;
+			case 0x1002: vendor = "AMD "; break;
+			case 0x10DE: vendor = "NVIDIA Corporation"; break;
+			case 0x8086: vendor = "Intel"; break;
 			}
 			ImGui::Text(vendor);
 			ImGui::Text(deviceName);
@@ -300,6 +300,43 @@ namespace Frost
 
 	void ImGuiLayer::SetDarkThemeColors()
 	{
+
+
+		// Hazel
+#if 0
+		auto& colors = ImGui::GetStyle().Colors;
+		colors[ImGuiCol_WindowBg] = ImVec4{ 0.1f, 0.105f, 0.11f, 1.0f };
+
+		// Headers
+		colors[ImGuiCol_Header] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
+		colors[ImGuiCol_HeaderHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
+		colors[ImGuiCol_HeaderActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+
+		// Buttons
+		colors[ImGuiCol_Button] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
+		colors[ImGuiCol_ButtonHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
+		colors[ImGuiCol_ButtonActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+
+		// Frame BG
+		colors[ImGuiCol_FrameBg] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
+		colors[ImGuiCol_FrameBgHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
+		colors[ImGuiCol_FrameBgActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+
+		// Tabs
+		colors[ImGuiCol_Tab] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+		colors[ImGuiCol_TabHovered] = ImVec4{ 0.38f, 0.3805f, 0.381f, 1.0f };
+		colors[ImGuiCol_TabActive] = ImVec4{ 0.28f, 0.2805f, 0.281f, 1.0f };
+		colors[ImGuiCol_TabUnfocused] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+		colors[ImGuiCol_TabUnfocusedActive] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
+
+		// Title
+		colors[ImGuiCol_TitleBg] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+		colors[ImGuiCol_TitleBgActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+		colors[ImGuiCol_TitleBgCollapsed] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+#endif
+
+		// Frost
+#if 1
 		ImVec4* colors = ImGui::GetStyle().Colors;
 		colors[ImGuiCol_Text] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
 		colors[ImGuiCol_TextDisabled] = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
@@ -380,7 +417,9 @@ namespace Frost
 		style.GrabRounding = 3;
 		style.LogSliderDeadzone = 4;
 		style.TabRounding = 4;
+#endif
 
+		//Idk
 #if 0
 		auto& colors = ImGui::GetStyle().Colors;
 		colors[ImGuiCol_WindowBg] = ImVec4{ 0.06f, 0.06f, 0.09f, 1.0f };
@@ -431,53 +470,4 @@ namespace Frost
 		colors[ImGuiCol_SliderGrabActive] = ImVec4(0.66f, 0.66f, 0.66f, 1.0f);
 #endif
 	}
-
-	void UI::Begin(const std::string& title)
-	{
-		ImGui::Begin(title.c_str());
-	}
-
-	void UI::End()
-	{
-		ImGui::End();
-	}
-
-	void UI::ColorEdit(const std::string& name, glm::vec3& value)
-	{
-		ImGui::ColorEdit3(name.c_str(), reinterpret_cast<float*>(&value));
-	}
-
-	void UI::ColorEdit(const std::string& name, glm::vec4& value)
-	{
-		ImGui::ColorEdit4(name.c_str(), reinterpret_cast<float*>(&value));
-	}
-
-	void UI::Slider(const std::string& name, glm::vec3& value, float min, float max)
-	{
-		ImGui::SliderFloat3(name.c_str(), reinterpret_cast<float*>(&value), min, max);
-	}
-
-	void UI::Slider(const std::string& name, float& value, float min, float max)
-	{
-		ImGui::SliderFloat(name.c_str(), reinterpret_cast<float*>(&value), min, max);
-	}
-
-	void UI::Slider(const std::string& name, int& value, int min, int max)
-	{
-		ImGui::SliderInt(name.c_str(), reinterpret_cast<int*>(&value), min, max);
-	}
-
-	void UI::CheckMark(const std::string& name, bool& value)
-	{
-		ImGui::Checkbox(name.c_str(), &value);
-	}
-
-	void UI::SetMouseEnabled(bool enable)
-	{
-		if (enable)
-			ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
-		else
-			ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
-	}
-
 }

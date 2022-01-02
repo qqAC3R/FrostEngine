@@ -94,11 +94,14 @@ namespace Frost
 
 		// Selecting the best swapchain present mode
 		VkPresentModeKHR pickedPresentMode = VK_PRESENT_MODE_FIFO_KHR; // Default one
-		for (const auto& availablePresentMode : avaialbePresentModes)
+		if (!m_VSync)
 		{
-			if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR && !m_VSync)
+			for (const auto& availablePresentMode : avaialbePresentModes)
 			{
-				pickedPresentMode = availablePresentMode;
+				if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR && !m_VSync)
+				{
+					pickedPresentMode = availablePresentMode;
+				}
 			}
 		}
 

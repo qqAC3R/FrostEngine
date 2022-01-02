@@ -5,22 +5,21 @@
 
 namespace Frost
 {
-	class Sandbox : public Application
+	class EditorApp : public Application
 	{
 	public:
-		Sandbox()
+		EditorApp()
 		{
 			PushLayer(new EditorLayer());
 		}
 
-		~Sandbox()
+		~EditorApp()
 		{
-
 		}
 	};
 }
 
 Frost::Application* Frost::CreateApplication()
 {
-	return new Sandbox();
+	return new EditorApp();
 }

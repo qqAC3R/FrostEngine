@@ -88,24 +88,26 @@ namespace Frost
 		const Vector<Index>& GetIndices() const { return m_Indices; }
 		Vector<Index>& GetIndices() { return m_Indices; }
 
+		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
+		
 		DataStorage& GetMaterialData(uint32_t materialIndex) { return m_MaterialData[materialIndex]; }
 		MaterialInstance& GetMaterial() { return m_Material; }
 		const MaterialInstance& GetMaterial() const { return m_Material; }
 		Vector<Ref<Material>> GetVulkanMaterial() { return m_Materials; }
 		Ref<BottomLevelAccelerationStructure> GetAccelerationStructure() const { return m_AccelerationStructure; }
 
-		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
-		const Math::BoundingBox& GetBoundingBox() const { return m_BoundingBox; }
+		bool IsLoaded() const { return m_IsLoaded; }
+		const std::string& GetFilepath() const { return m_Filepath; }
 
 		static Ref<Mesh> Load(const std::string& filepath, MaterialInstance material = {});
-
-		void Destroy();
 	private:
 		void TraverseNodes(aiNode* node, const glm::mat4& parentTransform = glm::mat4(1.0f), uint32_t level = 0);
 	private:
 		Ref<Shader> m_MeshShader;
+
+		std::string m_Filepath;
+		bool m_IsLoaded;
 		
-		Math::BoundingBox m_BoundingBox;
 		Vector<Submesh> m_Submeshes;
 		Vector<Vertex> m_Vertices;
 		Vector<Index> m_Indices;

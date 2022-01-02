@@ -5,18 +5,19 @@ namespace Frost
 {
 	RendererAPI::API RendererAPI::s_API = RendererAPI::API::Vulkan;
 
-
 	RenderQueue::RenderQueue()
 	{
-		m_Data.reserve(1024);
+		m_Data.reserve(2048);
+		m_LightData.PointLights.reserve(1024);
 	}
+
 	RenderQueue::~RenderQueue()
 	{
 	}
 
 	void RenderQueue::SetCamera(const EditorCamera& camera)
 	{
-		Camera = camera;
+		m_Camera = camera;
 		CameraViewMatrix = camera.GetViewMatrix();
 		CameraProjectionMatrix = camera.GetProjectionMatrix();
 		CameraPosition = camera.GetPosition();
@@ -26,17 +27,26 @@ namespace Frost
 
 	void RenderQueue::Add(Ref<Mesh> mesh, const glm::mat4& transform)
 	{
-		RenderQueue::RenderData data{};
+		RenderQueue::RenderData& data = m_Data.emplace_back();
 		data.Mesh = mesh;
 		data.Transform = transform;
 
-		m_Data.push_back(data);
 		m_SubmeshCount += mesh->GetSubMeshes().size();
+	}
+
+	void RenderQueue::AddPointLight(const PointLightComponent& pointLight, const glm::vec3& position)
+	{
+		LightData::PointLight pointLightComponent{};
+		memcpy((void*)&pointLightComponent, (void*)&pointLight, sizeof(PointLightComponent));
+
+		pointLightComponent.Position = position;
+		m_LightData.PointLights.push_back(pointLightComponent);
 	}
 
 	void RenderQueue::Reset()
 	{
 		m_Data.clear();
+		m_LightData.PointLights.clear();
 		CameraViewMatrix = glm::mat4(1.0f);
 		CameraProjectionMatrix = glm::mat4(1.0f);
 	}

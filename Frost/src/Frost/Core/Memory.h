@@ -71,8 +71,7 @@ namespace Frost
 		////////////////////////////////////////////////////
 		Ref& operator=(const Ref<T>& refPointer)
 		{
-			if(m_Instance)
-				DecreaseRef();
+			DecreaseRef();
 
 			m_RefCount = refPointer.m_RefCount;
 			m_Instance = refPointer.m_Instance;
@@ -85,8 +84,7 @@ namespace Frost
 
 		Ref& operator=(Ref<T>&& refPointer)
 		{
-			if (m_Instance)
-				DecreaseRef();
+			DecreaseRef();
 
 			m_RefCount = refPointer.m_RefCount;
 			m_Instance = refPointer.m_Instance;
@@ -187,6 +185,12 @@ namespace Frost
 		{
 			if (m_RefCount)
 			{
+				if (*m_RefCount == 0)
+				{
+					delete m_RefCount;
+					return;
+				}
+
 				--(*m_RefCount);
 				if (*m_RefCount == 0)
 				{
@@ -245,6 +249,11 @@ namespace Frost
 		[[nodiscard]] Ref<T2> AsRef() const
 		{
 			Ref<T2> ref = Ref<T2>((T2*)m_Instance);
+
+			// Delete the old ref count just allocated (from constructor)
+			delete ref.m_RefCount;
+
+			// Set the ref count that the weak ref previously had
 			ref.m_RefCount = m_RefCount;
 			++(*m_RefCount);
 

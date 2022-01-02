@@ -46,7 +46,7 @@ namespace Frost
 	}
 
 	Mesh::Mesh(const std::string& filepath, MaterialInstance material)
-		: m_Material(material)
+		: m_Material(material), m_Filepath(filepath)
 	{
 		Assimp::Importer* m_Importer = new Assimp::Importer;
 
@@ -54,7 +54,7 @@ namespace Frost
 		FROST_ASSERT(!(!scene || !scene->HasMeshes()), m_Importer->GetErrorString());
 
 		m_MeshShader = Renderer::GetShaderLibrary()->Get("GeometryPass");
-
+		m_IsLoaded = true;
 
 		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
 		// Allocate texture slots before storing the vertex data, because we are using bindless
@@ -172,12 +172,14 @@ namespace Frost
 			glm::vec3 min = glm::vec3(submesh.Transform * glm::vec4(transformedSubmeshAABB.Min, 1.0f));
 			glm::vec3 max = glm::vec3(submesh.Transform * glm::vec4(transformedSubmeshAABB.Max, 1.0f));
 
+#if 0
 			m_BoundingBox.Min.x = glm::min(m_BoundingBox.Min.x, min.x);
 			m_BoundingBox.Min.y = glm::min(m_BoundingBox.Min.y, min.y);
 			m_BoundingBox.Min.z = glm::min(m_BoundingBox.Min.z, min.z);
 			m_BoundingBox.Max.x = glm::max(m_BoundingBox.Max.x, max.x);
 			m_BoundingBox.Max.y = glm::max(m_BoundingBox.Max.y, max.y);
 			m_BoundingBox.Max.z = glm::max(m_BoundingBox.Max.z, max.z);
+#endif
 		}
 
 		{
@@ -479,12 +481,6 @@ namespace Frost
 		return;
 	}
 
-
-	Mesh::~Mesh()
-	{
-		Destroy();
-	}
-
 	void Mesh::TraverseNodes(aiNode* node, const glm::mat4& parentTransform, uint32_t level)
 	{
 		glm::mat4 transform = parentTransform * Utils::AssimpMat4ToGlmMat4(node->mTransformation);
@@ -492,15 +488,23 @@ namespace Frost
 		{
 			uint32_t mesh = node->mMeshes[i];
 			auto& submesh = m_Submeshes[mesh];
-			//submesh.Transform = transform;
-			submesh.Transform = glm::mat4(1.0f);
+			submesh.Transform = transform;
+			//submesh.Transform = glm::mat4(1.0f);
 		}
 
 		for (uint32_t i = 0; i < node->mNumChildren; i++)
 			TraverseNodes(node->mChildren[i], transform, level + 1);
 	}
 
-	void Mesh::Destroy()
+	Mesh::~Mesh()
 	{
+		auto whiteTexture = Renderer::GetWhiteLUT();
+		for (auto& textureSlotPair : m_TextureAllocatorSlots)
+		{
+			uint32_t textureSlot = textureSlotPair.second;
+			VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureSlot);
+			VulkanBindlessAllocator::RevmoveTextureCustomSlot(textureSlot);
+		}
 	}
+
 }

@@ -18,6 +18,7 @@ void main()
 
 #type fragment
 #version 450
+#extension GL_EXT_scalar_block_layout : enable
 
 // Constants
 const float PI = 3.141592;
@@ -29,10 +30,11 @@ const vec3 Fdielectric = vec3(0.04);
 
 struct PointLight
 {
-    vec3 Position;
     vec3 Radiance;
+	float Intensity;
     float Radius;
     float Falloff;
+    vec3 Position;
 };
 
 struct DirectionalLight
@@ -54,10 +56,9 @@ layout(binding = 0) uniform sampler2D u_PositionTexture;
 layout(binding = 1) uniform sampler2D u_AlbedoTexture;
 layout(binding = 2) uniform sampler2D u_NormalTexture;
 layout(binding = 3) uniform sampler2D u_CompositeTexture;
-layout(binding = 4) uniform LightData {
-    uint u_LightCount;
-    PointLight u_PointLights[1];
-};
+layout(binding = 4, scalar) readonly buffer u_LightData { // Using scalar, it will fix our byte padding issues?
+	PointLight u_PointLights[1024];
+} LightData;
 
 layout(binding = 6) uniform samplerCube u_RadianceFilteredMap;
 layout(binding = 7) uniform samplerCube u_IrradianceMap;
@@ -70,8 +71,9 @@ layout(binding = 9) uniform CameraData {
 
 
 layout(push_constant) uniform PushConstant {
-    vec3 CameraPosition;
+    vec4 CameraPosition; // vec3 - camera position + float pointLightCount
 } u_PushConstant;
+
 
 struct SurfaceProperties
 {
@@ -120,7 +122,7 @@ vec3 PointLightContribution(PointLight pointLight)
 {
     vec3 Lc = vec3(0.0);
     {
-        vec3 LightPosition = pointLight.Position;
+        vec3 LightPosition = vec3(pointLight.Position);
 
         vec3  Li = normalize(LightPosition - m_Surface.WorldPos);     //  Light direction
         vec3  Lh  = normalize(m_Surface.ViewVector + Li);             //  Half view vector
@@ -129,7 +131,7 @@ vec3 PointLightContribution(PointLight pointLight)
         float attenuation = clamp(1.0 - (Ld * Ld) / (pointLight.Radius * pointLight.Radius), 0.0, 1.0);
 		attenuation *= mix(attenuation, 1.0, pointLight.Falloff);
 
-        vec3 LRadiance = pointLight.Radiance * attenuation;
+        vec3 LRadiance = vec3(pointLight.Radiance) * attenuation;
 
         // Calculate angles between surface normal and various light vectors.
 		float cosLi = max(0.0, dot(m_Surface.Normal, Li));
@@ -237,7 +239,7 @@ void main()
     // Calculating the normals and worldPos
     m_Surface.WorldPos =    texture(u_PositionTexture, v_TexCoord).rgb;
     m_Surface.Normal =      normalize(texture(u_NormalTexture, v_TexCoord).rgb);
-    m_Surface.ViewVector =  normalize(u_PushConstant.CameraPosition - m_Surface.WorldPos);
+    m_Surface.ViewVector =  normalize(vec3(u_PushConstant.CameraPosition) - m_Surface.WorldPos);
 
     // Sampling the textures from gbuffer
     m_Surface.Albedo =      texture(u_AlbedoTexture, v_TexCoord).rgb;
@@ -248,26 +250,32 @@ void main()
 	m_Surface.F0 = mix(Fdielectric, m_Surface.Albedo, m_Surface.Metalness);
 
 
-    PointLight pointLight;
-	pointLight.Position = vec3(5.0f, 9.0f, 3.0f);
-	pointLight.Radiance = vec3(1.0f);
-	pointLight.Radius = 40.0f;
-	pointLight.Falloff = 1.0f;
-
 	DirectionalLight dirLight;
 	dirLight.Direction = vec3(0.9f, 0.5f, 0.9f);
 	dirLight.Radiance = vec3(1.0f);
 	dirLight.Multiplier = 0.05f;
 
-	vec3 Lo = PointLightContribution(pointLight);
+	// Calculating all point lights contribution
+	vec3 Lo = vec3(0.0f);
+	uint pointLightCount = int(u_PushConstant.CameraPosition.w);
+	for(uint i = 0; i < pointLightCount; i++)
+	{
+		PointLight pointLight = LightData.u_PointLights[i];
+		Lo += PointLightContribution(pointLight);
+	}
+
+
+	// Calculating all directional lights contribution
 	vec3 Ld = DirectionalLightContribution(dirLight);
 
+	// Adding up the point light and directional light contribution
     vec3 result = Lo + Ld;
 
+	// Adding up the ibl
 	float IBLIntensity = 1.0f;
 	result += IBL_Contribution() * IBLIntensity;
 
-	// Tonemapping
+	// Tonemapping (ACES algorithm)
 	result = AcesApprox(result * m_CameraData.Exposure);
 
 	// Gamma correction

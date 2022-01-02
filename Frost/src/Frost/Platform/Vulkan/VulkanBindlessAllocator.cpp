@@ -43,7 +43,7 @@ namespace Frost
 	void VulkanBindlessAllocator::Init()
 	{
 		// Random generator initialization
-		s_UniformDistribution = std::uniform_int_distribution<uint64_t>(0, m_TextureMaxStorage - 1);
+		s_UniformDistribution = std::uniform_int_distribution<uint64_t>(1, m_TextureMaxStorage - 1);
 
 		///////////////////////////////////////////////////////////
 		// Descriptor Pool
@@ -71,7 +71,7 @@ namespace Frost
 		layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		layoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
-		Vector<VkDescriptorBindingFlags> descriptorBindingFlags = { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT };
+		Vector<VkDescriptorBindingFlags> descriptorBindingFlags = { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT };
 
 		VkDescriptorSetLayoutBindingFlagsCreateInfo descriptorSetLayoutBindingFlags{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO };
 		descriptorSetLayoutBindingFlags.bindingCount = (uint32_t)descriptorBindingFlags.size();
@@ -162,6 +162,11 @@ namespace Frost
 		{
 			AddTextureInternal(slot, texture2d);
 		}
+	}
+
+	void VulkanBindlessAllocator::RevmoveTextureCustomSlot(uint32_t slot)
+	{
+		m_TextureSlots[slot] = nullptr;
 	}
 
 	void VulkanBindlessAllocator::AddTextureInternal(uint32_t slot, const Ref<Texture2D>& texture2d)
