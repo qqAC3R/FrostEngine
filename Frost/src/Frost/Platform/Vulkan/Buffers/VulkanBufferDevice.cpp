@@ -82,6 +82,31 @@ namespace Frost
 		m_DescriptorInfo.range = m_BufferData.Size;
 	}
 
+	void VulkanBufferDevice::SetMemoryBarrier(VkCommandBuffer cmdBuf,
+		VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask,
+		VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
+	{
+		VkBufferMemoryBarrier memoryBufferBarrier{ VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+		memoryBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		memoryBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+		memoryBufferBarrier.srcAccessMask = srcAccessMask;
+		memoryBufferBarrier.dstAccessMask = dstAccessMask;
+
+		memoryBufferBarrier.buffer = m_Buffer;
+		memoryBufferBarrier.size = m_DescriptorInfo.range;
+		memoryBufferBarrier.offset = 0;
+
+		vkCmdPipelineBarrier(cmdBuf,
+			srcStageMask,
+			dstStageMask,
+			0,
+			0, nullptr,
+			1, &memoryBufferBarrier,
+			0, nullptr
+		);
+	}
+
 	void VulkanBufferDevice::Destroy()
 	{
 		if (m_Buffer == VK_NULL_HANDLE) return;

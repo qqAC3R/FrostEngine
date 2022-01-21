@@ -298,6 +298,15 @@ namespace Frost
 		return ImGui_ImplVulkan_AddTexture(vulkanTexture->GetVulkanSampler(), vulkanTexture->GetVulkanImageView(), vulkanTexture->GetVulkanImageLayout());
 	}
 
+	void* ImGuiLayer::GetTextureIDFromVulkanTexture_MipLevel(Ref<Image2D> texture, uint32_t mipLevel)
+	{
+		Ref<VulkanImage2D> vulkanTexture = texture.As<VulkanImage2D>();
+
+		return ImGui_ImplVulkan_AddTexture(
+			vulkanTexture->GetVulkanSampler(), vulkanTexture->GetVulkanImageViewMip(mipLevel), vulkanTexture->GetVulkanImageLayout()
+		);
+	}
+
 	void ImGuiLayer::SetDarkThemeColors()
 	{
 

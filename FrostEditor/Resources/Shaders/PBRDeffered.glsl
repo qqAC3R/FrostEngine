@@ -57,8 +57,12 @@ layout(binding = 1) uniform sampler2D u_AlbedoTexture;
 layout(binding = 2) uniform sampler2D u_NormalTexture;
 layout(binding = 3) uniform sampler2D u_CompositeTexture;
 layout(binding = 4, scalar) readonly buffer u_LightData { // Using scalar, it will fix our byte padding issues?
-	PointLight u_PointLights[1024];
+	PointLight u_PointLights[];
 } LightData;
+
+layout(binding = 10, scalar) readonly buffer u_VisibleLightData { // Using scalar, it will fix our byte padding issues?
+	int Indices[];
+} VisibleLightData;
 
 layout(binding = 6) uniform samplerCube u_RadianceFilteredMap;
 layout(binding = 7) uniform samplerCube u_IrradianceMap;
@@ -67,11 +71,13 @@ layout(binding = 8) uniform sampler2D u_BRDFLut;
 layout(binding = 9) uniform CameraData {
 	float Gamma;
 	float Exposure;
+	float PointLightCount;
+	float LightCullingWorkgroup;
 } m_CameraData;
 
 
 layout(push_constant) uniform PushConstant {
-    vec4 CameraPosition; // vec3 - camera position + float pointLightCount
+    vec4 CameraPosition; // vec4 - camera position + float pointLightCount + lightCullingWorkgroup.x
 } u_PushConstant;
 
 
@@ -88,6 +94,16 @@ struct SurfaceProperties
     vec3 F0;
 } m_Surface;
 
+
+
+int GetLightBufferIndex(int i)
+{
+    ivec2 tileID = ivec2(gl_FragCoord) / ivec2(16, 16); //Current Fragment position / Tile count
+    uint index = tileID.y * uint(m_CameraData.LightCullingWorkgroup) + tileID.x;
+
+    uint offset = index * 1024;
+    return VisibleLightData.Indices[offset + i];
+}
 
 
 float NDFGGX(float cosLh, float roughness)
@@ -218,6 +234,7 @@ vec3 IBL_Contribution()
 	// Sample BRDF Lut, 1.0 - roughness for y-coord because texture was generated (in Sparky) for gloss model
 	vec2 specularBRDF = texture(u_BRDFLut, vec2(NdotV, 1.0 - m_Surface.Roughness)).rg;
 	vec3 specularIBL = specularIrradiance * (m_Surface.F0 * specularBRDF.x + specularBRDF.y);
+	//vec3 specularIBL = specularIrradiance * (m_Surface.F0);
 
 	return kd * diffuseIBL + specularIBL;
 }
@@ -257,11 +274,21 @@ void main()
 
 	// Calculating all point lights contribution
 	vec3 Lo = vec3(0.0f);
-	uint pointLightCount = int(u_PushConstant.CameraPosition.w);
+	uint pointLightCount = uint(m_CameraData.PointLightCount);
+	//uint pointLightCount = uint(u_PushConstant.CameraPosition.w);
+
+
+	float heatMap = 0.0f;
 	for(uint i = 0; i < pointLightCount; i++)
 	{
-		PointLight pointLight = LightData.u_PointLights[i];
-		Lo += PointLightContribution(pointLight);
+		int lightIndex = GetLightBufferIndex(int(i));
+        if (lightIndex == -1)
+            break;
+
+		PointLight pointLight = LightData.u_PointLights[lightIndex];
+		Lo += PointLightContribution(pointLight) * pointLight.Intensity;
+
+		heatMap += 0.1f;
 	}
 
 
@@ -282,5 +309,5 @@ void main()
 	result = pow(result, vec3(1.0f / m_CameraData.Gamma));
 
 	// Outputting the result
-    o_Color = vec4(result, 1.0f);
+    o_Color = vec4(result + vec3(heatMap), 1.0f);
 }

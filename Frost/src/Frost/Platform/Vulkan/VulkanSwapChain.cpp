@@ -20,6 +20,8 @@ namespace Frost
 		}
 	}
 
+	static RendererConfig s_RendererConfig = Renderer::GetRendererConfig();
+
 	VulkanSwapChain::VulkanSwapChain(GLFWwindow* window)
 	{
 		VkInstance instance = VulkanContext::GetInstance();
@@ -328,8 +330,7 @@ namespace Frost
 		presentInfo.pImageIndices = &m_CurrentFrameIndex;
 		FROST_VKCHECK(vkQueuePresentKHR(m_PresentQueue, &presentInfo));
 
-		RendererConfig rendererConfig = Renderer::GetRendererConfig();
-		m_CurrentBufferIndex = (m_CurrentBufferIndex + 1) % rendererConfig.FramesInFlight;
+		m_CurrentBufferIndex = (m_CurrentBufferIndex + 1) % s_RendererConfig.FramesInFlight;
 	}
 
 	void VulkanSwapChain::PickPresentQueue()

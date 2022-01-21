@@ -7,7 +7,6 @@
 struct GLFWwindow;
 namespace Frost
 {
-
 	class VulkanSwapChain
 	{
 	public:

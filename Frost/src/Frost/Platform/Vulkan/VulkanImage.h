@@ -38,6 +38,8 @@ namespace Frost
 		VkImageView GetVulkanImageView() const { return m_ImageView; }
 		VkImageLayout GetVulkanImageLayout() const { return m_ImageLayout; }
 
+		VkImageView GetVulkanImageViewMip(uint32_t mipLevel) { return m_Mips[mipLevel]; }
+
 		VkDescriptorImageInfo& GetVulkanDescriptorInfo(DescriptorImageType imageType) {
 			FROST_ASSERT_INTERNAL((m_DescriptorInfo.find(imageType) != m_DescriptorInfo.end()));
 			return m_DescriptorInfo[imageType];
@@ -69,16 +71,18 @@ namespace Frost
 			VkImage& image, VulkanMemoryInfo& imageMemory
 		);
 		void CreateImageView(VkImageView& imageView, VkImage image, VkImageUsageFlags imageUsage, VkFormat format, uint32_t mipLevels, uint32_t textureDepth);
-		void CreateImageSampler(VkSampler& sampler, VkFilter filtering, VkSamplerAddressMode samplerAdressMode, uint32_t mipLevels);
+		void CreateImageSampler(VkSampler& sampler, VkFilter filtering, VkSamplerAddressMode samplerAdressMode, VkSamplerMipmapMode samplerMipMapMode, uint32_t mipLevels, VkSamplerReductionMode reductionMode = VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE);
 
 		void CopyBufferToImage(VkCommandBuffer cmdBuf, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t depth);
 
 		VkFormat GetImageFormat(ImageFormat imageFormat);
 		VkFilter GetImageFiltering(ImageFilter imageFiltering);
 		VkSamplerAddressMode GetImageWrap(ImageWrap imageWrap);
+		VkSamplerMipmapMode GetImageSamplerMipMapMode(ImageFilter imageFiltering);
 		VkImageUsageFlags GetImageUsageFlags(ImageUsage imageUsage);
 		VkImageLayout GetImageLayout(ImageUsage imageUsage);
 		VkAccessFlags GetAccessFlagsFromLayout(VkImageLayout imageLayout);
+		VkSamplerReductionMode GetSamplerReductionMode(ReductionMode reductionMode);
 		VkPipelineStageFlags GetPipelineStageFlagsFromLayout(VkImageLayout imageLayout);
 		VkDeviceSize CalculateImageBufferSize(uint32_t width, uint32_t height, ImageFormat imageFormat);
 	}

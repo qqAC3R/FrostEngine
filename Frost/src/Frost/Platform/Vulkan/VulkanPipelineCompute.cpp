@@ -57,6 +57,8 @@ namespace Frost
 
 	void VulkanComputePipeline::Dispatch(VkCommandBuffer cmdBuf, uint32_t groupX, uint32_t groupY, uint32_t groupZ)
 	{
+		// TODO: Maybe binding should be separated?
+		// (In the case of generating the Hi-Z buffer, this would happen `depth buffer mipLevels` times)
 		vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pipeline);
 		vkCmdDispatch(cmdBuf, groupX, groupY, groupZ);
 	}

@@ -9,6 +9,19 @@
 
 namespace Frost
 {
+
+	struct IndirectMeshData
+	{
+		IndirectMeshData() = default;
+		IndirectMeshData(uint32_t submeshOffset, uint32_t SubmeshCount, uint32_t meshIndex)
+			: SubmeshOffset(submeshOffset), SubmeshCount(SubmeshCount), MeshIndex(meshIndex)
+		{}
+
+		uint32_t SubmeshOffset; // Offset of the last submeshes (used for indirect drawing)
+		uint32_t SubmeshCount; // How many submeshes were actually submitted (we are doing culling)
+		uint32_t MeshIndex; // The index from the render queue
+	};
+
 	class VulkanGeometryPass : public SceneRenderPass
 	{
 	public:
@@ -23,6 +36,11 @@ namespace Frost
 		virtual void* GetInternalData() override { return (void*)m_Data; }
 
 		virtual const std::string& GetName() override { return m_Name; }
+
+	private:
+		void Geometry_DataInit();
+		void HZB_DataInit();
+		void LateCull_DataInit();
 
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
@@ -45,31 +63,62 @@ namespace Frost
 			// Matricies
 			glm::mat4 WorldSpaceMatrix;
 			glm::mat4 ModelMatrix;
+		};
 
-			// SubMesh indices
-			//uint32_t WorldMeshIndex;
-			//uint32_t SubmeshIndex;
+		struct MeshData
+		{
+			glm::mat4 Transform;
+			glm::vec4 AABB_Min;
+			glm::vec4 AABB_Max;
+		};
+
+		struct ComputeShaderPS // Push constant
+		{
+			glm::vec4 DepthPyramidSize; // vec2 DepthPyramidRes || float DrawCount || float Padding
+			glm::mat4 ViewProjectionMatrix;
 		};
 
 		struct InternalData
 		{
+			// Geometry pass
 			Ref<Pipeline> Pipeline;
 			Ref<RenderPass> RenderPass;
-			Ref<Shader> Shader;
+			Ref<Shader> GeometryShader;
 			Vector<Ref<Material>> Descriptor;
 
-			//Vector<HeapBlock> VertexBuffer; // Vertex buffer of the scene
-			//Vector<HeapBlock> IndexBuffer; // Index buffer of the scene
 
+			// Depth pyramid construction
+			Ref<Shader> HZBShader; // Hi-Z Buffer Builder Compute Shader
+			Ref<ComputePipeline> HZBPipeline;
+			Vector<Vector<Ref<Material>>> HZBDescriptor;
+			Vector<Ref<Image2D>> DepthPyramid;
+			uint32_t HZB_MipLevels;
+			glm::vec2 HZB_Dimensions;
+
+			// For occlusion culling
+			Ref<Shader> LateCullShader;
+			Ref<ComputePipeline> LateCullPipeline;
+			Vector<Ref<Material>> LateCullDescriptor;
+			
+			HeapBlock MeshSpecs; 
+
+			Ref<BufferDevice> DebugDeviceBuffer; // Debug
+			ComputeShaderPS ComputeShaderPushConstant; // Push constant data for the occlusion culling shader
+
+
+
+
+
+			// Indirect drawing
 			Vector<HeapBlock> IndirectCmdBuffer;
-			Vector<HeapBlock> InstanceSpecs;
+			Vector<HeapBlock> MaterialSpecs;
 
-			//Vector<Ref<BufferDevice>> IndirectCmdBuffer;
+
 		};
 
 		struct PushConstant
 		{
-			uint32_t  MaterialIndex;
+			uint32_t MaterialIndex;
 		};
 
 		InternalData* m_Data;

@@ -28,7 +28,7 @@ namespace Frost
 	{
 	public:
 		EditorLayer()
-			: Layer("Example"), m_EditorCamera(85.0f, 1600.0f / 900.0f, 0.1f, 1000.0f)
+			: Layer("Example"), m_EditorCamera(85.0f, 1600.0f / 900.0f, 0.1f, 10000.0f)
 		{
 		}
 
@@ -54,13 +54,13 @@ namespace Frost
 			m_ViewportPanel = Ref<ViewportPanel>::Create();
 			m_ViewportPanel->Init(nullptr);
 
-
+#if 0
 			{
 				auto& sponzaEntity = m_EditorScene->CreateEntity("Sphere");
 				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
 				meshComponent.Mesh = Mesh::Load("Resources/Meshes/Sphere.fbx", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
 			}
-
+#endif
 			{
 				auto& sponzaEntity = m_EditorScene->CreateEntity("Plane");
 				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
@@ -149,7 +149,7 @@ namespace Frost
 
 					Renderer::Resize(viewportPanelSize.x, viewportPanelSize.y);
 					m_EditorCamera.SetViewportSize(viewportPanelSize.x, viewportPanelSize.y);
-					m_EditorCamera.SetProjectionMatrix(glm::perspective(70.0f, viewportPanelSize.x / viewportPanelSize.y, 0.1f, 1000.0f));
+					m_EditorCamera.SetProjectionMatrix(glm::perspective(70.0f, viewportPanelSize.x / viewportPanelSize.y, 0.1f, 10000.0f));
 				}
 
 

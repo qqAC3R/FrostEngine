@@ -29,6 +29,7 @@ namespace Frost
 		void Render();
 
 		static void* GetTextureIDFromVulkanTexture(Ref<Image2D> texture);
+		static void* GetTextureIDFromVulkanTexture_MipLevel(Ref<Image2D> texture, uint32_t mipLevel);
 	private:
 		void SetDarkThemeColors();
 

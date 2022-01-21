@@ -169,7 +169,8 @@ namespace Frost
 		// Creating the sampler
 		VkFilter filtering = Utils::GetImageFiltering(imageSpecification.Sampler.SamplerFilter);
 		VkSamplerAddressMode wrap = Utils::GetImageWrap(imageSpecification.Sampler.SamplerWrap);
-		Utils::CreateImageSampler(m_ImageSampler, filtering, wrap, m_MipLevelCount);
+		VkSamplerMipmapMode mipMapMode = Utils::GetImageSamplerMipMapMode(imageSpecification.Sampler.SamplerFilter);
+		Utils::CreateImageSampler(m_ImageSampler, filtering, wrap, mipMapMode, m_MipLevelCount);
 
 		VulkanContext::SetStructDebugName("TextureCubeMap-Image", VK_OBJECT_TYPE_IMAGE, m_Image);
 		VulkanContext::SetStructDebugName("TextureCubeMap-ImageView", VK_OBJECT_TYPE_IMAGE_VIEW, m_ImageView);

@@ -125,9 +125,8 @@ struct MaterialData
 };
 layout(set = 0, binding = 0, scalar) readonly buffer u_MaterialUniform
 {
-	MaterialData Data[16384];
+	MaterialData Data[];
 } MaterialUniform;
-
 
 // Bindless
 layout(set = 1, binding = 0) uniform sampler2D u_Textures[];

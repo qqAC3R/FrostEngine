@@ -8,7 +8,7 @@ namespace Frost
 		None = 0,
 
 		// Color
-		R8,
+		R8, R32,
 		RGBA8, RGBA16F, RGBA32F,
 
 		// Depth/Stencil
@@ -31,13 +31,19 @@ namespace Frost
 
 	enum class ImageWrap
 	{
-		Repeat
+		Repeat, ClampToEdge
+	};
+
+	enum class ReductionMode
+	{
+		None, Min, Max
 	};
 
 	struct SamplerProperties
 	{
 		ImageWrap SamplerWrap = ImageWrap::Repeat;
 		ImageFilter SamplerFilter = ImageFilter::Linear;
+		ReductionMode ReductionMode_Optional = ReductionMode::None; // Optional
 	};
 
 	struct ImageSpecification
@@ -48,7 +54,6 @@ namespace Frost
 		uint32_t Width = 0;
 		uint32_t Height = 0;
 		bool UseMipChain = true;
-		//uint32_t Mips = 1;
 	};
 
 	class Image

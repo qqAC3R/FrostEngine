@@ -120,25 +120,6 @@ namespace Frost
 				else
 					FROST_CORE_WARN("This entity already has the Point Light Component!");
 			}
-#if 0
-			if (ImGui::MenuItem("Camera"))
-			{
-				if (!m_SceneHierarchy->GetSelectedEntity().HasComponent<CameraComponent>())
-					m_SelectionContext.AddComponent<CameraComponent>();
-				else
-					HZ_CORE_WARN("This entity already has the Camera Component!");
-				ImGui::CloseCurrentPopup();
-			}
-
-			if (ImGui::MenuItem("Sprite Renderer"))
-			{
-				if (!m_SelectionContext.HasComponent<SpriteRendererComponent>())
-					m_SelectionContext.AddComponent<SpriteRendererComponent>();
-				else
-					HZ_CORE_WARN("This entity already has the Sprite Renderer Component!");
-				ImGui::CloseCurrentPopup();
-			}
-#endif
 
 			ImGui::EndPopup();
 		}

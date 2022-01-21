@@ -1,15 +1,17 @@
 #include "frostpch.h"
 #include "VulkanCompositePass.h"
 
-#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
-#include "Frost/Platform/Vulkan/VulkanFramebuffer.h"
-#include "Frost/Platform/Vulkan/VulkanRenderPass.h"
+#include "Frost/Platform/Vulkan/VulkanImage.h"
+#include "Frost/Platform/Vulkan/VulkanTexture.h"
+#include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanRenderer.h"
 #include "Frost/Platform/Vulkan/VulkanPipeline.h"
-#include "Frost/Platform/Vulkan/VulkanContext.h"
-#include "Frost/Platform/Vulkan/VulkanTexture.h"
-#include "Frost/Platform/Vulkan/VulkanImage.h"
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
+#include "Frost/Platform/Vulkan/VulkanRenderPass.h"
+#include "Frost/Platform/Vulkan/VulkanFramebuffer.h"
+#include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 
 namespace Frost
 {
@@ -32,7 +34,10 @@ namespace Frost
 
 		m_Data->CompositeShader = Renderer::GetShaderLibrary()->Get("PBRDeffered");
 		m_Data->SkyboxShader = Renderer::GetShaderLibrary()->Get("RenderSkybox");
+		m_Data->LightCullingShader = Renderer::GetShaderLibrary()->Get("TiledLightCulling");
 
+
+		
 		RenderPassSpecification renderPassSpec =
 		{
 			1600, 900, 3,
@@ -45,7 +50,7 @@ namespace Frost
 				},
 				// Depth Attachment
 				{
-					FramebufferTextureFormat::DepthStencil, ImageUsage::DepthStencil,
+					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
 					OperationLoad::Load,        OperationStore::Store,
 					OperationLoad::DontCare,    OperationStore::DontCare,
 				}
@@ -126,23 +131,7 @@ namespace Frost
 		}
 
 
-
-#if 0
-		// Light data into a uniform buffer
-		m_PointLightData = new PointLightData();
-		m_PointLightData->LightCount = 1;
-		m_PointLightData->PointLights.resize(1);
-
-		m_PointLightData->PointLights[0].Position = glm::vec3(5.0f, 10.0f, 5.0f);
-		m_PointLightData->PointLights[0].Radiance = glm::vec3(1.0f);
-		m_PointLightData->PointLights[0].Radius = 2.0f;
-		m_PointLightData->PointLights[0].Falloff = 1.0f;
-
-		uint32_t uboSize = sizeof(uint32_t) + sizeof(PointLightProperties);
-
-		m_Data->m_PointLightUniformBuffer = UniformBuffer::Create(uboSize);
-		m_Data->m_PointLightUniformBuffer->SetData(&m_PointLightData);
-#endif
+		// Point lights
 		{
 			uint32_t maxPointLightCount = Renderer::GetRendererConfig().MaxPointLightCount;
 
@@ -157,6 +146,8 @@ namespace Frost
 				pointLightBufferData.DeviceBuffer = BufferDevice::Create(lightDataSize, { BufferUsage::Storage });
 				pointLightBufferData.HostBuffer.Allocate(lightDataSize);
 			}
+
+			TiledLightCulling_DataInit();
 		}
 
 
@@ -188,14 +179,18 @@ namespace Frost
 				Ref<Texture2D> brdfLut = Renderer::GetBRDFLut();
 
 				descriptor->Set("CameraData.Gamma", 2.2f);
+				
 				descriptor->Set("u_PositionTexture", positionTexture);
 				descriptor->Set("u_NormalTexture", normalTexture);
 				descriptor->Set("u_AlbedoTexture", albedoTexture);
 				descriptor->Set("u_CompositeTexture", compositeTexture);
+
 				descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
 				descriptor->Set("u_IrradianceMap", irradianceMap);
 				descriptor->Set("u_BRDFLut", brdfLut);
+				
 				descriptor->Set("u_LightData", m_Data->PointLightBufferData[index].DeviceBuffer);
+				descriptor->Set("u_VisibleLightData", m_Data->PointLightIndices[index]);
 
 				descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 
@@ -203,18 +198,46 @@ namespace Frost
 			}
 		}
 
-		m_Data->PreviousDepthbuffer.resize(framesInFlight);
-		for (auto& depthbuffer : m_Data->PreviousDepthbuffer)
-		{
-			ImageSpecification imageSpec{};
-			imageSpec.Width = 1600;
-			imageSpec.Height = 900;
-			imageSpec.Format = ImageFormat::Depth24Stencil8;
-			imageSpec.Usage = ImageUsage::DepthStencil;
-			imageSpec.UseMipChain = true;
-			depthbuffer = Image2D::Create(imageSpec);
-		}
 
+	}
+
+	void VulkanCompositePass::TiledLightCulling_DataInit()
+	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+
+		ComputePipeline::CreateInfo computePipelineCI{};
+		computePipelineCI.Shader = m_Data->LightCullingShader;
+		m_Data->LightCullingPipeline = ComputePipeline::Create(computePipelineCI);
+
+		m_Data->PointLightIndices.resize(framesInFlight);
+		m_Data->CullingDataBuffer.resize(framesInFlight);
+		m_Data->LightCullingDescriptor.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			auto& descriptor = m_Data->LightCullingDescriptor[i];
+			descriptor = Material::Create(m_Data->LightCullingShader, "Tiled_LightCulling");
+
+			// Light indices buffer
+			uint32_t workGroupsX = (1600 + ( 1600 % 16 )) / 16.0f;
+			uint32_t workGroupsY = (900  + ( 900 % 16  )) / 16.0f;
+			uint64_t lightIndicesBufferSize = workGroupsX * workGroupsY * 1024 * sizeof(int32_t); // 16x16 (tiles) * 1024 (lights per tile)
+			m_Data->PointLightIndices[i] = BufferDevice::Create(lightIndicesBufferSize, { BufferUsage::Storage });
+
+			// Renderer Data
+			m_Data->CullingDataBuffer[i] = BufferDevice::Create(sizeof(RendererData), { BufferUsage::Storage });
+
+			// Depth buffer neccesary for the `i` frmae
+			const Ref<Image2D>& depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(5, i);
+
+			// Setting up the data into the descriptor
+			descriptor->Set("u_LightData", m_Data->PointLightBufferData[i].DeviceBuffer);
+			descriptor->Set("u_VisibleLightsBuffer", m_Data->PointLightIndices[i]);
+			descriptor->Set("u_RendererData", m_Data->CullingDataBuffer[i]);
+			descriptor->Set("u_DepthBuffer", depthBuffer);
+
+			auto& vulkanDescriptor = descriptor.As<VulkanMaterial>();
+			vulkanDescriptor->UpdateVulkanDescriptorIfNeeded();
+		}
 	}
 
 	void VulkanCompositePass::OnUpdate(const RenderQueue& renderQueue)
@@ -231,31 +254,15 @@ namespace Frost
 		// Updating the push constant data from the renderQueue
 		m_PushConstantData.CameraPosition = glm::vec4(renderQueue.CameraPosition, 1.0f);
 
+		TiledLightCulling_OnUpdate(renderQueue);
 
 		{
-			// From the GBuffer blit the depth texture to render the environment cubemap
+			// From the GBuffer, blit the depth texture to render the environment cubemap
 			auto vulkanSrcDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(5, currentFrameIndex);
 			auto vulkanDstDepthImage = m_Data->RenderPass->GetColorAttachment(1, currentFrameIndex).As<VulkanImage2D>();
 			vulkanDstDepthImage->BlitImage(cmdBuf, vulkanSrcDepthImage);
 		}
 
-#if 0
-		{
-			// Create the depth pyramid
-			// Steps:
-			// 1) Blit the depth buffer from the previous frame into a new texture
-			// 2) Generate the mips for that texture
-			int32_t previousFrameIndex = (int32_t)currentFrameIndex - 1;
-			if (previousFrameIndex < 0)
-				previousFrameIndex = Renderer::GetRendererConfig().FramesInFlight - 1;
-
-			auto vulkanSrcDepthImage = m_Data->RenderPass->GetColorAttachment(1, currentFrameIndex);
-			auto vulkanDstDepthImage = m_Data->PreviousDepthbuffer[previousFrameIndex].As<VulkanImage2D>();
-			vulkanDstDepthImage->BlitImage(cmdBuf, vulkanSrcDepthImage);
-
-			vulkanDstDepthImage->GenerateMipMaps(cmdBuf, vulkanDstDepthImage->GetVulkanImageLayout());
-		}
-#endif
 
 		// Setting up the light data
 		// Gathering the data
@@ -265,14 +272,12 @@ namespace Frost
 		uint32_t pointLightDataSize = (pointLightCount * sizeof(RenderQueue::LightData::PointLight));
 
 		// Writting into a cpu buffer
-		//m_Data->PointLightBufferData[currentFrameIndex].HostBuffer.Write((void*)&pointLightCount, sizeof(uint32_t), 0);
 		m_Data->PointLightBufferData[currentFrameIndex].HostBuffer.Write((void*)pointLightData, pointLightDataSize, 0);
 
 		// Copying the cpu buffer into the gpu
 		m_Data->PointLightBufferData[currentFrameIndex].DeviceBuffer->SetData(pointLightDataSize, pointLightDataCPUPointer);
 
 		m_PushConstantData.CameraPosition.w = static_cast<float>(pointLightCount);
-		// TODO: Shaders reading wrong values!!!
 
 
 		m_Data->RenderPass->Bind();
@@ -293,6 +298,9 @@ namespace Frost
 
 		// Camera information
 		m_Data->Descriptor[currentFrameIndex]->Set("CameraData.Exposure", renderQueue.m_Camera.GetExposure());
+		m_Data->Descriptor[currentFrameIndex]->Set("CameraData.PointLightCount", static_cast<float>(pointLightCount));
+		m_Data->Descriptor[currentFrameIndex]->Set("CameraData.LightCullingWorkgroup", m_RendererData.ScreenSize.x / 16.0f);
+
 
 		// Drawing a quad
 		m_Data->Descriptor[currentFrameIndex]->Bind(m_Data->CompositePipeline);
@@ -319,8 +327,51 @@ namespace Frost
 		m_Data->RenderPass->Unbind();
 	}
 
+	void VulkanCompositePass::TiledLightCulling_OnUpdate(const RenderQueue& renderQueue)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		auto& vulkanDescriptor = m_Data->LightCullingDescriptor[currentFrameIndex].As<VulkanMaterial>();
+		auto& vulkanComputePipeline = m_Data->LightCullingPipeline.As<VulkanComputePipeline>();
+		auto& vulkanLightIndicesBuffer = m_Data->PointLightIndices[currentFrameIndex].As<VulkanBufferDevice>();
+
+
+		// Updating the renderData for the tiled light culling shader
+		m_RendererData.ScreenSize = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
+		m_RendererData.PointLightCount = static_cast<uint32_t>(renderQueue.m_LightData.PointLights.size());
+		m_RendererData.ProjectionMatrix = renderQueue.CameraProjectionMatrix;
+		m_RendererData.ProjectionMatrix[1][1] *= -1;
+
+		m_RendererData.ViewMatrix = renderQueue.CameraViewMatrix;
+		m_RendererData.ViewProjectionMatrix = m_RendererData.ProjectionMatrix * m_RendererData.ViewMatrix;
+
+
+		// Setting up the rendererData
+		m_Data->CullingDataBuffer[currentFrameIndex]->SetData((void*)&m_RendererData);
+
+
+		vulkanDescriptor->Bind(cmdBuf, m_Data->LightCullingPipeline);
+
+		uint32_t screenSizeX = m_RendererData.ScreenSize.x;
+		uint32_t screenSizeY = m_RendererData.ScreenSize.y;
+
+		vulkanComputePipeline->Dispatch(cmdBuf,
+			(screenSizeX + (screenSizeX % 16)) / 16.0f,
+			(screenSizeY + (screenSizeY % 16)) / 16.0f,
+			1
+		);
+
+		// Putting a memory barrier to wait till the tiled compute shader finishes
+		vulkanLightIndicesBuffer->SetMemoryBarrier(cmdBuf,
+			VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+		);
+	}
+
 	void VulkanCompositePass::OnResize(uint32_t width, uint32_t height)
 	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+
 		RenderPassSpecification renderPassSpec =
 		{
 			width, height, 3,
@@ -334,7 +385,7 @@ namespace Frost
 
 				// Depth Attachment
 				{
-					FramebufferTextureFormat::DepthStencil, ImageUsage::DepthStencil,
+					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
 					OperationLoad::Load,      OperationStore::Store,
 					OperationLoad::DontCare,  OperationStore::DontCare,
 				}
@@ -342,26 +393,40 @@ namespace Frost
 		};
 		m_Data->RenderPass = RenderPass::Create(renderPassSpec);
 
-		m_Data->PreviousDepthbuffer.resize(Renderer::GetRendererConfig().FramesInFlight);
-		for (auto& depthbuffer : m_Data->PreviousDepthbuffer)
+
+		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
-			ImageSpecification imageSpec{};
-			imageSpec.Width = width;
-			imageSpec.Height = height;
-			imageSpec.Format = ImageFormat::Depth24Stencil8;
-			imageSpec.Usage = ImageUsage::DepthStencil;
-			imageSpec.UseMipChain = true;
-			depthbuffer = Image2D::Create(imageSpec);
+			auto& vulkanComputeDescriptor = m_Data->LightCullingDescriptor[i].As<VulkanMaterial>();
+			auto& vulkanCompositeDescriptor = m_Data->Descriptor[i].As<VulkanMaterial>();
+
+			// Depth buffer neccesary for the `i` frmae
+			const Ref<Image2D>& depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(5, i);
+
+			// Light indices buffer
+			uint32_t workGroupsX = (width +  (width % 16)) / 16.0f;
+			uint32_t workGroupsY = (height + (height % 16)) / 16.0f;
+			uint64_t lightIndicesBufferSize = workGroupsX * workGroupsY * 1024 * sizeof(int32_t); // 16x16 (tiles) * 1024 (lights per tile)
+			m_Data->PointLightIndices[i] = BufferDevice::Create(lightIndicesBufferSize, { BufferUsage::Storage });
+
+			// Setting up the data into the descriptor
+			vulkanComputeDescriptor->Set("u_DepthBuffer", depthBuffer);
+			vulkanComputeDescriptor->Set("u_VisibleLightsBuffer", m_Data->PointLightIndices[i]);
+			vulkanCompositeDescriptor->Set("u_VisibleLightData", m_Data->PointLightIndices[i]); // For the composite pass too
+
+			// Update them
+			vulkanComputeDescriptor->UpdateVulkanDescriptorIfNeeded();
+			vulkanCompositeDescriptor->UpdateVulkanDescriptorIfNeeded();
 		}
 
 
-		uint32_t index = 0;
-		for (auto& descriptor : m_Data->Descriptor)
+		for(uint32_t i = 0; i < m_Data->Descriptor.size(); i++)
 		{
-			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, index);
-			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
-			Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
-			Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
+			auto& descriptor = m_Data->Descriptor[i];
+
+			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, i);
+			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, i);
+			Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, i);
+			Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, i);
 
 			descriptor->Set("u_PositionTexture", positionTexture);
 			descriptor->Set("u_NormalTexture", normalTexture);
@@ -369,8 +434,6 @@ namespace Frost
 			descriptor->Set("u_CompositeTexture", compositeTexture);
 
 			descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
-
-			index++;
 		}
 
 	}

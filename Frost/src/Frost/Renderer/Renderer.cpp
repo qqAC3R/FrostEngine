@@ -46,6 +46,10 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentMipFilter.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/RenderSkybox.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirect.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/HiZBufferBuilder.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledLightCulling.glsl");
+
 		
 		// Init the pools
 		s_RendererAPI->Init();
@@ -58,6 +62,8 @@ namespace Frost
 		TextureSpecification textureSpec{};
 		textureSpec.UseMips = false;
 		s_Data->m_WhiteTexture = Texture2D::Create("Resources/LUT/White.jpg", textureSpec);
+
+		textureSpec.Format = ImageFormat::RGBA16F;
 		s_Data->m_BRDFLut = Texture2D::Create("Resources/LUT/BRDF_LUT.tga", textureSpec);
 
 		// Init the renderpasses

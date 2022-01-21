@@ -25,6 +25,11 @@ namespace Frost
 		VkDeviceAddress GetVulkanBufferAddress() const { return m_BufferAddress; }
 		VkDescriptorBufferInfo& GetVulkanDescriptorInfo() { return m_DescriptorInfo; }
 
+		void SetMemoryBarrier(VkCommandBuffer cmdBuf,
+			VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask,
+			VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+
 		virtual void Destroy() override;
 	private:
 		void GetBufferAddress();

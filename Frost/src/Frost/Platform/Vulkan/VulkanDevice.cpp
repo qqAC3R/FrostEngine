@@ -13,6 +13,8 @@ namespace Frost
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData)
 	{
+		if(messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
+			FROST_CORE_WARN("[PERFORMANCE_WARNING] Validation layer : {0}", pCallbackData->pMessage);
 
 		if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
 			FROST_CORE_WARN("[WARNING] Validation layer : {0}", pCallbackData->pMessage);

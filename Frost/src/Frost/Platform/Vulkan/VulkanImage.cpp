@@ -87,7 +87,14 @@ namespace Frost
 		// Creating the sampler
 		VkFilter filtering = Utils::GetImageFiltering(specification.Sampler.SamplerFilter);
 		VkSamplerAddressMode addressMode = Utils::GetImageWrap(specification.Sampler.SamplerWrap);
-		Utils::CreateImageSampler(m_ImageSampler, filtering, addressMode, m_MipLevelCount);
+		VkSamplerMipmapMode mipMapMode = Utils::GetImageSamplerMipMapMode(specification.Sampler.SamplerFilter);
+		VkSamplerReductionMode reductionMode = Utils::GetSamplerReductionMode(specification.Sampler.ReductionMode_Optional);
+		Utils::CreateImageSampler(m_ImageSampler, filtering, addressMode, mipMapMode, m_MipLevelCount, reductionMode);
+
+		// Setting the debug names for the structs
+		VulkanContext::SetStructDebugName("Image2D-Image", VK_OBJECT_TYPE_IMAGE, m_Image);
+		VulkanContext::SetStructDebugName("Image2D-ImageView", VK_OBJECT_TYPE_IMAGE_VIEW, m_ImageView);
+		VulkanContext::SetStructDebugName("Image2D-Sampler", VK_OBJECT_TYPE_SAMPLER, m_ImageSampler);
 
 		// Updating the descriptor
 		UpdateDescriptor();
@@ -199,7 +206,9 @@ namespace Frost
 		// Creating the sampler
 		VkFilter filtering = Utils::GetImageFiltering(specification.Sampler.SamplerFilter);
 		VkSamplerAddressMode addressMode = Utils::GetImageWrap(specification.Sampler.SamplerWrap);
-		Utils::CreateImageSampler(m_ImageSampler, filtering, addressMode, m_MipLevelCount);
+		VkSamplerMipmapMode mipMapMode = Utils::GetImageSamplerMipMapMode(specification.Sampler.SamplerFilter);
+		VkSamplerReductionMode reductionMode = Utils::GetSamplerReductionMode(specification.Sampler.ReductionMode_Optional);
+		Utils::CreateImageSampler(m_ImageSampler, filtering, addressMode, mipMapMode, m_MipLevelCount, reductionMode);
 
 		// Setting the debug names for the structs
 		VulkanContext::SetStructDebugName("Image2D-Image", VK_OBJECT_TYPE_IMAGE, m_Image);
@@ -523,7 +532,7 @@ namespace Frost
 			FROST_VKCHECK(vkCreateImageView(device, &createInfo, nullptr, &imageView));
 		}
 
-		void CreateImageSampler(VkSampler& sampler, VkFilter filtering, VkSamplerAddressMode samplerAdressMode, uint32_t mipLevels)
+		void CreateImageSampler(VkSampler& sampler, VkFilter filtering, VkSamplerAddressMode samplerAdressMode, VkSamplerMipmapMode samplerMipMapMode, uint32_t mipLevels, VkSamplerReductionMode reductionMode)
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 			VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
@@ -546,10 +555,20 @@ namespace Frost
 			samplerInfo.compareEnable = VK_FALSE;
 			samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
 
-			samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			samplerInfo.mipmapMode = samplerMipMapMode;
 			samplerInfo.mipLodBias = 0.0f;
 			samplerInfo.minLod = 0.0f;
 			samplerInfo.maxLod = static_cast<float>(mipLevels);
+
+			// Optional features (for depth pyramid mostly)
+			VkSamplerReductionModeCreateInfoEXT createInfoReduction{ VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO_EXT };
+			if (reductionMode != VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE)
+			{
+				createInfoReduction.reductionMode = reductionMode;
+
+				samplerInfo.pNext = &createInfoReduction;
+			}
+
 
 			FROST_VKCHECK(vkCreateSampler(device, &samplerInfo, nullptr, &sampler));
 		}
@@ -590,6 +609,7 @@ namespace Frost
 			switch (imageFormat)
 			{
 				case ImageFormat::R8:               return VK_FORMAT_R8_UNORM;
+				case ImageFormat::R32:              return VK_FORMAT_R32_SFLOAT;
 				case ImageFormat::RGBA8:            return VK_FORMAT_R8G8B8A8_UNORM;
 				case ImageFormat::RGBA16F:          return VK_FORMAT_R16G16B16A16_SFLOAT;
 				case ImageFormat::RGBA32F:          return VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -615,10 +635,22 @@ namespace Frost
 		{
 			switch (imageWrap)
 			{
-				case ImageWrap::Repeat: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+				case ImageWrap::Repeat:		 return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+				case ImageWrap::ClampToEdge: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			}
 			FROST_ASSERT_MSG("ImageWrap is invalid!");
 			return VkSamplerAddressMode();
+		}
+
+		VkSamplerMipmapMode GetImageSamplerMipMapMode(ImageFilter imageFiltering)
+		{
+			switch (imageFiltering)
+			{
+			case ImageFilter::Linear:   return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			case ImageFilter::Nearest:  return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			}
+			FROST_ASSERT_MSG("ImageFilter is invalid!");
+			return VkSamplerMipmapMode();
 		}
 
 		VkImageUsageFlags GetImageUsageFlags(ImageUsage imageUsage)
@@ -660,6 +692,17 @@ namespace Frost
 				case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:         return VK_ACCESS_SHADER_READ_BIT;
 			}
 			return VK_ACCESS_NONE_KHR;
+		}
+
+		VkSamplerReductionMode GetSamplerReductionMode(ReductionMode reductionMode)
+		{
+			switch (reductionMode)
+			{
+				case ReductionMode::Min:    return VK_SAMPLER_REDUCTION_MODE_MIN;
+				case ReductionMode::Max:    return VK_SAMPLER_REDUCTION_MODE_MAX;
+				case ReductionMode::None:	return VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE;
+			}
+			return VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE;
 		}
 
 		VkPipelineStageFlags GetPipelineStageFlagsFromLayout(VkImageLayout imageLayout)

@@ -21,9 +21,11 @@ namespace Frost
 
 		virtual const std::string& GetName() override { return m_Name; }
 	private:
+		void TiledLightCulling_DataInit();
+		void TiledLightCulling_OnUpdate(const RenderQueue& renderQueue);
+	private:
 		std::string m_Name;
 		SceneRenderPassPipeline* m_RenderPassPipeline;
-
 
 		struct InternalData
 		{
@@ -32,13 +34,16 @@ namespace Frost
 			Ref<RenderPass> RenderPass;
 			Vector<Ref<Material>> Descriptor;
 			Ref<Shader> CompositeShader;
-			//Ref<UniformBuffer> m_PointLightUniformBuffer;
 
 			// Light data
 			Vector<HeapBlock> PointLightBufferData;
+			Vector<Ref<BufferDevice>> PointLightIndices;
 
-			// For depth pyramid (occlusion culling)
-			Vector<Ref<Image2D>> PreviousDepthbuffer;
+			// Light culling
+			Ref<Shader> LightCullingShader;
+			Ref<ComputePipeline> LightCullingPipeline;
+			Vector<Ref<Material>> LightCullingDescriptor;
+			Vector<Ref<BufferDevice>> CullingDataBuffer;
 
 			// Skybox pass
 			Ref<Shader> SkyboxShader;
@@ -55,22 +60,17 @@ namespace Frost
 		};
 		PushConstantData m_PushConstantData;
 
-		struct PointLightProperties
+		struct RendererData // For the Tiled LightCulling compute shader
 		{
-			glm::vec3 Position;
-			glm::vec3 Radiance;
-			float Radius;
-			float Falloff;
-		};
+			glm::vec2 ScreenSize;
+			int PointLightCount;
+			int Padding;
 
-#if 0
-		struct PointLightData
-		{
-			uint32_t LightCount = 0;
-			Vector<PointLightProperties> PointLights;
+			glm::mat4 ViewMatrix;
+			glm::mat4 ProjectionMatrix;
+			glm::mat4 ViewProjectionMatrix;
 		};
-		PointLightData* m_PointLightData;
-#endif
+		RendererData m_RendererData;
 
 		friend class SceneRenderPassPipeline;
 	};
