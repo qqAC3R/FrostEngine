@@ -12,6 +12,7 @@
 #include "Frost/Platform/Vulkan/VulkanImage.h"
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanVertexBuffer.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
@@ -43,7 +44,8 @@ namespace Frost
 		m_Data = new InternalData();
 
 		m_Data->GeometryShader = Renderer::GetShaderLibrary()->Get("GeometryPassIndirectBindless");
-		m_Data->LateCullShader = Renderer::GetShaderLibrary()->Get("OcclusionCulling");
+		//m_Data->LateCullShader = Renderer::GetShaderLibrary()->Get("OcclusionCulling");
+		m_Data->LateCullShader = Renderer::GetShaderLibrary()->Get("OcclusionCulling_V2");
 		m_Data->HZBShader = Renderer::GetShaderLibrary()->Get("HiZBufferBuilder");
 
 
@@ -84,7 +86,7 @@ namespace Frost
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
-
+#if 0
 				// Composite Attachment
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
@@ -98,6 +100,7 @@ namespace Frost
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
+#endif
 
 				// Depth Attachment
 				{
@@ -111,6 +114,7 @@ namespace Frost
 
 
 		// Pipeline creations
+		/*
 		BufferLayout bufferLayout = {
 			{ "a_Position",      ShaderDataType::Float3 },
 			{ "a_TexCoord",	     ShaderDataType::Float2 },
@@ -119,6 +123,13 @@ namespace Frost
 			{ "a_Bitangent",     ShaderDataType::Float3 },
 			{ "a_MaterialIndex", ShaderDataType::Float }
 		};
+		*/
+		BufferLayout bufferLayout = {
+			{ "a_ModelSpaceMatrix",  ShaderDataType::Mat4 },
+			{ "a_WorldSpaceMatrix",  ShaderDataType::Mat4 },
+		};
+		bufferLayout.m_InputType = InputType::Instanced;
+
 		Pipeline::CreateInfo pipelineCreateInfo{};
 		pipelineCreateInfo.Shader = m_Data->GeometryShader;
 		pipelineCreateInfo.UseDepthTest = true;
@@ -155,8 +166,8 @@ namespace Frost
 			auto& instanceSpec = m_Data->MaterialSpecs[i];
 
 			// Allocating a heap block
-			instanceSpec.DeviceBuffer = BufferDevice::Create(sizeof(InstanceData) * maxCountMeshes, { BufferUsage::Storage });
-			instanceSpec.HostBuffer.Allocate(sizeof(InstanceData) * maxCountMeshes);
+			instanceSpec.DeviceBuffer = BufferDevice::Create(sizeof(MaterialData) * maxCountMeshes, { BufferUsage::Storage });
+			instanceSpec.HostBuffer.Allocate(sizeof(MaterialData) * maxCountMeshes);
 
 			// Setting the storage buffer into the descriptor
 			m_Data->Descriptor[i]->Set("u_MaterialUniform", instanceSpec.DeviceBuffer);
@@ -173,19 +184,8 @@ namespace Frost
 		//////////////////////////////////////////////
 		// DEPTH PYRAMID CONSTRUCTION ////////////////
 		//////////////////////////////////////////////
-		//m_Data->DepthPyramid.resize(framesInFlight);
-		//for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			// Calculating the previous frame index
-
-			//int previousFrameIndex = i - 1;
-			//if (previousFrameIndex < 0)
-			//	previousFrameIndex = framesInFlight - 1;
-
-
-			// Depth pyramid creation
-			//auto& depthPyramid = m_Data->DepthPyramid[i];
-			//auto& previousDepthBuffer = m_Data->RenderPass->GetColorAttachment(5, previousFrameIndex);
 			{
 				m_Data->HZB_Dimensions = glm::vec2(1600, 900);
 
@@ -206,8 +206,6 @@ namespace Frost
 
 					m_Data->DepthPyramid[i] = Image2D::Create(imageSpec);
 				}
-
-
 			}
 
 			// Pipeline creation
@@ -293,9 +291,6 @@ namespace Frost
 
 						vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
 					}
-
-					//material->Set("i_Depth", previousDepthBuffer);
-					//material->Set("o_Depth", depthPyramid);
 				}
 			}
 		}
@@ -316,12 +311,12 @@ namespace Frost
 			computePipelineCreateInfo.Shader = m_Data->LateCullShader;
 			m_Data->LateCullPipeline = ComputePipeline::Create(computePipelineCreateInfo);
 
-			m_Data->DebugDeviceBuffer = BufferDevice::Create(sizeof(glm::vec4) * 2, { BufferUsage::Storage });
+			m_Data->DebugDeviceBuffer = BufferDevice::Create(sizeof(glm::mat4) * 1024, { BufferUsage::Storage });
 
 
 			// Mesh specs for the compute shader (occlusion culling) TODO: Only 1??
-			m_Data->MeshSpecs.DeviceBuffer = BufferDevice::Create(sizeof(MeshData) * maxCountMeshes, { BufferUsage::Storage });
-			m_Data->MeshSpecs.HostBuffer.Allocate(sizeof(MeshData) * maxCountMeshes);
+			m_Data->MeshSpecs.DeviceBuffer = BufferDevice::Create(sizeof(MeshData_OC) * maxCountMeshes, { BufferUsage::Storage });
+			m_Data->MeshSpecs.HostBuffer.Allocate(sizeof(MeshData_OC) * maxCountMeshes);
 
 			m_Data->LateCullDescriptor.resize(framesInFlight);
 			for (uint32_t i = 0; i < m_Data->LateCullDescriptor.size(); i++)
@@ -340,8 +335,6 @@ namespace Frost
 			}
 		}
 	}
-
-	static int s_DebugMipLevel = 0;
 
 	void VulkanGeometryPass::OnUpdate(const RenderQueue& renderQueue)
 	{
@@ -363,22 +356,22 @@ namespace Frost
 
 		/*
 			Each mesh might have a set of submeshes which are sent to render individualy.
-			We dont need them when we render them indirectly (because the gpu renders all the submeshes automatically),
+			We dont need them when we render them indirectly (because the gpu renders all the submeshes automatically - `multidraw`),
 			instead we just need to know the `start index` of every mesh in the `VkDrawIndexedIndirectCommand` buffer.
 		*/
 		Vector<IndirectMeshData> meshIndirectData;
 		
 		// `Indirect draw commands` offset
-		uint32_t indirectCmdsOffset = 0;
+		uint64_t indirectCmdsOffset = 0;
 
 		// Data for occlusion culling shader
-		MeshData meshData{};
+		MeshData_OC meshData{};
 		uint32_t meshDataOffset = 0;
 
 		// `Instance data` offset.
 		//  Allocating here the `InstanceData`, because if we allocate it for every submesh in the scene, it will be way more expensive
-		uint32_t instanceDataOffset = 0;
-		InstanceData instData{};
+		MaterialData instData{};
+		uint32_t materialDataOffset = 0;
 
 		// Get all the indirect draw commands
 		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
@@ -387,13 +380,20 @@ namespace Frost
 			auto mesh = renderQueue.m_Data[i].Mesh;
 			const Vector<Submesh>& submeshes = mesh->GetSubMeshes();
 
+			// Instanced data for submeshes
+			SubmeshInstanced submeshInstanced{};
+			uint32_t vboInstancedDataOffset = 0;
+
+			// Count how many meshes were submitted (for calculating offsets)
 			uint32_t submittedSubmeshes = 0;
+
 			// Set commands for the submeshes
 			for (uint32_t k = 0; k < submeshes.size(); k++)
 			{
 				const Submesh& submesh = submeshes[k];
 
 				glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
+
 
 				// TODO: Fix frustum culling
 #if 0
@@ -430,29 +430,38 @@ namespace Frost
 				instData.Emission =            materialData.Get<float>("EmissionFactor");
 
 				// Matricies
-				instData.ModelMatrix =		 modelMatrix;
-				instData.WorldSpaceMatrix =  viewProjectionMatrix * instData.ModelMatrix;
+				//instData.ModelMatrix =		 modelMatrix;
+				//instData.WorldSpaceMatrix =  viewProjectionMatrix * instData.ModelMatrix;
 
 				// The data collected from the mesh, should be written into a cpu buffer, which will later be copied into a storage buffer
-				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write((void*)&instData, sizeof(InstanceData), instanceDataOffset);
+				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write((void*)&instData, sizeof(MaterialData), materialDataOffset);
 
 
 
 				// Setting up `Mesh data` for the occlusion culling compute shader
-				meshData.Transform = instData.ModelMatrix;
+				meshData.Transform = modelMatrix;
 				meshData.AABB_Min = glm::vec4(submesh.BoundingBox.Min, 1.0f);
 				meshData.AABB_Max = glm::vec4(submesh.BoundingBox.Max, 1.0f);
-				m_Data->MeshSpecs.HostBuffer.Write((void*)&meshData, sizeof(MeshData), meshDataOffset);
+				m_Data->MeshSpecs.HostBuffer.Write((void*)&meshData, sizeof(MeshData_OC), meshDataOffset);
 
+				// Submit instanced data into a cpu buffer (which will be later sent to the gpu's instanced vbo)
+				submeshInstanced.ModelSpaceMatrix = modelMatrix;
+				submeshInstanced.WorldSpaceMatrix = viewProjectionMatrix * modelMatrix;
+				mesh->GetVertexBufferInstanced_CPU().Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
 
 				// Adding up the offset
-				meshDataOffset     += sizeof(MeshData);
-				instanceDataOffset += sizeof(InstanceData);
+				meshDataOffset     += sizeof(MeshData_OC);
+				materialDataOffset += sizeof(MaterialData);
 				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
 				submittedSubmeshes += 1;
+				vboInstancedDataOffset += sizeof(SubmeshInstanced);
 			}
 
-#if 1
+			// Submit instanced data from a cpu buffer to gpu vertex buffer
+			auto vulkanVBOInstanced = mesh->GetVertexBufferInstanced().As<VulkanBufferDevice>();
+			vulkanVBOInstanced->SetData(vboInstancedDataOffset, mesh->GetVertexBufferInstanced_CPU().Data);
+
+#if 0
 			if (!meshIndirectData.size())
 			{
 				if (submittedSubmeshes != 0)
@@ -484,6 +493,13 @@ namespace Frost
 			}
 			else
 			{
+				uint32_t previousMeshOffset = meshIndirectData[i - 1].SubmeshOffset;
+				uint32_t previousMeshCount = meshIndirectData[i - 1].SubmeshCount;
+
+				uint32_t currentOffset = previousMeshOffset + previousMeshCount;
+
+				meshIndirectData.emplace_back(IndirectMeshData(currentOffset, submeshes.size(), i));
+
 				// If it is not the first mesh, then we set the offset as the last mesh's submesh count
 				//auto previousMesh = renderQueue.m_Data[i - 1].Mesh;
 				//auto previousSubmeshes = previousMesh->GetSubMeshes();
@@ -492,14 +508,10 @@ namespace Frost
 
 				//meshIndirectData.emplace_back(meshOffsets[meshOffsets.size() - 1] + previousSubmeshCount);
 
-				uint32_t previousMeshOffset = meshIndirectData[i - 1].SubmeshOffset;
-				uint32_t previousMeshCount = meshIndirectData[i - 1].SubmeshCount;
-
-				uint32_t currentOffset = previousMeshOffset + previousMeshCount;
-
-				meshIndirectData.emplace_back(IndirectMeshData(currentOffset, submeshes.size(), i));
 			}
 #endif
+
+
 		}
 
 		// Sending the data into the gpu buffer
@@ -511,141 +523,15 @@ namespace Frost
 		// Instance data
 		auto vulkanInstanceDataBuffer = m_Data->MaterialSpecs[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
 		void* instanceDataPointer = m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Data;
-		vulkanInstanceDataBuffer->SetData(instanceDataOffset, instanceDataPointer);
+		vulkanInstanceDataBuffer->SetData(materialDataOffset, instanceDataPointer);
 
 		// Mesh data
 		auto vulkanMeshDataBuffer = m_Data->MeshSpecs.DeviceBuffer.As<VulkanBufferDevice>();
 		void* meshDataPointer = m_Data->MeshSpecs.HostBuffer.Data;
 		vulkanMeshDataBuffer->SetData(meshDataOffset, meshDataPointer);
 
-		{
-			// Occlusion culling
-			// 
-			// Create the depth pyramid
-			// Steps:
-			// 1) Blit the depth buffer from the previous frame into a new texture
-			// 2) Generate the mips for that texture
-			int32_t previousFrameIndex = (int32_t)currentFrameIndex - 1;
-			if (previousFrameIndex < 0)
-				previousFrameIndex = Renderer::GetRendererConfig().FramesInFlight - 1;
 
-			auto srcDepthImage = m_Data->RenderPass->GetColorAttachment(5, previousFrameIndex);
-			auto vulkanSrcDepthImage = srcDepthImage.As<VulkanImage2D>();
-
-			VkImageLayout srcDepthImageLayout = vulkanSrcDepthImage->GetVulkanImageLayout();
-			vulkanSrcDepthImage->TransitionLayout(cmdBuf, srcDepthImageLayout, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT);
-			
-
-#if 0
-			// Debug
-			ImGui::Begin("HZB");
-			ImTextureID depthPyramidID = ImGuiLayer::GetTextureIDFromVulkanTexture_MipLevel(m_Data->DepthPyramid[currentFrameIndex], (uint32_t)s_DebugMipLevel);
-			ImGui::Image(depthPyramidID, { 400, 300 });
-			ImGui::SliderInt("MipLevel", &s_DebugMipLevel, 0, 10);
-			ImGui::End();
-#endif
-
-#if 0
-			// Occlusion Culling Part1:
-			glm::vec2 currentHZB_Dimensions = m_Data->HZB_Dimensions;
-			for (uint32_t i = 0; i < m_Data->HZB_MipLevels; i++)
-			{
-
-				auto vulkanHZB_Pipeline = m_Data->HZBPipeline.As<VulkanComputePipeline>();
-				auto vulkanHZB_Descriptor = m_Data->HZBDescriptor[currentFrameIndex][i].As<VulkanMaterial>();
-				auto vulkanDepthPyramid = m_Data->DepthPyramid[currentFrameIndex].As<VulkanImage2D>();
-
-				if (i == 0)
-				{
-					vulkanHZB_Descriptor->Set("i_Depth", srcDepthImage);
-				}
-				else
-				{
-					currentHZB_Dimensions.x /= 2;
-					currentHZB_Dimensions.y /= 2;
-				}
-
-				vulkanHZB_Descriptor->Bind(cmdBuf, m_Data->HZBPipeline);
-
-				vulkanHZB_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &currentHZB_Dimensions);
-				
-
-
-				
-				vulkanHZB_Pipeline->Dispatch(cmdBuf, std::floor(currentHZB_Dimensions.x / 32.0f) + 1, std::floor(currentHZB_Dimensions.y / 32.0f) + 1, 1.0f);
-
-
-
-				VkImageSubresourceRange imageSubrange{};
-				imageSubrange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				imageSubrange.baseArrayLayer = 0;
-				imageSubrange.baseMipLevel = i;
-				imageSubrange.layerCount = 1;
-				imageSubrange.levelCount = 1;
-
-				Utils::InsertImageMemoryBarrier(cmdBuf, vulkanDepthPyramid->GetVulkanImage(),
-					VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, 
-					vulkanDepthPyramid->GetVulkanImageLayout(), vulkanDepthPyramid->GetVulkanImageLayout(),
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					imageSubrange
-				);
-			}
-#endif
-
-#if 0
-			// Occlusion Culling Part2:
-			{
-				auto vulkanComputePipeline = m_Data->LateCullPipeline.As<VulkanComputePipeline>();
-
-				auto vulkanComputeDescriptor = m_Data->LateCullDescriptor[currentFrameIndex].As<VulkanMaterial>();
-				vulkanComputeDescriptor->Bind(cmdBuf, m_Data->LateCullPipeline);
-
-
-				m_Data->ComputeShaderPushConstant.DepthPyramidSize.z = indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand);
-				m_Data->ComputeShaderPushConstant.ViewProjectionMatrix = viewProjectionMatrix;
-				vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->ComputeShaderPushConstant);
-
-				vulkanComputePipeline->Dispatch(cmdBuf, std::floor(m_Data->ComputeShaderPushConstant.DepthPyramidSize.z / 64.0f) + 1, 1, 1);
-
-				vulkanIndirectCmdBuffer->SetMemoryBarrier(cmdBuf,
-					VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT
-				);
-
-			}
-#endif
-
-#if 0
-			auto vulkanDstDepthImage = m_Data->PreviousDepthbuffer[currentFrameIndex].As<VulkanImage2D>();
-			vulkanDstDepthImage->BlitImage(cmdBuf, srcDepthImage);
-
-			vulkanDstDepthImage->GenerateMipMaps(cmdBuf, vulkanDstDepthImage->GetVulkanImageLayout());
-
-#if 1
-			auto vulkanComputeDescriptor = m_Data->LateCullPipeline[currentFrameIndex].As<VulkanMaterial>();
-			vulkanComputeDescriptor->Bind(cmdBuf, m_Data->ComputePipeline);
-
-			auto vulkanComputePipeline = m_Data->ComputePipeline.As<VulkanComputePipeline>();
-
-			m_Data->ComputeShaderPushConstant.DepthPyramidSize.z = indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand);
-			m_Data->ComputeShaderPushConstant.ViewProjectionMatrix = viewProjectionMatrix;
-			vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->ComputeShaderPushConstant);
-			
-			vulkanComputePipeline->Dispatch(cmdBuf, m_Data->ComputeShaderPushConstant.DepthPyramidSize.z / 1.0f, 1, 1);
-
-			vulkanIndirectCmdBuffer->SetMemoryBarrier(cmdBuf,
-				VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
-				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT
-			);
-
-			ImGui::Begin("Depth");
-			ImTextureID textureID = ImGuiLayer::GetTextureIDFromVulkanTexture(m_Data->PreviousDepthbuffer[currentFrameIndex]);
-			ImGui::Image(textureID, { 200.0f, 150.0f });
-			ImGui::End();
-
-#endif
-#endif
-		}
+		OcclusionCullUpdate(renderQueue, indirectCmdsOffset);
 
 
 
@@ -693,13 +579,20 @@ namespace Frost
 			// Get the mesh
 			auto mesh = renderQueue.m_Data[meshIndex].Mesh;
 
-			// Bind the vertex/index buffers
-			mesh->GetVertexBuffer()->Bind();
+			// Bind the index buffer
 			mesh->GetIndexBuffer()->Bind();
+			
+			// Bind the vertex buffer (only the instanced one, since for the "per vertex" one, we are using BDAs
+			auto vulkanVertexBufferInstanced = mesh->GetVertexBufferInstanced().As<VulkanBufferDevice>();
+			VkBuffer vertexBufferInstanced = vulkanVertexBufferInstanced->GetVulkanBuffer();
+			VkDeviceSize deviceSize[1] = { 0 };
+			vkCmdBindVertexBuffers(cmdBuf, 0, 1, &vertexBufferInstanced, deviceSize);
+
 
 			// Set the transform matrix and model matrix of the submesh into a constant buffer
 			PushConstant pushConstant;
 			pushConstant.MaterialIndex = meshIndirectData[i].SubmeshOffset;
+			pushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
 
 			uint32_t submeshCount = meshData.SubmeshCount;
@@ -776,6 +669,111 @@ namespace Frost
 #endif
 		// End the renderpass
 		m_Data->RenderPass->Unbind();
+	}
+
+	void VulkanGeometryPass::OcclusionCullUpdate(const RenderQueue& renderQueue, uint64_t indirectCmdsOffset)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		auto vulkanIndirectCmdBuffer = m_Data->IndirectCmdBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		void* indirectCmdsPointer = m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Data;
+
+		// Occlusion culling
+		{
+			int32_t previousFrameIndex = (int32_t)currentFrameIndex - 1;
+			if (previousFrameIndex < 0)
+				previousFrameIndex = Renderer::GetRendererConfig().FramesInFlight - 1;
+
+			auto srcDepthImage = m_Data->RenderPass->GetDepthAttachment(previousFrameIndex);
+			auto vulkanSrcDepthImage = srcDepthImage.As<VulkanImage2D>();
+
+			VkImageLayout srcDepthImageLayout = vulkanSrcDepthImage->GetVulkanImageLayout();
+			vulkanSrcDepthImage->TransitionLayout(cmdBuf, srcDepthImageLayout, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT);
+
+
+#if 0
+			// Debug
+			ImGui::Begin("HZB");
+			ImTextureID depthPyramidID = ImGuiLayer::GetTextureIDFromVulkanTexture_MipLevel(m_Data->DepthPyramid[currentFrameIndex], (uint32_t)s_DebugMipLevel);
+			ImGui::Image(depthPyramidID, { 400, 300 });
+			ImGui::SliderInt("MipLevel", &s_DebugMipLevel, 0, 10);
+			ImGui::End();
+#endif
+
+			// Occlusion Culling Part1:
+			glm::vec2 currentHZB_Dimensions = m_Data->HZB_Dimensions;
+			for (uint32_t mipLevel = 0; mipLevel < m_Data->HZB_MipLevels; mipLevel++)
+			{
+
+				auto vulkanHZB_Pipeline = m_Data->HZBPipeline.As<VulkanComputePipeline>();
+				auto vulkanHZB_Descriptor = m_Data->HZBDescriptor[currentFrameIndex][mipLevel].As<VulkanMaterial>();
+				auto vulkanDepthPyramid = m_Data->DepthPyramid[currentFrameIndex].As<VulkanImage2D>();
+
+				if (mipLevel == 0)
+				{
+					vulkanHZB_Descriptor->Set("i_Depth", srcDepthImage);
+				}
+				else
+				{
+					currentHZB_Dimensions.x /= 2;
+					currentHZB_Dimensions.y /= 2;
+				}
+
+				vulkanHZB_Descriptor->Bind(cmdBuf, m_Data->HZBPipeline);
+
+				vulkanHZB_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &currentHZB_Dimensions);
+
+
+
+
+				vulkanHZB_Pipeline->Dispatch(cmdBuf, std::floor(currentHZB_Dimensions.x / 32.0f) + 1, std::floor(currentHZB_Dimensions.y / 32.0f) + 1, 1.0f);
+
+
+
+				VkImageSubresourceRange imageSubrange{};
+				imageSubrange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				imageSubrange.baseArrayLayer = 0;
+				imageSubrange.baseMipLevel = mipLevel;
+				imageSubrange.layerCount = 1;
+				imageSubrange.levelCount = 1;
+
+				Utils::InsertImageMemoryBarrier(cmdBuf, vulkanDepthPyramid->GetVulkanImage(),
+					VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+					vulkanDepthPyramid->GetVulkanImageLayout(), vulkanDepthPyramid->GetVulkanImageLayout(),
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					imageSubrange
+				);
+			}
+
+			// Occlusion Culling Part2:
+			{
+				auto vulkanComputePipeline = m_Data->LateCullPipeline.As<VulkanComputePipeline>();
+
+				auto vulkanComputeDescriptor = m_Data->LateCullDescriptor[currentFrameIndex].As<VulkanMaterial>();
+				vulkanComputeDescriptor->Bind(cmdBuf, m_Data->LateCullPipeline);
+
+
+				m_Data->ComputeShaderPushConstant.DepthPyramidSize.z = indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand);
+
+				m_Data->ComputeShaderPushConstant.CamFar = renderQueue.m_Camera.GetFarClip();
+				m_Data->ComputeShaderPushConstant.CamNear = renderQueue.m_Camera.GetNearClip();
+				m_Data->ComputeShaderPushConstant.ViewMatrix = renderQueue.m_Camera.GetViewMatrix();
+				m_Data->ComputeShaderPushConstant.ProjectionMaxtrix = renderQueue.m_Camera.GetProjectionMatrix();
+				m_Data->ComputeShaderPushConstant.ProjectionMaxtrix[1][1] *= -1;
+
+				vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->ComputeShaderPushConstant);
+
+				uint32_t workGroupsX = std::floor((indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand)) / 64.0f) + 1;
+				vulkanComputePipeline->Dispatch(cmdBuf, workGroupsX, 1, 1);
+
+				vulkanIndirectCmdBuffer->SetMemoryBarrier(cmdBuf,
+					VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT
+				);
+
+			}
+		}
 	}
 
 	void VulkanGeometryPass::OnResize(uint32_t width, uint32_t height)
@@ -904,34 +902,6 @@ namespace Frost
 
 			}
 		}
-
-#if 0
-		// Depth pyramid
-		for (auto& depthBuffer : m_Data->PreviousDepthbuffer)
-		{
-			ImageSpecification imageSpec{};
-			imageSpec.Width = width;
-			imageSpec.Height = height;
-			imageSpec.Format = ImageFormat::Depth32;
-			imageSpec.Usage = ImageUsage::DepthStencil;
-			//imageSpec.Format = ImageFormat::R32;
-			//imageSpec.Usage = ImageUsage::ColorAttachment;
-
-			imageSpec.UseMipChain = true;
-			depthBuffer = Image2D::Create(imageSpec);
-		}
-
-		for (uint32_t i = 0; i < m_Data->LateCullDescriptor.size(); i++)
-		{
-			auto& computeDescriptor = m_Data->LateCullDescriptor[i];
-
-			computeDescriptor->Set("DepthPyramid", m_Data->PreviousDepthbuffer[i]);
-
-			auto& computeVulkanDescriptor = m_Data->LateCullDescriptor[i].As<VulkanMaterial>();
-			computeVulkanDescriptor->UpdateVulkanDescriptorIfNeeded();
-		}
-#endif
-
 	}
 
 	void VulkanGeometryPass::ShutDown()

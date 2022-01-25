@@ -127,32 +127,17 @@ void main()
     float depth = textureLod(DepthPyramid, aabbCenter, level).x;
     
     
-    if(meshAvgDepth > depth)
-    {
-        u_DrawCommands.cmds[di].indexCount = 0;
-        u_DrawCommands.cmds[di].instanceCount = 1;
-        u_DrawCommands.cmds[di].firstIndex = 0;
-        u_DrawCommands.cmds[di].vertexOffset = 0;
-        u_DrawCommands.cmds[di].firstInstance = 0;
-    }
+    //if(meshAvgDepth > depth)
+    //{
+    //    u_DrawCommands.cmds[di].indexCount = 0;
+    //    u_DrawCommands.cmds[di].instanceCount = 1;
+    //    u_DrawCommands.cmds[di].firstIndex = 0;
+    //    u_DrawCommands.cmds[di].vertexOffset = 0;
+    //    u_DrawCommands.cmds[di].firstInstance = 0;
+    //}
     
     u_DebugBuffer.Value1.xy = aabbCenter;
     u_DebugBuffer.Value1.z = level;
 
     u_DebugBuffer.Value2.xyzw = aabb;
-
-
-    //u_DebugBuffer.Values.x = meshAvgDepth;
-    //u_DebugBuffer.Values.y = depth;
-    //u_DebugBuffer.Values.z = level;
-    //u_DebugBuffer.Values.w = (aabb.xy + aabb.zw) * 0.5;
-
-    //u_DebugBuffer.Values.xy = ndc_AABBCenter.xy;
-    //u_DebugBuffer.Values.zw = aabbClipSpace_Center.xy;
-
-
-    //u_DebugBuffer.Values.x = aabb.x * u_PushConstant.DepthPyramidRes.x;
-    //u_DebugBuffer.Values.y = aabb.y * u_PushConstant.DepthPyramidRes.y;
-    //u_DebugBuffer.Values.z = aabb.z * u_PushConstant.DepthPyramidRes.x;
-    //u_DebugBuffer.Values.w = aabb.w * u_PushConstant.DepthPyramidRes.y;
 }

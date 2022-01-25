@@ -147,14 +147,9 @@ namespace Frost
 
 				
 
-				if (subMeshLastIndex < index.V1)
-					subMeshLastIndex = index.V1;
-
-				if (subMeshLastIndex < index.V2)
-					subMeshLastIndex = index.V2;
-
-				if (subMeshLastIndex < index.V3)
-					subMeshLastIndex = index.V3;
+				if (subMeshLastIndex < index.V1) subMeshLastIndex = index.V1;
+				if (subMeshLastIndex < index.V2) subMeshLastIndex = index.V2;
+				if (subMeshLastIndex < index.V3) subMeshLastIndex = index.V3;
 			}
 			maxIndex = subMeshLastIndex + 1;
 
@@ -165,38 +160,20 @@ namespace Frost
 		// Traverse over every mesh to get the transforms
 		TraverseNodes(scene->mRootNode);
 
-		// Calculate AABB for every submesh
-		for (const auto& submesh : m_Submeshes)
 		{
-			Math::BoundingBox transformedSubmeshAABB = submesh.BoundingBox;
-			glm::vec3 min = glm::vec3(submesh.Transform * glm::vec4(transformedSubmeshAABB.Min, 1.0f));
-			glm::vec3 max = glm::vec3(submesh.Transform * glm::vec4(transformedSubmeshAABB.Max, 1.0f));
+			// Timer
+			std::string timerText = m_Filepath + " buffers creation";
+			Timer timer(timerText.c_str());
 
-#if 0
-			m_BoundingBox.Min.x = glm::min(m_BoundingBox.Min.x, min.x);
-			m_BoundingBox.Min.y = glm::min(m_BoundingBox.Min.y, min.y);
-			m_BoundingBox.Min.z = glm::min(m_BoundingBox.Min.z, min.z);
-			m_BoundingBox.Max.x = glm::max(m_BoundingBox.Max.x, max.x);
-			m_BoundingBox.Max.y = glm::max(m_BoundingBox.Max.y, max.y);
-			m_BoundingBox.Max.z = glm::max(m_BoundingBox.Max.z, max.z);
-#endif
-		}
-
-		{
-			Timer timer("Mesh's buffers creation");
-
+			// Vertex/Index buffer
 			m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
 			m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)m_Indices.size() * sizeof(Index));
 
+			// Instanced vertex buffer
+			m_VertexBufferInstanced_CPU.Allocate(m_Submeshes.size() * sizeof(SubmeshInstanced) + 1);
+			m_VertexBufferInstanced = BufferDevice::Create(m_Submeshes.size() * sizeof(SubmeshInstanced), { BufferUsage::Vertex });
 
-			// TODO: Maybe remove vertex binding in the far future??
-#if 0
-			uint64_t vertexBufferBDA = m_VertexBuffer.As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
-
-			m_VertexBufferPointerBD = BufferDevice::Create(sizeof(uint64_t), { BufferUsage::Storage });
-			m_VertexBufferPointerBD->SetData((void*) &vertexBufferBDA);
-#endif
-
+			// Acceleration structure creation
 			MeshASInfo meshInfo{};
 			meshInfo.MeshVertexBuffer = m_VertexBuffer;
 			meshInfo.MeshIndexBuffer = m_IndexBuffer;
@@ -221,8 +198,8 @@ namespace Frost
 				// Emission -       float       (4 bytes)
 				// UseNormalMap -   uint32_t    (4 bytes)
 				// Texture IDs -    4 uint32_t  (16 bytes)
-				// Model matrix -   mat4        (64 bytes)
-				m_MaterialData[i].Allocate(108);
+				// Model matrix -   mat4        (64 bytes) --
+				m_MaterialData[i].Allocate(44);
 
 
 				// Each mesh has 4 textures, and se we allocated numMaterials * 4 texture slots.
@@ -237,6 +214,7 @@ namespace Frost
 				m_MaterialData[i].Add("RoughnessTexture", m_TextureAllocatorSlots[roughnessTextureIndex]);
 				m_MaterialData[i].Add("MetalnessTexture", m_TextureAllocatorSlots[metalnessTextureIndex]);
 
+				/*
 				// Sometimes there could be more materials then submeshes (for some odd reason)
 				if (i < m_Submeshes.size())
 				{
@@ -246,6 +224,7 @@ namespace Frost
 				{
 					m_MaterialData[i].Add("ModelMatrix", glm::mat4(1.0f));
 				}
+				*/
 
 
 				auto aiMaterial = scene->mMaterials[i];

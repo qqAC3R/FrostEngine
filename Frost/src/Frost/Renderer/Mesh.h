@@ -63,6 +63,12 @@ namespace Frost
 		std::string MeshName;
 	};
 
+	struct SubmeshInstanced
+	{
+		glm::mat4 ModelSpaceMatrix;
+		glm::mat4 WorldSpaceMatrix;
+	};
+
 	struct MaterialUniform
 	{
 		glm::vec3 AlbedoColor = glm::vec3(0.8f);
@@ -76,20 +82,23 @@ namespace Frost
 	{
 	public:
 		Mesh(const std::string& filepath, MaterialInstance material);
-		~Mesh();
+		virtual ~Mesh();
 
 		const Ref<VertexBuffer>& GetVertexBuffer() const { return m_VertexBuffer; }
+		const Ref<BufferDevice>& GetVertexBufferInstanced() const { return m_VertexBufferInstanced; }
 		const Ref<IndexBuffer>& GetIndexBuffer() const { return m_IndexBuffer; }
 		const Ref<IndexBuffer>& GetSubmeshIndexBuffer() const { return m_SubmeshIndexBuffers; }
 
-		const Vector<Vertex>& GetVertices() const { return m_Vertices; }
 		Vector<Vertex>& GetVertices() { return m_Vertices; }
+		const Vector<Vertex>& GetVertices() const { return m_Vertices; }
 		
-		const Vector<Index>& GetIndices() const { return m_Indices; }
 		Vector<Index>& GetIndices() { return m_Indices; }
+		const Vector<Index>& GetIndices() const { return m_Indices; }
 
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
 		
+		Buffer& GetVertexBufferInstanced_CPU() { return m_VertexBufferInstanced_CPU; }
+
 		DataStorage& GetMaterialData(uint32_t materialIndex) { return m_MaterialData[materialIndex]; }
 		MaterialInstance& GetMaterial() { return m_Material; }
 		const MaterialInstance& GetMaterial() const { return m_Material; }
@@ -108,22 +117,28 @@ namespace Frost
 		std::string m_Filepath;
 		bool m_IsLoaded;
 		
-		Vector<Submesh> m_Submeshes;
 		Vector<Vertex> m_Vertices;
 		Vector<Index> m_Indices;
+		Vector<Submesh> m_Submeshes;
 		HashMap<uint32_t, Vector<Triangle>> m_TriangleCache;
 
 		Ref<VertexBuffer> m_VertexBuffer;
+		Ref<BufferDevice> m_VertexBufferInstanced;
 		Ref<IndexBuffer> m_IndexBuffer;
 		Ref<IndexBuffer> m_SubmeshIndexBuffers;
 
-		Vector<Ref<Texture2D>> m_Textures;
-		Vector<Ref<Material>> m_Materials;
-		Vector<DataStorage> m_MaterialData;
+		Buffer m_VertexBufferInstanced_CPU;
 
-		HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots;
+		Vector<Ref<Texture2D>> m_Textures;
+		Vector<Ref<Material>> m_Materials; // TODO: Maybe remove it? since the engine is now bindless
+		Vector<DataStorage> m_MaterialData; // Bindless
+
+		HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots; // Bindless
+		Ref<BottomLevelAccelerationStructure> m_AccelerationStructure; // For RT
+
+
+
 
 		MaterialInstance m_Material;
-		Ref<BottomLevelAccelerationStructure> m_AccelerationStructure;
 	};
 }

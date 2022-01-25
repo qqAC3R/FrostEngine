@@ -173,7 +173,7 @@ namespace Frost
 				Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, index);
 				Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
 				Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
-				Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
+				//Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
 				Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
 				Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment()->GetIrradianceMap();
 				Ref<Texture2D> brdfLut = Renderer::GetBRDFLut();
@@ -183,7 +183,7 @@ namespace Frost
 				descriptor->Set("u_PositionTexture", positionTexture);
 				descriptor->Set("u_NormalTexture", normalTexture);
 				descriptor->Set("u_AlbedoTexture", albedoTexture);
-				descriptor->Set("u_CompositeTexture", compositeTexture);
+				//descriptor->Set("u_CompositeTexture", compositeTexture);
 
 				descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
 				descriptor->Set("u_IrradianceMap", irradianceMap);
@@ -227,7 +227,7 @@ namespace Frost
 			m_Data->CullingDataBuffer[i] = BufferDevice::Create(sizeof(RendererData), { BufferUsage::Storage });
 
 			// Depth buffer neccesary for the `i` frmae
-			const Ref<Image2D>& depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(5, i);
+			const Ref<Image2D>& depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetDepthAttachment(i);
 
 			// Setting up the data into the descriptor
 			descriptor->Set("u_LightData", m_Data->PointLightBufferData[i].DeviceBuffer);
@@ -258,8 +258,8 @@ namespace Frost
 
 		{
 			// From the GBuffer, blit the depth texture to render the environment cubemap
-			auto vulkanSrcDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(5, currentFrameIndex);
-			auto vulkanDstDepthImage = m_Data->RenderPass->GetColorAttachment(1, currentFrameIndex).As<VulkanImage2D>();
+			auto vulkanSrcDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetDepthAttachment(currentFrameIndex);
+			auto vulkanDstDepthImage = m_Data->RenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
 			vulkanDstDepthImage->BlitImage(cmdBuf, vulkanSrcDepthImage);
 		}
 
@@ -400,7 +400,7 @@ namespace Frost
 			auto& vulkanCompositeDescriptor = m_Data->Descriptor[i].As<VulkanMaterial>();
 
 			// Depth buffer neccesary for the `i` frmae
-			const Ref<Image2D>& depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(5, i);
+			const Ref<Image2D>& depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetDepthAttachment(i);
 
 			// Light indices buffer
 			uint32_t workGroupsX = (width +  (width % 16)) / 16.0f;
@@ -426,12 +426,12 @@ namespace Frost
 			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, i);
 			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, i);
 			Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, i);
-			Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, i);
+			//Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, i);
 
 			descriptor->Set("u_PositionTexture", positionTexture);
 			descriptor->Set("u_NormalTexture", normalTexture);
 			descriptor->Set("u_AlbedoTexture", albedoTexture);
-			descriptor->Set("u_CompositeTexture", compositeTexture);
+			//descriptor->Set("u_CompositeTexture", compositeTexture);
 
 			descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 		}

@@ -59,6 +59,7 @@ namespace Frost
 				framebufferAttachmentInfo[i].TextureFormat == FramebufferTextureFormat::DepthStencil)
 			{
 				depthAttachmentRefs.push_back(attachmentRef);
+				m_DepthAttachmentIndex = i;
 			}
 			else
 			{

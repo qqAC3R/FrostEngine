@@ -29,6 +29,17 @@ namespace Frost
 		return VK_FORMAT_R32G32B32A32_SFLOAT;
 	}
 
+	static uint32_t GetLocationOffset(const BufferElement& element)
+	{
+		switch (element.Type)
+		{
+			case ShaderDataType::Mat3: return 3;
+			case ShaderDataType::Mat4: return 4;
+			default:				   return 0;
+		}
+		return 0;
+	}
+
 	namespace Utils
 	{
 
@@ -51,15 +62,45 @@ namespace Frost
 		{
 			Vector<VkVertexInputAttributeDescription> attributeDescriptions{};
 
-			for (uint32_t i = 0; i < bufferLayout.m_BufferElements.size(); i++)
+			uint32_t index = 0;
+			//for (uint32_t i = 0; i < bufferLayout.m_BufferElements.size(); i++)
+			for (auto& element : bufferLayout.m_BufferElements)
 			{
+				/* We use an offset because the vulkan spec says:
+
+				if we are using a n*m matrix, then it will be assigned multiple locations starting with the location specified.
+				The number of locations assigned for each matrix will be the same as for an n-element array of m-component vectors. */
+				if (element.Type == ShaderDataType::Mat3 || element.Type == ShaderDataType::Mat4)
+				{
+					uint32_t matrixSize = GetLocationOffset(element);
+					uint32_t matrixOffset = 0;
+
+					for (uint32_t i = 0; i < matrixSize; i++)
+					{
+						VkVertexInputAttributeDescription attributeDescription;
+						attributeDescription.binding = 0;
+						attributeDescription.location = index;
+						attributeDescription.format = ShaderDataTypeFormat(element.Type);
+						attributeDescription.offset = element.Offset + matrixOffset;
+
+						attributeDescriptions.push_back(attributeDescription);
+						
+						index++;
+						matrixOffset += matrixSize * sizeof(float);
+					}
+
+					continue;
+				}
+
 				VkVertexInputAttributeDescription attributeDescription;
 				attributeDescription.binding = 0;
-				attributeDescription.location = i;
-				attributeDescription.format = ShaderDataTypeFormat(bufferLayout.m_BufferElements[i].Type);
-				attributeDescription.offset = bufferLayout.m_BufferElements[i].Offset;
+				attributeDescription.location = index;
+				attributeDescription.format = ShaderDataTypeFormat(element.Type);
+				attributeDescription.offset = element.Offset;
 
 				attributeDescriptions.push_back(attributeDescription);
+
+				index++;
 			}
 
 			return attributeDescriptions;

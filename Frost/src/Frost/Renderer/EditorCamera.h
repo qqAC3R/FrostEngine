@@ -49,6 +49,9 @@ namespace Frost
 
 		glm::quat GetOrientation() const;
 
+		float GetFarClip() const { return m_FarClip; }
+		float GetNearClip() const { return m_NearClip; }
+
 		const FrustumCamera& GetFrustum() const { return m_Frustum; }
 
 		float GetPitch() const { return m_Pitch; }

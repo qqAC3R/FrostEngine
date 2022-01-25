@@ -47,6 +47,7 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/RenderSkybox.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirect.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling_V2.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/HiZBufferBuilder.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledLightCulling.glsl");
 

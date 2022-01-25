@@ -51,6 +51,7 @@ namespace Frost
 
 		virtual Ref<Framebuffer> GetFramebuffer(uint32_t index = 0) const = 0;
 		virtual Ref<Image2D> GetColorAttachment(uint32_t attachmentSlot, uint32_t index = 0) const = 0;
+		virtual Ref<Image2D> GetDepthAttachment(uint32_t index) const = 0;
 		virtual const RenderPassSpecification& GetSpecification() const = 0;
 		virtual void Destroy() = 0;
 

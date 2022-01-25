@@ -55,7 +55,7 @@ layout(location = 1) in vec2 v_TexCoord;
 layout(binding = 0) uniform sampler2D u_PositionTexture;
 layout(binding = 1) uniform sampler2D u_AlbedoTexture;
 layout(binding = 2) uniform sampler2D u_NormalTexture;
-layout(binding = 3) uniform sampler2D u_CompositeTexture;
+//layout(binding = 3) uniform sampler2D u_CompositeTexture;
 layout(binding = 4, scalar) readonly buffer u_LightData { // Using scalar, it will fix our byte padding issues?
 	PointLight u_PointLights[];
 } LightData;
@@ -251,17 +251,36 @@ vec3 AcesApprox(vec3 v)
     return clamp((v*(a*v+b))/(v*(c*v+d)+e), 0.0f, 1.0f);
 }
 
+// https://aras-p.info/texts/CompactNormalStorage.html
+vec3 DecodeNormals(vec2 enc)
+{
+    float scale = 1.7777f;
+    vec3 nn = vec3(enc, 0.0f) * vec3(2 * scale, 2 * scale,0) + vec3(-scale, -scale,1);
+    
+	float g = 2.0 / dot(nn.xyz,nn.xyz);
+
+    vec3 n;
+    n.xy = g*nn.xy;
+    n.z = g-1;
+
+    return n;
+}
+
 void main()
 {
     // Calculating the normals and worldPos
     m_Surface.WorldPos =    texture(u_PositionTexture, v_TexCoord).rgb;
-    m_Surface.Normal =      normalize(texture(u_NormalTexture, v_TexCoord).rgb);
     m_Surface.ViewVector =  normalize(vec3(u_PushConstant.CameraPosition) - m_Surface.WorldPos);
+
+	// Decode normals
+	vec2 decodedNormals =   texture(u_NormalTexture, v_TexCoord).rg;
+    m_Surface.Normal =      DecodeNormals(decodedNormals);
+
 
     // Sampling the textures from gbuffer
     m_Surface.Albedo =      texture(u_AlbedoTexture, v_TexCoord).rgb;
-    m_Surface.Metalness =   texture(u_CompositeTexture, v_TexCoord).r;
-    m_Surface.Roughness =   texture(u_CompositeTexture, v_TexCoord).g;
+    m_Surface.Metalness =   texture(u_NormalTexture, v_TexCoord).b;
+    m_Surface.Roughness =   texture(u_NormalTexture, v_TexCoord).a;
 
     // Fresnel approximation
 	m_Surface.F0 = mix(Fdielectric, m_Surface.Albedo, m_Surface.Metalness);

@@ -53,7 +53,7 @@ namespace Frost
 
 		void Write(void* data, uint32_t size, uint32_t offset = 0)
 		{
-			FROST_ASSERT(offset + size >= Size, "Buffer overflow!");
+			FROST_ASSERT(!(offset + size > Size), "Buffer overflow!");
 			memcpy((Byte*)Data + offset, data, size);
 		}
 

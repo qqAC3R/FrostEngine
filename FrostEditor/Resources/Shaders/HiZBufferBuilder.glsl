@@ -16,20 +16,20 @@ void main()
 	uvec2 pos = gl_GlobalInvocationID.xy;
 
 	// Sampler is set up to do min reduction, so this computes the minimum depth of a 2x2 texel quad
-	//float depth = texture(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize).x;
+	float depth = texture(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize).x;
 	
 	// Texture gather approach
-	//vec4 depths = textureGather(i_Depth, pos, 0);
+	//vec4 depths = textureGather(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, 0);
 	//
 	//float depth = max(max(depths.x, depths.y), max(depths.z, depths.w));
 	
 
-	float depth1 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2(-1,  0)).x; // left
-	float depth2 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 1,  0)).x; // right
-	float depth3 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 0,  1)).x; // up
-	float depth4 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 0, -1)).x; // down
-
-	float depth = max(max(depth1, depth2), max(depth3, depth4));
+	//float depth1 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2(-1,  0)).x; // left
+	//float depth2 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 1,  0)).x; // right
+	//float depth3 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 0,  1)).x; // up
+	//float depth4 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 0, -1)).x; // down
+	//
+	//float depth = max(max(depth1, depth2), max(depth3, depth4));
 
 
 	imageStore(o_Depth, ivec2(pos), vec4(depth));

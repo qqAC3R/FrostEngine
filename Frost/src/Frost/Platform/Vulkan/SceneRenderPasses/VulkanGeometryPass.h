@@ -42,10 +42,12 @@ namespace Frost
 		void HZB_DataInit();
 		void LateCull_DataInit();
 
+		void OcclusionCullUpdate(const RenderQueue& renderQueue, uint64_t indirectCmdsOffset);
+
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
 
-		struct InstanceData
+		struct MaterialData
 		{
 			// PBR material values
 			glm::vec4 AlbedoColor; // Using a vec4 instead of vec3 because of vulkan's alignment (the offset should be a mutiple of 4)
@@ -61,11 +63,11 @@ namespace Frost
 			uint32_t NormalTextureID;
 
 			// Matricies
-			glm::mat4 WorldSpaceMatrix;
-			glm::mat4 ModelMatrix;
+			//glm::mat4 WorldSpaceMatrix;
+			//glm::mat4 ModelMatrix;
 		};
 
-		struct MeshData
+		struct MeshData_OC // Data for occlusion culling
 		{
 			glm::mat4 Transform;
 			glm::vec4 AABB_Min;
@@ -74,8 +76,17 @@ namespace Frost
 
 		struct ComputeShaderPS // Push constant
 		{
-			glm::vec4 DepthPyramidSize; // vec2 DepthPyramidRes || float DrawCount || float Padding
-			glm::mat4 ViewProjectionMatrix;
+			//glm::vec4 DepthPyramidSize; // vec2 DepthPyramidRes || float DrawCount || float Padding
+			//glm::mat4 ViewProjectionMatrix;
+
+			glm::vec4 DepthPyramidSize;
+			glm::mat4 ViewMatrix;
+			glm::mat4 ProjectionMaxtrix;
+			float CamNear;
+			float CamFar;
+			float Padding1;
+			float Padding2;
+
 		};
 
 		struct InternalData
@@ -119,6 +130,7 @@ namespace Frost
 		struct PushConstant
 		{
 			uint32_t MaterialIndex;
+			uint64_t VertexBufferBDA;
 		};
 
 		InternalData* m_Data;
