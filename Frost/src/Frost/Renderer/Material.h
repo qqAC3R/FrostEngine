@@ -29,7 +29,8 @@ namespace Frost
 		virtual void Set(const std::string& name, float value) = 0;
 		virtual void Set(const std::string& name, uint32_t value) = 0;
 		virtual void Set(const std::string& name, const glm::vec3& value) = 0;
-		
+		virtual void Set(const std::string& name, const glm::mat4& value) = 0;
+
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) = 0;
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex) = 0;
 		virtual void Set(const std::string& name, const Ref<TextureCubeMap>& cubeMap) = 0;
@@ -94,6 +95,7 @@ namespace Frost
 			m_Buffer.Write((void*)&data, sizeof(T), bufferSpecs.Offset);
 		}
 
+		operator void* () { return m_Buffer.Data; }
 	public:
 		struct BufferSpecification
 		{

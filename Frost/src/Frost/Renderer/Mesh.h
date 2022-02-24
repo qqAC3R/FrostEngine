@@ -99,10 +99,12 @@ namespace Frost
 		
 		Buffer& GetVertexBufferInstanced_CPU() { return m_VertexBufferInstanced_CPU; }
 
+		uint32_t GetMaterialCount() { return (uint32_t)m_MaterialData.size(); }
 		DataStorage& GetMaterialData(uint32_t materialIndex) { return m_MaterialData[materialIndex]; }
-		MaterialInstance& GetMaterial() { return m_Material; }
-		const MaterialInstance& GetMaterial() const { return m_Material; }
-		Vector<Ref<Material>> GetVulkanMaterial() { return m_Materials; }
+
+		MaterialInstance& GetMaterial() { return m_Material; } // TODO: Remove this
+		const MaterialInstance& GetMaterial() const { return m_Material; } // TODO: Remove this
+		Vector<Ref<Material>> GetVulkanMaterial() { return m_Materials; } // TODO: Remove this (now using bindless)
 		Ref<BottomLevelAccelerationStructure> GetAccelerationStructure() const { return m_AccelerationStructure; }
 
 		bool IsLoaded() const { return m_IsLoaded; }

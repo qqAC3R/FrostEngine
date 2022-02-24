@@ -7,7 +7,7 @@
 #include "Frost/Platform/Vulkan/RayTracing/VulkanRayTracingPipeline.h"
 #include "Frost/Platform/Vulkan/RayTracing/VulkanShaderBindingTable.h"
 #include "Frost/Platform/Vulkan/RayTracing/VulkanAccelerationStructure.h"
-#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanComputeRenderPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanComputePass.h"
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
 #include "Frost/Math/Math.h"
 
@@ -38,7 +38,7 @@ namespace Frost
 		imageSpec.Usage = ImageUsage::Storage;
 		imageSpec.Format = ImageFormat::RGBA16F;
 
-		auto cubeMapTexture = m_RenderPassPipeline->GetRenderPassData<VulkanComputeRenderPass>()->CubeMap;
+		auto cubeMapTexture = m_RenderPassPipeline->GetRenderPassData<VulkanComputePass>()->CubeMap;
 		uint32_t maxInstances = Renderer::GetRendererConfig().RayTracing.MaxInstance;
 		uint32_t maxMeshes = Renderer::GetRendererConfig().MaxMesh;
 

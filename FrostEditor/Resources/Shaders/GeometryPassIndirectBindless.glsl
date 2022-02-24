@@ -46,10 +46,6 @@ struct MaterialData
 	uint RoughessTextureID;
 	uint MetalnessTextureID;
 	uint NormalTextureID;
-
-	// Matricies
-	//mat4 WorldSpaceMatrix;
-	//mat4 ModelMatrix;
 };
 layout(set = 0, binding = 0, scalar) readonly buffer u_MaterialUniform
 {
@@ -58,8 +54,10 @@ layout(set = 0, binding = 0, scalar) readonly buffer u_MaterialUniform
 
 layout(push_constant) uniform Constants
 {
+	mat4 ViewMatrix;
 	uint MaterialIndex;
 	uint64_t VertexBufferBDA;
+	uint Padding;
 } u_PushConstant;
 
 void main()
@@ -74,7 +72,7 @@ void main()
 	//mat4 WorldSpaceMatrix = MaterialUniform.Data[nonuniformEXT(meshIndex)].WorldSpaceMatrix;
 
 	// Compute world position
-	vec4 worldPos = a_WorldSpaceMatrix * vec4(vertex.Position, 1.0);
+	vec4 worldPos = a_WorldSpaceMatrix * vec4(vertex.Position, 1.0f);
 
 	// Calculating the normals with the model matrix
 	mat3 normalMatrix = transpose(inverse(mat3(a_ModelSpaceMatrix)));
@@ -86,11 +84,11 @@ void main()
 
 	// World position
 	v_FragmentPos = vec3(a_ModelSpaceMatrix * vec4(vertex.Position, 1.0f));
+	v_ViewPosition = vec3(u_PushConstant.ViewMatrix * a_ModelSpaceMatrix * vec4(vertex.Position, 1.0f));
 
 	//v_BufferIndex = int(u_PushConstant.MaterialIndex + a_MaterialIndex);
 	v_BufferIndex = int(meshIndex);
 	v_TextureIndex = int(vertex.MaterialIndex);
-
 
 	// Calculating the TBN matrix for normal maps
 	vec3 N = normalize(v_Normal);
@@ -111,8 +109,7 @@ void main()
 layout(location = 0) out vec4 o_WoldPos;
 layout(location = 1) out vec4 o_Normals;
 layout(location = 2) out vec4 o_Albedo;
-//layout(location = 3) out vec4 o_Composite;
-//layout(location = 4) out vec4 o_ViewPosition;
+layout(location = 3) out vec4 o_ViewPos;
 
 layout(location = 0) in vec3 v_FragmentPos;
 layout(location = 1) in vec3 v_Normal;
@@ -136,10 +133,6 @@ struct MaterialData
 	uint RoughessTextureID;
 	uint MetalnessTextureID;
 	uint NormalTextureID;
-
-	// Matricies
-	//mat4 WorldSpaceMatrix;
-	//mat4 ModelMatrix;
 };
 layout(set = 0, binding = 0, scalar) readonly buffer u_MaterialUniform
 {
@@ -214,6 +207,9 @@ void main()
 	// World Pos
 	o_WoldPos = vec4(v_FragmentPos, 1.0f);
 	
+	// View space Position
+	o_ViewPos = vec4(v_ViewPosition, 1.0f);
+
 	// Normals
 	if(useNormalMap == 1)
 		o_Normals = vec4(GetVec3FromNormalMap(u_Textures[nonuniformEXT(normalTextureID)]), 1.0f);
@@ -232,7 +228,6 @@ void main()
 	// Composite (roughness and metalness)
 	float metalness = metalnessFactor * SampleTexture(metalnessTextureID).r;
 	float roughness = roughnessFactor * SampleTexture(roughnessTextureID).r;
-	//o_Composite = vec4(metalness, roughness, 1.0f, 1.0f);
 
 	o_Normals.z = metalness;
 	o_Normals.w = roughness;

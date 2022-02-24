@@ -1,5 +1,5 @@
 #include "frostpch.h"
-#include "VulkanComputeRenderPass.h"
+#include "VulkanComputePass.h"
 
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
@@ -11,12 +11,12 @@
 namespace Frost
 {
 
-	VulkanComputeRenderPass::VulkanComputeRenderPass()
+	VulkanComputePass::VulkanComputePass()
 		: m_Name("ComputePass")
 	{
 	}
 
-	void VulkanComputeRenderPass::Init(SceneRenderPassPipeline* renderPassPipeline)
+	void VulkanComputePass::Init(SceneRenderPassPipeline* renderPassPipeline)
 	{
 		m_RenderPassPipeline = renderPassPipeline;
 		m_Data = new InternalData();
@@ -47,7 +47,7 @@ namespace Frost
 		m_Data->ComputePipeline = ComputePipeline::Create(computePipelineCreateInfo);
 	}
 
-	void VulkanComputeRenderPass::OnUpdate(const RenderQueue& renderQueue)
+	void VulkanComputePass::OnUpdate(const RenderQueue& renderQueue)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		Ref<VulkanComputePipeline> vulkanComputePipeline = m_Data->ComputePipeline.As<VulkanComputePipeline>();
@@ -72,11 +72,11 @@ namespace Frost
 		ImGui::End();
 	}
 
-	void VulkanComputeRenderPass::OnResize(uint32_t width, uint32_t height)
+	void VulkanComputePass::OnResize(uint32_t width, uint32_t height)
 	{
 	}
 
-	void VulkanComputeRenderPass::ShutDown()
+	void VulkanComputePass::ShutDown()
 	{
 		delete m_Data;
 	}

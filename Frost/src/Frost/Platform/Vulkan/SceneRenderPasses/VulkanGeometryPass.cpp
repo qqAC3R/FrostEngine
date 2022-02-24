@@ -17,8 +17,8 @@
 
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
 
-#include <imgui.h>
-#include "Frost/ImGui/ImGuiLayer.h"
+//#include <imgui.h>
+//#include "Frost/ImGui/ImGuiLayer.h"
 
 namespace Frost
 {
@@ -44,7 +44,6 @@ namespace Frost
 		m_Data = new InternalData();
 
 		m_Data->GeometryShader = Renderer::GetShaderLibrary()->Get("GeometryPassIndirectBindless");
-		//m_Data->LateCullShader = Renderer::GetShaderLibrary()->Get("OcclusionCulling");
 		m_Data->LateCullShader = Renderer::GetShaderLibrary()->Get("OcclusionCulling_V2");
 		m_Data->HZBShader = Renderer::GetShaderLibrary()->Get("HiZBufferBuilder");
 
@@ -81,6 +80,13 @@ namespace Frost
 				},
 
 				// Albedo Attachment
+				{
+					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
+				// View-space Position Attachment
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
@@ -396,11 +402,10 @@ namespace Frost
 
 
 				// TODO: Fix frustum culling
-#if 0
+#if 1
 				//if (!submesh.BoundingBox.IsOnFrustum(renderQueue.m_Camera.GetFrustum(), modelMatrix))
 				//	continue;
 #endif
-
 
 				// Submit the submesh into the cpu buffer
 				VkDrawIndexedIndirectCommand indirectCmdBuf{};
@@ -410,32 +415,6 @@ namespace Frost
 				indirectCmdBuf.instanceCount = 1;
 				indirectCmdBuf.vertexOffset = submesh.BaseVertex;
 				m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
-
-
-				// Setting up the material data into a storage buffer
-				DataStorage& materialData = mesh->GetMaterialData(k);
-
-				// Textures
-				instData.AlbedoTextureID =     materialData.Get<uint32_t>("AlbedoTexture");
-				instData.RoughessTextureID =   materialData.Get<uint32_t>("RoughnessTexture");
-				instData.MetalnessTextureID =  materialData.Get<uint32_t>("MetalnessTexture");
-				instData.NormalTextureID =     materialData.Get<uint32_t>("NormalTexture");
-
-				instData.UseNormalMap =		   materialData.Get<uint32_t>("UseNormalMap");
-
-				// PBR values
-				instData.AlbedoColor =         glm::vec4(materialData.Get<glm::vec3>("AlbedoColor"), 1.0f);
-				instData.Roughness =           materialData.Get<float>("RoughnessFactor");
-				instData.Metalness =           materialData.Get<float>("MetalnessFactor");
-				instData.Emission =            materialData.Get<float>("EmissionFactor");
-
-				// Matricies
-				//instData.ModelMatrix =		 modelMatrix;
-				//instData.WorldSpaceMatrix =  viewProjectionMatrix * instData.ModelMatrix;
-
-				// The data collected from the mesh, should be written into a cpu buffer, which will later be copied into a storage buffer
-				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write((void*)&instData, sizeof(MaterialData), materialDataOffset);
-
 
 
 				// Setting up `Mesh data` for the occlusion culling compute shader
@@ -449,9 +428,9 @@ namespace Frost
 				submeshInstanced.WorldSpaceMatrix = viewProjectionMatrix * modelMatrix;
 				mesh->GetVertexBufferInstanced_CPU().Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
 
+
 				// Adding up the offset
 				meshDataOffset     += sizeof(MeshData_OC);
-				materialDataOffset += sizeof(MaterialData);
 				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
 				submittedSubmeshes += 1;
 				vboInstancedDataOffset += sizeof(SubmeshInstanced);
@@ -460,6 +439,34 @@ namespace Frost
 			// Submit instanced data from a cpu buffer to gpu vertex buffer
 			auto vulkanVBOInstanced = mesh->GetVertexBufferInstanced().As<VulkanBufferDevice>();
 			vulkanVBOInstanced->SetData(vboInstancedDataOffset, mesh->GetVertexBufferInstanced_CPU().Data);
+
+
+			for (uint32_t k = 0; k < mesh->GetMaterialCount(); k++)
+			{
+				// Setting up the material data into a storage buffer
+				DataStorage& materialData = mesh->GetMaterialData(k);
+
+#if 1
+				// Textures
+				instData.AlbedoTextureID = materialData.Get<uint32_t>("AlbedoTexture");
+				instData.RoughessTextureID = materialData.Get<uint32_t>("RoughnessTexture");
+				instData.MetalnessTextureID = materialData.Get<uint32_t>("MetalnessTexture");
+				instData.NormalTextureID = materialData.Get<uint32_t>("NormalTexture");
+
+				instData.UseNormalMap = materialData.Get<uint32_t>("UseNormalMap");
+
+				// PBR values
+				instData.AlbedoColor = glm::vec4(materialData.Get<glm::vec3>("AlbedoColor"), 1.0f);
+				instData.Roughness = materialData.Get<float>("RoughnessFactor");
+				instData.Metalness = materialData.Get<float>("MetalnessFactor");
+				instData.Emission = materialData.Get<float>("EmissionFactor");
+#endif
+
+				// The data collected from the mesh, should be written into a cpu buffer, which will later be copied into a storage buffer
+				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write((void*)&instData, sizeof(MaterialData), materialDataOffset);
+
+				materialDataOffset += sizeof(MaterialData);
+			}
 
 #if 0
 			if (!meshIndirectData.size())
@@ -531,7 +538,7 @@ namespace Frost
 		vulkanMeshDataBuffer->SetData(meshDataOffset, meshDataPointer);
 
 
-		OcclusionCullUpdate(renderQueue, indirectCmdsOffset);
+		//OcclusionCullUpdate(renderQueue, indirectCmdsOffset);
 
 
 
@@ -593,6 +600,7 @@ namespace Frost
 			PushConstant pushConstant;
 			pushConstant.MaterialIndex = meshIndirectData[i].SubmeshOffset;
 			pushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
+			pushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
 
 			uint32_t submeshCount = meshData.SubmeshCount;
@@ -818,8 +826,10 @@ namespace Frost
 
 			for (uint32_t i = 0; i < m_Data->LateCullDescriptor.size(); i++)
 			{
-				auto& material = m_Data->LateCullDescriptor[i];
-				material->Set("DepthPyramid", m_Data->DepthPyramid[i]);
+				auto& vulkanMaterial = m_Data->LateCullDescriptor[i].As<VulkanMaterial>();
+				vulkanMaterial->Set("DepthPyramid", m_Data->DepthPyramid[i]);
+
+				vulkanMaterial->UpdateVulkanDescriptorIfNeeded();
 			}
 
 

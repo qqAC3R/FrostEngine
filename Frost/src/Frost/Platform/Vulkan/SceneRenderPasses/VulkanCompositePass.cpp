@@ -368,6 +368,11 @@ namespace Frost
 		);
 	}
 
+	void VulkanCompositePass::LightBufferBlur_OnUpdate(const RenderQueue& renderQueue)
+	{
+
+	}
+
 	void VulkanCompositePass::OnResize(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;

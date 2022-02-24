@@ -273,8 +273,8 @@ void main()
     m_Surface.ViewVector =  normalize(vec3(u_PushConstant.CameraPosition) - m_Surface.WorldPos);
 
 	// Decode normals
-	vec2 decodedNormals =   texture(u_NormalTexture, v_TexCoord).rg;
-    m_Surface.Normal =      DecodeNormals(decodedNormals);
+	vec2 encodedNormals =   texture(u_NormalTexture, v_TexCoord).rg;
+    m_Surface.Normal =      DecodeNormals(encodedNormals);
 
 
     // Sampling the textures from gbuffer

@@ -14,11 +14,12 @@ struct MeshDrawCommand
     int  vertexOffset;
     uint firstInstance;
 };
-
 layout(set = 0, binding = 0, scalar) buffer DrawCommands
 {
     MeshDrawCommand cmds[];
 } u_DrawCommands;
+
+
 
 struct MeshSpecifications
 {
@@ -26,7 +27,6 @@ struct MeshSpecifications
     vec4 AABB_Min;
     vec4 AABB_Max;
 };
-
 layout(set = 0, binding = 1) buffer MeshSpecs
 {
     MeshSpecifications specs[];
@@ -56,8 +56,13 @@ void main()
 {
 	uint idx = gl_GlobalInvocationID.x;
 
+    // If the global invocation is bigger then needed, then just return
     if(idx >= uint(u_PushConstant.DepthPyramidRes.z)) { return; }
 
+    // The object is already frustum culled
+    if(u_DrawCommands.cmds[idx].indexCount == 0) { return; }
+
+    // Get the neccesarry data
     MeshSpecifications meshSpec = u_MeshSpecs.specs[idx];
 
 
@@ -141,7 +146,7 @@ void main()
     // Now for the result, we check if the `zMin` (being the minimum z values of the current mesh),
     // has lower z value then the sampled depth pyramid (`sceneZ`). If so, then the object is in front, so it shouldn't be culled,
     // otherwise the object will be culled
-    if((!(zMin < sceneZ)))
+    if(!(zMin <= sceneZ))
     {
         u_DrawCommands.cmds[idx].indexCount = 0;
         u_DrawCommands.cmds[idx].instanceCount = 1;
@@ -149,6 +154,7 @@ void main()
         u_DrawCommands.cmds[idx].vertexOffset = 0;
         u_DrawCommands.cmds[idx].firstInstance = 0;
     }
+    
 
     // Debugging
     u_DebugBuffer.Value[idx][0].x = mip;

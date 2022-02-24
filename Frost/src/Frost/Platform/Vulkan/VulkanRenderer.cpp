@@ -12,10 +12,11 @@
 #include "Frost/Platform/Vulkan/VulkanImage.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
-#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanRayTracingPass.h"
-#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanComputeRenderPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanPostFXPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanComputePass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanCompositePass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanRayTracingPass.h"
 
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 
@@ -104,6 +105,7 @@ namespace Frost
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanPostFXPass>::Create());
 		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputeRenderPass>::Create());
 		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
 	}
@@ -264,8 +266,9 @@ namespace Frost
 		if(id == 0)
 			return s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[currentFrameIndex];
 		
-		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
-		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, currentFrameIndex);
+		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanPostFXPass>()->FinalImage[currentFrameIndex];
+		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
+		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
 	}
 
 	VkDescriptorSet VulkanRenderer::AllocateDescriptorSet(VkDescriptorSetAllocateInfo allocInfo)

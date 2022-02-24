@@ -502,6 +502,11 @@ namespace Frost
 		Set<float>(name, value);
 	}
 
+	void VulkanMaterial::Set(const std::string& name, const glm::mat4& value)
+	{
+		Set<glm::mat4>(name, value);
+	}
+
 	Ref<BufferDevice> VulkanMaterial::GetBuffer(const std::string& name)
 	{
 		FROST_ASSERT(bool(m_MaterialData.find(name) != m_MaterialData.end()), "Couldn't find the member");

@@ -66,6 +66,8 @@ namespace Frost
 				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
 				meshComponent.Mesh = Mesh::Load("Resources/Meshes/Plane.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
 			}
+
+
 		}
 
 		virtual void OnUpdate(Frost::Timestep ts)
@@ -240,8 +242,6 @@ namespace Frost
 
 			ImGui::End();
 		}
-
-
 
 		virtual void OnEvent(Event& event)
 		{

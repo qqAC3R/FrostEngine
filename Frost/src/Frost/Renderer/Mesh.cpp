@@ -198,8 +198,21 @@ namespace Frost
 				// Emission -       float       (4 bytes)
 				// UseNormalMap -   uint32_t    (4 bytes)
 				// Texture IDs -    4 uint32_t  (16 bytes)
-				// Model matrix -   mat4        (64 bytes) --
-				m_MaterialData[i].Allocate(44);
+				m_MaterialData[i].Allocate(48);
+
+				// Fill up the data in the correct order for us to copy it later
+				DataStorage& materialData = m_MaterialData[i];
+				materialData.Add("AlbedoColor",     glm::vec4(0.0f));
+				materialData.Add("EmissionFactor",  0.0f);
+				materialData.Add("RoughnessFactor", 0.0f);
+				materialData.Add("MetalnessFactor", 0.0f);
+
+				materialData.Add("UseNormalMap", 0);
+
+				materialData.Add("AlbedoTexture",    0);
+				materialData.Add("RoughnessTexture", 0);
+				materialData.Add("MetalnessTexture", 0);
+				materialData.Add("NormalTexture",    0);
 
 
 				// Each mesh has 4 textures, and se we allocated numMaterials * 4 texture slots.
@@ -209,10 +222,10 @@ namespace Frost
 				uint32_t normalMapTextureIndex = (i * 4) + 3;
 
 
-				m_MaterialData[i].Add("AlbedoTexture", m_TextureAllocatorSlots[albedoTextureIndex]);
-				m_MaterialData[i].Add("NormalTexture", m_TextureAllocatorSlots[normalMapTextureIndex]);
-				m_MaterialData[i].Add("RoughnessTexture", m_TextureAllocatorSlots[roughnessTextureIndex]);
-				m_MaterialData[i].Add("MetalnessTexture", m_TextureAllocatorSlots[metalnessTextureIndex]);
+				m_MaterialData[i].Set("AlbedoTexture", m_TextureAllocatorSlots[albedoTextureIndex]);
+				m_MaterialData[i].Set("NormalTexture", m_TextureAllocatorSlots[normalMapTextureIndex]);
+				m_MaterialData[i].Set("RoughnessTexture", m_TextureAllocatorSlots[roughnessTextureIndex]);
+				m_MaterialData[i].Set("MetalnessTexture", m_TextureAllocatorSlots[metalnessTextureIndex]);
 
 				/*
 				// Sometimes there could be more materials then submeshes (for some odd reason)
@@ -242,14 +255,14 @@ namespace Frost
 					glm::vec3 materialColor = { aiColor.r, aiColor.g, aiColor.b };
 
 					mi->Set("u_MaterialUniform.AlbedoColor", materialColor);
-					m_MaterialData[i].Add("AlbedoColor", materialColor);
+					m_MaterialData[i].Set("AlbedoColor", glm::vec4(materialColor, 1.0f));
 				}
 
 				// Geting the emission factor
 				if (aiMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, aiEmission) == AI_SUCCESS)
 				{
 					mi->Set("u_MaterialUniform.Emission", aiEmission.r);
-					m_MaterialData[i].Add("EmissionFactor", aiEmission.r);
+					m_MaterialData[i].Set("EmissionFactor", aiEmission.r);
 				}
 
 
@@ -268,8 +281,8 @@ namespace Frost
 
 				mi->Set("u_MaterialUniform.Roughness", roughness);
 				mi->Set("u_MaterialUniform.Metalness", metalness);
-				m_MaterialData[i].Add("RoughnessFactor", roughness);
-				m_MaterialData[i].Add("MetalnessFactor", metalness);
+				m_MaterialData[i].Set("RoughnessFactor", roughness);
+				m_MaterialData[i].Set("MetalnessFactor", metalness);
 
 
 				// Albedo Map
@@ -329,7 +342,7 @@ namespace Frost
 						mi->Set("u_NormalTexture", texture);
 						mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(1));
 
-						m_MaterialData[i].Add("UseNormalMap", uint32_t(1));
+						m_MaterialData[i].Set("UseNormalMap", uint32_t(1));
 						VulkanBindlessAllocator::AddTextureCustomSlot(texture, m_TextureAllocatorSlots[normalMapTextureIndex]);
 					}
 					else
@@ -338,7 +351,7 @@ namespace Frost
 						mi->Set("u_NormalTexture", whiteTexture);
 						mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
 
-						m_MaterialData[i].Add("UseNormalMap", uint32_t(0));
+						m_MaterialData[i].Set("UseNormalMap", uint32_t(0));
 						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[normalMapTextureIndex]);
 					}
 				}
@@ -347,7 +360,7 @@ namespace Frost
 					mi->Set("u_NormalTexture", whiteTexture);
 					mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
 
-					m_MaterialData[i].Add("UseNormalMap", uint32_t(0));
+					m_MaterialData[i].Set("UseNormalMap", uint32_t(0));
 					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, m_TextureAllocatorSlots[normalMapTextureIndex]);
 
 				}

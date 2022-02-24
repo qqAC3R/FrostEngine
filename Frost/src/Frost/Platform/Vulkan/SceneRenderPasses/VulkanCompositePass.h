@@ -23,6 +23,7 @@ namespace Frost
 	private:
 		void TiledLightCulling_DataInit();
 		void TiledLightCulling_OnUpdate(const RenderQueue& renderQueue);
+		void LightBufferBlur_OnUpdate(const RenderQueue& renderQueue);
 	private:
 		std::string m_Name;
 		SceneRenderPassPipeline* m_RenderPassPipeline;

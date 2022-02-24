@@ -50,6 +50,8 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling_V2.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/HiZBufferBuilder.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledLightCulling.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SSCT.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GaussianBlur.glsl");
 
 		
 		// Init the pools

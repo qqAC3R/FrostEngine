@@ -10,10 +10,10 @@
 namespace Frost
 {
 
-	class VulkanComputeRenderPass : public SceneRenderPass
+	class VulkanComputePass : public SceneRenderPass
 	{
 	public:
-		VulkanComputeRenderPass();
+		VulkanComputePass();
 
 		virtual void Init(SceneRenderPassPipeline* renderPassPipeline) override;
 		virtual void OnUpdate(const RenderQueue& renderQueue);

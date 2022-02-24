@@ -29,6 +29,7 @@ namespace Frost
 		virtual void Set(const std::string& name, float value) override;
 		virtual void Set(const std::string& name, uint32_t value) override;
 		virtual void Set(const std::string& name, const glm::vec3& value) override;
+		virtual void Set(const std::string& name, const glm::mat4& value) override;
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) override;
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex) override;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) override;

@@ -61,10 +61,6 @@ namespace Frost
 			uint32_t RoughessTextureID;
 			uint32_t MetalnessTextureID;
 			uint32_t NormalTextureID;
-
-			// Matricies
-			//glm::mat4 WorldSpaceMatrix;
-			//glm::mat4 ModelMatrix;
 		};
 
 		struct MeshData_OC // Data for occlusion culling
@@ -76,9 +72,6 @@ namespace Frost
 
 		struct ComputeShaderPS // Push constant
 		{
-			//glm::vec4 DepthPyramidSize; // vec2 DepthPyramidRes || float DrawCount || float Padding
-			//glm::mat4 ViewProjectionMatrix;
-
 			glm::vec4 DepthPyramidSize;
 			glm::mat4 ViewMatrix;
 			glm::mat4 ProjectionMaxtrix;
@@ -86,7 +79,6 @@ namespace Frost
 			float CamFar;
 			float Padding1;
 			float Padding2;
-
 		};
 
 		struct InternalData
@@ -129,8 +121,10 @@ namespace Frost
 
 		struct PushConstant
 		{
+			glm::mat4 ViewMatrix;
 			uint32_t MaterialIndex;
 			uint64_t VertexBufferBDA;
+			uint32_t Padding_ = 0;
 		};
 
 		InternalData* m_Data;

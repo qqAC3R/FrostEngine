@@ -154,14 +154,6 @@ void main()
     barrier();
 
 
-    //if(tileID.x % 2 == 0)
-    //{
-    //    uint offset = index * 1024; // Determine position in global buffer
-    //    
-    //    LightIndices.Indices[offset + 0] = 0;
-    //    LightIndices.Indices[offset + 1] = -1;
-    //}
-
     // One thread should fill the global light buffer
     if (gl_LocalInvocationIndex == 0)
     {
