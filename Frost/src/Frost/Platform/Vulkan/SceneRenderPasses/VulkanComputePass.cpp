@@ -47,6 +47,10 @@ namespace Frost
 		m_Data->ComputePipeline = ComputePipeline::Create(computePipelineCreateInfo);
 	}
 
+	void VulkanComputePass::InitLate()
+	{
+	}
+
 	void VulkanComputePass::OnUpdate(const RenderQueue& renderQueue)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -73,6 +77,10 @@ namespace Frost
 	}
 
 	void VulkanComputePass::OnResize(uint32_t width, uint32_t height)
+	{
+	}
+
+	void VulkanComputePass::OnResizeLate(uint32_t width, uint32_t height)
 	{
 	}
 

@@ -98,7 +98,7 @@ struct SurfaceProperties
 
 int GetLightBufferIndex(int i)
 {
-    ivec2 tileID = ivec2(gl_FragCoord) / ivec2(16, 16); //Current Fragment position / Tile count
+    ivec2 tileID = ivec2(gl_FragCoord.xy) / ivec2(16, 16); //Current Fragment position / Tile count
     uint index = tileID.y * uint(m_CameraData.LightCullingWorkgroup) + tileID.x;
 
     uint offset = index * 1024;

@@ -19,7 +19,7 @@ layout(binding = 0, scalar) readonly buffer u_LightData { // Using scalar, it wi
 } LightData;
 
 layout(binding = 1) writeonly buffer u_VisibleLightsBuffer {
-	int Indices[]; // Probably 16^2 * 1024
+	int Indices[];
 } LightIndices;
 
 

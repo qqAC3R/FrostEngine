@@ -57,11 +57,26 @@ namespace Frost
 		}
 	}
 
-	void SceneRenderPassPipeline::ResizeRenderPasses(uint32_t width, uint32_t height)
+	void SceneRenderPassPipeline::InitLateRenderPasses()
 	{
 		for (auto& renderPass : m_RenderPasses)
 		{
+			renderPass->InitLate();
+		}
+	}
+
+	void SceneRenderPassPipeline::ResizeRenderPasses(uint32_t width, uint32_t height)
+	{
+		// Resize
+		for (auto& renderPass : m_RenderPasses)
+		{
 			renderPass->OnResize(width, height);
+		}
+
+		// Late resize
+		for (auto& renderPass : m_RenderPasses)
+		{
+			renderPass->OnResizeLate(width, height);
 		}
 	}
 

@@ -85,7 +85,7 @@ namespace Frost
 		virtual ~Mesh();
 
 		const Ref<VertexBuffer>& GetVertexBuffer() const { return m_VertexBuffer; }
-		const Ref<BufferDevice>& GetVertexBufferInstanced() const { return m_VertexBufferInstanced; }
+		const Ref<BufferDevice>& GetVertexBufferInstanced(uint32_t index) const { return m_VertexBufferInstanced[index]; }
 		const Ref<IndexBuffer>& GetIndexBuffer() const { return m_IndexBuffer; }
 		const Ref<IndexBuffer>& GetSubmeshIndexBuffer() const { return m_SubmeshIndexBuffers; }
 
@@ -97,7 +97,7 @@ namespace Frost
 
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
 		
-		Buffer& GetVertexBufferInstanced_CPU() { return m_VertexBufferInstanced_CPU; }
+		Buffer& GetVertexBufferInstanced_CPU(uint32_t index) { return m_VertexBufferInstanced_CPU[index]; }
 
 		uint32_t GetMaterialCount() { return (uint32_t)m_MaterialData.size(); }
 		DataStorage& GetMaterialData(uint32_t materialIndex) { return m_MaterialData[materialIndex]; }
@@ -125,11 +125,11 @@ namespace Frost
 		HashMap<uint32_t, Vector<Triangle>> m_TriangleCache;
 
 		Ref<VertexBuffer> m_VertexBuffer;
-		Ref<BufferDevice> m_VertexBufferInstanced;
 		Ref<IndexBuffer> m_IndexBuffer;
 		Ref<IndexBuffer> m_SubmeshIndexBuffers;
 
-		Buffer m_VertexBufferInstanced_CPU;
+		Vector<Buffer> m_VertexBufferInstanced_CPU;
+		Vector<Ref<BufferDevice>> m_VertexBufferInstanced;
 
 		Vector<Ref<Texture2D>> m_Textures;
 		Vector<Ref<Material>> m_Materials; // TODO: Maybe remove it? since the engine is now bindless

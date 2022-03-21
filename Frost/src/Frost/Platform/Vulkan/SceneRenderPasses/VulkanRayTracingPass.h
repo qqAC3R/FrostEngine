@@ -20,8 +20,10 @@ namespace Frost
 		virtual ~VulkanRayTracingPass();
 
 		virtual void Init(SceneRenderPassPipeline* renderPassPipeline) override;
+		virtual void InitLate() override;
 		virtual void OnUpdate(const RenderQueue& renderQueue);
 		virtual void OnResize(uint32_t width, uint32_t height) override;
+		virtual void OnResizeLate(uint32_t width, uint32_t height) override;
 		virtual void ShutDown() override;
 
 		virtual void* GetInternalData() override { return (void*)m_Data; }

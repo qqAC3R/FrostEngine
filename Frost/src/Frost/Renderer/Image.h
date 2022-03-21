@@ -9,6 +9,7 @@ namespace Frost
 
 		// Color
 		R8, R32,
+		RG32F,
 		RGBA8, RGBA16F, RGBA32F,
 
 		// Depth/Stencil

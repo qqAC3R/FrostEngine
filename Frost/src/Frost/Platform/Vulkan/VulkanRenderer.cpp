@@ -52,7 +52,7 @@ namespace Frost
 	void VulkanRenderer::Init()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		s_Data = new Vulkan::RenderData;
+		s_Data = new Vulkan::RenderData();
 
 		// Initilization
 		Application::Get().GetImGuiLayer()->OnInit(VulkanContext::GetSwapChain()->GetRenderPass());
@@ -101,13 +101,16 @@ namespace Frost
 
 	void VulkanRenderer::InitRenderPasses()
 	{
-		// Scene render passes
+		// Init scene render passes
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanPostFXPass>::Create());
-		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputeRenderPass>::Create());
+		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputePass>::Create());
 		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
+
+		// Late init for scene render passes
+		s_Data->SceneRenderPasses->InitLateRenderPasses();
 	}
 
 	void VulkanRenderer::BeginFrame()
@@ -267,6 +270,7 @@ namespace Frost
 			return s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[currentFrameIndex];
 		
 		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanPostFXPass>()->FinalImage[currentFrameIndex];
+		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanPostFXPass>()->AO_Image[currentFrameIndex];
 		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
 		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
 	}

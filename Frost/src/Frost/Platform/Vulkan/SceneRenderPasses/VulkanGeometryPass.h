@@ -29,8 +29,10 @@ namespace Frost
 		virtual ~VulkanGeometryPass();
 
 		virtual void Init(SceneRenderPassPipeline* renderPassPipeline) override;
+		virtual void InitLate() override;
 		virtual void OnUpdate(const RenderQueue& renderQueue);
 		virtual void OnResize(uint32_t width, uint32_t height) override;
+		virtual void OnResizeLate(uint32_t width, uint32_t height) override;
 		virtual void ShutDown() override;
 
 		virtual void* GetInternalData() override { return (void*)m_Data; }
@@ -39,8 +41,7 @@ namespace Frost
 
 	private:
 		void Geometry_DataInit();
-		void HZB_DataInit();
-		void LateCull_DataInit();
+		void LateCull_DataInit(uint32_t width, uint32_t height);
 
 		void OcclusionCullUpdate(const RenderQueue& renderQueue, uint64_t indirectCmdsOffset);
 

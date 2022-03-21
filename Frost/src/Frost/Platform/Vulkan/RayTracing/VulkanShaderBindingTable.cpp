@@ -21,6 +21,7 @@ namespace Frost
 			vk::PhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
 			auto properties = physicalDevice.getProperties2KHR<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
 			return properties.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
+			//return VkPhysicalDeviceRayTracingPipelinePropertiesKHR();
 		}
 
 		static void LoadRayTracingShader(VkShaderModule& shaderModule,                                 // reading

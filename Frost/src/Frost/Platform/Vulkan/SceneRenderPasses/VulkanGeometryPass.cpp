@@ -17,8 +17,8 @@
 
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
 
-//#include <imgui.h>
-//#include "Frost/ImGui/ImGuiLayer.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanPostFXPass.h"
+
 
 namespace Frost
 {
@@ -49,10 +49,13 @@ namespace Frost
 
 
 		Geometry_DataInit();
-		HZB_DataInit();
-		LateCull_DataInit();
 	}
 
+
+	void VulkanGeometryPass::InitLate()
+	{
+		LateCull_DataInit(1600, 900);
+	}
 
 	/// Geometry pass initialization
 	void VulkanGeometryPass::Geometry_DataInit()
@@ -92,21 +95,6 @@ namespace Frost
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
-#if 0
-				// Composite Attachment
-				{
-					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
-					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
-					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
-				},
-
-				// ECS Attachment
-				{
-					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
-					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
-					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
-				},
-#endif
 
 				// Depth Attachment
 				{
@@ -141,6 +129,7 @@ namespace Frost
 		pipelineCreateInfo.UseDepthTest = true;
 		pipelineCreateInfo.UseDepthWrite = true;
 		pipelineCreateInfo.UseStencil = false;
+		pipelineCreateInfo.Cull = CullMode::Back;
 		pipelineCreateInfo.RenderPass = m_Data->RenderPass;
 		pipelineCreateInfo.VertexBufferLayout = bufferLayout;
 		m_Data->Pipeline = Pipeline::Create(pipelineCreateInfo);
@@ -181,156 +170,48 @@ namespace Frost
 
 	}
 
-	void VulkanGeometryPass::HZB_DataInit()
+	void VulkanGeometryPass::LateCull_DataInit(uint32_t width, uint32_t height)
 	{
 		uint64_t maxCountMeshes = Renderer::GetRendererConfig().GeometryPass_Mesh_Count;
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 
 
-		//////////////////////////////////////////////
-		// DEPTH PYRAMID CONSTRUCTION ////////////////
-		//////////////////////////////////////////////
-		{
-			// Calculating the previous frame index
-			{
-				m_Data->HZB_Dimensions = glm::vec2(1600, 900);
-
-				m_Data->DepthPyramid.resize(framesInFlight);
-				for (uint32_t i = 0; i < framesInFlight; i++)
-				{
-
-					ImageSpecification imageSpec{};
-					imageSpec.Width = 1600;
-					imageSpec.Height = 900;
-					imageSpec.Sampler.ReductionMode_Optional = ReductionMode::Min;
-					imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
-					imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
-
-					imageSpec.Format = ImageFormat::R32;
-					imageSpec.Usage = ImageUsage::Storage;
-					imageSpec.UseMipChain = true;
-
-					m_Data->DepthPyramid[i] = Image2D::Create(imageSpec);
-				}
-			}
-
-			// Pipeline creation
-			ComputePipeline::CreateInfo computePipelineCreateInfo{};
-			computePipelineCreateInfo.Shader = m_Data->HZBShader;
-			m_Data->HZBPipeline = ComputePipeline::Create(computePipelineCreateInfo);
-
-
-			// Descriptor creation
-			uint32_t mipLevels = (uint32_t)std::floor(std::log2(std::max(1600, 900))) + 1;
-			m_Data->HZB_MipLevels = mipLevels;
-			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-			m_Data->HZBDescriptor.resize(framesInFlight);
-			for (uint32_t j = 0; j < framesInFlight; j++)
-			{
-				m_Data->HZBDescriptor[j].resize(mipLevels);
-				for (uint32_t i = 0; i < mipLevels; i++)
-				{
-					auto& material = m_Data->HZBDescriptor[j][i];
-					material = Material::Create(m_Data->HZBShader, "Hi-Z_Buffer_Builder");
-
-
-					auto& vulkanDescriptor = material.As<VulkanMaterial>();
-					auto& vulkanDepthPyramid = m_Data->DepthPyramid[j].As<VulkanImage2D>();
-
-					VkDescriptorSet descriptorSet = vulkanDescriptor->GetVulkanDescriptorSet(0);
-
-					// If we use the first descriptor set, we only will set the `o_Depth` texture (because the input will be last's frame depth buffer)
-					if (i == 0)
-					{
-						VkDescriptorImageInfo imageDescriptorInfo{};
-						imageDescriptorInfo.imageView = vulkanDepthPyramid->GetVulkanImageViewMip(0);
-						imageDescriptorInfo.imageLayout = vulkanDepthPyramid->GetVulkanImageLayout();
-						imageDescriptorInfo.sampler = vulkanDepthPyramid->GetVulkanSampler();
-
-						VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-						writeDescriptorSet.dstBinding = 1;
-						writeDescriptorSet.dstArrayElement = 0;
-						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-						writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
-						writeDescriptorSet.descriptorCount = 1;
-						writeDescriptorSet.dstSet = descriptorSet;
-
-						vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-
-						continue;
-					}
-
-
-					// Setting up `i_Depth`
-					{
-						VkDescriptorImageInfo imageDescriptorInfo{};
-						imageDescriptorInfo.imageView = vulkanDepthPyramid->GetVulkanImageViewMip(i - 1);
-						imageDescriptorInfo.imageLayout = vulkanDepthPyramid->GetVulkanImageLayout();
-						imageDescriptorInfo.sampler = vulkanDepthPyramid->GetVulkanSampler();
-
-						VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-						writeDescriptorSet.dstBinding = 0;
-						writeDescriptorSet.dstArrayElement = 0;
-						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-						writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
-						writeDescriptorSet.descriptorCount = 1;
-						writeDescriptorSet.dstSet = descriptorSet;
-
-						vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-					}
-
-					// Setting up `o_Depth`
-					{
-						VkDescriptorImageInfo imageDescriptorInfo{};
-						imageDescriptorInfo.imageView = vulkanDepthPyramid->GetVulkanImageViewMip(i);
-						imageDescriptorInfo.imageLayout = vulkanDepthPyramid->GetVulkanImageLayout();
-						imageDescriptorInfo.sampler = vulkanDepthPyramid->GetVulkanSampler();
-
-						VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-						writeDescriptorSet.dstBinding = 1;
-						writeDescriptorSet.dstArrayElement = 0;
-						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-						writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
-						writeDescriptorSet.descriptorCount = 1;
-						writeDescriptorSet.dstSet = descriptorSet;
-
-						vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-					}
-				}
-			}
-		}
-	}
-
-	void VulkanGeometryPass::LateCull_DataInit()
-	{
-		uint64_t maxCountMeshes = Renderer::GetRendererConfig().GeometryPass_Mesh_Count;
-		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-
+		m_Data->ComputeShaderPushConstant.DepthPyramidSize.x = width;
+		m_Data->ComputeShaderPushConstant.DepthPyramidSize.y = height;
 
 		//////////////////////////////////////////////
 		// LATE CULLING //////////////////////////////
 		//////////////////////////////////////////////
 		{
+			if (!m_Data->LateCullPipeline)
+			{
+				ComputePipeline::CreateInfo computePipelineCreateInfo{};
+				computePipelineCreateInfo.Shader = m_Data->LateCullShader;
+				m_Data->LateCullPipeline = ComputePipeline::Create(computePipelineCreateInfo);
 
-			ComputePipeline::CreateInfo computePipelineCreateInfo{};
-			computePipelineCreateInfo.Shader = m_Data->LateCullShader;
-			m_Data->LateCullPipeline = ComputePipeline::Create(computePipelineCreateInfo);
-
-			m_Data->DebugDeviceBuffer = BufferDevice::Create(sizeof(glm::mat4) * 1024, { BufferUsage::Storage });
+				m_Data->DebugDeviceBuffer = BufferDevice::Create(sizeof(glm::mat4) * 1024, { BufferUsage::Storage });
 
 
-			// Mesh specs for the compute shader (occlusion culling) TODO: Only 1??
-			m_Data->MeshSpecs.DeviceBuffer = BufferDevice::Create(sizeof(MeshData_OC) * maxCountMeshes, { BufferUsage::Storage });
-			m_Data->MeshSpecs.HostBuffer.Allocate(sizeof(MeshData_OC) * maxCountMeshes);
+				// Mesh specs for the compute shader (occlusion culling) TODO: Only 1??
+				m_Data->MeshSpecs.DeviceBuffer = BufferDevice::Create(sizeof(MeshData_OC) * maxCountMeshes, { BufferUsage::Storage });
+				m_Data->MeshSpecs.HostBuffer.Allocate(sizeof(MeshData_OC) * maxCountMeshes);
+			}
 
 			m_Data->LateCullDescriptor.resize(framesInFlight);
 			for (uint32_t i = 0; i < m_Data->LateCullDescriptor.size(); i++)
 			{
 				auto& computeDescriptor = m_Data->LateCullDescriptor[i];
 
-				computeDescriptor = Material::Create(m_Data->LateCullShader, "OcclusionCulling");
-				computeDescriptor->Set("DepthPyramid", m_Data->DepthPyramid[i]);
+				int32_t previousFrameIndex = (int32_t)i - 1;
+				if (previousFrameIndex < 0)
+					previousFrameIndex = Renderer::GetRendererConfig().FramesInFlight - 1;
+
+				auto lastFrameDepthPyramid = m_RenderPassPipeline->GetRenderPassData<VulkanPostFXPass>()->DepthPyramid[previousFrameIndex];
+
+				if(!computeDescriptor)
+					computeDescriptor = Material::Create(m_Data->LateCullShader, "OcclusionCulling");
+
+				computeDescriptor->Set("DepthPyramid", lastFrameDepthPyramid);
 				computeDescriptor->Set("MeshSpecs", m_Data->MeshSpecs.DeviceBuffer);
 				computeDescriptor->Set("DrawCommands", m_Data->IndirectCmdBuffer[i].DeviceBuffer);
 				computeDescriptor->Set("DebugBuffer", m_Data->DebugDeviceBuffer);
@@ -426,7 +307,7 @@ namespace Frost
 				// Submit instanced data into a cpu buffer (which will be later sent to the gpu's instanced vbo)
 				submeshInstanced.ModelSpaceMatrix = modelMatrix;
 				submeshInstanced.WorldSpaceMatrix = viewProjectionMatrix * modelMatrix;
-				mesh->GetVertexBufferInstanced_CPU().Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
+				mesh->GetVertexBufferInstanced_CPU(currentFrameIndex).Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
 
 
 				// Adding up the offset
@@ -437,8 +318,8 @@ namespace Frost
 			}
 
 			// Submit instanced data from a cpu buffer to gpu vertex buffer
-			auto vulkanVBOInstanced = mesh->GetVertexBufferInstanced().As<VulkanBufferDevice>();
-			vulkanVBOInstanced->SetData(vboInstancedDataOffset, mesh->GetVertexBufferInstanced_CPU().Data);
+			auto vulkanVBOInstanced = mesh->GetVertexBufferInstanced(currentFrameIndex).As<VulkanBufferDevice>();
+			vulkanVBOInstanced->SetData(vboInstancedDataOffset, mesh->GetVertexBufferInstanced_CPU(currentFrameIndex).Data);
 
 
 			for (uint32_t k = 0; k < mesh->GetMaterialCount(); k++)
@@ -590,7 +471,7 @@ namespace Frost
 			mesh->GetIndexBuffer()->Bind();
 			
 			// Bind the vertex buffer (only the instanced one, since for the "per vertex" one, we are using BDAs
-			auto vulkanVertexBufferInstanced = mesh->GetVertexBufferInstanced().As<VulkanBufferDevice>();
+			auto vulkanVertexBufferInstanced = mesh->GetVertexBufferInstanced(currentFrameIndex).As<VulkanBufferDevice>();
 			VkBuffer vertexBufferInstanced = vulkanVertexBufferInstanced->GetVulkanBuffer();
 			VkDeviceSize deviceSize[1] = { 0 };
 			vkCmdBindVertexBuffers(cmdBuf, 0, 1, &vertexBufferInstanced, deviceSize);
@@ -606,6 +487,7 @@ namespace Frost
 			uint32_t submeshCount = meshData.SubmeshCount;
 			uint32_t offset = meshIndirectData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
 			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
+
 		}
 
 #if 0
@@ -687,100 +569,32 @@ namespace Frost
 		auto vulkanIndirectCmdBuffer = m_Data->IndirectCmdBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
 		void* indirectCmdsPointer = m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Data;
 
-		// Occlusion culling
+		// Occlusion Culling Part2:
 		{
-			int32_t previousFrameIndex = (int32_t)currentFrameIndex - 1;
-			if (previousFrameIndex < 0)
-				previousFrameIndex = Renderer::GetRendererConfig().FramesInFlight - 1;
+			auto vulkanComputePipeline = m_Data->LateCullPipeline.As<VulkanComputePipeline>();
 
-			auto srcDepthImage = m_Data->RenderPass->GetDepthAttachment(previousFrameIndex);
-			auto vulkanSrcDepthImage = srcDepthImage.As<VulkanImage2D>();
-
-			VkImageLayout srcDepthImageLayout = vulkanSrcDepthImage->GetVulkanImageLayout();
-			vulkanSrcDepthImage->TransitionLayout(cmdBuf, srcDepthImageLayout, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT);
+			auto vulkanComputeDescriptor = m_Data->LateCullDescriptor[currentFrameIndex].As<VulkanMaterial>();
+			vulkanComputeDescriptor->Bind(cmdBuf, m_Data->LateCullPipeline);
 
 
-#if 0
-			// Debug
-			ImGui::Begin("HZB");
-			ImTextureID depthPyramidID = ImGuiLayer::GetTextureIDFromVulkanTexture_MipLevel(m_Data->DepthPyramid[currentFrameIndex], (uint32_t)s_DebugMipLevel);
-			ImGui::Image(depthPyramidID, { 400, 300 });
-			ImGui::SliderInt("MipLevel", &s_DebugMipLevel, 0, 10);
-			ImGui::End();
-#endif
+			m_Data->ComputeShaderPushConstant.DepthPyramidSize.z = indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand);
 
-			// Occlusion Culling Part1:
-			glm::vec2 currentHZB_Dimensions = m_Data->HZB_Dimensions;
-			for (uint32_t mipLevel = 0; mipLevel < m_Data->HZB_MipLevels; mipLevel++)
-			{
+			m_Data->ComputeShaderPushConstant.CamFar = renderQueue.m_Camera.GetFarClip();
+			m_Data->ComputeShaderPushConstant.CamNear = renderQueue.m_Camera.GetNearClip();
+			m_Data->ComputeShaderPushConstant.ViewMatrix = renderQueue.m_Camera.GetViewMatrix();
+			m_Data->ComputeShaderPushConstant.ProjectionMaxtrix = renderQueue.m_Camera.GetProjectionMatrix();
+			m_Data->ComputeShaderPushConstant.ProjectionMaxtrix[1][1] *= -1;
 
-				auto vulkanHZB_Pipeline = m_Data->HZBPipeline.As<VulkanComputePipeline>();
-				auto vulkanHZB_Descriptor = m_Data->HZBDescriptor[currentFrameIndex][mipLevel].As<VulkanMaterial>();
-				auto vulkanDepthPyramid = m_Data->DepthPyramid[currentFrameIndex].As<VulkanImage2D>();
+			vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->ComputeShaderPushConstant);
 
-				if (mipLevel == 0)
-				{
-					vulkanHZB_Descriptor->Set("i_Depth", srcDepthImage);
-				}
-				else
-				{
-					currentHZB_Dimensions.x /= 2;
-					currentHZB_Dimensions.y /= 2;
-				}
+			uint32_t workGroupsX = std::floor((indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand)) / 64.0f) + 1;
+			vulkanComputePipeline->Dispatch(cmdBuf, workGroupsX, 1, 1);
 
-				vulkanHZB_Descriptor->Bind(cmdBuf, m_Data->HZBPipeline);
+			vulkanIndirectCmdBuffer->SetMemoryBarrier(cmdBuf,
+				VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT
+			);
 
-				vulkanHZB_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &currentHZB_Dimensions);
-
-
-
-
-				vulkanHZB_Pipeline->Dispatch(cmdBuf, std::floor(currentHZB_Dimensions.x / 32.0f) + 1, std::floor(currentHZB_Dimensions.y / 32.0f) + 1, 1.0f);
-
-
-
-				VkImageSubresourceRange imageSubrange{};
-				imageSubrange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				imageSubrange.baseArrayLayer = 0;
-				imageSubrange.baseMipLevel = mipLevel;
-				imageSubrange.layerCount = 1;
-				imageSubrange.levelCount = 1;
-
-				Utils::InsertImageMemoryBarrier(cmdBuf, vulkanDepthPyramid->GetVulkanImage(),
-					VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-					vulkanDepthPyramid->GetVulkanImageLayout(), vulkanDepthPyramid->GetVulkanImageLayout(),
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					imageSubrange
-				);
-			}
-
-			// Occlusion Culling Part2:
-			{
-				auto vulkanComputePipeline = m_Data->LateCullPipeline.As<VulkanComputePipeline>();
-
-				auto vulkanComputeDescriptor = m_Data->LateCullDescriptor[currentFrameIndex].As<VulkanMaterial>();
-				vulkanComputeDescriptor->Bind(cmdBuf, m_Data->LateCullPipeline);
-
-
-				m_Data->ComputeShaderPushConstant.DepthPyramidSize.z = indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand);
-
-				m_Data->ComputeShaderPushConstant.CamFar = renderQueue.m_Camera.GetFarClip();
-				m_Data->ComputeShaderPushConstant.CamNear = renderQueue.m_Camera.GetNearClip();
-				m_Data->ComputeShaderPushConstant.ViewMatrix = renderQueue.m_Camera.GetViewMatrix();
-				m_Data->ComputeShaderPushConstant.ProjectionMaxtrix = renderQueue.m_Camera.GetProjectionMatrix();
-				m_Data->ComputeShaderPushConstant.ProjectionMaxtrix[1][1] *= -1;
-
-				vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->ComputeShaderPushConstant);
-
-				uint32_t workGroupsX = std::floor((indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand)) / 64.0f) + 1;
-				vulkanComputePipeline->Dispatch(cmdBuf, workGroupsX, 1, 1);
-
-				vulkanIndirectCmdBuffer->SetMemoryBarrier(cmdBuf,
-					VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT
-				);
-
-			}
 		}
 	}
 
@@ -789,129 +603,11 @@ namespace Frost
 		s_RenderPassSpec.FramebufferSpecification.Width = width;
 		s_RenderPassSpec.FramebufferSpecification.Height = height;
 		m_Data->RenderPass = RenderPass::Create(s_RenderPassSpec);
+	}
 
-
-
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-
-		{
-
-			// Depth pyramid creation
-			{
-
-				m_Data->HZB_Dimensions = glm::vec2(width, height);
-				m_Data->HZB_MipLevels = (uint32_t)std::floor(std::log2(std::max(width, height))) + 1;
-
-				m_Data->ComputeShaderPushConstant.DepthPyramidSize.x = width;
-				m_Data->ComputeShaderPushConstant.DepthPyramidSize.y = height;
-
-				for (uint32_t i = 0; i < framesInFlight; i++)
-				{
-					ImageSpecification imageSpec{};
-					imageSpec.Width = width;
-					imageSpec.Height = height;
-					imageSpec.Sampler.ReductionMode_Optional = ReductionMode::Min;
-					imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
-					imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
-
-					imageSpec.Format = ImageFormat::R32;
-					imageSpec.Usage = ImageUsage::Storage;
-					imageSpec.UseMipChain = true;
-
-					m_Data->DepthPyramid[i] = Image2D::Create(imageSpec);
-				}
-			}
-
-
-			for (uint32_t i = 0; i < m_Data->LateCullDescriptor.size(); i++)
-			{
-				auto& vulkanMaterial = m_Data->LateCullDescriptor[i].As<VulkanMaterial>();
-				vulkanMaterial->Set("DepthPyramid", m_Data->DepthPyramid[i]);
-
-				vulkanMaterial->UpdateVulkanDescriptorIfNeeded();
-			}
-
-
-			
-			// Setting up the HZB builder descriptor
-			for (uint32_t j = 0; j < framesInFlight; j++)
-			{
-				for (uint32_t i = 0; i < m_Data->HZB_MipLevels; i++)
-				{
-					auto& material = m_Data->HZBDescriptor[j][i];
-
-					auto& vulkanDescriptor = material.As<VulkanMaterial>();
-					auto& vulkanDepthPyramid = m_Data->DepthPyramid[j].As<VulkanImage2D>();
-
-					VkDescriptorSet descriptorSet = vulkanDescriptor->GetVulkanDescriptorSet(0);
-
-					// If we use the first descriptor set, we only will set the `o_Depth` texture (because the input will be last's frame depth buffer)
-					if (i == 0)
-					{
-						VkDescriptorImageInfo imageDescriptorInfo{};
-						imageDescriptorInfo.imageView = vulkanDepthPyramid->GetVulkanImageViewMip(0);
-						imageDescriptorInfo.imageLayout = vulkanDepthPyramid->GetVulkanImageLayout();
-						imageDescriptorInfo.sampler = vulkanDepthPyramid->GetVulkanSampler();
-
-						VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-						writeDescriptorSet.dstBinding = 1;
-						writeDescriptorSet.dstArrayElement = 0;
-						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-						writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
-						writeDescriptorSet.descriptorCount = 1;
-						writeDescriptorSet.dstSet = descriptorSet;
-
-						vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-
-						continue;
-					}
-
-
-					// Setting up `i_Depth`
-					{
-						VkDescriptorImageInfo imageDescriptorInfo{};
-						imageDescriptorInfo.imageView = vulkanDepthPyramid->GetVulkanImageViewMip(i - 1);
-						imageDescriptorInfo.imageLayout = vulkanDepthPyramid->GetVulkanImageLayout();
-						imageDescriptorInfo.sampler = vulkanDepthPyramid->GetVulkanSampler();
-
-						VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-						writeDescriptorSet.dstBinding = 0;
-						writeDescriptorSet.dstArrayElement = 0;
-						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-						writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
-						writeDescriptorSet.descriptorCount = 1;
-						writeDescriptorSet.dstSet = descriptorSet;
-
-						vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-					}
-
-					// Setting up `o_Depth`
-					{
-						VkDescriptorImageInfo imageDescriptorInfo{};
-						imageDescriptorInfo.imageView = vulkanDepthPyramid->GetVulkanImageViewMip(i);
-						imageDescriptorInfo.imageLayout = vulkanDepthPyramid->GetVulkanImageLayout();
-						imageDescriptorInfo.sampler = vulkanDepthPyramid->GetVulkanSampler();
-
-						VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-						writeDescriptorSet.dstBinding = 1;
-						writeDescriptorSet.dstArrayElement = 0;
-						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-						writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
-						writeDescriptorSet.descriptorCount = 1;
-						writeDescriptorSet.dstSet = descriptorSet;
-
-						vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-					}
-
-					//material->Set("i_Depth", previousDepthBuffer);
-					//material->Set("o_Depth", depthPyramid);
-
-
-				}
-
-			}
-		}
+	void VulkanGeometryPass::OnResizeLate(uint32_t width, uint32_t height)
+	{
+		LateCull_DataInit(width, height);
 	}
 
 	void VulkanGeometryPass::ShutDown()

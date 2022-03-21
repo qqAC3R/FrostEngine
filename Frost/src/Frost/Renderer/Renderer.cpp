@@ -10,6 +10,7 @@ namespace Frost
 		Ref<ShaderLibrary> m_ShaderLibrary;
 		Ref<Texture2D> m_WhiteTexture;
 		Ref<Texture2D> m_BRDFLut;
+		Ref<Texture2D> m_NoiseLut;
 		Ref<SceneEnvironment> m_Environment;
 	};
 
@@ -52,6 +53,9 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledLightCulling.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SSCT.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GaussianBlur.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VisibilityBuffer.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GroundTruthAO_V2.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SpatialDenoiser.glsl");
 
 		
 		// Init the pools
@@ -68,6 +72,11 @@ namespace Frost
 
 		textureSpec.Format = ImageFormat::RGBA16F;
 		s_Data->m_BRDFLut = Texture2D::Create("Resources/LUT/BRDF_LUT.tga", textureSpec);
+
+		textureSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+		textureSpec.Format = ImageFormat::RG32F;
+		s_Data->m_NoiseLut = Texture2D::Create("Resources/LUT/Noise.png", textureSpec);
+
 
 		// Init the renderpasses
 		s_RendererAPI->InitRenderPasses();
@@ -122,6 +131,11 @@ namespace Frost
 	Ref<Texture2D> Renderer::GetBRDFLut()
 	{
 		return s_Data->m_BRDFLut;
+	}
+
+	Ref<Texture2D> Renderer::GetNoiseLut()
+	{
+		return s_Data->m_NoiseLut;
 	}
 
 	void Renderer::ExecuteCommandBuffer()

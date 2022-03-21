@@ -75,6 +75,7 @@ namespace Frost
 		static Ref<Image2D> GetFinalImage(uint32_t id) { return s_RendererAPI->GetFinalImage(id); }
 		static Ref<Texture2D> GetWhiteLUT();
 		static Ref<Texture2D> GetBRDFLut();
+		static Ref<Texture2D> GetNoiseLut();
 
 		static Ref<ShaderLibrary> GetShaderLibrary();
 		static Ref<SceneEnvironment> GetSceneEnvironment();

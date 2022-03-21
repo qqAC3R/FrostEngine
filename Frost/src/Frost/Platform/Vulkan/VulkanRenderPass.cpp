@@ -100,8 +100,8 @@ namespace Frost
 		renderPassInfo.pAttachments = attachmentDescriptions.data();
 		renderPassInfo.subpassCount = 1;
 		renderPassInfo.pSubpasses = &subpass;	
-		renderPassInfo.dependencyCount = 1;
-		renderPassInfo.pDependencies = &dependency;
+		renderPassInfo.dependencyCount = 0;
+		renderPassInfo.pDependencies = nullptr;
 
 		FROST_VKCHECK(vkCreateRenderPass(device, &renderPassInfo, nullptr, &m_RenderPass));
 		VulkanContext::SetStructDebugName("RenderPass", VK_OBJECT_TYPE_RENDER_PASS, m_RenderPass);

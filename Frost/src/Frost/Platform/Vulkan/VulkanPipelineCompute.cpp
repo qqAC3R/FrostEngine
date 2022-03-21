@@ -34,6 +34,8 @@ namespace Frost
 		pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
 		FROST_VKCHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
 
+		if (!shaderStages.size())
+			FROST_ASSERT_MSG("'#type' hasn't been added in the shader file");
 
 		VkComputePipelineCreateInfo computePipelineCreateInfo{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
 		computePipelineCreateInfo.layout = m_PipelineLayout;

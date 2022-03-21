@@ -51,6 +51,7 @@ namespace Frost
 
 		float GetFarClip() const { return m_FarClip; }
 		float GetNearClip() const { return m_NearClip; }
+		float GetCameraFOV() const { return m_FOV; }
 
 		const FrustumCamera& GetFrustum() const { return m_Frustum; }
 

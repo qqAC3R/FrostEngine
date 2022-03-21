@@ -113,6 +113,10 @@ namespace Frost
 			s_UpdateTLAS[i] = true;
 	}
 
+	void VulkanRayTracingPass::InitLate()
+	{
+	}
+
 	void VulkanRayTracingPass::OnUpdate(const RenderQueue& renderQueue)
 	{
 		// If we have 0 meshes, we shouldnt render this pass
@@ -276,6 +280,10 @@ namespace Frost
 			auto vulkanMaterial = m_Data->Descriptor[i].As<VulkanMaterial>();
 			vulkanMaterial->UpdateVulkanDescriptorIfNeeded();
 		}
+	}
+
+	void VulkanRayTracingPass::OnResizeLate(uint32_t width, uint32_t height)
+	{
 	}
 
 	void VulkanRayTracingPass::ShutDown()

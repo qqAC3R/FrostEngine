@@ -14,8 +14,10 @@ namespace Frost
 		virtual ~SceneRenderPass() {}
 
 		virtual void Init(SceneRenderPassPipeline* renderPassPipeline) = 0;
+		virtual void InitLate() = 0; // After initializating all the renderpasses, `init late` is being called
 		virtual void OnUpdate(const RenderQueue& renderQueue) = 0;
 		virtual void OnResize(uint32_t width, uint32_t height) = 0;
+		virtual void OnResizeLate(uint32_t width, uint32_t height) = 0;  // After resizing all the renderpasses, `resize late` is being called
 		virtual void ShutDown() = 0;
 
 		virtual void* GetInternalData() = 0;
@@ -76,6 +78,7 @@ namespace Frost
 		}
 		
 		void UpdateRenderPasses(const RenderQueue& renderQueue);
+		void InitLateRenderPasses();
 
 	private:
 		Vector<Ref<SceneRenderPass>> m_RenderPasses;

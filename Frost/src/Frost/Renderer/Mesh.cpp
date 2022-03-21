@@ -170,8 +170,16 @@ namespace Frost
 			m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)m_Indices.size() * sizeof(Index));
 
 			// Instanced vertex buffer
-			m_VertexBufferInstanced_CPU.Allocate(m_Submeshes.size() * sizeof(SubmeshInstanced) + 1);
-			m_VertexBufferInstanced = BufferDevice::Create(m_Submeshes.size() * sizeof(SubmeshInstanced), { BufferUsage::Vertex });
+			uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+
+			m_VertexBufferInstanced.resize(framesInFlight);
+			m_VertexBufferInstanced_CPU.resize(framesInFlight);
+			for (uint32_t i = 0; i < framesInFlight; i++)
+			{
+				m_VertexBufferInstanced_CPU[i].Allocate(m_Submeshes.size() * sizeof(SubmeshInstanced) + 1);
+				m_VertexBufferInstanced[i] = BufferDevice::Create(m_Submeshes.size() * sizeof(SubmeshInstanced), {BufferUsage::Vertex});
+			}
+
 
 			// Acceleration structure creation
 			MeshASInfo meshInfo{};
