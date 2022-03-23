@@ -820,8 +820,10 @@ namespace Frost
 
 		vulkan_AO_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->m_AO_PushConstant);
 
-		uint32_t groupX = std::floor(width  / 32.0f) + 1;
-		uint32_t groupY = std::floor(height / 32.0f) + 1;
+		//uint32_t groupX = (width + static_cast<float>((uint32_t)width % 32)) / 32.0f;
+		//uint32_t groupY = (height + static_cast<float>((uint32_t)height % 32)) / 32.0f;
+		uint32_t groupX = static_cast<uint32_t>(std::floor(width / 32.0f)) + 1;
+		uint32_t groupY = static_cast<uint32_t>(std::floor(height / 32.0f)) + 1;
 		vulkan_AO_Pipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 

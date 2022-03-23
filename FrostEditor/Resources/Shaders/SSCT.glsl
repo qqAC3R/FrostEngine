@@ -655,10 +655,10 @@ void main()
 	if(gl_GlobalInvocationID.x > u_UniformBuffer.ScreenSize.x || gl_GlobalInvocationID.y > u_UniformBuffer.ScreenSize.y) return;
 
 	// Sample information from the gbuffer
-	vec3 viewPos = texture(u_ViewPosTex, s_UV).xyz;
-	vec3 currentColor = texture(u_ColorFrameTex, s_UV).rgb;
-	float metallic = texture(u_NormalTex, s_UV).z;
-	float roughness = texture(u_NormalTex, s_UV).w;
+	vec3 viewPos = texelFetch(u_ViewPosTex, pixelCoord, 0).xyz;
+	vec3 currentColor = texelFetch(u_ColorFrameTex, pixelCoord, 0).rgb;
+	float metallic = texelFetch(u_NormalTex, pixelCoord, 0).z;
+	float roughness = texelFetch(u_NormalTex, pixelCoord, 0).w;
 
 	metallic = 1.0f;
 	roughness = 0.0f;
@@ -728,8 +728,6 @@ void main()
 
 	float ao = texture(u_AOBuffer, s_UV).r;
 	vec3 final_finalColor = MultiBounce(ao, finalColor);
-
-
 
 	// Store the values
 	imageStore(o_FrameTex, pixelCoord, vec4(vec3(finalColor * final_finalColor), 1.0f));

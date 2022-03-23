@@ -47,12 +47,12 @@ namespace Frost
 		{
 			// Poll Events
 			m_Window->OnUpdate();
-			
+
 			// Timestep
 			float time = (float)m_Window->GetTime(); // Platform::GetTime
 			Timestep timestep = time - m_LastFrameTime;
 			m_LastFrameTime = time;
-
+			
 			if (!m_Minimized)
 			{
 				Renderer::BeginFrame();

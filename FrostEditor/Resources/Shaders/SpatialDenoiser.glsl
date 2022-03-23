@@ -71,6 +71,7 @@ void main()
 	//totalao += Sample2x2(i_Texture, loc + ivec2(0, 2));
 	//totalao += Sample2x2(i_Texture, loc + ivec2(2, 2));
 
+	totalao += texelFetch(i_Texture, loc + ivec2(0, 0), 0).r;
 	totalao += texelFetch(i_Texture, loc + ivec2(1, 0), 0).r;
 	totalao += texelFetch(i_Texture, loc + ivec2(0, 1), 0).r;
 	totalao += texelFetch(i_Texture, loc + ivec2(1, 1), 0).r;

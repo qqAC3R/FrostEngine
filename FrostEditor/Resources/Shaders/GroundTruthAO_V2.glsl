@@ -165,7 +165,7 @@ float ComputeHBAO(vec3 vpos, vec3 vnorm, vec3 vdir)
 		currStep += stepSize;
 	}
 
-	float aoIntensity = 2.0f;
+	float aoIntensity = 4.0f;
 
 	ao *= aoIntensity / (NUM_STEPS * 2);
 	ao = (1.0f - ao);
@@ -211,7 +211,7 @@ float ComputeGTAO(vec3 vpos, vec3 vnorm, vec3 vdir)
 			
 		// h1
 		{
-			s = GetViewPosition(vec2(gl_GlobalInvocationID.xy) + offset, 0);
+			s = GetViewPosition(vec2(gl_GlobalInvocationID.xy) + offset, currStep);
 			ws = (s.xyz - vpos.xyz);
 
 			// Length of the vector
@@ -228,7 +228,7 @@ float ComputeGTAO(vec3 vpos, vec3 vnorm, vec3 vdir)
 
 		// h2
 		{
-			s = GetViewPosition(vec2(gl_GlobalInvocationID.xy) - offset, 0);
+			s = GetViewPosition(vec2(gl_GlobalInvocationID.xy) - offset, currStep);
 			ws = (s.xyz - vpos.xyz);
 
 			// Length of the vector
@@ -294,16 +294,16 @@ void main()
 {
 	ivec2 loc = ivec2(gl_GlobalInvocationID.xy);
 	vec2 s_UV = vec2(loc) / u_PushConstant.AO_Data.yz;
-	vec4 vpos = GetViewPosition(loc, 0.0);
+	//vec4 vpos = GetViewPosition(loc, 0.0);
+	vec4 vpos = texelFetch(u_ViewPositionTex, loc, 0);
 	
-	if (vpos.w == 1.0) {
-		imageStore(o_AOTexture, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(1.0f), 1.0f));
-		return;
-	}
+	//if (vpos.w == 1.0) {
+	//	imageStore(o_AOTexture, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(1.0f), 1.0f));
+	//	return;
+	//}
 
 	vec3 world_norm = DecodeNormals(texelFetch(u_NormalsTex, loc, 0).rg);
 	vec3 vnorm = transpose(inverse(mat3(u_PushConstant.ViewMatrix))) * world_norm;
-	vnorm = normalize(vnorm);
 	vec3 vdir = normalize(-vpos.xyz);
 
 	float ao = ComputeAO(vpos.xyz, vnorm.xyz, vdir.xyz, u_PushConstant.AO_Mode);
