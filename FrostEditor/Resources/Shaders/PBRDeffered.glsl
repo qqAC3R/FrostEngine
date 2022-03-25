@@ -90,6 +90,7 @@ struct SurfaceProperties
     vec3 Albedo;
     float Roughness;
     float Metalness;
+    float Emission;
 
     vec3 F0;
 } m_Surface;
@@ -255,13 +256,15 @@ vec3 AcesApprox(vec3 v)
 vec3 DecodeNormals(vec2 enc)
 {
     float scale = 1.7777f;
-    vec3 nn = vec3(enc, 0.0f) * vec3(2 * scale, 2 * scale,0) + vec3(-scale, -scale,1);
+    vec3 nn = vec3(enc, 1.0f) * vec3(2 * scale, 2 * scale,0) + vec3(-scale, -scale,1);
     
 	float g = 2.0 / dot(nn.xyz,nn.xyz);
 
     vec3 n;
     n.xy = g*nn.xy;
     n.z = g-1;
+
+	n = clamp(n, vec3(-1.0f), vec3(1.0f));
 
     return n;
 }
@@ -281,6 +284,7 @@ void main()
     m_Surface.Albedo =      texture(u_AlbedoTexture, v_TexCoord).rgb;
     m_Surface.Metalness =   texture(u_NormalTexture, v_TexCoord).b;
     m_Surface.Roughness =   texture(u_NormalTexture, v_TexCoord).a;
+    m_Surface.Emission =    texture(u_AlbedoTexture, v_TexCoord).a;
 
     // Fresnel approximation
 	m_Surface.F0 = mix(Fdielectric, m_Surface.Albedo, m_Surface.Metalness);
@@ -294,7 +298,6 @@ void main()
 	// Calculating all point lights contribution
 	vec3 Lo = vec3(0.0f);
 	uint pointLightCount = uint(m_CameraData.PointLightCount);
-	//uint pointLightCount = uint(u_PushConstant.CameraPosition.w);
 
 
 	float heatMap = 0.0f;
@@ -321,11 +324,8 @@ void main()
 	float IBLIntensity = 1.0f;
 	result += IBL_Contribution() * IBLIntensity;
 
-	// Tonemapping (ACES algorithm)
-	result = AcesApprox(result * m_CameraData.Exposure);
-
-	// Gamma correction
-	result = pow(result, vec3(1.0f / m_CameraData.Gamma));
+	result *= (1.0f + m_Surface.Emission);
+	result *= m_CameraData.Exposure;
 
 	// Outputting the result
     o_Color = vec4(result + vec3(heatMap), 1.0f);

@@ -13,7 +13,6 @@ layout(push_constant) uniform PushConstant {
 
 float weight[5] = float[] (0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
 
-
 void main()
 {
 	vec2 s_UV = vec2(gl_GlobalInvocationID.xy) / u_PushConstant.ScreenSize;

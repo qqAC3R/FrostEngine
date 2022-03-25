@@ -58,13 +58,15 @@ namespace Frost
 			{
 				auto& sponzaEntity = m_EditorScene->CreateEntity("Sphere");
 				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
-				meshComponent.Mesh = Mesh::Load("Resources/Meshes/Sphere.fbx", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
+				meshComponent.Mesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
 			}
 #endif
 			{
 				auto& sponzaEntity = m_EditorScene->CreateEntity("Plane");
 				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
 				meshComponent.Mesh = Mesh::Load("Resources/Meshes/Plane.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
+
+				m_EmissionFactor = &meshComponent.Mesh->GetMaterialData(0).Get<float>("EmissionFactor");
 			}
 
 
@@ -236,8 +238,9 @@ namespace Frost
 			ImGui::Checkbox("Use raytracing", &m_UseRT);
 			ImGui::Separator();
 			UserInterface::Text("Camera Properties");
-			UserInterface::SliderFloat("Exposure", m_EditorCamera.GetExposure(), 0.0f, 5.0f);
+			UserInterface::SliderFloat("Exposure", m_EditorCamera.GetExposure(), 0.0f, 10.0f);
 			UserInterface::SliderFloat("DOF", m_EditorCamera.GetDOF(), 0.0f, 5.0f);
+			UserInterface::SliderFloat("Emission", *m_EmissionFactor, 0.0f, 10.0f);
 			ImGui::End();
 
 			ImGui::End();
@@ -286,6 +289,7 @@ namespace Frost
 		int m_GuizmoMode = -1;
 
 		bool m_UseRT = false;
+		float* m_EmissionFactor = nullptr;
 
 		Ref<Scene> m_EditorScene;
 		Ref<SceneHierarchyPanel> m_SceneHierarchyPanel;

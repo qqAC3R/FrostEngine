@@ -10,12 +10,12 @@ namespace Frost
 		None = 0,
 
 		// Color
-		RGBA8 = 1, RGBA16F = 2,
-		R8 = 3,
+		RGBA8 = 1, RGBA16F = 2, RGBA32F = 3,
+		R8 = 4,
 
 		// Depth/stencil
-		DEPTH32 = 4,
-		DEPTH24STENCIL8 = 5,
+		DEPTH32 = 5,
+		DEPTH24STENCIL8 = 6,
 
 		// Defaults
 		Depth = DEPTH32,

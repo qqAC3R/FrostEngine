@@ -76,12 +76,13 @@ void main()
 	vec3 envColor = textureLod(u_EnvTexture, v_FragmentPos, m_CameraData.Lod).rgb;
 
 	// Tone mapping
-	vec3 color = AcesApprox(envColor * m_CameraData.Exposure);
+	vec3 color = envColor * m_CameraData.Exposure;
+	//vec3 color = AcesApprox(envColor * m_CameraData.Exposure);
 	//vec3 color = Uncharted2Tonemap(envColor * m_CameraData.Exposure);
 	//color = color * (1.0f / Uncharted2Tonemap(vec3(11.2f)));	
 	
 	// Gamma correction
-	color = pow(color, vec3(1.0f / m_CameraData.Gamma));
+	//color = pow(color, vec3(1.0f / m_CameraData.Gamma));
 	
 	// Outputting the color
 	o_Color = vec4(color, 1.0);

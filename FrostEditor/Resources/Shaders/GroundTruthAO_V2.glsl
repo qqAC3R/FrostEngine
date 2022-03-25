@@ -9,7 +9,7 @@ layout(binding = 1) uniform sampler2D u_DepthPyramid;
 layout(binding = 2) uniform sampler2D u_NormalsTex;
 layout(binding = 3) uniform sampler2D u_NoiseTex;
 
-layout(binding = 4, rgba32f) uniform writeonly image2D o_AOTexture;
+layout(binding = 4) uniform writeonly image2D o_AOTexture;
 
 layout(push_constant) uniform PushConstant
 {
@@ -49,6 +49,8 @@ vec3 DecodeNormals(vec2 enc)
     vec3 n;
     n.xy = g*nn.xy;
     n.z = g-1;
+
+	n = clamp(n, vec3(-1.0f), vec3(1.0f));
 
     return n;
 }
@@ -303,10 +305,13 @@ void main()
 	//}
 
 	vec3 world_norm = DecodeNormals(texelFetch(u_NormalsTex, loc, 0).rg);
+	//vec3 world_norm = texelFetch(u_NormalsTex, loc, 0).rgb;
 	vec3 vnorm = transpose(inverse(mat3(u_PushConstant.ViewMatrix))) * world_norm;
 	vec3 vdir = normalize(-vpos.xyz);
 
 	float ao = ComputeAO(vpos.xyz, vnorm.xyz, vdir.xyz, u_PushConstant.AO_Mode);
+
+	ao = clamp(ao, 0.0f, 1.0f);
 
 	imageStore(o_AOTexture, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(ao), 1.0f));
 }

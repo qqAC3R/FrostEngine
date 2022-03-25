@@ -25,12 +25,12 @@ layout(buffer_reference, scalar) buffer Vertices { Vertex v[]; }; // Positions o
 
 
 layout(location = 0) out vec3 v_FragmentPos;
-layout(location = 1) out vec3 v_Normal;
-layout(location = 2) out vec2 v_TexCoord;
-layout(location = 3) out mat3 v_TBN;
-layout(location = 6) out vec3 v_ViewPosition;
-layout(location = 7) out flat int v_BufferIndex;
-layout(location = 8) out flat int v_TextureIndex;
+layout(location = 1) out vec2 v_TexCoord;
+layout(location = 2) out vec3 v_Normal;
+layout(location = 3) out vec3 v_Tangent;
+layout(location = 4) out vec3 v_ViewPosition;
+layout(location = 5) out flat int v_BufferIndex;
+layout(location = 6) out flat int v_TextureIndex;
 
 struct MaterialData
 {
@@ -66,18 +66,12 @@ void main()
 	Vertex vertex = verticies.v[gl_VertexIndex];
 
 	int meshIndex = int(u_PushConstant.MaterialIndex + vertex.MaterialIndex);
-	
-
-	//mat4 ModelMatrix = MaterialUniform.Data[nonuniformEXT(meshIndex)].ModelMatrix;
-	//mat4 WorldSpaceMatrix = MaterialUniform.Data[nonuniformEXT(meshIndex)].WorldSpaceMatrix;
-
-	// Compute world position
-	vec4 worldPos = a_WorldSpaceMatrix * vec4(vertex.Position, 1.0f);
 
 	// Calculating the normals with the model matrix
-	mat3 normalMatrix = transpose(inverse(mat3(a_ModelSpaceMatrix)));
-	v_Normal = normalMatrix * vertex.Normal;
-
+	//mat3 normalMatrix = transpose(inverse(mat3(a_ModelSpaceMatrix)));
+	mat3 normalMatrix = (mat3(a_ModelSpaceMatrix));
+	v_Normal = normalMatrix * normalize(vertex.Normal);
+	v_Tangent = normalMatrix * normalize(vertex.Tangent);
 
 	// Texture Coords
 	v_TexCoord = vertex.TexCoord;
@@ -90,12 +84,8 @@ void main()
 	v_BufferIndex = int(meshIndex);
 	v_TextureIndex = int(vertex.MaterialIndex);
 
-	// Calculating the TBN matrix for normal maps
-	vec3 N = normalize(v_Normal);
-	vec3 T = normalize(vertex.Tangent);
-	vec3 B = normalize(vertex.Bitangent);
-	v_TBN = mat3(T, B, N);
-	
+	// Compute world position
+	vec4 worldPos = a_WorldSpaceMatrix * vec4(vertex.Position, 1.0f);
 	gl_Position = worldPos;
 }
 
@@ -112,12 +102,12 @@ layout(location = 2) out vec4 o_Albedo;
 layout(location = 3) out vec4 o_ViewPos;
 
 layout(location = 0) in vec3 v_FragmentPos;
-layout(location = 1) in vec3 v_Normal;
-layout(location = 2) in vec2 v_TexCoord;
-layout(location = 3) in mat3 v_TBN;
-layout(location = 6) in vec3 v_ViewPosition;
-layout(location = 7) in flat int v_BufferIndex;
-layout(location = 8) in flat int v_TextureIndex;
+layout(location = 1) in vec2 v_TexCoord;
+layout(location = 2) in vec3 v_Normal;
+layout(location = 3) in vec3 v_Tangent;
+layout(location = 4) in vec3 v_ViewPosition;
+layout(location = 5) in flat int v_BufferIndex;
+layout(location = 6) in flat int v_TextureIndex;
 
 struct MaterialData
 {
@@ -149,8 +139,18 @@ vec4 SampleTexture(uint textureId)
 
 vec3 GetVec3FromNormalMap(sampler2D normalMap)
 {
-	vec3 tangentNormal = texture(normalMap, v_TexCoord).rgb * 2.0 - 1.0;
-	return vec3(v_TBN * tangentNormal);
+	vec3 tangentNormal = normalize(texture(normalMap, v_TexCoord).xyz * 2.0 - 1.0);
+
+	vec3 T = normalize(v_Tangent);
+	vec3 N = normalize(v_Normal);
+	vec3 B = normalize(cross(N, T));
+
+	mat3 TBN = mat3(T, B, N);
+	vec3 normal = normalize(vec3(TBN * tangentNormal));
+
+	normal = clamp(normal, vec3(-1.0f), vec3(1.0f));
+
+	return normal;
 }
 
 vec3 GetVec3ValueFromTexture(sampler2D textureSample, vec3 value)
@@ -184,6 +184,7 @@ vec2 EncodeNormals(vec3 n)
     
 	return enc;
 }
+
 
 void main()
 {
@@ -219,7 +220,7 @@ void main()
 	// Encode normals (from a vec3 to vec2)
 	vec2 encodedNormals = EncodeNormals(normalize(vec3(o_Normals)));
 	o_Normals = vec4(encodedNormals, 0.0f, 0.0f);
-
+	
 
 	// Albedo color
 	vec3 albedoTextureColor = SampleTexture(albedoTextureID).rgb;
@@ -231,4 +232,5 @@ void main()
 
 	o_Normals.z = metalness;
 	o_Normals.w = roughness;
+	o_Albedo.w = emissionFactor;
 }

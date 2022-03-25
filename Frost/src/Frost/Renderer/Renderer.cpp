@@ -56,6 +56,8 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VisibilityBuffer.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GroundTruthAO_V2.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SpatialDenoiser.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Bloom.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ColorCorrection.glsl");
 
 		
 		// Init the pools

@@ -16,7 +16,7 @@ namespace Frost
 
 		// Calculate the mip chain levels
 		if (specification.UseMipChain)
-			m_MipLevelCount = Utils::CalculateMipMapLevels(specification.Width, specification.Height);
+			CalculateMipSizes();
 		else
 			m_MipLevelCount = 1;
 
@@ -111,7 +111,7 @@ namespace Frost
 
 		// Calculate the mip chain levels
 		if (specification.UseMipChain)
-			m_MipLevelCount = Utils::CalculateMipMapLevels(specification.Width, specification.Height);
+			CalculateMipSizes();
 		else
 			m_MipLevelCount = 1;
 
@@ -283,7 +283,7 @@ namespace Frost
 		int32_t mipHeight = m_ImageSpecification.Height;
 
 		TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+			Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout), Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 		
 		for (uint32_t i = 1; i < m_MipLevelCount; i++)
 		{
@@ -477,6 +477,25 @@ namespace Frost
 		m_DescriptorInfo[DescriptorImageType::Storage].imageView = m_ImageView;
 		m_DescriptorInfo[DescriptorImageType::Storage].imageLayout = m_ImageLayout;
 		m_DescriptorInfo[DescriptorImageType::Storage].sampler = nullptr;
+	}
+
+	void VulkanImage2D::CalculateMipSizes()
+	{
+		m_MipLevelCount = Utils::CalculateMipMapLevels(m_ImageSpecification.Width, m_ImageSpecification.Height);
+
+		uint32_t mipWidth = m_ImageSpecification.Width;
+		uint32_t mipHeight = m_ImageSpecification.Height;
+
+		for (uint32_t mip = 0; mip < m_MipLevelCount; mip++)
+		{
+			if (mip != 0)
+			{
+				mipWidth /= 2;
+				mipHeight /= 2;
+			}
+			auto mipSize = std::make_tuple(mipWidth, mipHeight);
+			m_MipSizes[mip] = mipSize;
+		}
 	}
 
 	namespace Utils

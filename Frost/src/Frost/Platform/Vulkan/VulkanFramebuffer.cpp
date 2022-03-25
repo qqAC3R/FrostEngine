@@ -53,6 +53,7 @@ namespace Frost
 				case FramebufferTextureFormat::R8:				 return ImageFormat::R8;
 				case FramebufferTextureFormat::RGBA8:            return ImageFormat::RGBA8;
 				case FramebufferTextureFormat::RGBA16F:          return ImageFormat::RGBA16F;
+				case FramebufferTextureFormat::RGBA32F:          return ImageFormat::RGBA32F;
 				case FramebufferTextureFormat::DEPTH32:          return ImageFormat::Depth32;
 				case FramebufferTextureFormat::DEPTH24STENCIL8:  return ImageFormat::Depth24Stencil8;
 				case FramebufferTextureFormat::None:             FROST_ASSERT_MSG("FramebufferTextureFormat::None is invalid!");

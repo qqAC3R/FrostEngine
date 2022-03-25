@@ -25,8 +25,9 @@ layout(binding = 3) uniform sampler2D u_NormalTex; // includes compressed vec2 n
 layout(binding = 4) uniform sampler2D u_PrefilteredColorBuffer;
 layout(binding = 5) uniform sampler2D u_VisibilityBuffer;
 layout(binding = 8) uniform sampler2D u_AOBuffer;
+layout(binding = 9) uniform sampler2D u_BloomTexture;
 
-layout(binding = 6, rgba16f) uniform writeonly image2D o_FrameTex;
+layout(binding = 6, rgba8) uniform writeonly image2D o_FrameTex;
 
 layout(binding = 7) uniform UniformBuffer {
 	mat4 ProjectionMatrix;
@@ -85,6 +86,8 @@ vec3 DecodeNormals(vec2 enc)
     vec3 n;
     n.xy = g*nn.xy;
     n.z = g-1;
+
+	n = clamp(n, vec3(-1.0f), vec3(1.0f));
 
     return n;
 }
@@ -647,6 +650,26 @@ vec3 MultiBounce(float ao, vec3 albedo)
 	return max(x, ((x * a + b) * x + c) * x);
 }
 
+//bool IsSurfaceInBloom()
+//{
+//	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+//	vec3 color = texelFetch(u_BloomTexture, pixelCoord, 0).rgb;
+//	if(color.x > 0.99f || color.y > 0.99f || color.z > 0.99f) return true;
+//	return false;
+//}
+
+// From https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+vec3 AcesApprox(vec3 v)
+{
+    v *= 0.6f;
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((v*(a*v+b))/(v*(c*v+d)+e), 0.0f, 1.0f);
+}
+
 void main()
 {
 	s_UV = vec2(gl_GlobalInvocationID.xy) / u_UniformBuffer.ScreenSize.xy;
@@ -659,6 +682,11 @@ void main()
 	vec3 currentColor = texelFetch(u_ColorFrameTex, pixelCoord, 0).rgb;
 	float metallic = texelFetch(u_NormalTex, pixelCoord, 0).z;
 	float roughness = texelFetch(u_NormalTex, pixelCoord, 0).w;
+
+	//if(IsSurfaceInBloom()) { 
+	//	imageStore(o_FrameTex, pixelCoord, vec4(vec3(currentColor), 1.0f));
+	//	return;
+	//}
 
 	metallic = 1.0f;
 	roughness = 0.0f;
@@ -676,8 +704,9 @@ void main()
 
 
 	// Decode normals and calculate normals in view space (from model space)
-	vec2 decodedNormals = texture(u_NormalTex, s_UV).xy;
+	vec2 decodedNormals = texelFetch(u_NormalTex, pixelCoord, 0).xy;
     vec3 normal = DecodeNormals(decodedNormals);
+    //vec3 normal = texelFetch(u_NormalTex, pixelCoord, 0).xyz;
 	vec3 viewNormal = transpose(inverse(mat3(u_UniformBuffer.ViewMatrix))) * normal;
 
 	// Fresnel factor
@@ -727,8 +756,14 @@ void main()
 	vec3 finalColor = mix(currentColor, resultingColor.xyz, 0.4f);
 
 	float ao = texture(u_AOBuffer, s_UV).r;
-	vec3 final_finalColor = MultiBounce(ao, finalColor);
+	vec3 ao_contribution = MultiBounce(ao, finalColor);
+
+	vec3 final_finalColor = finalColor * ao_contribution;
+	final_finalColor += texelFetch(u_BloomTexture, pixelCoord, 0).rgb;
+	final_finalColor = AcesApprox(final_finalColor);
+
+	final_finalColor = pow(final_finalColor, vec3(1.0f / 1.2f));
 
 	// Store the values
-	imageStore(o_FrameTex, pixelCoord, vec4(vec3(finalColor * final_finalColor), 1.0f));
+	imageStore(o_FrameTex, pixelCoord, vec4(vec3(final_finalColor), 1.0f));
 }

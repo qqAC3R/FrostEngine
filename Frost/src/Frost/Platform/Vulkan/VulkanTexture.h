@@ -61,6 +61,14 @@ namespace Frost
 		virtual uint32_t GetHeight() const override { return m_ImageSpecification.Height; }
 		virtual uint32_t GetMipChainLevels() const override { return m_MipLevelCount; }
 
+		virtual std::tuple<uint32_t, uint32_t> GetTextureSize() const override {
+			return std::make_tuple(m_ImageSpecification.Width, m_ImageSpecification.Height);
+		}
+
+		virtual uint32_t GetMipWidth(uint32_t mip) override { return std::get<0>(m_MipSizes[mip]); }
+		virtual uint32_t GetMipHeight(uint32_t mip) override { return std::get<1>(m_MipSizes[mip]); }
+		virtual std::tuple<uint32_t, uint32_t> GetMipSize(uint32_t mip) override { return m_MipSizes[mip]; }
+
 		virtual ImageSpecification& GetSpecification() override { return m_ImageSpecification; }
 		virtual const ImageSpecification& GetSpecification() const override { return m_ImageSpecification; }
 
@@ -76,6 +84,7 @@ namespace Frost
 		}
 	private:
 		void UpdateDescriptor();
+		void CalculateMipSizes();
 	private:
 		VkImage m_Image = VK_NULL_HANDLE;
 		VulkanMemoryInfo m_ImageMemory;
@@ -86,6 +95,7 @@ namespace Frost
 
 		uint32_t m_MipLevelCount;
 		std::unordered_map<uint32_t, VkImageView> m_Mips;
+		HashMap<uint32_t, std::tuple<uint32_t, uint32_t>> m_MipSizes;
 
 		ImageSpecification m_ImageSpecification;
 		HashMap<DescriptorImageType, VkDescriptorImageInfo> m_DescriptorInfo;

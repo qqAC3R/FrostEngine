@@ -73,7 +73,8 @@ namespace Frost
 			switch (renderPassSpecs.RenderPassSpec[i].FramebufferAttachmentSpec.TextureFormat)
 			{
 			case FramebufferTextureFormat::RGBA8:
-			case FramebufferTextureFormat::RGBA16F: clearValue.color =        { 0.0f, 0.0f, 0.0f, 0.0f}; break;
+			case FramebufferTextureFormat::RGBA16F:
+			case FramebufferTextureFormat::RGBA32F: clearValue.color =        { 0.0f, 0.0f, 0.0f, 0.0f}; break;
 
 			case FramebufferTextureFormat::DepthStencil:
 			case FramebufferTextureFormat::Depth:   clearValue.depthStencil = { 1.0f, 0 };               break;
@@ -189,6 +190,7 @@ namespace Frost
 			{
 			case FramebufferTextureFormat::RGBA8:	 return { VK_FORMAT_R8G8B8A8_SRGB,       VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
 			case FramebufferTextureFormat::RGBA16F:	 return { VK_FORMAT_R16G16B16A16_SFLOAT, VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
+			case FramebufferTextureFormat::RGBA32F:	 return { VK_FORMAT_R32G32B32A32_SFLOAT, VK_ATTACHMENT_STORE_OP_STORE, colorImageLayout };
 			case FramebufferTextureFormat::DEPTH32:	 return { VK_FORMAT_D32_SFLOAT,			 VK_ATTACHMENT_STORE_OP_STORE, depthImageLayout };
 			}
 
@@ -224,10 +226,10 @@ namespace Frost
 		{
 			switch (format)
 			{
-				//case FramebufferTextureFormat::RGBA8:	         return VK_FORMAT_R8G8B8A8_SRGB;
 				case FramebufferTextureFormat::R8:	             return VK_FORMAT_R8_UNORM;
 				case FramebufferTextureFormat::RGBA8:	         return VK_FORMAT_R8G8B8A8_UNORM;
 				case FramebufferTextureFormat::RGBA16F:	         return VK_FORMAT_R16G16B16A16_SFLOAT;
+				case FramebufferTextureFormat::RGBA32F:	         return VK_FORMAT_R32G32B32A32_SFLOAT;
 				case FramebufferTextureFormat::DEPTH32:          return VK_FORMAT_D32_SFLOAT;
 				case FramebufferTextureFormat::DEPTH24STENCIL8:  return VK_FORMAT_D24_UNORM_S8_UINT;
 			}

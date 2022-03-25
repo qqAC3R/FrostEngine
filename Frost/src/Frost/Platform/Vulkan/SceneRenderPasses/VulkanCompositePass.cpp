@@ -44,7 +44,7 @@ namespace Frost
 			{
 				// Color Attachment
 				{
-					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
+					FramebufferTextureFormat::RGBA32F, ImageUsage::Storage,
 					OperationLoad::Clear,  OperationStore::Store,
 					OperationLoad::Load,   OperationStore::DontCare,
 				},
@@ -396,7 +396,7 @@ namespace Frost
 			{
 				// Color Attachment
 				{
-					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
+					FramebufferTextureFormat::RGBA32F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,
 					OperationLoad::DontCare, OperationStore::DontCare,
 				},

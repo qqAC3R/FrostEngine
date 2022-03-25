@@ -52,7 +52,7 @@ namespace Frost
 		imageSpec.UseMipChain = textureSpec.UseMips;
 		imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 		imageSpec.Sampler.SamplerWrap = ImageWrap::Repeat;
-		imageSpec.Usage = ImageUsage::Storage;
+		imageSpec.Usage = textureSpec.Usage;
 		imageSpec.Format = imageFormat;
 		m_Image = Image2D::Create(imageSpec, textureData);
 
@@ -98,7 +98,7 @@ namespace Frost
 
 		// Calculate the mip chain levels
 		if (imageSpecification.UseMipChain)
-			m_MipLevelCount = Utils::CalculateMipMapLevels(imageSpecification.Width, imageSpecification.Height);
+			CalculateMipSizes();
 		else
 			m_MipLevelCount = 1;
 
@@ -320,6 +320,25 @@ namespace Frost
 		m_DescriptorInfo[DescriptorImageType::Storage].imageView = m_ImageView;
 		m_DescriptorInfo[DescriptorImageType::Storage].imageLayout = m_ImageLayout;
 		m_DescriptorInfo[DescriptorImageType::Storage].sampler = nullptr;
+	}
+
+	void VulkanTextureCubeMap::CalculateMipSizes()
+	{
+		m_MipLevelCount = Utils::CalculateMipMapLevels(m_ImageSpecification.Width, m_ImageSpecification.Height);
+
+		uint32_t mipWidth = m_ImageSpecification.Width;
+		uint32_t mipHeight = m_ImageSpecification.Height;
+
+		for (uint32_t mip = 0; mip < m_MipLevelCount; mip++)
+		{
+			if (mip != 0)
+			{
+				mipWidth /= 2;
+				mipHeight /= 2;
+			}
+			auto mipSize = std::make_tuple(mipWidth, mipHeight);
+			m_MipSizes[mip] = mipSize;
+		}
 	}
 
 }

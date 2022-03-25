@@ -40,6 +40,12 @@ namespace Frost
 		void SpatialDenoiser_InitData(uint32_t width, uint32_t height);
 		void SpatialDenoiser_Update(const RenderQueue& renderQueue);
 
+		void Bloom_InitData(uint32_t width, uint32_t height);
+		void Bloom_Update(const RenderQueue& renderQueue);
+
+		void ColorCorrection_InitData(uint32_t width, uint32_t height);
+		void ColorCorrection_Update(const RenderQueue& renderQueue);
+
 		void CalculateMipLevels(uint32_t width, uint32_t height);
 
 	private:
@@ -74,35 +80,30 @@ namespace Frost
 			Vector<Vector<Ref<Material>>> VisibilityDescriptor;
 			Vector<Ref<Image2D>> VisibilityImage;
 
-			struct VisBuffer_PushConstant
-			{
-				uint32_t CurrentMipLevel;
-				float NearPlane;
-				float FarPlane;
-			} m_VisBufferPushConstant;
-
 			// GTAO pass
 			Ref<Shader> AO_Shader;
 			Ref<ComputePipeline> AO_Pipeline;
 			Vector<Ref<Material>> AO_Descriptor;
 			Vector<Ref<Image2D>> AO_Image;
-			
-			struct AO_PushConstant
-			{
-				glm::mat4 ViewMatrix;
-				glm::mat4 InvProjMatrix;
-
-				// vec4:                                       x        ||     y,z   
-				glm::vec3 AO_Data = glm::vec3(0.0f); // ProjectionScale || ScreenSize
-				int32_t AO_Mode = 0;
-
-			} m_AO_PushConstant;
 
 			// Denoising pass
 			Ref<Shader> DenoiserShader;
 			Ref<ComputePipeline> DenoiserPipeline;
 			Vector<Ref<Material>> DenoiserDescriptor;
 			Vector<Ref<Image2D>> DenoiserImage;
+
+			// Bloom pass
+			Ref<Shader> BloomShader;
+			Ref<ComputePipeline> BloomPipeline;
+			Vector<Ref<Material>> BloomDescriptor;
+			Vector<Ref<Image2D>> Bloom_DownsampledTexture;
+			Vector<Ref<Image2D>> Bloom_UpsampledTexture;
+
+			// Color correction
+			Ref<Shader> ColorCorrectionShader;
+			Ref<ComputePipeline> ColorCorrectionPipeline;
+			Vector<Ref<Material>> ColorCorrectionDescriptor;
+			Vector<Ref<Image2D>> ColorCorrectionTexture;
 		};
 
 		InternalData* m_Data;
