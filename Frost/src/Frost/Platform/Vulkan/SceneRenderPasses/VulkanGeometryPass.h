@@ -13,13 +13,16 @@ namespace Frost
 	struct IndirectMeshData
 	{
 		IndirectMeshData() = default;
-		IndirectMeshData(uint32_t submeshOffset, uint32_t SubmeshCount, uint32_t meshIndex)
-			: SubmeshOffset(submeshOffset), SubmeshCount(SubmeshCount), MeshIndex(meshIndex)
+		IndirectMeshData(uint32_t submeshOffset, uint32_t SubmeshCount, uint32_t meshIndex, uint32_t materialCount, uint32_t materialOffset)
+			: SubmeshOffset(submeshOffset), SubmeshCount(SubmeshCount), MeshIndex(meshIndex), MaterialCount(materialCount), MaterialOffset(materialOffset)
 		{}
 
 		uint32_t SubmeshOffset; // Offset of the last submeshes (used for indirect drawing)
 		uint32_t SubmeshCount; // How many submeshes were actually submitted (we are doing culling)
 		uint32_t MeshIndex; // The index from the render queue
+
+		uint32_t MaterialCount;
+		uint32_t MaterialOffset;
 	};
 
 	class VulkanGeometryPass : public SceneRenderPass

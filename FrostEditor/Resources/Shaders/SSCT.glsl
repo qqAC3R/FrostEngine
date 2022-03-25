@@ -650,13 +650,13 @@ vec3 MultiBounce(float ao, vec3 albedo)
 	return max(x, ((x * a + b) * x + c) * x);
 }
 
-//bool IsSurfaceInBloom()
-//{
-//	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
-//	vec3 color = texelFetch(u_BloomTexture, pixelCoord, 0).rgb;
-//	if(color.x > 0.99f || color.y > 0.99f || color.z > 0.99f) return true;
-//	return false;
-//}
+bool IsSurfaceInBloom()
+{
+	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+	vec3 color = texelFetch(u_BloomTexture, pixelCoord, 0).rgb;
+	if(color.x > 0.99f || color.y > 0.99f || color.z > 0.99f) return true;
+	return false;
+}
 
 // From https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 vec3 AcesApprox(vec3 v)
@@ -759,10 +759,11 @@ void main()
 	vec3 ao_contribution = MultiBounce(ao, finalColor);
 
 	vec3 final_finalColor = finalColor * ao_contribution;
-	final_finalColor += texelFetch(u_BloomTexture, pixelCoord, 0).rgb;
-	final_finalColor = AcesApprox(final_finalColor);
+	final_finalColor += pow(AcesApprox(texelFetch(u_BloomTexture, pixelCoord, 0).rgb), vec3(1.0f / 2.2f));
+	//final_finalColor = clamp(final_finalColor, vec3(0.0f), vec3(1.0f));
+	//final_finalColor = AcesApprox(final_finalColor);
 
-	final_finalColor = pow(final_finalColor, vec3(1.0f / 1.2f));
+	//final_finalColor = pow(final_finalColor, vec3(1.0f / 2.2f));
 
 	// Store the values
 	imageStore(o_FrameTex, pixelCoord, vec4(vec3(final_finalColor), 1.0f));

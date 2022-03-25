@@ -32,26 +32,6 @@ layout(location = 4) out vec3 v_ViewPosition;
 layout(location = 5) out flat int v_BufferIndex;
 layout(location = 6) out flat int v_TextureIndex;
 
-struct MaterialData
-{
-	// PBR values
-	vec4 AlbedoColor;
-	float Emission;
-	float Roughness;
-	float Metalness;
-	uint UseNormalMap;
-			
-	// Texture IDs
-	uint AlbedoTextureID;
-	uint RoughessTextureID;
-	uint MetalnessTextureID;
-	uint NormalTextureID;
-};
-layout(set = 0, binding = 0, scalar) readonly buffer u_MaterialUniform
-{
-	MaterialData Data[];
-} MaterialUniform;
-
 layout(push_constant) uniform Constants
 {
 	mat4 ViewMatrix;
@@ -124,7 +104,7 @@ struct MaterialData
 	uint MetalnessTextureID;
 	uint NormalTextureID;
 };
-layout(set = 0, binding = 0, scalar) readonly buffer u_MaterialUniform
+layout(set = 0, binding = 0) readonly buffer u_MaterialUniform
 {
 	MaterialData Data[];
 } MaterialUniform;

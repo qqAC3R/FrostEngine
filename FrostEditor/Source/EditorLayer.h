@@ -54,13 +54,13 @@ namespace Frost
 			m_ViewportPanel = Ref<ViewportPanel>::Create();
 			m_ViewportPanel->Init(nullptr);
 
-#if 0
-			{
-				auto& sponzaEntity = m_EditorScene->CreateEntity("Sphere");
-				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
-				meshComponent.Mesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
-			}
-#endif
+			//for(uint32_t i = 0; i < 50; i++)
+			//{
+			//	auto& sponzaEntity = m_EditorScene->CreateEntity("Sphere");
+			//	auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
+			//	meshComponent.Mesh = Mesh::Load("Resources/Meshes/Sphere.fbx", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
+			//}
+
 			{
 				auto& sponzaEntity = m_EditorScene->CreateEntity("Plane");
 				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();

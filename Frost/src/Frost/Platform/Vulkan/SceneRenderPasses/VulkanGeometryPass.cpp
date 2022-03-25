@@ -377,16 +377,19 @@ namespace Frost
 			// If we are submitting the first mesh, we don't need any offset
 			if (meshIndirectData.size() == 0)
 			{
-				meshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i));
+				meshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0));
 			}
 			else
 			{
 				uint32_t previousMeshOffset = meshIndirectData[i - 1].SubmeshOffset;
 				uint32_t previousMeshCount = meshIndirectData[i - 1].SubmeshCount;
+				uint32_t currentMeshOffset = previousMeshOffset + previousMeshCount;
 
-				uint32_t currentOffset = previousMeshOffset + previousMeshCount;
+				uint32_t previousMaterialOffset = meshIndirectData[i - 1].MaterialOffset;
+				uint32_t previousMaterialCount = meshIndirectData[i - 1].MaterialCount;
+				uint32_t currentMaterialOffset = previousMaterialOffset + previousMaterialCount;
 
-				meshIndirectData.emplace_back(IndirectMeshData(currentOffset, submeshes.size(), i));
+				meshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
 
 				// If it is not the first mesh, then we set the offset as the last mesh's submesh count
 				//auto previousMesh = renderQueue.m_Data[i - 1].Mesh;
@@ -413,7 +416,7 @@ namespace Frost
 		void* instanceDataPointer = m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Data;
 		vulkanInstanceDataBuffer->SetData(materialDataOffset, instanceDataPointer);
 
-		// Mesh data
+		// Mesh data (occlusion culling)
 		auto vulkanMeshDataBuffer = m_Data->MeshSpecs.DeviceBuffer.As<VulkanBufferDevice>();
 		void* meshDataPointer = m_Data->MeshSpecs.HostBuffer.Data;
 		vulkanMeshDataBuffer->SetData(meshDataOffset, meshDataPointer);
@@ -479,7 +482,7 @@ namespace Frost
 
 			// Set the transform matrix and model matrix of the submesh into a constant buffer
 			PushConstant pushConstant;
-			pushConstant.MaterialIndex = meshIndirectData[i].SubmeshOffset;
+			pushConstant.MaterialIndex = meshIndirectData[i].MaterialOffset;
 			pushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 			pushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);

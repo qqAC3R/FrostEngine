@@ -895,7 +895,7 @@ namespace Frost
 
 		// vec4:                                       x        ||     y,z   
 		glm::vec3 AO_Data = glm::vec3(0.0f); // ProjectionScale || ScreenSize
-		int32_t AO_Mode = 0;
+		int32_t AO_Mode = 1; // 0 = HBAO || 1 = GTAO
 
 	} s_AO_pushConstant;
 
