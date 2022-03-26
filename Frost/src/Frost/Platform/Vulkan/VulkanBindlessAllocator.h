@@ -31,7 +31,7 @@ namespace Frost
 
 		static uint32_t AddTexture(const Ref<Texture2D>& texture2d);
 		static void AddTextureCustomSlot(const Ref<Texture2D>& texture2d, uint32_t slot);
-		static void RevmoveTextureCustomSlot(uint32_t slot);
+		static void RemoveTextureCustomSlot(uint32_t slot);
 	private:
 		static void AddTextureInternal(uint32_t slot, const Ref<Texture2D>& texture2d);
 	private:

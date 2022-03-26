@@ -19,6 +19,8 @@
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/InspectorPanel.h"
 #include "Panels/ViewportPanel.h"
+#include "Panels/MaterialEditor.h"
+#include "Panels/AssetBrowser.h"
 
 #include "UserInterface/UIWidgets.h"
 
@@ -54,6 +56,12 @@ namespace Frost
 			m_ViewportPanel = Ref<ViewportPanel>::Create();
 			m_ViewportPanel->Init(nullptr);
 
+			m_MaterialEditor = Ref<MaterialEditor>::Create();
+			m_MaterialEditor->Init(nullptr);
+
+			m_AssetBrowser = Ref<AssetBrowser>::Create();
+			m_AssetBrowser->Init(nullptr);
+
 			//for(uint32_t i = 0; i < 50; i++)
 			//{
 			//	auto& sponzaEntity = m_EditorScene->CreateEntity("Sphere");
@@ -65,8 +73,6 @@ namespace Frost
 				auto& sponzaEntity = m_EditorScene->CreateEntity("Plane");
 				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
 				meshComponent.Mesh = Mesh::Load("Resources/Meshes/Plane.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
-
-				m_EmissionFactor = &meshComponent.Mesh->GetMaterialData(0).Get<float>("EmissionFactor");
 			}
 
 
@@ -142,8 +148,22 @@ namespace Frost
 				ImGui::EndMenuBar();
 			}
 
+
 			Renderer::Submit([&]()
 			{
+				// Scene hierarchy panel rendering
+				m_SceneHierarchyPanel->Render();
+
+				// Inspector panel rendering
+				m_InspectorPanel->Render();
+
+				// Material editor rendering
+				m_MaterialEditor->SetActiveEntity(m_SceneHierarchyPanel->GetSelectedEntity());
+				m_MaterialEditor->Render();
+
+				// Asset browser rendering
+				m_AssetBrowser->Render();
+
 				// Viewport rendering
 				m_ViewportPanel->BeginRender();
 
@@ -223,15 +243,6 @@ namespace Frost
 
 				m_ViewportPanel->EndRender();
 			});
-
-			// Scene hierarchy panel rendering
-			m_SceneHierarchyPanel->Render();
-
-			// Inspector panel rendering
-			m_InspectorPanel->Render();
-
-			
-
 			
 			ImGui::Begin("Settings");
 			//UserInterface::CheckMark("Camera Properties");
@@ -240,7 +251,6 @@ namespace Frost
 			UserInterface::Text("Camera Properties");
 			UserInterface::SliderFloat("Exposure", m_EditorCamera.GetExposure(), 0.0f, 10.0f);
 			UserInterface::SliderFloat("DOF", m_EditorCamera.GetDOF(), 0.0f, 5.0f);
-			UserInterface::SliderFloat("Emission", *m_EmissionFactor, 0.0f, 10.0f);
 			ImGui::End();
 
 			ImGui::End();
@@ -289,11 +299,12 @@ namespace Frost
 		int m_GuizmoMode = -1;
 
 		bool m_UseRT = false;
-		float* m_EmissionFactor = nullptr;
 
 		Ref<Scene> m_EditorScene;
 		Ref<SceneHierarchyPanel> m_SceneHierarchyPanel;
 		Ref<InspectorPanel> m_InspectorPanel;
 		Ref<ViewportPanel> m_ViewportPanel;
+		Ref<MaterialEditor> m_MaterialEditor;
+		Ref<AssetBrowser> m_AssetBrowser;
 	};
 }

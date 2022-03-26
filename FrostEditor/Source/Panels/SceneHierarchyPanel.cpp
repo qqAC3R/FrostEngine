@@ -104,7 +104,7 @@ namespace Frost
 	{
 		auto& tag = entity.GetComponent<TagComponent>().Tag;
 
-		ImGuiTreeNodeFlags flags = 0;
+		ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entity) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_OpenOnArrow;
 		if (m_SelectedEntity == entity)
 		{
 			flags = ImGuiTreeNodeFlags_Selected;
@@ -117,7 +117,6 @@ namespace Frost
 		{
 			ImGui::PopStyleColor();
 		}
-
 		if (ImGui::IsItemClicked())
 		{
 			m_SelectedEntity = entity;

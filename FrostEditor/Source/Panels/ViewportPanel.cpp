@@ -44,7 +44,7 @@ namespace Frost
 		}
 	}
 
-	void ViewportPanel::RenderTexture(Ref<Texture2D> texture)
+	void ViewportPanel::RenderTexture(Ref<Image2D> texture)
 	{
 		ImGui::Image(ImGuiLayer::GetTextureIDFromVulkanTexture(texture), ImVec2{ m_ViewportSize.x, m_ViewportSize.y });
 	}

@@ -558,13 +558,19 @@ vec4 ConeSampleWeightedColor(vec2 samplePos, float mipLevel)
 	return vec4(color * visibility, visibility);
 }
 
+vec4 ConeSampleWeightRoughness(vec2 samplePos, float mipLevel, float roughness)
+{
+	/* Sample color buffer with pre-integrated visibility */
+	vec3 color = textureLod(u_PrefilteredColorBuffer, samplePos, mipLevel).rgb;
+	return vec4(color * roughness, roughness);
+}
+
 // https://github.com/LukasBanana/ForkENGINE/blob/master/shaders/SSCTReflectionPixelShader.glsl#L600
 vec4 ConeTrace(vec2 startPos, vec2 endPos, float roughness)
 {
 	float lod = 0.0f;
 
 	float specularPower = RoughnessToSpecularPower(roughness);
-
 
 	/* Information */
 	vec4 reflectionColor = vec4(0.0f);
@@ -610,22 +616,21 @@ vec4 ConeTrace(vec2 startPos, vec2 endPos, float roughness)
 		reflectionColorArray[i] = ConeSampleWeightedColor(samplePos, mipLevel);
 		
 
-		//if (reflectionColor.a > 1.0f)
-		//	break;
+		if (reflectionColor.a > 1.0f)
+			break;
 		
 		/* Calculate next smaller triangle that approximates the cone in screen space */
 		adjacentLength = IsoscelesTriangleNextAdjacent(adjacentLength, incircleSize);
 	}
 
 	reflectionColor = vec4(0.0f);
-
+	
 	for(uint i = 6; i >= 0; i--)
 	{
 		reflectionColor += reflectionColorArray[i];
-
+	
 		if (reflectionColor.a > 1.0f)
 			break;
-		
 	}
 
 	// Normalize the values
@@ -682,31 +687,31 @@ void main()
 	vec3 currentColor = texelFetch(u_ColorFrameTex, pixelCoord, 0).rgb;
 	float metallic = texelFetch(u_NormalTex, pixelCoord, 0).z;
 	float roughness = texelFetch(u_NormalTex, pixelCoord, 0).w;
+	float roughnessFactor = roughness / 2.0f;
 
 	//if(IsSurfaceInBloom()) { 
 	//	imageStore(o_FrameTex, pixelCoord, vec4(vec3(currentColor), 1.0f));
 	//	return;
 	//}
 
-	metallic = 1.0f;
-	roughness = 0.0f;
+	//metallic = 1.0f;
+	//roughness = 0.0f;
 	
 	if(viewPos.x == 0.0f && viewPos.y == 0.0f && viewPos.z == 0.0f) {
 		imageStore(o_FrameTex, pixelCoord, vec4(currentColor, 1.0f));
 		return; 
 	}
 
-	if(metallic <= 0.1f || roughness > 0.8f)
-	{
-		imageStore(o_FrameTex, pixelCoord, vec4(currentColor, 1.0f));
-		return;
-	}
+	//if(metallic <= 0.1f || roughness > 0.8f)
+	//{
+	//	imageStore(o_FrameTex, pixelCoord, vec4(currentColor, 1.0f));
+	//	return;
+	//}
 
 
 	// Decode normals and calculate normals in view space (from model space)
 	vec2 decodedNormals = texelFetch(u_NormalTex, pixelCoord, 0).xy;
     vec3 normal = DecodeNormals(decodedNormals);
-    //vec3 normal = texelFetch(u_NormalTex, pixelCoord, 0).xyz;
 	vec3 viewNormal = transpose(inverse(mat3(u_UniformBuffer.ViewMatrix))) * normal;
 
 	// Fresnel factor
@@ -719,7 +724,6 @@ void main()
 	vec3 hitPos = viewPos.xyz;
 
 	vec3 worldPos = vec3(vec4(viewPos, 1.0f) * u_UniformBuffer.InvViewMatrix);
-	vec3 jitter = mix(vec3(0.0f), vec3(Hash33(worldPos)), roughness);
 	vec3 reflectionDir = normalize(reflect(normalize(viewPos), normalize(viewNormal)));
 
 
@@ -727,7 +731,7 @@ void main()
 	const float nearPlane = 0.1f;
 	vec3 currentCoords = vec3(s_UV, textureLod(u_HiZBuffer, s_UV, 0.0f).r);
 
-	vec3 reflectVector = normalize(reflectionDir + jitter) * max(1.0f, -viewPos.z);
+	vec3 reflectVector = normalize(reflectionDir) * max(1.0f, -viewPos.z);
 	vec3 screenReflectVector = ProjectPoint(viewPos.xyz + reflectVector * nearPlane) - currentCoords;
 
 	// Firstly we ray trace to find the intersection point
@@ -736,8 +740,8 @@ void main()
 
 
 	// 0.2 = 22.6 degrees, 0.1 = 11.4 degrees, 0.07 = 8 degrees angle
-	//float roughnessFactor = 
-	vec4 coneTracedColor = ConeTrace(s_UV, hitCoords.xy, 0.07f);
+	vec4 coneTracedColor = ConeTrace(s_UV, hitCoords.xy, roughnessFactor);
+	//vec4 coneTracedColor = vec4(texture(u_ColorFrameTex, hitCoords.xy).rgb, 1.0f);
 
 
 
@@ -760,10 +764,6 @@ void main()
 
 	vec3 final_finalColor = finalColor * ao_contribution;
 	final_finalColor += pow(AcesApprox(texelFetch(u_BloomTexture, pixelCoord, 0).rgb), vec3(1.0f / 2.2f));
-	//final_finalColor = clamp(final_finalColor, vec3(0.0f), vec3(1.0f));
-	//final_finalColor = AcesApprox(final_finalColor);
-
-	//final_finalColor = pow(final_finalColor, vec3(1.0f / 2.2f));
 
 	// Store the values
 	imageStore(o_FrameTex, pixelCoord, vec4(vec3(final_finalColor), 1.0f));

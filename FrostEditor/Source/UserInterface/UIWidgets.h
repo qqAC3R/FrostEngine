@@ -19,6 +19,8 @@ namespace Frost
 
 		static std::string DrawFilePath(const std::string& label, const std::string& textBox, const std::string& format, float columnWidth = 100.0f);
 
+		static void CheckBox(const std::string& label, bool& value);
+
 	};
 
 }

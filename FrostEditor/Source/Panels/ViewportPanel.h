@@ -22,7 +22,7 @@ namespace Frost
 		virtual void Shutdown() override;
 
 		void BeginRender();
-		void RenderTexture(Ref<Texture2D> texture);
+		void RenderTexture(Ref<Image2D> texture);
 		void EndRender();
 
 		bool IsResized() const { return m_IsResized; }

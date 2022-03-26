@@ -164,7 +164,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanBindlessAllocator::RevmoveTextureCustomSlot(uint32_t slot)
+	void VulkanBindlessAllocator::RemoveTextureCustomSlot(uint32_t slot)
 	{
 		m_TextureSlots[slot] = nullptr;
 	}
@@ -176,6 +176,7 @@ namespace Frost
 		VkDescriptorImageInfo* imageDescriptorInfo = &vulkanImage2d->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
 
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		vkDeviceWaitIdle(device); // I wanted to avoid this with some hacky tricks, but at some point the validation errors were like "fuck you", so i had no choice :(
 
 		for (auto& descriptorSet : m_DescriptorSet)
 		{

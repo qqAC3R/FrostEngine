@@ -113,16 +113,18 @@ namespace Frost
 		std::string path;
 		if (ImGui::Button("..", buttonSize))
 		{
-			if (format == "fbx")
-				path = Frost::FileDialogs::OpenFile("Mesh map (*.fbx, *gltf)\0*.fbx;*.gltf\0");
-			//else if (format == "hdr")
-			//	path = Hazel::FileDialogs::OpenFile("Hdr map (*.hdr)\0*.hdr\0");
+			path = FileDialogs::OpenFile("");
 		}
 
 		ImGui::Columns(1);
 		ImGui::PopID();
 
 		return path;
+	}
+
+	void UserInterface::CheckBox(const std::string& label, bool& value)
+	{
+		ImGui::Checkbox(label.c_str(), &value);
 	}
 
 	void UserInterface::Text(const std::string& text)

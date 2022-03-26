@@ -91,16 +91,18 @@ namespace Frost
 
 		Vector<Vertex>& GetVertices() { return m_Vertices; }
 		const Vector<Vertex>& GetVertices() const { return m_Vertices; }
-		
+
 		Vector<Index>& GetIndices() { return m_Indices; }
 		const Vector<Index>& GetIndices() const { return m_Indices; }
 
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
-		
+
 		Buffer& GetVertexBufferInstanced_CPU(uint32_t index) { return m_VertexBufferInstanced_CPU[index]; }
 
 		uint32_t GetMaterialCount() { return (uint32_t)m_MaterialData.size(); }
 		DataStorage& GetMaterialData(uint32_t materialIndex) { return m_MaterialData[materialIndex]; }
+
+		Ref<Texture2D> GetTexture(uint32_t textureId) { return m_Textures[textureId]; }
 
 		MaterialInstance& GetMaterial() { return m_Material; } // TODO: Remove this
 		const MaterialInstance& GetMaterial() const { return m_Material; } // TODO: Remove this
@@ -109,6 +111,8 @@ namespace Frost
 
 		bool IsLoaded() const { return m_IsLoaded; }
 		const std::string& GetFilepath() const { return m_Filepath; }
+
+		void SetNewTexture(uint32_t textureId, Ref<Texture2D> texture);
 
 		static Ref<Mesh> Load(const std::string& filepath, MaterialInstance material = {});
 	private:
@@ -131,9 +135,10 @@ namespace Frost
 		Vector<Buffer> m_VertexBufferInstanced_CPU;
 		Vector<Ref<BufferDevice>> m_VertexBufferInstanced;
 
-		Vector<Ref<Texture2D>> m_Textures;
+		//Vector<Ref<Texture2D>> m_Textures;
+		HashMap<uint32_t, Ref<Texture2D>> m_Textures;
 		Vector<Ref<Material>> m_Materials; // TODO: Maybe remove it? since the engine is now bindless
-		Vector<DataStorage> m_MaterialData; // Bindless
+		Vector<DataStorage> m_MaterialData; // Bindless data
 
 		HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots; // Bindless
 		Ref<BottomLevelAccelerationStructure> m_AccelerationStructure; // For RT
