@@ -43,4 +43,11 @@ namespace Frost
 	public:
 		static Ref<TextureCubeMap> Create(ImageSpecification imageSpec = {});
 	};
+
+	class Texture3D : public Image
+	{
+	public:
+		virtual uint32_t GetDepth() const = 0;
+		static Ref<Texture3D> Create(ImageSpecification imageSpec = {});
+	};
 }

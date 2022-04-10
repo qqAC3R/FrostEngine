@@ -86,7 +86,7 @@ namespace Frost
 	}
 
 	/////////////////////////////////////////////////////
-	// VULKAN TEXTURE CUBEMAP
+	// VULKAN TEXTURE CUBEMAP 
 	/////////////////////////////////////////////////////
 	VulkanTextureCubeMap::VulkanTextureCubeMap(const ImageSpecification& imageSpecification)
 		: m_ImageSpecification(imageSpecification), m_ImageLayout(VK_IMAGE_LAYOUT_UNDEFINED)
@@ -341,4 +341,240 @@ namespace Frost
 		}
 	}
 
+
+	/////////////////////////////////////////////////////
+	// VULKAN TEXTURE 3D 
+	/////////////////////////////////////////////////////
+	VulkanTexture3D::VulkanTexture3D(const ImageSpecification& imageSpecification)
+		: m_ImageSpecification(imageSpecification), m_ImageLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+	{
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		VkFormat textureFormat = Utils::GetImageFormat(imageSpecification.Format);
+		VkImageUsageFlags usageFlags = Utils::GetImageUsageFlags(imageSpecification.Usage);
+
+		// Calculate the mip chain levels
+		if (imageSpecification.UseMipChain)
+			CalculateMipSizes();
+		else
+			m_MipLevelCount = 1;
+
+		Utils::CreateImage(imageSpecification.Width, imageSpecification.Height, imageSpecification.Depth, m_MipLevelCount,
+			VK_IMAGE_TYPE_3D, textureFormat,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | usageFlags,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			m_Image, m_ImageMemory
+		);
+
+		VkImageLayout textureLayout = Utils::GetImageLayout(imageSpecification.Usage);
+
+
+		// Recording a temporary commandbuffer for transitioning
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
+
+		// Generating mip maps if necessary and changing the layout to SHADER_READ_ONLY_OPTIMAL
+		TransitionLayout(cmdBuf, textureLayout, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(textureLayout));
+
+		// Ending the temporary commandbuffer for transitioning
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
+
+
+		// Create image view
+		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, m_MipLevelCount, imageSpecification.Depth);
+
+		// Creating the imageView mips
+		for (uint32_t i = 0; i < m_MipLevelCount; i++)
+		{
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+			VkImageViewCreateInfo createInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+			createInfo.image = m_Image;
+			createInfo.format = textureFormat;
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
+
+			createInfo.subresourceRange.baseMipLevel = i;
+			createInfo.subresourceRange.levelCount = 1;
+
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 1;
+			switch (textureFormat)
+			{
+			case VK_FORMAT_D32_SFLOAT:
+			case VK_FORMAT_D24_UNORM_S8_UINT:
+				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; break;
+			default:
+				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			}
+
+			FROST_VKCHECK(vkCreateImageView(device, &createInfo, nullptr, &m_Mips[i]));
+		}
+
+		// Creating the sampler
+		VkFilter filtering = Utils::GetImageFiltering(imageSpecification.Sampler.SamplerFilter);
+		VkSamplerAddressMode wrap = Utils::GetImageWrap(imageSpecification.Sampler.SamplerWrap);
+		VkSamplerMipmapMode mipMapMode = Utils::GetImageSamplerMipMapMode(imageSpecification.Sampler.SamplerFilter);
+		Utils::CreateImageSampler(m_ImageSampler, filtering, wrap, mipMapMode, m_MipLevelCount);
+
+
+		VulkanContext::SetStructDebugName("Texture3D-Image", VK_OBJECT_TYPE_IMAGE, m_Image);
+		VulkanContext::SetStructDebugName("Texture3D-ImageView", VK_OBJECT_TYPE_IMAGE_VIEW, m_ImageView);
+		VulkanContext::SetStructDebugName("Texture3D-Sampler", VK_OBJECT_TYPE_SAMPLER, m_ImageSampler);
+
+		UpdateDescriptor();
+	}
+
+	VulkanTexture3D::~VulkanTexture3D()
+	{
+		Destroy();
+	}
+
+	void VulkanTexture3D::Destroy()
+	{
+		if (m_Image == VK_NULL_HANDLE) return;
+
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		VulkanAllocator::DestroyImage(m_Image, m_ImageMemory);
+		vkDestroyImageView(device, m_ImageView, nullptr);
+		vkDestroySampler(device, m_ImageSampler, nullptr);
+
+		for (auto& [mipLevel, imageView] : m_Mips)
+			vkDestroyImageView(device, imageView, nullptr);
+
+		m_Image = VK_NULL_HANDLE;
+	}
+
+	void VulkanTexture3D::TransitionLayout(VkCommandBuffer cmdBuf, VkImageLayout newImageLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
+	{
+		VkImageSubresourceRange subresourceRange{};
+		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		subresourceRange.levelCount = m_MipLevelCount;
+		subresourceRange.layerCount = 1;
+		Utils::SetImageLayout(cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
+
+		m_ImageLayout = newImageLayout;
+	}
+
+	void VulkanTexture3D::GenerateMipMaps(VkCommandBuffer cmdBuffer, VkImageLayout newImageLayout)
+	{
+		int32_t mipWidth = m_ImageSpecification.Width;
+		int32_t mipHeight = m_ImageSpecification.Height;
+
+		TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+		);
+
+		for (uint32_t i = 1; i < m_MipLevelCount; i++)
+		{
+			VkImageSubresourceRange subresourceRange{};
+			subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			subresourceRange.baseArrayLayer = 0;
+			subresourceRange.layerCount = 1;
+			subresourceRange.levelCount = 1;
+			subresourceRange.baseMipLevel = i - 1;
+
+
+			VkImageBlit blit{};
+
+			// Src
+			blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.srcOffsets[0] = { 0, 0, 0 };
+			blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+			blit.srcSubresource.baseArrayLayer = 0;
+			blit.srcSubresource.layerCount = 1;
+			blit.srcSubresource.mipLevel = i - 1;
+
+			// Dst
+			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.dstOffsets[0] = { 0, 0, 0 };
+			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+			blit.dstSubresource.baseArrayLayer = 0;
+			blit.dstSubresource.layerCount = 1;
+			blit.dstSubresource.mipLevel = i;
+
+			// Transition from `VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL` to `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL`
+			Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
+				Utils::GetAccessFlagsFromLayout(m_ImageLayout),
+				Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+				m_ImageLayout,
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
+				Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+				subresourceRange
+			);
+
+			vkCmdBlitImage(cmdBuffer,
+				m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				1, &blit,
+				VK_FILTER_LINEAR
+			);
+
+			// Transition from `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL` to "newImageLayout"
+			Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
+				Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+				Utils::GetAccessFlagsFromLayout(newImageLayout),
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				newImageLayout,
+				Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+				Utils::GetPipelineStageFlagsFromLayout(newImageLayout),
+				subresourceRange
+			);
+
+			if (mipWidth > 1) mipWidth /= 2;
+			if (mipHeight > 1) mipHeight /= 2;
+		}
+
+		VkImageSubresourceRange subresourceRange{};
+		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		subresourceRange.baseMipLevel = m_MipLevelCount - 1;
+		subresourceRange.levelCount = 1;
+
+		subresourceRange.baseArrayLayer = 0;
+		subresourceRange.layerCount = 1;
+
+		Utils::InsertImageMemoryBarrier(cmdBuffer, m_Image,
+			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			Utils::GetAccessFlagsFromLayout(newImageLayout),
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			newImageLayout,
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			Utils::GetPipelineStageFlagsFromLayout(newImageLayout),
+			subresourceRange
+		);
+
+		m_ImageLayout = newImageLayout;
+	}
+
+	void VulkanTexture3D::CalculateMipSizes()
+	{
+		m_MipLevelCount = Utils::CalculateMipMapLevels(m_ImageSpecification.Width, m_ImageSpecification.Height);
+
+		uint32_t mipWidth = m_ImageSpecification.Width;
+		uint32_t mipHeight = m_ImageSpecification.Height;
+		uint32_t mipDepth = m_ImageSpecification.Depth;
+
+		for (uint32_t mip = 0; mip < m_MipLevelCount; mip++)
+		{
+			if (mip != 0)
+			{
+				mipWidth /= 2;
+				mipHeight /= 2;
+			}
+			glm::vec3 mipSize = { mipWidth, mipHeight, mipDepth };
+			m_MipSizes[mip] = mipSize;
+		}
+	}
+
+	void VulkanTexture3D::UpdateDescriptor()
+	{
+		m_DescriptorInfo[DescriptorImageType::Sampled].imageView = m_ImageView;
+		m_DescriptorInfo[DescriptorImageType::Sampled].imageLayout = m_ImageLayout;
+		m_DescriptorInfo[DescriptorImageType::Sampled].sampler = m_ImageSampler;
+
+		m_DescriptorInfo[DescriptorImageType::Storage].imageView = m_ImageView;
+		m_DescriptorInfo[DescriptorImageType::Storage].imageLayout = m_ImageLayout;
+		m_DescriptorInfo[DescriptorImageType::Storage].sampler = nullptr;
+	}
 }

@@ -44,7 +44,7 @@ namespace Frost
 		void Bloom_Update(const RenderQueue& renderQueue);
 
 		void ColorCorrection_InitData(uint32_t width, uint32_t height);
-		void ColorCorrection_Update(const RenderQueue& renderQueue);
+		void ColorCorrection_Update(const RenderQueue& renderQueue, uint32_t target);
 
 		void CalculateMipLevels(uint32_t width, uint32_t height);
 
@@ -55,12 +55,12 @@ namespace Frost
 		{
 			// General
 			uint32_t ScreenMipLevel;
-			Vector<Ref<Image2D>> FinalImage;
 
 			// SSR
 			Ref<Shader> SSRShader;
 			Ref<ComputePipeline> SSRPipeline;
 			Vector<Ref<Material>> SSRDescriptor;
+			Vector<Ref<Image2D>> SSRTexture;
 
 			// Pre-filtered color buffer
 			Vector<Ref<Image2D>> BlurredColorBuffer;
@@ -104,6 +104,7 @@ namespace Frost
 			Ref<ComputePipeline> ColorCorrectionPipeline;
 			Vector<Ref<Material>> ColorCorrectionDescriptor;
 			Vector<Ref<Image2D>> ColorCorrectionTexture;
+			Vector<Ref<Image2D>> FinalTexture;
 		};
 
 		InternalData* m_Data;

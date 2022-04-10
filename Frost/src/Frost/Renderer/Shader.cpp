@@ -3,6 +3,7 @@
 
 #include "Frost/Platform/Vulkan/VulkanShader.h"
 #include "Frost/Renderer/Renderer.h"
+#include "Frost/Utils/Timer.h"
 
 #include <spirv_cross.hpp>
 
@@ -35,6 +36,16 @@ namespace Frost
 		return nullptr;
 	}
 
+	static std::string GetShaderNameFromFilepath(const std::string& filepath)
+	{
+		auto lastSlash = filepath.find_last_of("/\\");
+		lastSlash = lastSlash == std::string::npos ? 0 : lastSlash + 1;
+		auto lastDot = filepath.rfind(".");
+		auto count = lastDot == std::string::npos ? filepath.size() - lastSlash : lastDot - lastSlash;
+
+		return filepath.substr(lastSlash, count);
+	}
+
 	ShaderLibrary::ShaderLibrary()
 	{
 	}
@@ -59,6 +70,10 @@ namespace Frost
 
 	void ShaderLibrary::Load(const std::string& filepath)
 	{
+		std::string shaderName = GetShaderNameFromFilepath(filepath);
+		std::string text = "Shader '" + shaderName + "' was compiled in ";
+		Timer shaderCompileTimer(text.c_str());
+
 		auto shader = Shader::Create(filepath);
 		Add(shader);
 	}

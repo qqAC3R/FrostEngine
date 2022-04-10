@@ -689,25 +689,10 @@ void main()
 	float roughness = texelFetch(u_NormalTex, pixelCoord, 0).w;
 	float roughnessFactor = roughness / 2.0f;
 
-	//if(IsSurfaceInBloom()) { 
-	//	imageStore(o_FrameTex, pixelCoord, vec4(vec3(currentColor), 1.0f));
-	//	return;
-	//}
-
-	//metallic = 1.0f;
-	//roughness = 0.0f;
-	
 	if(viewPos.x == 0.0f && viewPos.y == 0.0f && viewPos.z == 0.0f) {
 		imageStore(o_FrameTex, pixelCoord, vec4(currentColor, 1.0f));
 		return; 
 	}
-
-	//if(metallic <= 0.1f || roughness > 0.8f)
-	//{
-	//	imageStore(o_FrameTex, pixelCoord, vec4(currentColor, 1.0f));
-	//	return;
-	//}
-
 
 	// Decode normals and calculate normals in view space (from model space)
 	vec2 decodedNormals = texelFetch(u_NormalTex, pixelCoord, 0).xy;
@@ -757,14 +742,14 @@ void main()
 
 
 	// Calculate the final result
-	vec3 finalColor = mix(currentColor, resultingColor.xyz, 0.4f);
+	//vec3 finalColor = mix(currentColor, resultingColor.xyz, 0.4f);
 
-	float ao = texture(u_AOBuffer, s_UV).r;
-	vec3 ao_contribution = MultiBounce(ao, finalColor);
-
-	vec3 final_finalColor = finalColor * ao_contribution;
-	final_finalColor += pow(AcesApprox(texelFetch(u_BloomTexture, pixelCoord, 0).rgb), vec3(1.0f / 2.2f));
+	//float ao = texture(u_AOBuffer, s_UV).r;
+	//vec3 ao_contribution = MultiBounce(ao, finalColor);
+	//
+	//vec3 final_finalColor = finalColor * ao_contribution;
+	//final_finalColor += pow(AcesApprox(texelFetch(u_BloomTexture, pixelCoord, 0).rgb), vec3(1.0f / 2.2f));
 
 	// Store the values
-	imageStore(o_FrameTex, pixelCoord, vec4(vec3(final_finalColor), 1.0f));
+	imageStore(o_FrameTex, pixelCoord, vec4(vec3(resultingColor), 1.0f));
 }

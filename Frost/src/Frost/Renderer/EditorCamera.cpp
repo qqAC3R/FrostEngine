@@ -195,6 +195,11 @@ namespace Frost
 		dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e) { return OnKeyPressed(e); });
 	}
 
+	void EditorCamera::UpdateFrustum()
+	{
+		m_Frustum.UpdateFrustum(*this);
+	}
+
 	bool EditorCamera::OnMouseScroll(MouseScrolledEvent& e)
 	{
 		if (m_IsActive)

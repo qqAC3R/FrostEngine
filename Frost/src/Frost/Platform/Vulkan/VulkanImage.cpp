@@ -512,9 +512,9 @@ namespace Frost
 			imageInfo.imageType = type;
 			imageInfo.extent.width = width;
 			imageInfo.extent.height = height;
-			imageInfo.extent.depth = 1; //TODO: Take in another parameter (for 3D textures?)
+			imageInfo.extent.depth = depth == 1 || depth == 6 ? 1 : depth; //TODO: Take in another parameter (for 3D textures?)
 			imageInfo.mipLevels = mipLevels;
-			imageInfo.arrayLayers = depth;
+			imageInfo.arrayLayers = depth == 1 || depth == 6 ? depth : 1;
 			imageInfo.format = format;
 			imageInfo.tiling = tiling;
 			imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -530,15 +530,23 @@ namespace Frost
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
+			VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D;
+			switch (textureDepth)
+			{
+			case 1:  imageViewType = VK_IMAGE_VIEW_TYPE_2D; break;
+			case 6:  imageViewType = VK_IMAGE_VIEW_TYPE_CUBE; break;
+			default: imageViewType = VK_IMAGE_VIEW_TYPE_3D; break;
+			}
+
 			VkImageViewCreateInfo createInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
 			createInfo.image = image;
 			createInfo.format = format;
-			createInfo.viewType = textureDepth == 6 ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
+			createInfo.viewType = imageViewType;
 
 			createInfo.subresourceRange.baseMipLevel = 0;
 			createInfo.subresourceRange.levelCount = mipLevels;
 			createInfo.subresourceRange.baseArrayLayer = 0;
-			createInfo.subresourceRange.layerCount = textureDepth;
+			createInfo.subresourceRange.layerCount = textureDepth == 6 ? textureDepth : 1;
 			switch (format)
 			{
 			case VK_FORMAT_D32_SFLOAT:
@@ -562,6 +570,8 @@ namespace Frost
 			VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 			samplerInfo.magFilter = filtering;
 			samplerInfo.minFilter = filtering;
+
+			samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 			
 			samplerInfo.addressModeU = samplerAdressMode;
 			samplerInfo.addressModeV = samplerAdressMode;

@@ -17,6 +17,9 @@
 
 namespace Frost
 {
+#define TARGET_BLOOM     0
+#define TARGET_COMPOSITE 1
+
 	VulkanPostFXPass::VulkanPostFXPass()
 		: m_Name("Post-ProcessingPass")
 	{
@@ -53,6 +56,16 @@ namespace Frost
 
 	void VulkanPostFXPass::InitLate()
 	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			auto vulkanColorCorrectionDescriptor = m_Data->ColorCorrectionDescriptor[i].As<VulkanMaterial>();
+
+			vulkanColorCorrectionDescriptor->Set("u_SSRTexture", m_Data->SSRTexture[i]);
+			vulkanColorCorrectionDescriptor->Set("u_AOTexture", m_Data->DenoiserImage[i]);
+			vulkanColorCorrectionDescriptor->UpdateVulkanDescriptorIfNeeded();
+		}
 	}
 
 	void VulkanPostFXPass::BlurColorBuffer_InitData(uint32_t width, uint32_t height)
@@ -181,7 +194,7 @@ namespace Frost
 				m_Data->SSRPipeline = ComputePipeline::Create(computePipelineCreateInfo);
 		}
 
-		m_Data->FinalImage.resize(framesInFlight);
+		m_Data->SSRTexture.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
@@ -190,7 +203,7 @@ namespace Frost
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Width = width;
 			imageSpec.Height = height;
-			m_Data->FinalImage[i] = Image2D::Create(imageSpec);
+			m_Data->SSRTexture[i] = Image2D::Create(imageSpec);
 		}
 
 		
@@ -212,7 +225,7 @@ namespace Frost
 			vulkanMaterial->Set("u_ViewPosTex", viewPosTexture);
 			vulkanMaterial->Set("u_HiZBuffer", m_Data->DepthPyramid[i]);
 			vulkanMaterial->Set("u_NormalTex", normalTexture);
-			vulkanMaterial->Set("o_FrameTex", m_Data->FinalImage[i]);
+			vulkanMaterial->Set("o_FrameTex", m_Data->SSRTexture[i]);
 			vulkanMaterial->Set("u_PrefilteredColorBuffer", m_Data->BlurredColorBuffer[i]);
 			vulkanMaterial->Set("u_VisibilityBuffer", m_Data->VisibilityImage[i]);
 			vulkanMaterial->Set("u_AOBuffer", m_Data->DenoiserImage[i]);
@@ -636,6 +649,7 @@ namespace Frost
 		}
 
 		m_Data->ColorCorrectionTexture.resize(framesInFlight);
+		m_Data->FinalTexture.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
@@ -647,6 +661,7 @@ namespace Frost
 			imageSpec.Height = height;
 
 			m_Data->ColorCorrectionTexture[i] = Image2D::Create(imageSpec);
+			m_Data->FinalTexture[i] = Image2D::Create(imageSpec);
 		}
 
 		m_Data->ColorCorrectionDescriptor.resize(framesInFlight);
@@ -661,7 +676,9 @@ namespace Frost
 
 			vulkanColorCorrectionDescriptor->Set("u_ColorFrameTexture", colorBuffer);
 			vulkanColorCorrectionDescriptor->Set("u_BloomTexture", m_Data->Bloom_UpsampledTexture[i]);
-			vulkanColorCorrectionDescriptor->Set("o_Texture", m_Data->ColorCorrectionTexture[i]);
+			//vulkanColorCorrectionDescriptor->Set("u_SSRTexture", m_Data->SSRTexture[i]);
+			vulkanColorCorrectionDescriptor->Set("o_Texture_ForSSR", m_Data->ColorCorrectionTexture[i]);
+			vulkanColorCorrectionDescriptor->Set("o_Texture_Final", m_Data->FinalTexture[i]);
 
 			vulkanColorCorrectionDescriptor->UpdateVulkanDescriptorIfNeeded();
 		}
@@ -677,25 +694,14 @@ namespace Frost
 		finalImage->TransitionLayout(cmdBuf, finalImage->GetVulkanImageLayout());
 
 		Bloom_Update(renderQueue);
-
-		ColorCorrection_Update(renderQueue);
-
+		ColorCorrection_Update(renderQueue, TARGET_BLOOM);
 		HZB_Update(renderQueue);
-		//auto hzb = m_Data->DepthPyramid[currentFrameIndex].As<VulkanImage2D>();
-		//hzb->TransitionLayout(cmdBuf, hzb->GetVulkanImageLayout());
-
 		BlurColorBuffer_Update(renderQueue);
-		//auto blurImage = m_Data->BlurredColorBuffer[currentFrameIndex].As<VulkanImage2D>();
-		//blurImage->TransitionLayout(cmdBuf, blurImage->GetVulkanImageLayout());
-
 		Visibility_Update(renderQueue);
-
 		AO_Update(renderQueue);
-
 		SpatialDenoiser_Update(renderQueue);
-
-
 		SSR_Update(renderQueue);
+		ColorCorrection_Update(renderQueue, TARGET_COMPOSITE);
 	}
 
 	void VulkanPostFXPass::BlurColorBuffer_Update(const RenderQueue& renderQueue)
@@ -707,7 +713,7 @@ namespace Frost
 		auto vulkan_BlurPipeline = m_Data->BlurPipeline.As<VulkanComputePipeline>();
 		auto vulkan_BlurColorTexture = m_Data->BlurredColorBuffer[currentFrameIndex].As<VulkanImage2D>();
 
-		glm::vec2 currentRes = glm::vec2(renderQueue.ViewPortWidth, renderQueue.ViewPortHeight);
+		glm::vec3 currentRes = glm::vec3(renderQueue.ViewPortWidth, renderQueue.ViewPortHeight, 0);
 		for (uint32_t mipLevel = 0; mipLevel < m_Data->ScreenMipLevel; mipLevel++)
 		{
 			auto vulkan_BlurDescriptor = m_Data->BlurShaderDescriptor[currentFrameIndex][mipLevel].As<VulkanMaterial>();
@@ -717,6 +723,7 @@ namespace Frost
 				currentRes.x /= 2;
 				currentRes.y /= 2;
 			}
+			currentRes.z = static_cast<float>(mipLevel);
 
 			vulkan_BlurDescriptor->Bind(cmdBuf, m_Data->BlurPipeline);
 			vulkan_BlurPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &currentRes);
@@ -905,10 +912,6 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 
-		ImGui::Begin("Renderer");
-		ImGui::SliderInt("AO_Mode", (int32_t*)&s_AO_pushConstant.AO_Mode, 0, 1);
-		ImGui::End();
-
 		auto vulkan_AO_Pipeline = m_Data->AO_Pipeline.As<VulkanComputePipeline>();
 		auto vulkan_AO_Descriptor = m_Data->AO_Descriptor[currentFrameIndex].As<VulkanMaterial>();
 
@@ -990,8 +993,7 @@ namespace Frost
 		);
 	}
 
-
-	void VulkanPostFXPass::ColorCorrection_Update(const RenderQueue& renderQueue)
+	void VulkanPostFXPass::ColorCorrection_Update(const RenderQueue& renderQueue, uint32_t target)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -1004,7 +1006,7 @@ namespace Frost
 
 		vulkan_cc_Descriptor->Bind(cmdBuf, m_Data->ColorCorrectionPipeline);
 
-		glm::vec2 pushConstant = { 2.2f, renderQueue.m_Camera.GetExposure() };
+		glm::vec3 pushConstant = { 2.2f, renderQueue.m_Camera.GetExposure(), static_cast<float>(target) };
 		vulkan_cc_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant);
 
 		float width = renderQueue.ViewPortWidth;
@@ -1419,6 +1421,16 @@ namespace Frost
 
 	void VulkanPostFXPass::OnResizeLate(uint32_t width, uint32_t height)
 	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			auto vulkanColorCorrectionDescriptor = m_Data->ColorCorrectionDescriptor[i].As<VulkanMaterial>();
+
+			vulkanColorCorrectionDescriptor->Set("u_SSRTexture", m_Data->SSRTexture[i]);
+			vulkanColorCorrectionDescriptor->Set("u_AOTexture", m_Data->DenoiserImage[i]);
+			vulkanColorCorrectionDescriptor->UpdateVulkanDescriptorIfNeeded();
+		}
 	}
 
 	void VulkanPostFXPass::CalculateMipLevels(uint32_t width, uint32_t height)

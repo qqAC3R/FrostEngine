@@ -28,6 +28,8 @@ namespace Frost
 		void OnUpdate(Timestep ts);
 		void OnEvent(Event& e);
 
+		void UpdateFrustum();
+
 		bool IsActive() const { return m_IsActive; }
 		void SetActive(bool active) { m_IsActive = active; }
 

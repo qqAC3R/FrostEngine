@@ -58,6 +58,11 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SpatialDenoiser.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Bloom.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ColorCorrection.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Transmittance.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/MultiScatter.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SkyViewBuilder.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SkyViewIrradiance.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SkyViewFilter.glsl");
 
 		
 		// Init the pools
@@ -78,7 +83,6 @@ namespace Frost
 		textureSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
 		textureSpec.Format = ImageFormat::RG32F;
 		s_Data->m_NoiseLut = Texture2D::Create("Resources/LUT/Noise.png", textureSpec);
-
 
 		// Init the renderpasses
 		s_RendererAPI->InitRenderPasses();

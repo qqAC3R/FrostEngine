@@ -12,6 +12,7 @@
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanDynamicSkyPass.h"
 
 namespace Frost
 {
@@ -76,7 +77,8 @@ namespace Frost
 			m_Data->SkyboxPipeline = Pipeline::Create(pipelineCreateInfo);
 			m_Data->SkyboxDescriptor = Material::Create(m_Data->SkyboxShader);
 
-			auto envCubeMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
+			//auto envCubeMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
+			auto envCubeMap = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->SkyPrefilterMap;
 			m_Data->SkyboxDescriptor->Set("u_EnvTexture", envCubeMap);
 			m_Data->SkyboxDescriptor->Set("CameraData.Gamma", 2.2f);
 			m_Data->SkyboxDescriptor->Set("CameraData.Exposure", 0.1f);
@@ -174,8 +176,11 @@ namespace Frost
 				Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
 				Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
 				//Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
-				Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
-				Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment()->GetIrradianceMap();
+				//Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
+				//Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment()->GetIrradianceMap();
+				Ref<TextureCubeMap> prefilteredMap = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->SkyPrefilterMap;
+				Ref<TextureCubeMap> irradianceMap = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->SkyIrradianceMap;
+
 				Ref<Texture2D> brdfLut = Renderer::GetBRDFLut();
 
 				descriptor->Set("CameraData.Gamma", 2.2f);

@@ -54,6 +54,7 @@ namespace Frost
 		SamplerProperties Sampler{};
 		uint32_t Width = 0;
 		uint32_t Height = 0;
+		uint32_t Depth = 1;
 		bool UseMipChain = true;
 	};
 

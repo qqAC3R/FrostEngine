@@ -304,8 +304,14 @@ void main()
 	//	return;
 	//}
 
+	if(vpos.x == 0.0f && vpos.y == 0.0f && vpos.z == 0.0f)
+	{
+		imageStore(o_AOTexture, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(1.0f), 1.0f));
+		return;
+	}
+		
+
 	vec3 world_norm = DecodeNormals(texelFetch(u_NormalsTex, loc, 0).rg);
-	//vec3 world_norm = texelFetch(u_NormalsTex, loc, 0).rgb;
 	vec3 vnorm = transpose(inverse(mat3(u_PushConstant.ViewMatrix))) * world_norm;
 	vec3 vdir = normalize(-vpos.xyz);
 

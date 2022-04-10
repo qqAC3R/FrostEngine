@@ -21,7 +21,7 @@ namespace Frost
 		float& GetDOF() { return m_DOF; }
 	protected:
 		glm::mat4 m_ProjectionMatrix = glm::mat4(1.0f);
-		float m_Exposure = 0.8f;
-		float m_DOF = 1.0f; // This is just the lod of the skybox ("dof" is a fancy name here)
+		float m_Exposure = 4.5f;
+		float m_DOF = 0.0f; // This is just the lod of the skybox ("dof" is a fancy name here)
 	};
 }

@@ -246,8 +246,8 @@ namespace Frost
 			
 			ImGui::Begin("Settings");
 			//UserInterface::CheckMark("Camera Properties");
-			ImGui::Checkbox("Use raytracing", &m_UseRT);
-			ImGui::Separator();
+			//ImGui::Checkbox("Use raytracing", &m_UseRT);
+			//ImGui::Separator();
 			UserInterface::Text("Camera Properties");
 			UserInterface::SliderFloat("Exposure", m_EditorCamera.GetExposure(), 0.0f, 10.0f);
 			UserInterface::SliderFloat("DOF", m_EditorCamera.GetDOF(), 0.0f, 5.0f);

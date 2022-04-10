@@ -17,6 +17,7 @@
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanCompositePass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanRayTracingPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanDynamicSkyPass.h"
 
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 
@@ -103,6 +104,7 @@ namespace Frost
 	{
 		// Init scene render passes
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanDynamicSkyPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanPostFXPass>::Create());
@@ -269,7 +271,7 @@ namespace Frost
 		if(id == 0)
 			return s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[currentFrameIndex];
 		
-		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanPostFXPass>()->FinalImage[currentFrameIndex];
+		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanPostFXPass>()->FinalTexture[currentFrameIndex];
 		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanPostFXPass>()->AO_Image[currentFrameIndex];
 		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
 		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);

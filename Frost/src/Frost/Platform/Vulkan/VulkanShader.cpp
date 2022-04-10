@@ -60,11 +60,13 @@ namespace Frost
 			}
 		}
 
+#if 0
 		{
 			Timer shaderCompileTimer("VulkanShader");
-			CompileVulkanBinaries(shaderSources);
-			CreateShaderModules();
 		}
+#endif
+		CompileVulkanBinaries(shaderSources);
+		CreateShaderModules();
 
 		m_ReflectionData.SetReflectionData(m_VulkanSPIRV);
 		CreateVulkanDescriptorSetLayout();
@@ -97,12 +99,14 @@ namespace Frost
 			}
 		}
 
+#if 0
 		// Creating the shader binaries and the vulkan shader module
 		{
 			Timer shaderCompileTimer("VulkanShader");
-			CompileVulkanBinaries(shaderSources);
-			CreateShaderModules();
 		}
+#endif
+		CompileVulkanBinaries(shaderSources);
+		CreateShaderModules();
 
 		// Creating a hashmap for the custom sized members
 		for (auto& memberArraySize : customMemberArraySizes)

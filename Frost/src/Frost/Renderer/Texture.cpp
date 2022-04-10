@@ -29,4 +29,14 @@ namespace Frost
 		FROST_ASSERT_MSG("Unknown RendererAPI!");
 		return nullptr;
 	}
+
+	Ref<Texture3D> Texture3D::Create(ImageSpecification imageSpec)
+	{
+		switch (Renderer::GetAPI())
+		{
+			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
+			case RendererAPI::API::Vulkan: return CreateRef<VulkanTexture3D>(imageSpec);
+		}
+	}
+
 }
