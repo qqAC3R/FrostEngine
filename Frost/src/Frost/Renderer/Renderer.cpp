@@ -2,6 +2,7 @@
 #include "Renderer.h"
 
 #include "Frost/Platform/Vulkan/VulkanRenderer.h"
+#include "Frost/Platform/Vulkan/VulkanRendererDebugger.h"
 
 namespace Frost
 {
@@ -12,6 +13,7 @@ namespace Frost
 		Ref<Texture2D> m_BRDFLut;
 		Ref<Texture2D> m_NoiseLut;
 		Ref<SceneEnvironment> m_Environment;
+		Ref<RendererDebugger> m_RendererDebugger;
 	};
 
 	RendererAPI* Renderer::s_RendererAPI = nullptr;
@@ -86,6 +88,9 @@ namespace Frost
 
 		// Init the renderpasses
 		s_RendererAPI->InitRenderPasses();
+
+		// Create the renderer debugger
+		s_Data->m_RendererDebugger = RendererDebugger::Create();
 	}
 
 	void Renderer::ShutDown()
@@ -117,6 +122,11 @@ namespace Frost
 		{
 			s_Data->m_Environment->Load(filepath);
 		});
+	}
+
+	void Renderer::RenderDebugger()
+	{
+		s_Data->m_RendererDebugger->ImGuiRender();
 	}
 
 	Ref<ShaderLibrary> Renderer::GetShaderLibrary()
@@ -153,4 +163,17 @@ namespace Frost
 	{
 		return *s_CommandQueue;
 	}
+
+	Ref<RendererDebugger> RendererDebugger::Create()
+	{
+		switch (Renderer::GetAPI())
+		{
+			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
+			case RendererAPI::API::Vulkan: return CreateRef<VulkanRendererDebugger>();
+		}
+
+		FROST_ASSERT_MSG("Unknown RendererAPI!");
+		return nullptr;
+	}
+
 }

@@ -13,9 +13,18 @@ namespace Frost
 	class ImGuiLayer : public Layer
 	{
 	public:
-		ImGuiLayer();
-		~ImGuiLayer();
+		ImGuiLayer() {}
+		virtual ~ImGuiLayer() {}
 
+		virtual void Begin() = 0;
+		virtual void Render() = 0;
+
+		virtual void* GetImGuiTextureID(Ref<Image2D> texture, uint32_t mip = UINT32_MAX) = 0;
+		virtual void RenderTexture(Ref<Image2D> texture, uint32_t width, uint32_t height, uint32_t mip = UINT32_MAX) = 0;
+
+		static ImGuiLayer* Create();
+
+#if 0
 		void OnInit(VkRenderPass renderPass);
 
 		virtual void OnAttach() override;
@@ -27,7 +36,7 @@ namespace Frost
 
 		void Begin();
 		void Render();
-
+		
 		static void* GetTextureIDFromVulkanTexture(Ref<Image2D> texture);
 		static void* GetTextureIDFromVulkanTexture_MipLevel(Ref<Image2D> texture, uint32_t mipLevel);
 	private:
@@ -39,5 +48,6 @@ namespace Frost
 		VkRenderPass m_ImGuiRenderPass;
 		VkDescriptorPool m_DescriptorPool;
 		VkPhysicalDeviceProperties m_RendererSpecs;
+#endif
 	};
 }

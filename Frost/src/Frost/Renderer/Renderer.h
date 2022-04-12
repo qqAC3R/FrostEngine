@@ -72,6 +72,8 @@ namespace Frost
 		static void Resize(uint32_t width, uint32_t height) { s_RendererAPI->Resize(width, height); }
 		static void LoadEnvironmentMap(const std::string& filepath);
 
+		static void RenderDebugger();
+
 		static Ref<Image2D> GetFinalImage(uint32_t id) { return s_RendererAPI->GetFinalImage(id); }
 		static Ref<Texture2D> GetWhiteLUT();
 		static Ref<Texture2D> GetBRDFLut();
@@ -88,5 +90,15 @@ namespace Frost
 	private:
 		static RendererAPI* s_RendererAPI;
 		friend class Application;
+	};
+
+	class RendererDebugger
+	{
+	public:
+		virtual ~RendererDebugger() {};
+		
+		virtual void ImGuiRender() = 0;
+
+		static Ref<RendererDebugger> Create();
 	};
 }

@@ -78,6 +78,7 @@ layout(binding = 9) uniform CameraData {
 
 layout(push_constant) uniform PushConstant {
     vec4 CameraPosition; // vec4 - camera position + float pointLightCount + lightCullingWorkgroup.x
+	float UseLightHeatMap;
 } u_PushConstant;
 
 
@@ -328,5 +329,8 @@ void main()
 	result *= m_CameraData.Exposure;
 
 	// Outputting the result
-    o_Color = vec4(result + vec3(heatMap), 1.0f);
+    o_Color = vec4(result, 1.0f);
+
+	if(u_PushConstant.UseLightHeatMap == 1.0f)
+		o_Color.rgb += + vec3(heatMap);
 }

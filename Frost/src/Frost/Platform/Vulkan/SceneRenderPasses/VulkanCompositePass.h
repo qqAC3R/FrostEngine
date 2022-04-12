@@ -60,6 +60,7 @@ namespace Frost
 		struct PushConstantData
 		{
 			glm::vec4 CameraPosition;
+			float UseLightHeatMap = 0.0f;
 		};
 		PushConstantData m_PushConstantData;
 
@@ -76,5 +77,6 @@ namespace Frost
 		RendererData m_RendererData;
 
 		friend class SceneRenderPassPipeline;
+		friend class VulkanRendererDebugger;
 	};
 }

@@ -151,6 +151,8 @@ namespace Frost
 
 			Renderer::Submit([&]()
 			{
+				Renderer::RenderDebugger();
+
 				// Scene hierarchy panel rendering
 				m_SceneHierarchyPanel->Render();
 

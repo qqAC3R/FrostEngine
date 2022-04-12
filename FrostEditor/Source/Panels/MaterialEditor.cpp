@@ -4,7 +4,10 @@
 #include "Frost/ImGui/ImGuiLayer.h"
 #include "Frost/Utils/PlatformUtils.h"
 #include "Frost/Renderer/Renderer.h"
+#include "Frost/Core/Application.h"
+
 #include "../UserInterface/UIWidgets.h"
+
 #include <imgui.h>
 #include <imgui/imgui_internal.h>
 
@@ -95,7 +98,9 @@ namespace Frost
 					UserInterface::Text("Abledo");
 
 					Ref<Texture2D> albedoTexture = selectedEntityMesh.Mesh->GetTexture(albedoTextureID);
-					ImTextureID imguiAlbedoTextureId = ImGuiLayer::GetTextureIDFromVulkanTexture(albedoTexture->GetImage2D());
+
+					ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+					ImTextureID imguiAlbedoTextureId = imguiLayer->GetImGuiTextureID(albedoTexture->GetImage2D());
 
 					ImGui::PushID("Albedo_Texture_Button");
 					ImGui::ImageButton(imguiAlbedoTextureId, { 64, 64 });
@@ -146,7 +151,9 @@ namespace Frost
 					UserInterface::Text("Roughness");
 
 					Ref<Texture2D> roughnessTexture = selectedEntityMesh.Mesh->GetTexture(roughnessTextureID);
-					ImTextureID imguiRoughnessTextureId = ImGuiLayer::GetTextureIDFromVulkanTexture(roughnessTexture->GetImage2D());
+
+					ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+					ImTextureID imguiRoughnessTextureId = imguiLayer->GetImGuiTextureID(roughnessTexture->GetImage2D());
 
 					ImGui::PushID("Roughness_Texture_Button");
 					ImGui::ImageButton(imguiRoughnessTextureId, { 64, 64 });
@@ -180,7 +187,9 @@ namespace Frost
 					UserInterface::Text("Metalness");
 
 					Ref<Texture2D> metalnessTexture = selectedEntityMesh.Mesh->GetTexture(metalnessTextureID);
-					ImTextureID imguiMetalnesstextureId = ImGuiLayer::GetTextureIDFromVulkanTexture(metalnessTexture->GetImage2D());
+
+					ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+					ImTextureID imguiMetalnesstextureId = imguiLayer->GetImGuiTextureID(metalnessTexture->GetImage2D());
 					
 					ImGui::PushID("Metalness_Texture_Button");
 					ImGui::ImageButton(imguiMetalnesstextureId, { 64, 64 });
@@ -217,7 +226,9 @@ namespace Frost
 					UserInterface::Text("Normal Map");
 
 					Ref<Texture2D> normalTexture = selectedEntityMesh.Mesh->GetTexture(normalTextureID);
-					ImTextureID imguiNormaltextureId = ImGuiLayer::GetTextureIDFromVulkanTexture(normalTexture->GetImage2D());
+					//ImTextureID imguiNormaltextureId = ImGuiLayer::GetTextureIDFromVulkanTexture(normalTexture->GetImage2D());
+					ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+					ImTextureID imguiNormaltextureId = imguiLayer->GetImGuiTextureID(normalTexture->GetImage2D());
 
 					ImGui::PushID("Normal_Texture_Button");
 					ImGui::ImageButton(imguiNormaltextureId, { 64, 64 });

@@ -661,6 +661,8 @@ namespace Frost
 			imageSpec.Height = height;
 
 			m_Data->ColorCorrectionTexture[i] = Image2D::Create(imageSpec);
+
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
 			m_Data->FinalTexture[i] = Image2D::Create(imageSpec);
 		}
 

@@ -3,6 +3,8 @@
 
 #include "Frost/Core/Application.h"
 
+#include "Frost/ImGui/ImGuiVulkanLayer.h"
+
 #include "Frost/Renderer/Mesh.h"
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/Renderer/Pipeline.h"
@@ -56,7 +58,10 @@ namespace Frost
 		s_Data = new Vulkan::RenderData();
 
 		// Initilization
-		Application::Get().GetImGuiLayer()->OnInit(VulkanContext::GetSwapChain()->GetRenderPass());
+		ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+		VulkanImGuiLayer* vulkanImGuiLayer = static_cast<VulkanImGuiLayer*>(imguiLayer);
+		vulkanImGuiLayer->OnInit(VulkanContext::GetSwapChain()->GetRenderPass());
+
 		VulkanMaterial::AllocateDescriptorPool();
 	
 		// Creating the semaphores and fences

@@ -726,12 +726,9 @@ void main()
 
 	// 0.2 = 22.6 degrees, 0.1 = 11.4 degrees, 0.07 = 8 degrees angle
 	vec4 coneTracedColor = ConeTrace(s_UV, hitCoords.xy, roughnessFactor);
-	//vec4 coneTracedColor = vec4(texture(u_ColorFrameTex, hitCoords.xy).rgb, 1.0f);
-
-
 
 	// Fix artifacts
-	vec2 dCoords = smoothstep(0.2, 0.6, abs(vec2(0.5f) - hitCoords.xy));
+	vec2 dCoords = smoothstep(0.2f, 0.5f, abs(vec2(0.5f) - hitCoords.xy));
 	float screenEdgeFactor = clamp(1.0f - (dCoords.x + dCoords.y), 0.0f, 1.0f);
 	float multipler = pow(1.0f,
 						  relfectionSpecularFalloffExponent) *
@@ -739,16 +736,6 @@ void main()
 						  -reflectionDir.z;
 
 	vec3 resultingColor = coneTracedColor.xyz * clamp(multipler, 0.0f, 0.9f);
-
-
-	// Calculate the final result
-	//vec3 finalColor = mix(currentColor, resultingColor.xyz, 0.4f);
-
-	//float ao = texture(u_AOBuffer, s_UV).r;
-	//vec3 ao_contribution = MultiBounce(ao, finalColor);
-	//
-	//vec3 final_finalColor = finalColor * ao_contribution;
-	//final_finalColor += pow(AcesApprox(texelFetch(u_BloomTexture, pixelCoord, 0).rgb), vec3(1.0f / 2.2f));
 
 	// Store the values
 	imageStore(o_FrameTex, pixelCoord, vec4(vec3(resultingColor), 1.0f));
