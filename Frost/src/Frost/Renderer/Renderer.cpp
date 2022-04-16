@@ -49,7 +49,7 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentMipFilter.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/RenderSkybox.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirect.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling.glsl");
+		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling_V2.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/HiZBufferBuilder.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledLightCulling.glsl");
@@ -65,6 +65,7 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SkyViewBuilder.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SkyViewIrradiance.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SkyViewFilter.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/AerialPerspective.glsl");
 
 		
 		// Init the pools
@@ -76,7 +77,9 @@ namespace Frost
 
 		// LUTS
 		TextureSpecification textureSpec{};
+		textureSpec.Usage = ImageUsage::ReadOnly;
 		textureSpec.UseMips = false;
+
 		s_Data->m_WhiteTexture = Texture2D::Create("Resources/LUT/White.jpg", textureSpec);
 
 		textureSpec.Format = ImageFormat::RGBA16F;

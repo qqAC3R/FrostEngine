@@ -31,7 +31,7 @@ namespace Frost
 		allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 		allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;
 
-		vmaCreateAllocator(&allocatorInfo, &s_Allocator);
+		FROST_VKCHECK(vmaCreateAllocator(&allocatorInfo, &s_Allocator));
 		s_AllocatorDestroyed = false;
 	}
 
@@ -58,7 +58,7 @@ namespace Frost
 		VmaAllocationCreateInfo allocCreateInfo{};
 		allocCreateInfo.usage = Utils::GetVmaMemoryUsage(memoryFlags);
 
-		vmaCreateBuffer(s_Allocator, &bufferInfo, &allocCreateInfo, &buffer, &bufferMemory.allocation, nullptr);
+		FROST_VKCHECK(vmaCreateBuffer(s_Allocator, &bufferInfo, &allocCreateInfo, &buffer, &bufferMemory.allocation, nullptr));
 	}
 
 	void VulkanAllocator::AllocateBuffer(VkDeviceSize size, std::vector<BufferUsage> usage,
@@ -112,8 +112,8 @@ namespace Frost
 		allocationInfo.memoryType = memoryType;
 		allocationInfo.size = allocationSize;
 
-		vmaAllocateMemoryForImage(s_Allocator, image, &allocationCreateInfo, &memory.allocation, &allocationInfo);
-		vmaBindImageMemory(s_Allocator, memory.allocation, image);
+		FROST_VKCHECK(vmaAllocateMemoryForImage(s_Allocator, image, &allocationCreateInfo, &memory.allocation, &allocationInfo));
+		FROST_VKCHECK(vmaBindImageMemory(s_Allocator, memory.allocation, image));
 	}
 
 	void VulkanAllocator::AllocateImage(VkImageCreateInfo imageCreateInfo, MemoryUsage memoryFlags, VkImage& image, VulkanMemoryInfo& memory)
@@ -121,7 +121,7 @@ namespace Frost
 		VmaAllocationCreateInfo allocCreateInfo = {};
 		allocCreateInfo.usage = Utils::GetVmaMemoryUsage(memoryFlags);
 
-		vmaCreateImage(s_Allocator, &imageCreateInfo, &allocCreateInfo, &image, &memory.allocation, nullptr);
+		FROST_VKCHECK(vmaCreateImage(s_Allocator, &imageCreateInfo, &allocCreateInfo, &image, &memory.allocation, nullptr));
 	}
 
 	void VulkanAllocator::DestroyImage(const VkImage& image, const VulkanMemoryInfo& memory)
@@ -148,7 +148,7 @@ namespace Frost
 
 	void VulkanAllocator::BindBuffer(VkBuffer& buffer, VulkanMemoryInfo& memory, void** data)
 	{
-		vmaMapMemory(s_Allocator, memory.allocation, data);
+		FROST_VKCHECK(vmaMapMemory(s_Allocator, memory.allocation, data));
 	}
 
 	void VulkanAllocator::UnbindBuffer(VulkanMemoryInfo& memory)

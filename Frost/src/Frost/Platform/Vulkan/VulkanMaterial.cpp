@@ -376,6 +376,47 @@ namespace Frost
 		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];
 	}
 
+	void VulkanMaterial::Set(const std::string& name, const Ref<Texture3D>& texture)
+	{
+		// Allocate a PendingDescriptor and find the location (in the shader) of the member
+		PendingDescriptor& pendingDescriptor = m_PendingDescriptor.emplace_back();
+		auto location = GetShaderLocationFromString(name);
+		ShaderTextureData::TextureType shaderTextureType = ShaderTextureData::TextureType::Storage;
+
+		// Getting how the Texture3D is being used by the shader (as sampled/storage)
+		for (auto& texture : m_ReflectedData.GetTextureData())
+			if (location.Set == texture.Set && location.Binding == texture.Binding)
+				shaderTextureType = texture.Type;
+
+		// Set the data in the hash table
+		if (m_MaterialData[name].Type != DataPointer::DataType::TEXTURE) FROST_ASSERT_MSG("Wrong data type!");
+		Ref<void*> texturePointer = texture.As<void*>();
+		m_MaterialData[name].Pointer = texturePointer;
+
+		// Set a pointer to the PendingDescriptor so when we update the descriptor set, we check if it is still valid
+		pendingDescriptor.Pointer = texturePointer;
+
+		// Get the descriptor info
+		Ref<VulkanTexture3D> vulkanImage3d = texture.As<VulkanTexture3D>();
+		VkDescriptorImageInfo* imageDescriptorInfo = nullptr;
+
+		if (shaderTextureType == ShaderTextureData::TextureType::Storage)
+			imageDescriptorInfo = &vulkanImage3d->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
+		else
+			imageDescriptorInfo = &vulkanImage3d->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
+
+		// Push a WDS into pending descriptors
+		VkWriteDescriptorSet& writeDescriptorSet = pendingDescriptor.WDS;
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.dstBinding = location.Binding;
+		writeDescriptorSet.dstArrayElement = 0;
+		writeDescriptorSet.descriptorType = shaderTextureType == ShaderTextureData::TextureType::Storage ?
+																 VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writeDescriptorSet.pImageInfo = imageDescriptorInfo;
+		writeDescriptorSet.descriptorCount = 1;
+		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];
+	}
+
 	void VulkanMaterial::Set(const std::string& name, const Ref<Image2D>& image)
 	{
 		// Allocate a PendingDescriptor and find the location (in the shader) of the member
@@ -411,7 +452,7 @@ namespace Frost
 		writeDescriptorSet.dstBinding = location.Binding;
 		writeDescriptorSet.dstArrayElement = 0;
 		writeDescriptorSet.descriptorType = shaderTextureType == ShaderTextureData::TextureType::Storage ?
-											VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+																 VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writeDescriptorSet.pImageInfo = imageDescriptorInfo;
 		writeDescriptorSet.descriptorCount = 1;
 		writeDescriptorSet.dstSet = m_DescriptorSets[location.Set];

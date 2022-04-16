@@ -34,6 +34,7 @@ namespace Frost
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) = 0;
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex) = 0;
 		virtual void Set(const std::string& name, const Ref<TextureCubeMap>& cubeMap) = 0;
+		virtual void Set(const std::string& name, const Ref<Texture3D>& texture) = 0;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) = 0;
 		virtual void Set(const std::string& name, const Ref<BufferDevice>& storageBuffer) = 0;
 		virtual void Set(const std::string& name, const Ref<UniformBuffer>& uniformBuffer) = 0;

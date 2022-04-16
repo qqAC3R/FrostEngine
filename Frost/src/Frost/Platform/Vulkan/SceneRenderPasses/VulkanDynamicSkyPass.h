@@ -35,40 +35,11 @@ namespace Frost
 
 		void SkyPrefilter_InitData(uint32_t width, uint32_t height);
 		void SkyPrefilter_Update(const RenderQueue& renderQueue);
-	private:
-		SceneRenderPassPipeline* m_RenderPassPipeline;
 
-		struct InternalData
-		{
-			Ref<Shader> TransmittanceShader;
-			Ref<ComputePipeline> TransmittancePipeline;
-			Ref<Material> TransmittanceDescriptor;
-			Ref<Image2D> TransmittanceLUT;
+		void AerialPerspective_InitData(uint32_t width, uint32_t height);
+		void AerialPerspective_Update(const RenderQueue& renderQueue);
 
-			Ref<Shader> MultiScatterShader;
-			Ref<ComputePipeline> MultiScatterPipeline;
-			Ref<Material> MultiScatterDescriptor;
-			Ref<Image2D> MultiScatterLUT;
-
-			Ref<Shader> SkyViewShader;
-			Ref<ComputePipeline> SkyViewPipeline;
-			Ref<Material> SkyViewDescriptor;
-			Ref<Image2D> SkyViewLUT;
-
-
-			Ref<Shader> SkyIrradianceShader;
-			Ref<ComputePipeline> SkyIrradiancePipeline;
-			Ref<Material> SkyIrradianceDescriptor;
-			Ref<TextureCubeMap> SkyIrradianceMap;
-
-
-			Ref<Shader> SkyPrefilterShader;
-			Ref<ComputePipeline> SkyPrefilterPipeline;
-			Vector<Ref<Material>> SkyPrefilterDescriptor;
-			Ref<TextureCubeMap> SkyPrefilterMap;
-
-		};
-
+	public:
 #define SUN_POS glm::vec3(0.45f, -0.5f, -0.65f)
 
 		struct HillaireParams
@@ -81,7 +52,7 @@ namespace Frost
 			glm::vec4 PlanetAbledo_Radius = glm::vec4(0.0f, 0.0f, 0.0f, 6.360f); // Planet albedo (x, y, z) and radius.
 			glm::vec4 SunDir_AtmRadius = glm::vec4(SUN_POS, 6.460f);              // Sun direction (x, y, z) and atmosphere radius (w).
 			glm::vec4 ViewPos = glm::vec4(0.0f, 6.360f + 0.0002f, 0.0f, 0.0f);   // View position (x, y, z). w is unused.
-		} m_SkyParams;
+		};
 
 		struct SkyDiffuseParams
 		{
@@ -99,12 +70,55 @@ namespace Frost
 			float Unused1 = 0.0f;
 			float Unused2 = 0.0f;
 
-		} m_SkyDiffuseParams;
+		};
+	private:
+		SceneRenderPassPipeline* m_RenderPassPipeline;
 
-		InternalData* m_Data;
-		std::string m_Name;
+		struct InternalData
+		{
+			// Transmittance LUT
+			Ref<Shader> TransmittanceShader;
+			Ref<ComputePipeline> TransmittancePipeline;
+			Ref<Material> TransmittanceDescriptor;
+			Ref<Image2D> TransmittanceLUT;
+
+			// Multi scattering LUT
+			Ref<Shader> MultiScatterShader;
+			Ref<ComputePipeline> MultiScatterPipeline;
+			Ref<Material> MultiScatterDescriptor;
+			Ref<Image2D> MultiScatterLUT;
+
+			// Sky view LUT
+			Ref<Shader> SkyViewShader;
+			Ref<ComputePipeline> SkyViewPipeline;
+			Ref<Material> SkyViewDescriptor;
+			Ref<Image2D> SkyViewLUT;
+
+			// Iradiance cubemap
+			Ref<Shader> SkyIrradianceShader;
+			Ref<ComputePipeline> SkyIrradiancePipeline;
+			Ref<Material> SkyIrradianceDescriptor;
+			Ref<TextureCubeMap> SkyIrradianceMap;
+
+			// Prefiltered cubemap
+			Ref<Shader> SkyPrefilterShader;
+			Ref<ComputePipeline> SkyPrefilterPipeline;
+			Vector<Ref<Material>> SkyPrefilterDescriptor;
+			Ref<TextureCubeMap> SkyPrefilterMap;
+
+			// Aerial Perspective
+			Ref<Shader> AP_Shader;
+			Ref<ComputePipeline> AP_Pipeline;
+			Vector<Ref<Material>> AP_Descriptor;
+			Vector<Ref<Texture3D>> AerialLUT;
+
+			SkyDiffuseParams m_SkyDiffuseParams;
+			HillaireParams m_SkyParams;
+		};
 
 		friend class SceneRenderPassPipeline;
+		InternalData* m_Data;
+		std::string m_Name;
 	};
 
 }

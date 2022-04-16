@@ -126,7 +126,32 @@ namespace Frost
 
 	void VulkanImGuiLayer::OnImGuiRender()
 	{
+		//VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
 
+		ImGui::Begin("Renderer:");
+		{
+			const char* deviceName = (const char*)m_RendererSpecs.deviceName;
+
+			const char* vendor;
+			switch (m_RendererSpecs.vendorID)
+			{
+			case 0x1002: vendor = "AMD "; break;
+			case 0x10DE: vendor = "NVIDIA Corporation"; break;
+			case 0x8086: vendor = "Intel"; break;
+			}
+			ImGui::Text(vendor);
+			ImGui::Text(deviceName);
+			ImGui::Text("Frametime: %.2f ms", 1000.0f / ImGui::GetIO().Framerate);
+
+			ImGui::Separator();
+
+			GPUMemoryStats memoryStats = Application::Get().GetWindow().GetGraphicsContext()->GetGPUMemoryStats();
+			float used = memoryStats.UsedMemory / 1000000.0f;
+			float free = memoryStats.FreeMemory / 1000000.0f;
+			ImGui::Text("Used Memory: %.2f MB", used);
+			ImGui::Text("Free Memory: %.2f MB", free);
+		}
+		ImGui::End();
 	}
 
 	void VulkanImGuiLayer::OnResize(uint32_t width, uint32_t height)

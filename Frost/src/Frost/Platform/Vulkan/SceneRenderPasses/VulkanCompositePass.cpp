@@ -79,10 +79,31 @@ namespace Frost
 
 			//auto envCubeMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
 			auto envCubeMap = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->SkyPrefilterMap;
+			auto skyViewLut = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->SkyViewLUT;
+			auto transmittanceLut = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->TransmittanceLUT;
+
+			//Ref<VulkanDynamicSkyPass> dynamicSkyPass = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()m_SkyParams;
+			auto hillaireParams = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->m_SkyParams;
+			auto hillaireParams2 = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->m_SkyDiffuseParams;
+
 			m_Data->SkyboxDescriptor->Set("u_EnvTexture", envCubeMap);
+			m_Data->SkyboxDescriptor->Set("u_HillaireLUT", skyViewLut);
+			m_Data->SkyboxDescriptor->Set("u_TransmittanceLUT", transmittanceLut);
+
 			m_Data->SkyboxDescriptor->Set("CameraData.Gamma", 2.2f);
 			m_Data->SkyboxDescriptor->Set("CameraData.Exposure", 0.1f);
 			m_Data->SkyboxDescriptor->Set("CameraData.Lod", 3.0f);
+			m_Data->SkyboxDescriptor->Set("CameraData.SkyMode", 1.0f);
+
+			m_Data->SkyboxDescriptor->Set("CameraData.SunDir",           glm::vec3(hillaireParams.SunDir_AtmRadius));
+			m_Data->SkyboxDescriptor->Set("CameraData.SunIntensity",     hillaireParams2.SunIntensity);
+			m_Data->SkyboxDescriptor->Set("CameraData.SunSize",          hillaireParams2.SunSize);
+			
+			m_Data->SkyboxDescriptor->Set("CameraData.ViewPos",          glm::vec3(hillaireParams2.ViewPos_SkyIntensity));
+			m_Data->SkyboxDescriptor->Set("CameraData.SkyIntensity",     hillaireParams2.ViewPos_SkyIntensity.w);
+			
+			m_Data->SkyboxDescriptor->Set("CameraData.GroundRadius",     hillaireParams.PlanetAbledo_Radius.w);
+			m_Data->SkyboxDescriptor->Set("CameraData.AtmosphereRadius", hillaireParams.SunDir_AtmRadius.w);
 
 
 			// Skybox vertex buffer

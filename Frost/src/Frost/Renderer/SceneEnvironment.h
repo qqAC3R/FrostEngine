@@ -15,6 +15,8 @@ namespace Frost
 		virtual Ref<TextureCubeMap> GetIrradianceMap() = 0;
 		virtual Ref<TextureCubeMap> GetPrefilteredMap() = 0;
 
+		//virtual void RenderSkyBox() = 0;
+
 		virtual void Load(const std::string& filepath) = 0;
 
 		static Ref<SceneEnvironment> Create();

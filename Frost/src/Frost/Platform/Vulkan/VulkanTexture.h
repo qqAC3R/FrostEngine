@@ -143,12 +143,17 @@ namespace Frost
 		VkImageLayout GetVulkanImageLayout() const { return m_ImageLayout; }
 		VkImageView GetVulkanImageViewMip(uint32_t mip) { return VK_NULL_HANDLE; }
 
+		VkDescriptorImageInfo& GetVulkanDescriptorInfo(DescriptorImageType imageType) {
+			FROST_ASSERT_INTERNAL((m_DescriptorInfo.find(imageType) != m_DescriptorInfo.end()));
+			return m_DescriptorInfo[imageType];
+		}
 	private:
 		void CalculateMipSizes();
 		void UpdateDescriptor();
 	private:
 		VkImage m_Image = VK_NULL_HANDLE;
 		VulkanMemoryInfo m_ImageMemory;
+		VkDeviceMemory m_DeviceMemory; // TEMP
 
 		VkImageView m_ImageView;
 		VkSampler m_ImageSampler;

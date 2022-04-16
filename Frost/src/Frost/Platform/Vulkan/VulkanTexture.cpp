@@ -148,6 +148,7 @@ namespace Frost
 			createInfo.image = m_Image;
 			createInfo.format = textureFormat;
 			createInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+			createInfo.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
 
 			createInfo.subresourceRange.baseMipLevel = i;
 			createInfo.subresourceRange.levelCount = 1;
@@ -204,6 +205,7 @@ namespace Frost
 	{
 		VkImageSubresourceRange subresourceRange{};
 		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		subresourceRange.baseMipLevel = 0;
 		subresourceRange.levelCount = m_MipLevelCount;
 		subresourceRange.layerCount = 6; // 6 for cubemaps
 		Utils::SetImageLayout(cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
@@ -345,11 +347,131 @@ namespace Frost
 	/////////////////////////////////////////////////////
 	// VULKAN TEXTURE 3D 
 	/////////////////////////////////////////////////////
+
+	static uint32_t GetMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties, VkPhysicalDeviceMemoryProperties memoryProperties, VkBool32* memTypeFound = nullptr)
+	{
+		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+		{
+			if ((typeBits & 1) == 1)
+			{
+				if ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+				{
+					if (memTypeFound)
+					{
+						*memTypeFound = true;
+					}
+					return i;
+				}
+			}
+			typeBits >>= 1;
+		}
+
+		if (memTypeFound)
+		{
+			*memTypeFound = false;
+			return 0;
+		}
+		else
+		{
+			throw std::runtime_error("Could not find a matching memory type");
+		}
+	}
+
 	VulkanTexture3D::VulkanTexture3D(const ImageSpecification& imageSpecification)
 		: m_ImageSpecification(imageSpecification), m_ImageLayout(VK_IMAGE_LAYOUT_UNDEFINED)
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+#if 0
+		VkFormat textureFormat = Utils::GetImageFormat(imageSpecification.Format);
+		VkImageLayout textureLayout = Utils::GetImageLayout(imageSpecification.Usage);
 
+		VkPhysicalDeviceMemoryProperties memoryProperties;
+		VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
+		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+
+		m_MipLevelCount = 1;
+
+		VkImageCreateInfo imageCreateInfo { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+		imageCreateInfo.imageType = VK_IMAGE_TYPE_3D;
+		imageCreateInfo.format = textureFormat;
+		imageCreateInfo.mipLevels = 1;
+		imageCreateInfo.arrayLayers = 1;
+		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageCreateInfo.extent.width = imageSpecification.Width;
+		imageCreateInfo.extent.height = imageSpecification.Height;
+		imageCreateInfo.extent.depth = imageSpecification.Depth;
+		// Set initial layout of the image to undefined
+		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+		vkCreateImage(device, &imageCreateInfo, nullptr, &m_Image);
+
+		// Device local memory to back up image
+		VkMemoryAllocateInfo memAllocInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+		VkMemoryRequirements memReqs = {};
+		vkGetImageMemoryRequirements(device, m_Image, &memReqs);
+		memAllocInfo.allocationSize = memReqs.size;
+		memAllocInfo.memoryTypeIndex = GetMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, memoryProperties);
+		vkAllocateMemory(device, &memAllocInfo, nullptr, &m_DeviceMemory);
+		vkBindImageMemory(device, m_Image, m_DeviceMemory, 0);
+
+
+		// Create sampler
+		VkSamplerCreateInfo sampler{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+		sampler.magFilter = VK_FILTER_LINEAR;
+		sampler.minFilter = VK_FILTER_LINEAR;
+		sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler.mipLodBias = 0.0f;
+		sampler.compareOp = VK_COMPARE_OP_NEVER;
+		sampler.minLod = 0.0f;
+		sampler.maxLod = 0.0f;
+		sampler.maxAnisotropy = 1.0f;
+		sampler.anisotropyEnable = VK_FALSE;
+		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		vkCreateSampler(device, &sampler, nullptr, &m_ImageSampler);
+
+		// Create image view
+		VkImageViewCreateInfo view{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+		view.image = m_Image;
+		view.viewType = VK_IMAGE_VIEW_TYPE_3D;
+		view.format = textureFormat;
+		view.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
+		view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		view.subresourceRange.baseMipLevel = 0;
+		view.subresourceRange.baseArrayLayer = 0;
+		view.subresourceRange.layerCount = 1;
+		view.subresourceRange.levelCount = 1;
+		vkCreateImageView(device, &view, nullptr, &m_ImageView);
+
+
+
+		// Recording a temporary commandbuffer for transitioning
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
+
+		// Generating mip maps if necessary and changing the layout to SHADER_READ_ONLY_OPTIMAL
+		TransitionLayout(cmdBuf, textureLayout, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(textureLayout));
+
+		// Ending the temporary commandbuffer for transitioning
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
+
+#if 0
+		// Device local memory to back up image
+		VkMemoryAllocateInfo memAllocInfo { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+		VkMemoryRequirements memReqs = {};
+		vkGetImageMemoryRequirements(device, m_Image, &memReqs);
+		memAllocInfo.allocationSize = memReqs.size;
+		memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		VK_CHECK_RESULT(vkAllocateMemory(device, &memAllocInfo, nullptr, &texture.deviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(device, texture.image, texture.deviceMemory, 0));
+#endif
+#endif
+
+
+#if 1
 		VkFormat textureFormat = Utils::GetImageFormat(imageSpecification.Format);
 		VkImageUsageFlags usageFlags = Utils::GetImageUsageFlags(imageSpecification.Usage);
 
@@ -384,30 +506,34 @@ namespace Frost
 		Utils::CreateImageView(m_ImageView, m_Image, usageFlags, textureFormat, m_MipLevelCount, imageSpecification.Depth);
 
 		// Creating the imageView mips
-		for (uint32_t i = 0; i < m_MipLevelCount; i++)
+		if (m_MipLevelCount != 1)
 		{
-			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-			VkImageViewCreateInfo createInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-			createInfo.image = m_Image;
-			createInfo.format = textureFormat;
-			createInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
-
-			createInfo.subresourceRange.baseMipLevel = i;
-			createInfo.subresourceRange.levelCount = 1;
-
-			createInfo.subresourceRange.baseArrayLayer = 0;
-			createInfo.subresourceRange.layerCount = 1;
-			switch (textureFormat)
+			for (uint32_t i = 0; i < m_MipLevelCount; i++)
 			{
-			case VK_FORMAT_D32_SFLOAT:
-			case VK_FORMAT_D24_UNORM_S8_UINT:
-				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; break;
-			default:
-				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			}
+				VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-			FROST_VKCHECK(vkCreateImageView(device, &createInfo, nullptr, &m_Mips[i]));
+				VkImageViewCreateInfo createInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+				createInfo.image = m_Image;
+				createInfo.format = textureFormat;
+				createInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
+				createInfo.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
+
+				createInfo.subresourceRange.baseMipLevel = i;
+				createInfo.subresourceRange.levelCount = 1;
+
+				createInfo.subresourceRange.baseArrayLayer = 0;
+				createInfo.subresourceRange.layerCount = 1;
+				switch (textureFormat)
+				{
+				case VK_FORMAT_D32_SFLOAT:
+				case VK_FORMAT_D24_UNORM_S8_UINT:
+					createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; break;
+				default:
+					createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				}
+
+				FROST_VKCHECK(vkCreateImageView(device, &createInfo, nullptr, &m_Mips[i]));
+			}
 		}
 
 		// Creating the sampler
@@ -421,6 +547,7 @@ namespace Frost
 		VulkanContext::SetStructDebugName("Texture3D-ImageView", VK_OBJECT_TYPE_IMAGE_VIEW, m_ImageView);
 		VulkanContext::SetStructDebugName("Texture3D-Sampler", VK_OBJECT_TYPE_SAMPLER, m_ImageSampler);
 
+#endif
 		UpdateDescriptor();
 	}
 
@@ -448,9 +575,12 @@ namespace Frost
 	{
 		VkImageSubresourceRange subresourceRange{};
 		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		subresourceRange.baseMipLevel = 0;
 		subresourceRange.levelCount = m_MipLevelCount;
 		subresourceRange.layerCount = 1;
-		Utils::SetImageLayout(cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
+		Utils::SetImageLayout(
+			cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask
+		);
 
 		m_ImageLayout = newImageLayout;
 	}

@@ -542,6 +542,7 @@ namespace Frost
 			createInfo.image = image;
 			createInfo.format = format;
 			createInfo.viewType = imageViewType;
+			createInfo.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
 
 			createInfo.subresourceRange.baseMipLevel = 0;
 			createInfo.subresourceRange.levelCount = mipLevels;

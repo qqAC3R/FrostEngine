@@ -1,15 +1,26 @@
 #type compute
 #version 460
 
-layout(local_size_x = 8, local_size_y = 8) in;
-
 #define PI 3.141592654
+#define PLANET_RADIUS_OFFSET 0.01
 #define NUM_STEPS 32
 
-layout(binding = 0, rgba16f) writeonly uniform image2D u_SkyViewImage;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
+layout(binding = 0) writeonly uniform image3D u_AerialLUT;
 layout(binding = 1) uniform sampler2D u_TransmittanceLUT;
 layout(binding = 2) uniform sampler2D u_MultiScatterLUT;
+layout(binding = 4) uniform sampler3D u_AerialLUT_Sampler;
+
+// Camera specific uniforms.
+layout(binding = 3) uniform CameraBlock
+{
+	mat4 ViewMatrix;
+	mat4 ProjMatrix;
+	mat4 InvViewProjMatrix;
+	vec4 CamPosition;
+	vec4 NearFarPlane; // Near plane (x), far plane (y). z and w are unused.
+} u_CameraSpecs;
 
 layout(push_constant) uniform PushConstant
 {
@@ -31,6 +42,7 @@ struct ScatteringParams
 	vec4 MieAbsorption; //  Mie absorption base (x, y, z) and height falloff (w).
 	vec4 OzoneAbsorption; //  Ozone absorption base (x, y, z) and scale (w).
 };
+
 
 // Helper functions.
 float ArcCos(float x)
@@ -126,7 +138,7 @@ vec3 ComputeExtinction(vec3 pos, ScatteringParams params, float groundRadius)
 	return rayleighScattering + vec3(rayleighAbsorption + mieScattering + mieAbsorption) + ozoneAbsorption;
 }
 
-vec3 RaymarchScattering(vec3 pos,
+vec4 RayMarchScattering(vec3 pos,
 						vec3 rayDir,
 						vec3 sunDir,
 						float tMax,
@@ -135,17 +147,17 @@ vec3 RaymarchScattering(vec3 pos,
                         float atmoRadius)
 {
 	float cosTheta = dot(rayDir, sunDir);
-	
+
 	float miePhaseValue = GetMiePhase(cosTheta);
 	float rayleighPhaseValue = GetRayleighPhase(-cosTheta);
 
-	vec3 luminance = vec3(0.0f);
-	vec3 transmittance = vec3(1.0f);
-	float t = 0.0f;
+	vec3 lum = vec3(0.0);
+	vec3 transmittance = vec3(1.0);
+	float t = 0.0;
 
-	for(float i = 0.0f; i < float(NUM_STEPS); i += 1.0f)
+	for (uint i = 0; i < NUM_STEPS; i++)
 	{
-		float newT = ((i + 0.3) / float(NUM_STEPS)) * tMax;
+		float newT = ((float(i) + 0.3) / float(NUM_STEPS)) * tMax;
 		float dt = newT - t;
 		t = newT;
 
@@ -161,24 +173,30 @@ vec3 RaymarchScattering(vec3 pos,
 		vec3 sunTransmittance = GetValFromLUT(u_TransmittanceLUT, newPos, sunDir, groundRadius, atmoRadius);
 		vec3 psiMS = GetValFromLUT(u_MultiScatterLUT, newPos, sunDir, groundRadius, atmoRadius);
 
+
 		vec3 rayleighInScattering = rayleighScattering * (rayleighPhaseValue * sunTransmittance + psiMS);
 		vec3 mieInScattering = mieScattering * (miePhaseValue * sunTransmittance + psiMS);
-
 		vec3 inScattering = (rayleighInScattering + mieInScattering);
 
 		// Integrated scattering within path segment.
 		vec3 scatteringIntegral = (inScattering - inScattering * sampleTransmittance) / extinction;
 
-		luminance += scatteringIntegral * transmittance;
+		lum += scatteringIntegral * transmittance;
 
 		transmittance *= sampleTransmittance;
+
 	}
 
-	return luminance;
+	return vec4(lum, 1.0 - dot(transmittance, vec3(1.0 / 3.0)));
 }
 
 void main()
 {
+	ivec3 globalInvocation = ivec3(gl_GlobalInvocationID.xyz);
+
+	vec3 texSize = vec3(imageSize(u_AerialLUT).xyz);
+	vec3 texelSize = vec3(1.0f) / texSize;
+
 	ScatteringParams params;
 	params.RayleighScattering = m_SkyParams.RayleighScattering;
 	params.RayleighAbsorption = m_SkyParams.RayleighAbsorption;
@@ -189,53 +207,46 @@ void main()
 	float groundRadius = m_SkyParams.PlanetAbledo_Radius.w;
 	float atmosphereRadius = m_SkyParams.SunDir_AtmRadius.w;
 
-	
 	vec3 sunDir = normalize(-m_SkyParams.SunDir_AtmRadius.xyz);
 	vec3 viewPos = vec3(m_SkyParams.ViewPos.xyz);
 
-	ivec2 globalInvocation = ivec2(gl_GlobalInvocationID.xy);
-	vec2 size = vec2(imageSize(u_SkyViewImage).xy);
-	float u = (0.5 + globalInvocation.x) / size.x;
-	float v = (0.5 + globalInvocation.y) / size.y;
-	
-	float azimuthAngle = 2.0 * PI * (u - 0.5);
-	float adjV;
-	if(v < 0.5f)
+	// Compute the center of the voxel in worldspace (relative to the planet).
+	vec2 pixelPos = vec2(globalInvocation.xy) + vec2(0.5f);
+	vec3 clipSpace = vec3(vec2(2.0) * (pixelPos * texelSize.xy) - vec2(1.0), 0);
+	vec4 hPos = u_CameraSpecs.InvViewProjMatrix * vec4(clipSpace, 1.0);
+
+	vec3 camPos = (u_CameraSpecs.CamPosition.xyz * 1e-6) + viewPos;
+	vec3 worldDir = normalize(hPos.xyz);
+
+	float slice = (float(globalInvocation.z) + 0.5f) * texelSize.z;
+	slice *= slice;
+	slice *= texSize.z;
+
+	float planeDelta = (u_CameraSpecs.NearFarPlane.y - u_CameraSpecs.NearFarPlane.x) * texelSize.z * 1e-6;
+
+	float tMax = planeDelta * slice;
+	vec3 newWorldPos = camPos + (tMax * worldDir);
+	float voxelHeight = length(newWorldPos);
+
+	if(voxelHeight <= groundRadius + PLANET_RADIUS_OFFSET)
 	{
-		float coord = 1.0f - 2.0f * v;
-		adjV = -(coord * coord);
-	}
-	else
-	{
-		float coord = v * 2.0f - 1.0f;
-		adjV = coord * coord;
+		float offset = groundRadius + PLANET_RADIUS_OFFSET + 0.001f;
+		newWorldPos = normalize(newWorldPos) * offset;
+		tMax = length(newWorldPos - camPos);
 	}
 
-	float height = length(viewPos);
-	vec3 up = viewPos / height;
-
-	float horizonAngle = ArcCos(sqrt(height * height - groundRadius * groundRadius) / height) - 0.5f * PI;
-	float altitudeAngle = adjV * 0.5f * PI - horizonAngle;
-
-	float cosAltitude = cos(altitudeAngle);
-	vec3 rayDir = normalize(vec3(cosAltitude * sin(azimuthAngle), sin(altitudeAngle), -cosAltitude * cos(azimuthAngle)));
-
-	float sunAltitude = (0.5f * PI) - acos(dot(sunDir, up));
-	vec3 newSunDir = normalize(vec3(0.0f, sin(sunAltitude), -cos(sunAltitude)));
-
-	float atmosphereDist = RayIntersectSphere(viewPos, rayDir, atmosphereRadius);
-	float groundDist = RayIntersectSphere(viewPos, rayDir, groundRadius);
-	float tMax = (groundDist < 0.0f) ? atmosphereDist : groundDist;
-
-	vec3 luminance = RaymarchScattering(viewPos,
-										rayDir,
-										newSunDir,
-										tMax,
-										params,
-										groundRadius,
-										atmosphereRadius
+	vec4 result = RayMarchScattering(
+		camPos,
+		worldDir,
+		sunDir,
+		tMax,
+		params,
+		groundRadius,
+		atmosphereRadius
 	);
 
-	imageStore(u_SkyViewImage, globalInvocation, vec4(vec3(luminance), 1.0f));
+	result.rgb /= result.a;
+
+	imageStore(u_AerialLUT, globalInvocation, result);
 
 }

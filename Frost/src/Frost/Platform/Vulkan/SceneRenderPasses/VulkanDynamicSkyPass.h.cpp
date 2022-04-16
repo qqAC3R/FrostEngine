@@ -32,12 +32,14 @@ namespace Frost
 		m_Data->SkyViewShader = Renderer::GetShaderLibrary()->Get("SkyViewBuilder");
 		m_Data->SkyIrradianceShader = Renderer::GetShaderLibrary()->Get("SkyViewIrradiance");
 		m_Data->SkyPrefilterShader = Renderer::GetShaderLibrary()->Get("SkyViewFilter");
+		m_Data->AP_Shader = Renderer::GetShaderLibrary()->Get("AerialPerspective");
 
 		TransmittanceLUT_InitData(1600, 900);
 		MultiScatterLUT_InitData(1600, 900);
 		SkyViewLUT_InitData(1600, 900);
 		SkyIrradiance_InitData(1600, 900);
 		SkyPrefilter_InitData(1600, 900);
+		AerialPerspective_InitData(1600, 900);
 
 
 		//TransmittanceLUT_Update({});
@@ -210,29 +212,66 @@ namespace Frost
 		}
 	}
 
+	void VulkanDynamicSkyPass::AerialPerspective_InitData(uint32_t width, uint32_t height)
+	{
+		//uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		uint32_t framesInFlight = 1;
+
+		// SkyView Prefilter pipeline creation
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_Data->AP_Shader;
+		if (!m_Data->AP_Pipeline)
+			m_Data->AP_Pipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+		// SkyView Prefiltered Cubemap
+		m_Data->AerialLUT.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			ImageSpecification imageSpec{};
+			imageSpec.Width = 32;
+			imageSpec.Height = 32;
+			imageSpec.Depth = 32;
+			imageSpec.Format = ImageFormat::RGBA8;
+			imageSpec.Usage = ImageUsage::Storage;
+			imageSpec.UseMipChain = false;
+
+			m_Data->AerialLUT[i] = Texture3D::Create(imageSpec);
+		}
+
+		// Descriptor data
+		m_Data->AP_Descriptor.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+
+			if (!m_Data->AP_Descriptor[i])
+				m_Data->AP_Descriptor[i] = Material::Create(m_Data->AP_Shader, "AerialPerspective");
+
+			Ref<VulkanMaterial> vulkanMaterial = m_Data->AP_Descriptor[i].As<VulkanMaterial>();
+
+			vulkanMaterial->Set("u_AerialLUT", m_Data->AerialLUT[i]);
+			vulkanMaterial->Set("u_TransmittanceLUT", m_Data->TransmittanceLUT);
+			vulkanMaterial->Set("u_MultiScatterLUT", m_Data->MultiScatterLUT);
+			vulkanMaterial->Set("u_AerialLUT_Sampler", m_Data->AerialLUT[i]);
+
+			vulkanMaterial->UpdateVulkanDescriptorIfNeeded();
+		}
+	}
+
 	void VulkanDynamicSkyPass::InitLate()
 	{
 	}
 
-	static bool IsDone = true;
+	//static bool IsDone = true;
 
 	void VulkanDynamicSkyPass::OnUpdate(const RenderQueue& renderQueue)
 	{
-		if (IsDone)
-		{
-
-			TransmittanceLUT_Update(renderQueue);
-			MultiScatterLUT_Update(renderQueue);
-			SkyViewLUT_Update(renderQueue);
-			SkyIrradiance_Update(renderQueue);
-			SkyPrefilter_Update(renderQueue);
-
-			IsDone = false;
-		}
-		//ImGui::Begin("Hillaire2020");
-		//ImTextureID textureId = ImGuiLayer::GetTextureIDFromVulkanTexture(m_Data->SkyViewLUT);
-		//ImGui::Image(textureId, { 256, 128 });
-		//ImGui::End();
+		TransmittanceLUT_Update(renderQueue);
+		MultiScatterLUT_Update(renderQueue);
+		SkyViewLUT_Update(renderQueue);
+		SkyIrradiance_Update(renderQueue);
+		SkyPrefilter_Update(renderQueue);
+		AerialPerspective_Update(renderQueue);
+		
 	}
 
 	void VulkanDynamicSkyPass::TransmittanceLUT_Update(const RenderQueue& renderQueue)
@@ -246,7 +285,7 @@ namespace Frost
 		Ref<VulkanMaterial> vulkanTransmittanceMaterial = m_Data->TransmittanceDescriptor.As<VulkanMaterial>();
 
 		vulkanTransmittanceMaterial->Bind(cmdBuf, m_Data->TransmittancePipeline);
-		vulkanTransmittancePipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_SkyParams);
+		vulkanTransmittancePipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_Data->m_SkyParams);
 
 		vulkanTransmittancePipeline->Dispatch(cmdBuf, 256 / 8, 64 / 8, 1);
 
@@ -267,7 +306,7 @@ namespace Frost
 		Ref<VulkanMaterial> vulkanMultiScatterMaterial = m_Data->MultiScatterDescriptor.As<VulkanMaterial>();
 
 		vulkanMultiScatterMaterial->Bind(cmdBuf, m_Data->MultiScatterPipeline);
-		vulkanMultiScatterPipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_SkyParams);
+		vulkanMultiScatterPipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_Data->m_SkyParams);
 
 		vulkanMultiScatterPipeline->Dispatch(cmdBuf, 32, 32, 1);
 
@@ -288,7 +327,7 @@ namespace Frost
 		Ref<VulkanMaterial> vulkanSkyViewMaterial = m_Data->SkyViewDescriptor.As<VulkanMaterial>();
 
 		vulkanSkyViewMaterial->Bind(cmdBuf, m_Data->SkyViewPipeline);
-		vulkanSkyViewPipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_SkyParams);
+		vulkanSkyViewPipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_Data->m_SkyParams);
 
 		vulkanSkyViewPipeline->Dispatch(cmdBuf, 256 / 8, 128 / 8, 1);
 
@@ -311,9 +350,9 @@ namespace Frost
 		Ref<VulkanMaterial> vulkanSkyIrradianceMaterial = m_Data->SkyIrradianceDescriptor.As<VulkanMaterial>();
 
 		vulkanSkyIrradianceMaterial->Bind(cmdBuf, m_Data->SkyIrradiancePipeline);
-		vulkanSkyIrradiancePipeline->BindVulkanPushConstant(cmdBuf, "m_PushConstant", &m_SkyDiffuseParams);
+		vulkanSkyIrradiancePipeline->BindVulkanPushConstant(cmdBuf, "m_PushConstant", &m_Data->m_SkyDiffuseParams);
 
-		vulkanSkyIrradiancePipeline->Dispatch(cmdBuf, 512 / 8, 512 / 8, 6);
+		vulkanSkyIrradiancePipeline->Dispatch(cmdBuf, 32 / 8, 32 / 8, 6);
 
 		Ref<VulkanImage2D> vulkanIrradianceMap = m_Data->SkyIrradianceMap.As<VulkanImage2D>();
 		vulkanIrradianceMap->TransitionLayout(cmdBuf, vulkanIrradianceMap->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
@@ -340,16 +379,45 @@ namespace Frost
 			uint32_t groupX = static_cast<uint32_t>(glm::ceil(static_cast<float>(mipWidth) / 8.0f));
 			uint32_t groupY = static_cast<uint32_t>(glm::ceil(static_cast<float>(mipHeight) / 8.0f));
 
-			m_SkyDiffuseParams.Roughness = static_cast<float>(i) / 4.0f;
-			m_SkyDiffuseParams.NrSamples = 64;
+			m_Data->m_SkyDiffuseParams.Roughness = static_cast<float>(i) / 4.0f;
+			m_Data->m_SkyDiffuseParams.NrSamples = 64;
 
 			vulkanSkyPrefilterMaterial->Bind(cmdBuf, m_Data->SkyPrefilterPipeline);
-			vulkanSkyPrefilterPipeline->BindVulkanPushConstant(cmdBuf, "m_PushConstant", &m_SkyDiffuseParams);
+			vulkanSkyPrefilterPipeline->BindVulkanPushConstant(cmdBuf, "m_PushConstant", &m_Data->m_SkyDiffuseParams);
 
 			vulkanSkyPrefilterPipeline->Dispatch(cmdBuf, groupX, groupY, 6);
 
 			vulkanPrefilteredMap->TransitionLayout(cmdBuf, vulkanPrefilteredMap->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		}
+	}
+
+	void VulkanDynamicSkyPass::AerialPerspective_Update(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		// Getting the vulkan skyview_builder pipeline
+		Ref<VulkanComputePipeline> vulkanAerialPipeline = m_Data->AP_Pipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> vulkanAerialMaterial = m_Data->AP_Descriptor[0].As<VulkanMaterial>();
+
+		vulkanAerialMaterial->Bind(cmdBuf, m_Data->AP_Pipeline);
+		vulkanAerialPipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_Data->m_SkyParams);
+
+		glm::mat4 invViewProjMatrix = glm::inverse(renderQueue.m_Camera.GetViewProjection());
+		vulkanAerialMaterial->Set("CameraBlock.ViewMatrix", renderQueue.CameraViewMatrix);
+		vulkanAerialMaterial->Set("CameraBlock.ProjMatrix", renderQueue.CameraProjectionMatrix);
+		vulkanAerialMaterial->Set("CameraBlock.InvViewProjMatrix", invViewProjMatrix);
+		vulkanAerialMaterial->Set("CameraBlock.CamPosition", glm::vec4(renderQueue.CameraPosition, 0.0f));
+		vulkanAerialMaterial->Set("CameraBlock.NearFarPlane", glm::vec4(renderQueue.m_Camera.GetNearClip(), renderQueue.m_Camera.GetFarClip(), 0.0f, 0.0f));
+
+		vulkanAerialPipeline->Dispatch(cmdBuf, 32 / 8, 32 / 8, 32 / 8);
+
+		Ref<VulkanTexture3D> vulkanAerialLUT = m_Data->AerialLUT[0].As<VulkanTexture3D>();
+		vulkanAerialLUT->TransitionLayout(cmdBuf, vulkanAerialLUT->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+		//Ref<VulkanImage2D> vulkanIrradianceMap = m_Data->SkyIrradianceMap.As<VulkanImage2D>();
+		//vulkanIrradianceMap->TransitionLayout(cmdBuf, vulkanIrradianceMap->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 	}
 
 	void VulkanDynamicSkyPass::OnResize(uint32_t width, uint32_t height)
