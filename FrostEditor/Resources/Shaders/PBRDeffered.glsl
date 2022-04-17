@@ -88,7 +88,7 @@ struct SurfaceProperties
     vec3 Normal;
     vec3 ViewVector;
     
-    vec3 Albedo;
+    vec4 Albedo;
     float Roughness;
     float Metalness;
     float Emission;
@@ -108,138 +108,236 @@ int GetLightBufferIndex(int i)
 }
 
 
-float NDFGGX(float cosLh, float roughness)
-{
-	float alpha = roughness * roughness;
-	float alphaSq = alpha * alpha;
 
-	float denom = (cosLh * cosLh) * (alphaSq - 1.0) + 1.0;
-	return alphaSq / (PI * denom * denom);
+
+
+//------------------------------------------------------------------------------
+// Filament PBR.
+//------------------------------------------------------------------------------
+
+// Normal distribution function.
+float nGGX(float nDotH, float actualRoughness)
+{
+	float a = nDotH * actualRoughness;
+	float k = actualRoughness / (1.0 - nDotH * nDotH + a * a);
+	return k * k * (1.0 / PI);
 }
 
-vec3 FresnelSchlickRoughness(vec3 F0, float cosTheta, float roughness)
+// Fast visibility term. Incorrect as it approximates the two square roots.
+float vGGXFast(float nDotV, float nDotL, float actualRoughness)
 {
-	return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+	float a = actualRoughness;
+	float vVGGX = nDotL * (nDotV * (1.0 - a) + a);
+	float lVGGX = nDotV * (nDotL * (1.0 - a) + a);
+	return 0.5 / max(vVGGX + lVGGX, 1e-5);
 }
 
-// Single term for separable Schlick-GGX below.
-float GeometrySchlickG1(float cosTheta, float k)
+// Schlick approximation for the Fresnel factor.
+vec3 sFresnel(float vDotH, vec3 f0, vec3 f90)
 {
-	return cosTheta / (cosTheta * (1.0 - k) + k);
+	float p = 1.0 - vDotH;
+	return f0 + (f90 - f0) * p * p * p * p * p;
 }
 
-// Schlick-GGX approximation of geometric attenuation function using Smith's method.
-float GeometrySchlickGGX(float cosLi, float NdotV, float roughness)
+// Cook-Torrance specular for the specular component of the BRDF.
+vec3 Fs_CookTorrance(float nDotH,
+					float lDotH,
+					float nDotV,
+					float nDotL,
+                    float vDotH,
+					float actualRoughness,
+					vec3 f0,
+					vec3 f90)
 {
-	float r = roughness + 1.0;
-	float k = (r * r) / 8.0; // Epic suggests using this roughness remapping for analytic lights.
-	return GeometrySchlickG1(cosLi, k) * GeometrySchlickG1(NdotV, k);
+	float D = nGGX(nDotH, actualRoughness);
+	vec3 F = sFresnel(vDotH, f0, f90);
+	float V = vGGXFast(nDotV, nDotL, actualRoughness);
+	return D * F * V;
 }
 
-vec3 PointLightContribution(PointLight pointLight)
+//   for the diffuse component of the BRDF. Corrected to guarantee
+// energy is conserved.
+vec3 Fd_LambertCorrected(vec3 f0, vec3 f90, float vDotH, float lDotH,
+                        vec3 diffuseAlbedo)
 {
-    vec3 Lc = vec3(0.0);
-    {
-        vec3 LightPosition = vec3(pointLight.Position);
-
-        vec3  Li = normalize(LightPosition - m_Surface.WorldPos);     //  Light direction
-        vec3  Lh  = normalize(m_Surface.ViewVector + Li);             //  Half view vector
-        float Ld = length(LightPosition - m_Surface.WorldPos);        //  Light distance
-
-        float attenuation = clamp(1.0 - (Ld * Ld) / (pointLight.Radius * pointLight.Radius), 0.0, 1.0);
-		attenuation *= mix(attenuation, 1.0, pointLight.Falloff);
-
-        vec3 LRadiance = vec3(pointLight.Radiance) * attenuation;
-
-        // Calculate angles between surface normal and various light vectors.
-		float cosLi = max(0.0, dot(m_Surface.Normal, Li));
-		float cosLh = max(0.0, dot(m_Surface.Normal, Lh));
-
-
-        float NdotV = dot(m_Surface.Normal, m_Surface.ViewVector);
-
-        // Cook-Torrance BRDF
-        vec3 F   = FresnelSchlickRoughness(m_Surface.F0, max(dot(Lh, m_Surface.ViewVector), 0.0), m_Surface.Roughness);       
-        float D  = NDFGGX(cosLh, m_Surface.Roughness);        
-        float G  = GeometrySchlickGGX(cosLi, NdotV, m_Surface.Roughness);      
-        
-
-        vec3 kd = (1.0 - F) * (1.0 - m_Surface.Metalness);
-		vec3 diffuseBRDF = kd * m_Surface.Albedo;
-
-        
-		// Specular
-		vec3 specularBRDF = (F * D * G) / max(Epsilon, 4.0 * cosLi * NdotV);
-		specularBRDF = clamp(specularBRDF, vec3(0.0f), vec3(10.0f));
-		Lc += (diffuseBRDF + specularBRDF) * LRadiance * cosLi;
-    }
-    return Lc;
-}
-
-vec3 DirectionalLightContribution(DirectionalLight directionLight)
-{
-	vec3 result = vec3(0.0);
-
-	{
-		vec3 Li = directionLight.Direction;
-		vec3 Lradiance = directionLight.Radiance * directionLight.Multiplier;
-		vec3 Lh = normalize(Li + m_Surface.ViewVector);
-
-		// Calculate angles between surface normal and various light vectors.
-		float cosLi = max(0.0, dot(m_Surface.Normal, Li));
-		float cosLh = max(0.0, dot(m_Surface.Normal, Lh));
-
-		float NdotV = dot(m_Surface.Normal, m_Surface.ViewVector);
-
-		vec3 F = FresnelSchlickRoughness(m_Surface.F0, max(0.0, dot(Lh, m_Surface.ViewVector)), m_Surface.Roughness);
-		float D = NDFGGX(cosLh, m_Surface.Roughness);
-		float G = GeometrySchlickGGX(cosLi, NdotV, m_Surface.Roughness);
-
-		vec3 kd = (1.0 - F) * (1.0 - m_Surface.Metalness);
-		vec3 diffuseBRDF = kd * m_Surface.Albedo;
-
-		// Cook-Torrance
-		vec3 specularBRDF = (F * D * G) / max(Epsilon, 4.0 * cosLi * NdotV);
-		specularBRDF = clamp(specularBRDF, vec3(0.0f), vec3(10.0f));
-		result += (diffuseBRDF + specularBRDF) * Lradiance * cosLi;
-	}
+	// Making the assumption that the external medium is air (IOR of 1).
+	vec3 iorExtern = vec3(1.0);
+	// Calculating the IOR of the medium using f0.
+	vec3 iorIntern = (vec3(1.0) - sqrt(f0)) / (vec3(1.0) + sqrt(f0));
+	// Ratio of the IORs.
+	vec3 iorRatio = iorExtern / iorIntern;
 	
-	return result;
+	// Compute the incoming and outgoing Fresnel factors.
+	vec3 fIncoming = sFresnel(lDotH, f0, f90);
+	vec3 fOutgoing = sFresnel(vDotH, f0, f90);
+	
+	// Compute the fraction of light which doesn't get reflected back into the
+	// medium for TIR.
+	vec3 rExtern = PI * (20.0 * f0 + 1.0) / 21.0;
+	
+	// Use rExtern to compute the fraction of light which gets reflected back into
+	// the medium for TIR.
+	vec3 rIntern = vec3(1.0) - (iorRatio * iorRatio * (vec3(1.0) - rExtern));
+	
+	// The TIR contribution.
+	vec3 tirDiffuse = vec3(1.0) - (rIntern * diffuseAlbedo);
+	
+	// The final diffuse BRDF.
+	return (iorRatio * iorRatio) * diffuseAlbedo * (vec3(1.0) - fIncoming) * (vec3(1.0) - fOutgoing) / (PI * tirDiffuse);
 }
 
-vec3 RotateVectorByY(float angle, vec3 vec)
+vec3 ComputePointLightContribution(PointLight pointLight)
 {
-	angle = radians(angle);
-	mat3x3 rotationMatrix = { vec3(cos(angle),0.0,sin(angle)),
-							vec3(0.0,1.0,0.0),
-							vec3(-sin(angle),0.0,cos(angle)) };
-	return rotationMatrix * vec;
+	vec3 LightPosition = vec3(pointLight.Position);
+
+	// Get the values from the surfaces
+	vec3 albedo = m_Surface.Albedo.rgb;
+	float roughness = m_Surface.Roughness;
+	float metalness = m_Surface.Metalness;
+
+	// Compute some vectors needed for calculations
+	vec3 V = m_Surface.ViewVector;
+	vec3 N = m_Surface.Normal;
+
+	vec3  Ldir = normalize(LightPosition - m_Surface.WorldPos);  //  Light direction
+	vec3  Lh   = normalize(V + Ldir);                            //  Half view vector
+
+	float nDotV = max(abs(dot(N,    V)),   1e-5);
+	float nDotL =   clamp(dot(N,    Ldir), 1e-5, 1.0);
+	float nDotH =   clamp(dot(N,    Lh),   1e-5, 1.0);
+	float lDotH =   clamp(dot(Ldir, Lh),   1e-5, 1.0);
+	float vDotH =   clamp(dot(Ldir, Lh),   1e-5, 1.0);
+
+	// Attenuation
+	float Ld          = length(LightPosition - m_Surface.WorldPos); //  Light distance
+	float attenuation = clamp(1.0 - (Ld * Ld) / (pointLight.Radius * pointLight.Radius), 0.0, 1.0);
+	attenuation      *= mix(attenuation, 1.0, pointLight.Falloff);
+
+	// Compute the real roughness
+	float clampedRoughness = max(roughness, 0.045); // Frostbite uses a clamped factor for less artifacts
+	float actualRoughness = clampedRoughness * clampedRoughness;
+
+	// Sample the BRDF
+	vec2 DFG = texture(u_BRDFLut, vec2(nDotV, roughness)).rg;
+	DFG = max(DFG, vec2(1e-4));
+
+	// Compute the fresnel at angle 0 for the metallic and dielectric 
+	vec3 metallicF0 = albedo * metalness;
+	vec3 dielectricF0 = 0.16 * vec3(1.0f); // instead of "vec3(1.0f)" it should be "vec3(m_Surface.Albedo.a * m_Surface.Albedo.a)"
+	vec3 F90 = vec3(1.0); // Dirty, setting f90 to 1.0.
+
+	vec3 energyDielectric = vec3(1.0) + dielectricF0 * (vec3(1.0) / DFG.y - vec3(1.0));
+	vec3 energyMetallic =   vec3(1.0) + metallicF0   * (vec3(1.0) / DFG.y - vec3(1.0));
+
+
+	// Computing the dielectric BRDF
+	vec3 Fs = Fs_CookTorrance(nDotH, lDotH, nDotV, nDotL, vDotH, actualRoughness, dielectricF0, F90);
+	vec3 Fd = Fd_LambertCorrected(dielectricF0, F90, vDotH, lDotH, albedo);
+	vec3 dielectricBRDF = Fs + Fd;
+
+	// Computing the metallic BRDF (we don't use the diffuse term since metallic surfaces dont absorb rays)
+	vec3 metallicBRDF = Fs_CookTorrance(nDotH, lDotH, nDotV, nDotL, vDotH, actualRoughness, metallicF0, F90);
+
+	// Compute the final contribution between the metallic and dielectric brdf
+	vec3 finalContribution = mix(dielectricBRDF, metallicBRDF, metalness);
+	return finalContribution * pointLight.Intensity * pointLight.Radiance * nDotL * attenuation;
 }
 
-vec3 IBL_Contribution()
+vec3 ComputeDirectionalLightContribution(DirectionalLight directionalLight)
 {
-	float NdotV = dot(m_Surface.Normal, m_Surface.ViewVector);
-	// Specular reflection vector
-	vec3 Lr = 2.0 * NdotV * m_Surface.Normal - m_Surface.ViewVector;
+	// Get the values from the surfaces
+	vec3 albedo = m_Surface.Albedo.rgb;
+	float roughness = m_Surface.Roughness;
+	float metalness = m_Surface.Metalness;
 
+	// Compute some vectors needed for calculations
+	vec3 V = m_Surface.ViewVector;
+	vec3 N = m_Surface.Normal;
 
-	vec3 irradiance = texture(u_IrradianceMap, m_Surface.Normal).rgb;
-	vec3 F = FresnelSchlickRoughness(m_Surface.F0, NdotV, m_Surface.Roughness);
-	vec3 kd = (1.0 - F) * (1.0 - m_Surface.Metalness);
-	vec3 diffuseIBL = m_Surface.Albedo * irradiance;
+	vec3  Ldir = normalize(directionalLight.Direction);  //  Light direction
+	vec3  Lh   = normalize(V + Ldir);                    //  Half view vector
 
-	int envRadianceTexLevels = textureQueryLevels(u_RadianceFilteredMap);
-	float NoV = clamp(NdotV, 0.0, 1.0);
-	vec3 R = 2.0 * dot(m_Surface.ViewVector, m_Surface.Normal) * m_Surface.Normal - m_Surface.ViewVector;
-	vec3 specularIrradiance = textureLod(u_RadianceFilteredMap, RotateVectorByY(0.0f, Lr), (m_Surface.Roughness) * envRadianceTexLevels).rgb;
+	float nDotV = max(abs(dot(N,    V)),   1e-5);
+	float nDotL =   clamp(dot(N,    Ldir), 1e-5, 1.0);
+	float nDotH =   clamp(dot(N,    Lh),   1e-5, 1.0);
+	float lDotH =   clamp(dot(Ldir, Lh),   1e-5, 1.0);
+	float vDotH =   clamp(dot(Ldir, Lh),   1e-5, 1.0);
 
-	// Sample BRDF Lut, 1.0 - roughness for y-coord because texture was generated (in Sparky) for gloss model
-	vec2 specularBRDF = texture(u_BRDFLut, vec2(NdotV, 1.0 - m_Surface.Roughness)).rg;
-	vec3 specularIBL = specularIrradiance * (m_Surface.F0 * specularBRDF.x + specularBRDF.y);
-	//vec3 specularIBL = specularIrradiance * (m_Surface.F0);
+	// Compute the real roughness
+	float clampedRoughness = max(roughness, 0.045); // Frostbite uses a clamped factor for less artifacts
+	float actualRoughness = clampedRoughness * clampedRoughness;
 
-	return kd * diffuseIBL + specularIBL;
+	// Sample the BRDF
+	vec2 DFG = texture(u_BRDFLut, vec2(nDotV, roughness)).rg;
+	DFG = max(DFG, vec2(1e-4));
+
+	// Compute the fresnel at angle 0 for the metallic and dielectric 
+	vec3 metallicF0 = albedo * metalness;
+	vec3 dielectricF0 = 0.16 * vec3(1.0f); // instead of "vec3(1.0f)" it should be "vec3(m_Surface.Albedo.a * m_Surface.Albedo.a)"
+	vec3 F90 = vec3(1.0); // Dirty, setting f90 to 1.0.
+
+	vec3 energyDielectric = vec3(1.0) + dielectricF0 * (vec3(1.0) / DFG.y - vec3(1.0));
+	vec3 energyMetallic =   vec3(1.0) + metallicF0   * (vec3(1.0) / DFG.y - vec3(1.0));
+
+	// Computing the dielectric BRDF
+	vec3 Fs = Fs_CookTorrance(nDotH, lDotH, nDotV, nDotL, vDotH, actualRoughness, dielectricF0, F90);
+	vec3 Fd = Fd_LambertCorrected(dielectricF0, F90, vDotH, lDotH, albedo);
+	vec3 dielectricBRDF = Fs + Fd;
+
+	// Computing the metallic BRDF (we don't use the diffuse term since metallic surfaces dont absorb rays)
+	vec3 metallicBRDF = Fs_CookTorrance(nDotH, lDotH, nDotV, nDotL, vDotH, actualRoughness, metallicF0, F90);
+
+	// Compute the final contribution between the metallic and dielectric brdf
+	vec3 finalContribution = mix(dielectricBRDF, metallicBRDF, metalness);
+	return finalContribution * directionalLight.Multiplier * nDotL * directionalLight.Radiance;
 }
+
+
+// A fast approximation of specular AO given the diffuse AO. [Lagarde14]
+float ComputeSpecularAO(float nDotV, float ao, float roughness)
+{
+  return clamp(pow(nDotV + ao, exp2(-16.0 * roughness - 1.0)) - 1.0 + ao, 0.0, 1.0);
+}
+
+vec3 ComputeIBLContriubtion()
+{
+	// Get the values from the surfaces
+	vec3 albedo = m_Surface.Albedo.rgb;
+	float roughness = clamp(m_Surface.Roughness, 0.0f, 0.95f);
+	float metalness = m_Surface.Metalness;
+
+	// Compute some vectors needed for calculations
+	vec3 V = m_Surface.ViewVector;
+	vec3 N = m_Surface.Normal;
+
+	float nDotV = max(dot(N, V), 0.0);
+	vec3 R = normalize(reflect(V, N));
+
+	// Remap material properties.
+	vec3 diffuseAlbedo = (1.0 - metalness) * albedo;
+	vec3 F0 = mix(vec3(0.16), albedo, metalness); // instead of "vec3(0.16)" it should be "vec3(0.16 * m_Surface.Albedo.a * m_Surface.Albedo.a)"
+	vec3 dielectricF0 = 0.16 * vec3(1.0f);
+
+	// Compute the irradiance factor
+	vec3 irradiance = texture(u_IrradianceMap, N).rgb * diffuseAlbedo;
+
+
+	// Compute the radiance factor (depedent on the roughness)
+#define MAX_MIP 5.0f
+	//int envRadianceTexLevels = textureQueryLevels(u_RadianceFilteredMap);
+	float lod = MAX_MIP * roughness;
+	vec3 specularDecomp = textureLod(u_RadianceFilteredMap, -R, lod).rgb;
+
+	vec2 splitSums = texture(u_BRDFLut, vec2(nDotV, roughness)).rg;
+	//vec3 brdf = mix(vec3(splitSums.x), vec3(splitSums.y), F0);
+	vec3 brdf = vec3(F0 * splitSums.x + splitSums.y);
+
+	vec3 specularRadiance = brdf * specularDecomp;
+
+	return (irradiance + specularRadiance);
+}
+
+
 
 // From https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 vec3 AcesApprox(vec3 v)
@@ -282,13 +380,13 @@ void main()
 
 
     // Sampling the textures from gbuffer
-    m_Surface.Albedo =      texture(u_AlbedoTexture, v_TexCoord).rgb;
+    m_Surface.Albedo =      texture(u_AlbedoTexture, v_TexCoord).rgba;
     m_Surface.Metalness =   texture(u_NormalTexture, v_TexCoord).b;
     m_Surface.Roughness =   texture(u_NormalTexture, v_TexCoord).a;
     m_Surface.Emission =    texture(u_AlbedoTexture, v_TexCoord).a;
 
     // Fresnel approximation
-	m_Surface.F0 = mix(Fdielectric, m_Surface.Albedo, m_Surface.Metalness);
+	m_Surface.F0 = mix(Fdielectric, m_Surface.Albedo.rgb, m_Surface.Metalness);
 
 
 	DirectionalLight dirLight;
@@ -298,10 +396,10 @@ void main()
 
 	// Calculating all point lights contribution
 	vec3 Lo = vec3(0.0f);
-	uint pointLightCount = uint(m_CameraData.PointLightCount);
-
 
 	float heatMap = 0.0f;
+	uint pointLightCount = uint(m_CameraData.PointLightCount);
+
 	for(uint i = 0; i < pointLightCount; i++)
 	{
 		int lightIndex = GetLightBufferIndex(int(i));
@@ -309,23 +407,23 @@ void main()
             break;
 
 		PointLight pointLight = LightData.u_PointLights[lightIndex];
-		Lo += PointLightContribution(pointLight) * pointLight.Intensity;
+		Lo += ComputePointLightContribution(pointLight);// * pointLight.Intensity;
 
 		heatMap += 0.1f;
 	}
 
 
 	// Calculating all directional lights contribution
-	vec3 Ld = DirectionalLightContribution(dirLight);
+	vec3 Ld = ComputeDirectionalLightContribution(dirLight);
 
 	// Adding up the point light and directional light contribution
     vec3 result = Lo + Ld;
 
 	// Adding up the ibl
-	float IBLIntensity = 1.0f;
-	result += IBL_Contribution() * IBLIntensity;
+	float IBLIntensity = 0.5f;
+	result += ComputeIBLContriubtion() * IBLIntensity;
 
-	result *= (1.0f + m_Surface.Emission);
+	// Calculating the result with the camera exposure
 	result *= m_CameraData.Exposure;
 
 	// Outputting the result
