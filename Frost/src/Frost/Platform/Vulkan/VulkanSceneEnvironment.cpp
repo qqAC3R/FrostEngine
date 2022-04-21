@@ -6,12 +6,91 @@
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
+#include "Frost/Platform/Vulkan/VulkanImage.h"
+#include "Frost/Platform/Vulkan/VulkanPipeline.h"
 
 namespace Frost
 {
+
 	VulkanSceneEnvironment::VulkanSceneEnvironment()
 	{
-		InitShadersAndPipelines();
+		InitHDRMaps_ShadersAndPipeline();
+
+		TransmittanceLUT_InitData();
+		MultiScatterLUT_InitData();
+		SkyViewLUT_InitData();
+
+		SkyIrradiance_InitData();
+		SkyPrefilter_InitData();
+
+		AerialPerspective_InitData();
+	}
+
+	void VulkanSceneEnvironment::InitSkyBoxPipeline(Ref<RenderPass> renderPass)
+	{
+		m_SkyboxShader = Renderer::GetShaderLibrary()->Get("RenderSkybox");
+
+		// Skybox pipeline/descriptors
+		BufferLayout bufferLayout = {};
+		Pipeline::CreateInfo pipelineCreateInfo{};
+		pipelineCreateInfo.Shader = m_SkyboxShader;
+		pipelineCreateInfo.RenderPass = renderPass;
+		pipelineCreateInfo.VertexBufferLayout = bufferLayout;
+		pipelineCreateInfo.UseDepthTest = true;
+		pipelineCreateInfo.UseDepthWrite = true;
+		pipelineCreateInfo.Topology = PrimitiveTopology::Triangles;
+		pipelineCreateInfo.DepthCompareOperation = DepthCompare::LessOrEqual;
+		m_SkyboxPipeline = Pipeline::Create(pipelineCreateInfo);
+		m_SkyboxDescriptor = Material::Create(m_SkyboxShader);
+
+		auto envCubeMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
+		auto skyViewLut = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetSkyViewLUT();
+		auto transmittanceLut = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetTransmittanceLUT();
+
+		m_SkyboxDescriptor->Set("u_EnvTexture", envCubeMap);
+		m_SkyboxDescriptor->Set("u_HillaireLUT", skyViewLut);
+		m_SkyboxDescriptor->Set("u_TransmittanceLUT", transmittanceLut);
+
+		m_SkyboxDescriptor->Set("CameraData.Gamma", 2.2f);
+		m_SkyboxDescriptor->Set("CameraData.Exposure", 0.1f);
+		m_SkyboxDescriptor->Set("CameraData.Lod", 3.0f);
+		m_SkyboxDescriptor->Set("CameraData.SkyMode", 1.0f);
+
+		AtmosphereParams& atmosphereParams = m_AtmosphereParams;
+
+		m_SkyboxDescriptor->Set("CameraData.SunDir", glm::vec3(atmosphereParams.SunDirection_Intensity));
+		m_SkyboxDescriptor->Set("CameraData.SunIntensity", atmosphereParams.SunDirection_Intensity.w);
+		m_SkyboxDescriptor->Set("CameraData.SunSize", atmosphereParams.ViewPos_SunSize.w);
+
+		m_SkyboxDescriptor->Set("CameraData.ViewPos", glm::vec3(atmosphereParams.ViewPos_SunSize));
+		m_SkyboxDescriptor->Set("CameraData.SkyIntensity", 3.0f);
+
+		m_SkyboxDescriptor->Set("CameraData.GroundRadius", atmosphereParams.PlanetAbledo_Radius.w);
+		m_SkyboxDescriptor->Set("CameraData.AtmosphereRadius", atmosphereParams.AtmosphereRadius);
+	}
+
+	void VulkanSceneEnvironment::InitHDRMaps_ShadersAndPipeline()
+	{
+		m_RadianceShader = Renderer::GetShaderLibrary()->Get("EquirectangularToCubeMap");
+		m_IrradianceShader = Renderer::GetShaderLibrary()->Get("EnvironmentIrradiance");
+		m_PrefilteredMap = Renderer::GetShaderLibrary()->Get("EnvironmentMipFilter");
+
+		m_TransmittanceShader = Renderer::GetShaderLibrary()->Get("Transmittance");
+		m_MultiScatterShader = Renderer::GetShaderLibrary()->Get("MultiScatter");
+		m_SkyViewShader = Renderer::GetShaderLibrary()->Get("SkyViewBuilder");
+		m_SkyIrradianceShader = Renderer::GetShaderLibrary()->Get("SkyViewIrradiance");
+		m_SkyPrefilterShader = Renderer::GetShaderLibrary()->Get("SkyViewFilter");
+		m_AP_Shader = Renderer::GetShaderLibrary()->Get("AerialPerspective");
+
+
+		m_RadianceCompute = ComputePipeline::Create({ m_RadianceShader });
+		m_IrradianceCompute = ComputePipeline::Create({ m_IrradianceShader });
+		m_PrefilteredCompute = ComputePipeline::Create({ m_PrefilteredMap });
+
+
+		m_RadianceShaderDescriptor = Material::Create(m_RadianceShader, "EquirectangularToCubeMap");
+		m_IrradianceShaderDescriptor = Material::Create(m_IrradianceShader, "EnvironmentIrradiance");
+		m_PrefilteredShaderDescriptor = Material::Create(m_PrefilteredMap, "EnvironmentMipFilter");
 	}
 
 	void VulkanSceneEnvironment::Load(const std::string& filepath)
@@ -175,24 +254,363 @@ namespace Frost
 		}
 	}
 
+	void VulkanSceneEnvironment::TransmittanceLUT_InitData()
+	{
+		// Transmittance pipeline creation
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_TransmittanceShader;
+		m_TransmittancePipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+		// Transmittance LUT
+		ImageSpecification imageSpec{};
+		imageSpec.Width = 256;
+		imageSpec.Height = 64;
+		imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+		imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+		imageSpec.Format = ImageFormat::RGBA16F;
+		imageSpec.Usage = ImageUsage::Storage;
+
+		m_TransmittanceLUT = Image2D::Create(imageSpec);
+
+		// Descriptor data
+		m_TransmittanceDescriptor = Material::Create(m_TransmittanceShader, "TransmittanceShader");
+		m_TransmittanceDescriptor->Set("u_TransmittanceLUT", m_TransmittanceLUT);
+	}
+
+	void VulkanSceneEnvironment::MultiScatterLUT_InitData()
+	{
+		// MultiScatter pipeline creation
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_MultiScatterShader;
+		m_MultiScatterPipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+		// Multi Scatter LUT
+		ImageSpecification imageSpec{};
+		imageSpec.Width = 32;
+		imageSpec.Height = 32;
+		imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+		imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+		imageSpec.Format = ImageFormat::RGBA16F;
+		imageSpec.Usage = ImageUsage::Storage;
+
+		m_MultiScatterLUT = Image2D::Create(imageSpec);
+
+		// Descriptor data
+		m_MultiScatterDescriptor = Material::Create(m_MultiScatterShader, "MultiScatterShader");
+		m_MultiScatterDescriptor->Set("u_TransmittanceLUT", m_TransmittanceLUT);
+		m_MultiScatterDescriptor->Set("u_MultiScatterLUT", m_MultiScatterLUT);
+	}
+
+	void VulkanSceneEnvironment::SkyViewLUT_InitData()
+	{
+		// SkyView pipeline creation
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_SkyViewShader;
+		m_SkyViewPipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+		// SkyView LUT
+		ImageSpecification imageSpec{};
+		imageSpec.Width = 256;
+		imageSpec.Height = 128;
+		imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+		imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+		imageSpec.Format = ImageFormat::RGBA16F;
+		imageSpec.Usage = ImageUsage::Storage;
+
+		m_SkyViewLUT = Image2D::Create(imageSpec);
+
+
+		// Descriptor data
+		m_SkyViewDescriptor = Material::Create(m_SkyViewShader, "SkyViewBuilder_Shader");
+
+		m_SkyViewDescriptor->Set("u_TransmittanceLUT", m_TransmittanceLUT);
+		m_SkyViewDescriptor->Set("u_MultiScatterLUT", m_MultiScatterLUT);
+		m_SkyViewDescriptor->Set("u_SkyViewImage", m_SkyViewLUT);
+	}
+
+	void VulkanSceneEnvironment::SkyIrradiance_InitData()
+	{
+		// SkyView Irradiance pipeline creation
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_SkyIrradianceShader;
+		m_SkyIrradiancePipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+		// SkyView Irradiance Cubemap
+		ImageSpecification imageSpec{};
+		imageSpec.Width = 32;
+		imageSpec.Height = 32;
+		imageSpec.Format = ImageFormat::RGBA16F;
+		imageSpec.Usage = ImageUsage::Storage;
+		imageSpec.UseMipChain = false;
+
+		m_SkyIrradianceMap = TextureCubeMap::Create(imageSpec);
+
+
+		// Descriptor data
+		m_SkyIrradianceDescriptor = Material::Create(m_SkyIrradianceShader, "SkyViewIrradiance_Shader");
+
+		m_SkyIrradianceDescriptor->Set("u_SkyViewLUT", m_SkyViewLUT);
+		m_SkyIrradianceDescriptor->Set("u_IrradianceMap", m_SkyIrradianceMap);
+	}
+
+	void VulkanSceneEnvironment::SkyPrefilter_InitData()
+	{
+		// SkyView Prefilter pipeline creation
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_SkyPrefilterShader;
+		m_SkyPrefilterPipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+		// SkyView Prefiltered Cubemap
+		ImageSpecification imageSpec{};
+		imageSpec.Width = 64;
+		imageSpec.Height = 64;
+		imageSpec.Format = ImageFormat::RGBA16F;
+		imageSpec.Usage = ImageUsage::Storage;
+
+		m_SkyPrefilterMap = TextureCubeMap::Create(imageSpec);
+
+
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		Ref<VulkanTextureCubeMap> vulkanPrefilteredMap = m_SkyPrefilterMap.As<VulkanTextureCubeMap>();
+		// Descriptor data
+		m_SkyPrefilterDescriptor.resize(7);
+		for (uint32_t i = 0; i < 7; i++)
+		{
+			m_SkyPrefilterDescriptor[i] = Material::Create(m_SkyPrefilterShader, "SkyViewPrefilter_Shader");
+
+			Ref<VulkanMaterial> vulkanMaterial = m_SkyPrefilterDescriptor[i].As<VulkanMaterial>();
+			VkDescriptorSet descriptorSet = vulkanMaterial->GetVulkanDescriptorSet(0);
+
+			vulkanMaterial->Set("u_SkyViewLUT", m_SkyViewLUT);
+
+			VkDescriptorImageInfo imageInfo{};
+			imageInfo.imageLayout = vulkanPrefilteredMap->GetVulkanImageLayout();
+			imageInfo.imageView = vulkanPrefilteredMap->GetVulkanImageViewMip(i);
+			imageInfo.sampler = vulkanPrefilteredMap->GetVulkanSampler();
+
+			VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+			writeDescriptorSet.dstBinding = 1;
+			writeDescriptorSet.dstArrayElement = 0;
+			writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			writeDescriptorSet.pImageInfo = &imageInfo;
+			writeDescriptorSet.descriptorCount = 1;
+			writeDescriptorSet.dstSet = descriptorSet;
+
+			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, 0);
+			vulkanMaterial->UpdateVulkanDescriptorIfNeeded();
+		}
+	}
+
+	void VulkanSceneEnvironment::AerialPerspective_InitData()
+	{
+		// SkyView Prefilter pipeline creation
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_AP_Shader;
+		m_AP_Pipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+		ImageSpecification imageSpec{};
+		imageSpec.Width = 32;
+		imageSpec.Height = 32;
+		imageSpec.Depth = 32;
+		imageSpec.Format = ImageFormat::RGBA8;
+		imageSpec.Usage = ImageUsage::Storage;
+		imageSpec.UseMipChain = false;
+
+		m_AerialLUT = Texture3D::Create(imageSpec);
+
+		// Descriptor data
+		m_AP_Descriptor = Material::Create(m_AP_Shader, "AerialPerspective");
+
+		Ref<VulkanMaterial> vulkanMaterial = m_AP_Descriptor.As<VulkanMaterial>();
+
+		vulkanMaterial->Set("u_AerialLUT", m_AerialLUT);
+		vulkanMaterial->Set("u_TransmittanceLUT", m_TransmittanceLUT);
+		vulkanMaterial->Set("u_MultiScatterLUT", m_MultiScatterLUT);
+		vulkanMaterial->UpdateVulkanDescriptorIfNeeded();
+	}
+
+	void VulkanSceneEnvironment::SetEnvironmentMapCallback(std::function<void()> func)
+	{
+		// TODO
+	}
+
+	void VulkanSceneEnvironment::RenderSkyBox(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		// Getting the vulkan skybox pipline
+		Ref<VulkanPipeline> vulkanSkyboxPipeline = m_SkyboxPipeline.As<VulkanPipeline>();
+		vulkanSkyboxPipeline->Bind();
+		
+		m_SkyboxDescriptor->Set("CameraData.Exposure", renderQueue.m_Camera.GetExposure());
+		m_SkyboxDescriptor->Set("CameraData.Lod", renderQueue.m_Camera.GetDOF());
+
+		m_SkyboxDescriptor->Bind(m_SkyboxPipeline);
+		Vector<glm::mat4> pushConstant(2);
+		pushConstant[0] = renderQueue.m_Camera.GetProjectionMatrix();
+		pushConstant[1] = renderQueue.m_Camera.GetViewMatrix();
+
+		vulkanSkyboxPipeline->BindVulkanPushConstant("u_PushConstant", pushConstant.data());
+
+		vkCmdDraw(cmdBuf, 36, 1, 0, 0);
+	}
+
+	void VulkanSceneEnvironment::UpdateAtmosphere(const RenderQueue& renderQueue)
+	{
+		m_AtmosphereParams.ViewPos_SunSize.y = (6.360f + 0.0002f) + glm::clamp(renderQueue.CameraPosition.y / 100000.0f, 0.0f, 0.099f);
+
+		TransmittanceLUT_Update();
+		MultiScatterLUT_Update();
+		SkyViewLUT_Update();
+
+		SkyIrradiance_Update();
+		SkyPrefilter_Update();
+		AerialPerspective_Update(renderQueue);
+	}
+
+	void VulkanSceneEnvironment::TransmittanceLUT_Update()
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		// Getting the vulkan transmittance pipeline
+		Ref<VulkanComputePipeline> vulkanTransmittancePipeline = m_TransmittancePipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> vulkanTransmittanceMaterial = m_TransmittanceDescriptor.As<VulkanMaterial>();
+
+		vulkanTransmittanceMaterial->Bind(cmdBuf, m_TransmittancePipeline);
+		vulkanTransmittancePipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_AtmosphereParams);
+
+		vulkanTransmittancePipeline->Dispatch(cmdBuf, 256 / 8, 64 / 8, 1);
+
+		// Memory barrier
+		Ref<VulkanImage2D> transmittanceLUT = m_TransmittanceLUT.As<VulkanImage2D>();
+		transmittanceLUT->TransitionLayout(cmdBuf, transmittanceLUT->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	}
+
+	void VulkanSceneEnvironment::MultiScatterLUT_Update()
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		// Getting the vulkan multi scatter pipeline
+		Ref<VulkanComputePipeline> vulkanMultiScatterPipeline = m_MultiScatterPipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> vulkanMultiScatterMaterial = m_MultiScatterDescriptor.As<VulkanMaterial>();
+
+		vulkanMultiScatterMaterial->Bind(cmdBuf, m_MultiScatterPipeline);
+		vulkanMultiScatterPipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_AtmosphereParams);
+
+		vulkanMultiScatterPipeline->Dispatch(cmdBuf, 32, 32, 1);
+
+		// Memory barrier
+		Ref<VulkanImage2D> multiScatterLUT = m_MultiScatterLUT.As<VulkanImage2D>();
+		multiScatterLUT->TransitionLayout(cmdBuf, multiScatterLUT->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	}
+
+	void VulkanSceneEnvironment::SkyViewLUT_Update()
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		// Getting the vulkan skyview_builder pipeline
+		Ref<VulkanComputePipeline> vulkanSkyViewPipeline = m_SkyViewPipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> vulkanSkyViewMaterial = m_SkyViewDescriptor.As<VulkanMaterial>();
+
+		vulkanSkyViewMaterial->Bind(cmdBuf, m_SkyViewPipeline);
+		vulkanSkyViewPipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_AtmosphereParams);
+
+		vulkanSkyViewPipeline->Dispatch(cmdBuf, 256 / 8, 128 / 8, 1);
+
+		// Memory barrier
+		Ref<VulkanImage2D> skyViewLUT = m_SkyViewLUT.As<VulkanImage2D>();
+		skyViewLUT->TransitionLayout(cmdBuf, skyViewLUT->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+		skyViewLUT->GenerateMipMaps(cmdBuf, skyViewLUT->GetVulkanImageLayout());
+	}
+
+	void VulkanSceneEnvironment::SkyIrradiance_Update()
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		// Getting the vulkan skyview_builder pipeline
+		Ref<VulkanComputePipeline> vulkanSkyIrradiancePipeline = m_SkyIrradiancePipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> vulkanSkyIrradianceMaterial = m_SkyIrradianceDescriptor.As<VulkanMaterial>();
+
+		vulkanSkyIrradianceMaterial->Bind(cmdBuf, m_SkyIrradiancePipeline);
+		vulkanSkyIrradiancePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_AtmosphereParams);
+
+		vulkanSkyIrradiancePipeline->Dispatch(cmdBuf, 32 / 8, 32 / 8, 6);
+
+		Ref<VulkanImage2D> vulkanIrradianceMap = m_SkyIrradianceMap.As<VulkanImage2D>();
+		vulkanIrradianceMap->TransitionLayout(cmdBuf, vulkanIrradianceMap->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	}
+
+	void VulkanSceneEnvironment::SkyPrefilter_Update()
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		// Getting the vulkan skyview_builder pipeline
+		Ref<VulkanComputePipeline> vulkanSkyPrefilterPipeline = m_SkyPrefilterPipeline.As<VulkanComputePipeline>();
+		Ref<VulkanTextureCubeMap> vulkanPrefilteredMap = m_SkyPrefilterMap.As<VulkanTextureCubeMap>();
+
+		for (uint32_t i = 0; i < 7; i++)
+		{
+			Ref<VulkanMaterial> vulkanSkyPrefilterMaterial = m_SkyPrefilterDescriptor[i].As<VulkanMaterial>();
+
+			// Compute the current mip levels.
+			uint32_t mipWidth = vulkanPrefilteredMap->GetMipWidth(i);
+			uint32_t mipHeight = vulkanPrefilteredMap->GetMipHeight(i);
+
+			uint32_t groupX = static_cast<uint32_t>(glm::ceil(static_cast<float>(mipWidth) / 8.0f));
+			uint32_t groupY = static_cast<uint32_t>(glm::ceil(static_cast<float>(mipHeight) / 8.0f));
+
+			m_AtmosphereParams.Roughness = static_cast<float>(i) / 4.0f;
+			m_AtmosphereParams.NrSamples = 64;
+
+			vulkanSkyPrefilterMaterial->Bind(cmdBuf, m_SkyPrefilterPipeline);
+			vulkanSkyPrefilterPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_AtmosphereParams);
+
+			vulkanSkyPrefilterPipeline->Dispatch(cmdBuf, groupX, groupY, 6);
+
+			vulkanPrefilteredMap->TransitionLayout(cmdBuf, vulkanPrefilteredMap->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		}
+	}
+
+	void VulkanSceneEnvironment::AerialPerspective_Update(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		// Getting the vulkan skyview_builder pipeline
+		Ref<VulkanComputePipeline> vulkanAerialPipeline = m_AP_Pipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> vulkanAerialMaterial = m_AP_Descriptor.As<VulkanMaterial>();
+
+		vulkanAerialMaterial->Bind(cmdBuf, m_AP_Pipeline);
+		vulkanAerialPipeline->BindVulkanPushConstant(cmdBuf, "m_SkyParams", &m_AtmosphereParams);
+
+		glm::mat4 invViewProjMatrix = glm::inverse(renderQueue.m_Camera.GetViewProjection());
+		vulkanAerialMaterial->Set("CameraBlock.ViewMatrix", renderQueue.CameraViewMatrix);
+		vulkanAerialMaterial->Set("CameraBlock.ProjMatrix", renderQueue.CameraProjectionMatrix);
+		vulkanAerialMaterial->Set("CameraBlock.InvViewProjMatrix", invViewProjMatrix);
+		vulkanAerialMaterial->Set("CameraBlock.CamPosition", glm::vec4(renderQueue.CameraPosition, 0.0f));
+		vulkanAerialMaterial->Set("CameraBlock.NearFarPlane", glm::vec4(renderQueue.m_Camera.GetNearClip(), renderQueue.m_Camera.GetFarClip(), 0.0f, 0.0f));
+
+		vulkanAerialPipeline->Dispatch(cmdBuf, 32 / 8, 32 / 8, 32 / 8);
+
+		Ref<VulkanTexture3D> vulkanAerialLUT = m_AerialLUT.As<VulkanTexture3D>();
+		vulkanAerialLUT->TransitionLayout(cmdBuf, vulkanAerialLUT->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	}
+
 	VulkanSceneEnvironment::~VulkanSceneEnvironment()
 	{
 	}
-
-	void VulkanSceneEnvironment::InitShadersAndPipelines()
-	{
-		m_RadianceShader = Renderer::GetShaderLibrary()->Get("EquirectangularToCubeMap");
-		m_IrradianceShader = Renderer::GetShaderLibrary()->Get("EnvironmentIrradiance");
-		m_PrefilteredMap = Renderer::GetShaderLibrary()->Get("EnvironmentMipFilter");
-
-		m_RadianceCompute = ComputePipeline::Create({ m_RadianceShader });
-		m_IrradianceCompute = ComputePipeline::Create({ m_IrradianceShader });
-		m_PrefilteredCompute = ComputePipeline::Create({ m_PrefilteredMap });
-
-
-		m_RadianceShaderDescriptor = Material::Create(m_RadianceShader, "EquirectangularToCubeMap");
-		m_IrradianceShaderDescriptor = Material::Create(m_IrradianceShader, "EnvironmentIrradiance");
-		m_PrefilteredShaderDescriptor = Material::Create(m_PrefilteredMap, "EnvironmentMipFilter");
-	}
-
 }

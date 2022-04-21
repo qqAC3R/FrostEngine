@@ -12,22 +12,25 @@ layout(binding = 1, rgba16f) writeonly uniform imageCube u_IrradianceMap;
 
 layout(push_constant) uniform PushConstant
 {
-	vec4 SunDirection; // sun direction (x, y, z)
-	//vec4 SunIntensity_Size_GroundRadius_AtmoRadius;
+	vec4 RayleighScattering;
+	vec4 RayleighAbsorption;
+	vec4 MieScattering;
+	vec4 MieAbsorption;
 
-	float SunIntensity; //
-	float SunSize; //
-	float GroundRadius; 
-	float AtmosphereRadius; //
+	vec4 OzoneAbsorption;
+	vec4 PlanetAbledo_Radius;
 
-	vec4 ViewPos_SkyIntensity;
+	vec4 SunDirection_Intensity;
+	
+	vec4 ViewPos_SunSize;
+	
+	float AtmosphereRadius;
 
+	// Used for generating the irradiance map
 	float Roughness;
 	int NrSamples;
-	float Unused1;
-	float Unused2;
-	
-} m_PushConstant;
+
+} u_PushConstant;
 
 
 vec3 CubeToWorld(ivec3 cubeCoord, vec2 cubeSize)
@@ -113,10 +116,10 @@ void main()
 	vec2 cubemapSize = vec2(imageSize(u_IrradianceMap).xy);
 	vec3 worldPos = CubeToWorld(ivec3(gl_GlobalInvocationID), cubemapSize);
 
-	vec3 sunPos = normalize(m_PushConstant.SunDirection.xyz);
-	vec3 viewPos = m_PushConstant.ViewPos_SkyIntensity.xyz;
+	vec3 sunPos = normalize(u_PushConstant.SunDirection_Intensity.xyz);
+	vec3 viewPos = u_PushConstant.ViewPos_SunSize.xyz;
 
-	float groundRadius = m_PushConstant.GroundRadius;
+	float groundRadius = u_PushConstant.PlanetAbledo_Radius.w;
 
 	vec3 normal = normalize(worldPos);
 	normal.xyz *= -1.0f;
@@ -130,6 +133,6 @@ void main()
 		irradiance += SampleSkyViewLUT(u_SkyViewLUT, viewPos, sampleDir, sunPos, groundRadius);
 	}
 
-	irradiance = PI * irradiance * (1.0f / float(numSamples)) * m_PushConstant.ViewPos_SkyIntensity.w;
+	irradiance = PI * irradiance * (1.0f / float(numSamples)) * u_PushConstant.SunDirection_Intensity.w;
 	imageStore(u_IrradianceMap, ivec3(gl_GlobalInvocationID), vec4(irradiance, 1.0f));
 }

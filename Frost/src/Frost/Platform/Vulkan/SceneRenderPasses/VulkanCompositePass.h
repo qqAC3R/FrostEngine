@@ -49,10 +49,10 @@ namespace Frost
 			Vector<Ref<BufferDevice>> CullingDataBuffer;
 
 			// Skybox pass
-			Ref<Shader> SkyboxShader;
-			Ref<Pipeline> SkyboxPipeline;
-			Ref<Material> SkyboxDescriptor;
-			Ref<VertexBuffer> SkyBoxVertexBuffer;
+			//Ref<Shader> SkyboxShader;
+			//Ref<Pipeline> SkyboxPipeline;
+			//Ref<Material> SkyboxDescriptor;
+			//Ref<VertexBuffer> SkyBoxVertexBuffer;
 		};
 		InternalData* m_Data;
 

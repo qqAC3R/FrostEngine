@@ -737,6 +737,9 @@ void main()
 
 	vec3 resultingColor = coneTracedColor.xyz * clamp(multipler, 0.0f, 0.9f);
 
+	// Custom made function for the roughness weight
+	float roughnessWeight = exp(-roughness * 0.4f) * (1 - roughness);
+
 	// Store the values
-	imageStore(o_FrameTex, pixelCoord, vec4(vec3(resultingColor), 1.0f));
+	imageStore(o_FrameTex, pixelCoord, vec4(vec3(resultingColor * roughnessWeight), 1.0f));
 }

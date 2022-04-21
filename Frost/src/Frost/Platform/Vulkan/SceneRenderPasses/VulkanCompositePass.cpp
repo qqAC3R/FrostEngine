@@ -13,6 +13,7 @@
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanDynamicSkyPass.h"
+#include "Frost/Platform/Vulkan/VulkanSceneEnvironment.h"
 
 namespace Frost
 {
@@ -34,7 +35,6 @@ namespace Frost
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 
 		m_Data->CompositeShader = Renderer::GetShaderLibrary()->Get("PBRDeffered");
-		m_Data->SkyboxShader = Renderer::GetShaderLibrary()->Get("RenderSkybox");
 		m_Data->LightCullingShader = Renderer::GetShaderLibrary()->Get("TiledLightCulling");
 
 
@@ -59,99 +59,9 @@ namespace Frost
 		};
 		m_Data->RenderPass = RenderPass::Create(renderPassSpec);
 
-
-		{
-
-			// Skybox pipeline/descriptors
-			BufferLayout bufferLayout = {
-				{ "a_Position",      ShaderDataType::Float3 },
-			};
-			Pipeline::CreateInfo pipelineCreateInfo{};
-			pipelineCreateInfo.Shader = m_Data->SkyboxShader;
-			pipelineCreateInfo.RenderPass = m_Data->RenderPass;
-			pipelineCreateInfo.VertexBufferLayout = bufferLayout;
-			pipelineCreateInfo.UseDepthTest = true;
-			pipelineCreateInfo.UseDepthWrite = true;
-			pipelineCreateInfo.Topology = PrimitiveTopology::Triangles;
-			pipelineCreateInfo.DepthCompareOperation = DepthCompare::LessOrEqual;
-			m_Data->SkyboxPipeline = Pipeline::Create(pipelineCreateInfo);
-			m_Data->SkyboxDescriptor = Material::Create(m_Data->SkyboxShader);
-
-			//auto envCubeMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
-			auto envCubeMap = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->SkyPrefilterMap;
-			auto skyViewLut = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->SkyViewLUT;
-			auto transmittanceLut = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->TransmittanceLUT;
-
-			//Ref<VulkanDynamicSkyPass> dynamicSkyPass = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()m_SkyParams;
-			auto hillaireParams = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->m_SkyParams;
-			auto hillaireParams2 = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->m_SkyDiffuseParams;
-
-			m_Data->SkyboxDescriptor->Set("u_EnvTexture", envCubeMap);
-			m_Data->SkyboxDescriptor->Set("u_HillaireLUT", skyViewLut);
-			m_Data->SkyboxDescriptor->Set("u_TransmittanceLUT", transmittanceLut);
-
-			m_Data->SkyboxDescriptor->Set("CameraData.Gamma", 2.2f);
-			m_Data->SkyboxDescriptor->Set("CameraData.Exposure", 0.1f);
-			m_Data->SkyboxDescriptor->Set("CameraData.Lod", 3.0f);
-			m_Data->SkyboxDescriptor->Set("CameraData.SkyMode", 1.0f);
-
-			m_Data->SkyboxDescriptor->Set("CameraData.SunDir",           glm::vec3(hillaireParams.SunDir_AtmRadius));
-			m_Data->SkyboxDescriptor->Set("CameraData.SunIntensity",     hillaireParams2.SunIntensity);
-			m_Data->SkyboxDescriptor->Set("CameraData.SunSize",          hillaireParams2.SunSize);
-			
-			m_Data->SkyboxDescriptor->Set("CameraData.ViewPos",          glm::vec3(hillaireParams2.ViewPos_SkyIntensity));
-			m_Data->SkyboxDescriptor->Set("CameraData.SkyIntensity",     hillaireParams2.ViewPos_SkyIntensity.w);
-			
-			m_Data->SkyboxDescriptor->Set("CameraData.GroundRadius",     hillaireParams.PlanetAbledo_Radius.w);
-			m_Data->SkyboxDescriptor->Set("CameraData.AtmosphereRadius", hillaireParams.SunDir_AtmRadius.w);
-
-
-			// Skybox vertex buffer
-			float vertices[] = {
-					-1.0f, -1.0f, -1.0f,
-					 1.0f,  1.0f, -1.0f,
-					 1.0f, -1.0f, -1.0f,
-					 1.0f,  1.0f, -1.0f,
-					-1.0f, -1.0f, -1.0f,
-					-1.0f,  1.0f, -1.0f,
-					// front face		
-					-1.0f, -1.0f,  1.0f,
-					 1.0f, -1.0f,  1.0f,
-					 1.0f,  1.0f,  1.0f,
-					 1.0f,  1.0f,  1.0f,
-					-1.0f,  1.0f,  1.0f,
-					-1.0f, -1.0f,  1.0f,
-					// left face		
-					-1.0f,  1.0f,  1.0f,
-					-1.0f,  1.0f, -1.0f,
-					-1.0f, -1.0f, -1.0f,
-					-1.0f, -1.0f, -1.0f,
-					-1.0f, -1.0f,  1.0f,
-					-1.0f,  1.0f,  1.0f,
-					// right face		
-					 1.0f,  1.0f,  1.0f,
-					 1.0f, -1.0f, -1.0f,
-					 1.0f,  1.0f, -1.0f,
-					 1.0f, -1.0f, -1.0f,
-					 1.0f,  1.0f,  1.0f,
-					 1.0f, -1.0f,  1.0f,
-					 // bottom face		
-					 -1.0f, -1.0f, -1.0f,
-					  1.0f, -1.0f, -1.0f,
-					  1.0f, -1.0f,  1.0f,
-					  1.0f, -1.0f,  1.0f,
-					 -1.0f, -1.0f,  1.0f,
-					 -1.0f, -1.0f, -1.0f,
-					 // top face			
-					 -1.0f,  1.0f, -1.0f,
-					  1.0f,  1.0f , 1.0f,
-					  1.0f,  1.0f, -1.0f,
-					  1.0f,  1.0f,  1.0f,
-					 -1.0f,  1.0f, -1.0f,
-					 -1.0f,  1.0f,  1.0f,
-			};
-			m_Data->SkyBoxVertexBuffer = VertexBuffer::Create(&vertices, sizeof(vertices));
-		}
+		// Init the scene enviorment maps
+		Ref<VulkanSceneEnvironment> vulkanSceneEnvironment = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>();
+		vulkanSceneEnvironment->InitSkyBoxPipeline(m_Data->RenderPass);
 
 
 		// Point lights
@@ -196,11 +106,12 @@ namespace Frost
 				Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, index);
 				Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
 				Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
+
 				//Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
 				//Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
 				//Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment()->GetIrradianceMap();
-				Ref<TextureCubeMap> prefilteredMap = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->SkyPrefilterMap;
-				Ref<TextureCubeMap> irradianceMap = m_RenderPassPipeline->GetRenderPassData<VulkanDynamicSkyPass>()->SkyIrradianceMap;
+				Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetAtmoshperePrefilterMap();
+				Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetAtmoshpereIrradianceMap();
 
 				Ref<Texture2D> brdfLut = Renderer::GetBRDFLut();
 
@@ -279,7 +190,7 @@ namespace Frost
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		Ref<Framebuffer> framebuffer = m_Data->RenderPass->GetFramebuffer(currentFrameIndex);
 		Ref<VulkanPipeline> vulkanPipeline = m_Data->CompositePipeline.As<VulkanPipeline>();
-		Ref<VulkanPipeline> vulkanSkyboxPipeline = m_Data->SkyboxPipeline.As<VulkanPipeline>();
+		//Ref<VulkanPipeline> vulkanSkyboxPipeline = m_Data->SkyboxPipeline.As<VulkanPipeline>();
 
 		// Updating the push constant data from the renderQueue
 		m_PushConstantData.CameraPosition = glm::vec4(renderQueue.CameraPosition, 1.0f);
@@ -346,22 +257,7 @@ namespace Frost
 		vkCmdDraw(cmdBuf, 3, 1, 0, 0);
 
 
-		// Drawing the skybox
-		m_Data->SkyboxDescriptor->Set("CameraData.Exposure", renderQueue.m_Camera.GetExposure());
-		m_Data->SkyboxDescriptor->Set("CameraData.Lod", renderQueue.m_Camera.GetDOF());
-
-		vulkanSkyboxPipeline->Bind();
-
-		m_Data->SkyboxDescriptor->Bind(m_Data->SkyboxPipeline);
-		m_Data->SkyBoxVertexBuffer->Bind();
-		Vector<glm::mat4> pushConstant(2);
-		pushConstant[0] = renderQueue.m_Camera.GetProjectionMatrix();
-		pushConstant[1] = renderQueue.m_Camera.GetViewMatrix();
-
-		vulkanSkyboxPipeline->BindVulkanPushConstant("u_PushConstant", pushConstant.data());
-
-		vkCmdDraw(cmdBuf, 36, 1, 0, 0);
-
+		Renderer::GetSceneEnvironment()->RenderSkyBox(renderQueue);
 
 		m_Data->RenderPass->Unbind();
 	}

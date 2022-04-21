@@ -109,7 +109,7 @@ namespace Frost
 	{
 		// Init scene render passes
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
-		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanDynamicSkyPass>::Create());
+		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanDynamicSkyPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanPostFXPass>::Create());
@@ -163,6 +163,8 @@ namespace Frost
 			VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 			FROST_VKCHECK(vkBeginCommandBuffer(cmdBuf, &beginInfo));
 
+			// Update the sky
+			Renderer::GetSceneEnvironment()->UpdateAtmosphere(s_RenderQueue[currentFrameIndex]);
 
 			/* Updating all the graphics passes */
 			s_Data->SceneRenderPasses->UpdateRenderPasses(s_RenderQueue[currentFrameIndex]);

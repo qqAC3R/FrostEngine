@@ -7,6 +7,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 
 layout(binding = 0, rgba16f) restrict writeonly uniform image2D u_TransmittanceLUT;
 
+/*
 layout(push_constant) uniform PushConstant
 {
 	vec4 RayleighScattering;
@@ -18,6 +19,29 @@ layout(push_constant) uniform PushConstant
 	vec4 SunDir_AtmRadius; // Sun direction (x, y, z) and atmosphere radius (w).
 	vec4 ViewPos;  // View position (x, y, z). w is unused.
 } m_SkyParams;
+*/
+
+layout(push_constant) uniform PushConstant
+{
+	vec4 RayleighScattering;
+	vec4 RayleighAbsorption;
+	vec4 MieScattering;
+	vec4 MieAbsorption;
+
+	vec4 OzoneAbsorption;
+	vec4 PlanetAbledo_Radius;
+
+	vec4 SunDirection_Intensity;
+	
+	vec4 ViewPos_SunSize;
+	
+	float AtmosphereRadius;
+
+	// Used for generating the irradiance map
+	float Roughness;
+	int NrSamples;
+} m_SkyParams;
+
 
 struct ScatteringParams
 {
@@ -110,7 +134,7 @@ void main()
 	params.OzoneAbsorption = m_SkyParams.OzoneAbsorption;
 
 	float groundRadius = m_SkyParams.PlanetAbledo_Radius.w;
-	float atmosphereRadius = m_SkyParams.SunDir_AtmRadius.w;
+	float atmosphereRadius = m_SkyParams.AtmosphereRadius;
 
 	ivec2 globalInvocation = ivec2(gl_GlobalInvocationID.xy);
 	vec2 size = vec2(imageSize(u_TransmittanceLUT).xy);

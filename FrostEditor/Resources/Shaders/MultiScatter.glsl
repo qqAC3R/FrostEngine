@@ -18,10 +18,20 @@ layout(push_constant) uniform PushConstant
 	vec4 RayleighAbsorption;
 	vec4 MieScattering;
 	vec4 MieAbsorption;
+
 	vec4 OzoneAbsorption;
-	vec4 PlanetAbledo_Radius; // Planet albedo (x, y, z) and radius.
-	vec4 SunDir_AtmRadius; // Sun direction (x, y, z) and atmosphere radius (w).
-	vec4 ViewPos;  // View position (x, y, z). w is unused.
+	vec4 PlanetAbledo_Radius;
+
+	vec4 SunDirection_Intensity;
+	
+	vec4 ViewPos_SunSize;
+	
+	float AtmosphereRadius;
+
+	// Used for generating the irradiance map
+	float Roughness;
+	int NrSamples;
+
 } m_SkyParams;
 
 struct ScatteringParams
@@ -239,9 +249,14 @@ void main()
 	params.MieAbsorption = m_SkyParams.MieAbsorption;
 	params.OzoneAbsorption = m_SkyParams.OzoneAbsorption;
 
+	//float groundRadius = m_SkyParams.PlanetAbledo_Radius.w;
+	//float atmosphereRadius = m_SkyParams.SunDir_AtmRadius.w;
+	//vec3 groundAlbedo = m_SkyParams.PlanetAbledo_Radius.rgb;
+
 	float groundRadius = m_SkyParams.PlanetAbledo_Radius.w;
-	float atmosphereRadius = m_SkyParams.SunDir_AtmRadius.w;
+	float atmosphereRadius = m_SkyParams.AtmosphereRadius;
 	vec3 groundAlbedo = m_SkyParams.PlanetAbledo_Radius.rgb;
+
 
 	vec2 uv = (vec2(globalInvocation) + vec2(0.5f)) * texelSize;
 	float sunCosTheta = 2.0f * uv.x - 1.0f;

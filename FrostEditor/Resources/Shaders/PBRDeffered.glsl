@@ -420,7 +420,7 @@ void main()
     vec3 result = Lo + Ld;
 
 	// Adding up the ibl
-	float IBLIntensity = 0.5f;
+	float IBLIntensity = 1.0f;
 	result += ComputeIBLContriubtion() * IBLIntensity;
 
 	// Calculating the result with the camera exposure

@@ -1,18 +1,10 @@
 #pragma once
 
-//#include <GLFW/glfw3.h>
-
-#include "frostpch.h"
-
 #include "Frost/Events/Event.h"
 #include "Frost/Renderer/GraphicsContext.h"
-//#include "Frost/Events/ApplicationEvent.h"
-//#include "Frost/Events/KeyEvent.h"
-//#include "Frost/Events/MouseEvent.h"
 
 namespace Frost
 {
-
 	struct WindowProps
 	{
 		std::string Title;
@@ -26,7 +18,6 @@ namespace Frost
 		{
 		}
 	};
-
 
 	class Window
 	{
@@ -55,57 +46,4 @@ namespace Frost
 
 		static Window* Create(const WindowProps& props = WindowProps());
 	};
-
-
-	/*
-	class Window
-	{
-	public:
-		Window(uint32_t width, uint32_t height, std::string name);
-		virtual ~Window();
-
-		using EventCallbackFn = std::function<void(Event&)>;
-
-
-		inline uint32_t GetWidth() const{ return m_Data.Width; }
-		inline uint32_t GetHeight() const{ return m_Data.Height; }
-		
-		double GetTime() { return glfwGetTime(); }
-
-		inline GLFWwindow* GetWindow() const { return m_Window; };
-
-		void SetData(uint32_t width, uint32_t height, std::string name);
-		void SetVsync(bool enabled);
-
-		void GetSize(int& width, int& height);
-
-		void SetEventCallback(const EventCallbackFn& callback) { m_Data.EventCallback = callback; }
-
-		void OnUpdate();
-
-		void EnableCursour();
-		void DisableCursour();
-
-	private:
-		void RecreateWindow();
-
-	private:
-		GLFWwindow* m_Window;
-
-		struct WindowData
-		{
-			uint32_t Width;
-			uint32_t Height;
-			std::string Name;
-			EventCallbackFn EventCallback;
-
-			bool VSync = true;
-		};
-
-		WindowData m_Data;
-
-		bool m_IsResized = false;
-
-	};
-	*/
 }

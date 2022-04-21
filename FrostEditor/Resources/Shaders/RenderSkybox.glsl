@@ -2,7 +2,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(location = 0) in vec3 a_Position;
+//layout(location = 0) in vec3 a_Position;
 
 layout(push_constant) uniform Constants
 {
@@ -13,7 +13,7 @@ layout(push_constant) uniform Constants
 layout(location = 0) out vec3 v_FragmentPos;
 
 // Taken from: https://gist.github.com/rikusalminen/9393151
-vec3 createCube(int vertexID)
+vec3 CreateCube(int vertexID)
 {
   int tri = vertexID / 3;
   int idx = vertexID % 3;
@@ -41,7 +41,9 @@ vec3 createCube(int vertexID)
 
 void main()
 {
-	v_FragmentPos = a_Position;
+	//v_FragmentPos = a_Position;
+	vec3 cubeCoords = CreateCube(gl_VertexIndex);
+	v_FragmentPos = cubeCoords;
 
 
 	// Remove the translation from the view matrix
@@ -49,7 +51,7 @@ void main()
 	vkProjectionMatrix[1][1] *= -1;
 
 	mat4 modViewProjection = mat4(mat3(u_PushConstant.ViewMatrix));
-	vec4 clipPosition = vkProjectionMatrix * modViewProjection * vec4(a_Position, 1.0f);
+	vec4 clipPosition = vkProjectionMatrix * modViewProjection * vec4(cubeCoords, 1.0f);
 	
 	gl_Position = clipPosition.xyww;
 }
@@ -215,6 +217,8 @@ void main()
 			// Getting the color from the cubemap	
 			vec3 envColor = textureLod(u_EnvTexture, v_FragmentPos, m_CameraData.Lod).rgb;
 			color = envColor * m_CameraData.Exposure;	
+
+			//color *= 0.5f;
 
 			break;
 		}

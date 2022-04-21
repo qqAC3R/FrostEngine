@@ -17,10 +17,20 @@ layout(push_constant) uniform PushConstant
 	vec4 RayleighAbsorption;
 	vec4 MieScattering;
 	vec4 MieAbsorption;
+
 	vec4 OzoneAbsorption;
-	vec4 PlanetAbledo_Radius; // Planet albedo (x, y, z) and radius.
-	vec4 SunDir_AtmRadius; // Sun direction (x, y, z) and atmosphere radius (w).
-	vec4 ViewPos;  // View position (x, y, z). w is unused.
+	vec4 PlanetAbledo_Radius;
+
+	vec4 SunDirection_Intensity;
+	
+	vec4 ViewPos_SunSize;
+	
+	float AtmosphereRadius;
+
+	// Used for generating the irradiance map
+	float Roughness;
+	int NrSamples;
+
 } m_SkyParams;
 
 struct ScatteringParams
@@ -187,11 +197,10 @@ void main()
 	params.OzoneAbsorption = m_SkyParams.OzoneAbsorption;
 
 	float groundRadius = m_SkyParams.PlanetAbledo_Radius.w;
-	float atmosphereRadius = m_SkyParams.SunDir_AtmRadius.w;
+	float atmosphereRadius = m_SkyParams.AtmosphereRadius;
 
-	
-	vec3 sunDir = normalize(-m_SkyParams.SunDir_AtmRadius.xyz);
-	vec3 viewPos = vec3(m_SkyParams.ViewPos.xyz);
+	vec3 sunDir = normalize(-m_SkyParams.SunDirection_Intensity.xyz);
+	vec3 viewPos = vec3(m_SkyParams.ViewPos_SunSize.xyz);
 
 	ivec2 globalInvocation = ivec2(gl_GlobalInvocationID.xy);
 	vec2 size = vec2(imageSize(u_SkyViewImage).xy);

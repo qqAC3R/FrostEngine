@@ -49,9 +49,9 @@ namespace Frost
 			glm::vec4 MieScattering = glm::vec4(3.996f, 3.996f, 3.996f, 1.2f);
 			glm::vec4 MieAbsorption = glm::vec4(4.4f, 4.4f, 4.4f, 1.2f);
 			glm::vec4 OzoneAbsorption = glm::vec4(0.650f, 1.881f, 0.085f, 0.002f);
-			glm::vec4 PlanetAbledo_Radius = glm::vec4(0.0f, 0.0f, 0.0f, 6.360f); // Planet albedo (x, y, z) and radius.
-			glm::vec4 SunDir_AtmRadius = glm::vec4(SUN_POS, 6.460f);              // Sun direction (x, y, z) and atmosphere radius (w).
-			glm::vec4 ViewPos = glm::vec4(0.0f, 6.360f + 0.0002f, 0.0f, 0.0f);   // View position (x, y, z). w is unused.
+			glm::vec4 PlanetAbledo_Radius = glm::vec4(0.0f, 0.0f, 0.0f, 6.360f);  // Planet albedo (x, y, z) and radius.
+			glm::vec4 SunDir_AtmRadius = glm::vec4(0.45f, -0.5f, -0.65f, 6.460f); // Sun direction (x, y, z) and atmosphere radius (w).
+			glm::vec4 ViewPos = glm::vec4(0.0f, 6.360f + 0.0002f, 0.0f, 0.0f);    // View position (x, y, z). w is unused.
 		};
 
 		struct SkyDiffuseParams
