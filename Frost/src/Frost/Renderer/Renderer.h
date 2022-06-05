@@ -55,6 +55,7 @@ namespace Frost
 		static void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform);
 		static void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform);
 		static void Submit(const PointLightComponent& pointLight, const glm::vec3& position);
+		static void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
 
 		template<typename FuncT>
 		static void Submit(FuncT&& func)
@@ -92,11 +93,15 @@ namespace Frost
 		friend class Application;
 	};
 
+	// Forward declaration
+	class SceneRenderPassPipeline;
+
 	class RendererDebugger
 	{
 	public:
 		virtual ~RendererDebugger() {};
 		
+		virtual void Init(SceneRenderPassPipeline* renderPassPipeline) = 0;
 		virtual void ImGuiRender() = 0;
 
 		static Ref<RendererDebugger> Create();

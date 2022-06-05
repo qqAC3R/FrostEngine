@@ -76,6 +76,10 @@ namespace Frost
 		ImGui::End();
 	}
 
+	void VulkanComputePass::OnRenderDebug()
+	{
+	}
+
 	void VulkanComputePass::OnResize(uint32_t width, uint32_t height)
 	{
 	}

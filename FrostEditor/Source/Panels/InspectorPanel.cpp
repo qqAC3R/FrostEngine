@@ -132,11 +132,10 @@ namespace Frost
 		{
 			UserInterface::DrawVec3CoordsEdit("Translation", component.Translation);
 
-			glm::vec3 rotation = glm::degrees(component.Rotation);
+			glm::vec3 rotation = component.Rotation;
 			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
 			UserInterface::DrawVec3CoordsEdit("Rotation", rotation);
 			
-			component.Rotation = glm::radians(rotation);
 			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
 			UserInterface::DrawVec3CoordsEdit("Scale", component.Scale, 1.0f);
 		});
@@ -222,6 +221,52 @@ namespace Frost
 		});
 
 
+		DrawComponent<DirectionalLightComponent>("Directional Light", entity, [](auto& component)
+		{
+			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+			if (ImGui::BeginTable("DirectionalLightProperties", 2, flags))
+			{
+				{
+					ImGui::PushID(0);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Radiance");
+
+					ImGui::TableNextColumn();
+					UserInterface::DrawVec3ColorEdit("", component.Color);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(1);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Intensity");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Intensity, 0.055f);
+
+					ImGui::PopID();
+				}
+
+
+				{
+					ImGui::PushID(2);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Size");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Size, 0.055f);
+
+					ImGui::PopID();
+				}
+				ImGui::EndTable();
+			}
+			ImGui::PopStyleVar();
+		});
 
 	}
 

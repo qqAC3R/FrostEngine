@@ -98,6 +98,7 @@ namespace Frost
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
 
 		Buffer& GetVertexBufferInstanced_CPU(uint32_t index) { return m_VertexBufferInstanced_CPU[index]; }
+		void UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex);
 
 		uint32_t GetMaterialCount() { return (uint32_t)m_MaterialData.size(); }
 		DataStorage& GetMaterialData(uint32_t materialIndex) { return m_MaterialData[materialIndex]; }

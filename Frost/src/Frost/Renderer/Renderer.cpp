@@ -3,6 +3,7 @@
 
 #include "Frost/Platform/Vulkan/VulkanRenderer.h"
 #include "Frost/Platform/Vulkan/VulkanRendererDebugger.h"
+#include "Frost/Utils/Timer.h"
 
 namespace Frost
 {
@@ -13,7 +14,7 @@ namespace Frost
 		Ref<Texture2D> m_BRDFLut;
 		Ref<Texture2D> m_NoiseLut;
 		Ref<SceneEnvironment> m_Environment;
-		Ref<RendererDebugger> m_RendererDebugger;
+		//Ref<RendererDebugger> m_RendererDebugger;
 	};
 
 	RendererAPI* Renderer::s_RendererAPI = nullptr;
@@ -66,14 +67,12 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SkyViewIrradiance.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SkyViewFilter.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/AerialPerspective.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ApplyAerial.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Voxelization.glsl");
 
 		
 		// Init the pools
 		s_RendererAPI->Init();
-
-		// Environment cubemaps
-		s_Data->m_Environment = SceneEnvironment::Create();
-		s_Data->m_Environment->Load("Resources/EnvironmentMaps/pink_sunrise_4k.hdr");
 
 		// LUTS
 		TextureSpecification textureSpec{};
@@ -89,11 +88,21 @@ namespace Frost
 		textureSpec.Format = ImageFormat::RG32F;
 		s_Data->m_NoiseLut = Texture2D::Create("Resources/LUT/Noise.png", textureSpec);
 
+		// Environment cubemaps
+		s_Data->m_Environment = SceneEnvironment::Create();
+
 		// Init the renderpasses
 		s_RendererAPI->InitRenderPasses();
 
 		// Create the renderer debugger
-		s_Data->m_RendererDebugger = RendererDebugger::Create();
+		//s_Data->m_RendererDebugger = RendererDebugger::Create();
+		//s_Data->m_RendererDebugger->Init();
+
+		s_Data->m_Environment->InitCallbacks();
+		//s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/pink_sunrise_4k.hdr");
+		s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/dikhololo_night_4k.hdr");
+		//s_Data->m_Environment->SetType(SceneEnvironment::Type::Hillaire);
+		//s_Data->m_Environment->SetType(SceneEnvironment::Type::HDRMap);
 	}
 
 	void Renderer::ShutDown()
@@ -118,18 +127,23 @@ namespace Frost
 		s_RendererAPI->Submit(pointLight, position);
 	}
 
+	void Renderer::Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction)
+	{
+		s_RendererAPI->Submit(directionalLight, direction);
+	}
+
 	void Renderer::LoadEnvironmentMap(const std::string& filepath)
 	{
 		// TODO: Add some function for the SceneRenderpasses to update the env texture with the new ones
 		Renderer::Submit([&, filepath]() mutable
 		{
-			s_Data->m_Environment->Load(filepath);
+			s_Data->m_Environment->LoadEnvMap(filepath);
 		});
 	}
 
 	void Renderer::RenderDebugger()
 	{
-		s_Data->m_RendererDebugger->ImGuiRender();
+		s_RendererAPI->RenderDebugger();
 	}
 
 	Ref<ShaderLibrary> Renderer::GetShaderLibrary()

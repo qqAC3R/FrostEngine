@@ -68,28 +68,28 @@ namespace Frost
 		{
 			1600, 900, 3,
 			{
-				// Position Attachment
+				// Position Attachment // Attachment 0
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
-				// Normals Attachment
+				// Normals Attachment // Attachment 1
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
-				// Albedo Attachment
+				// Albedo Attachment // Attachment 2
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
-				// View-space Position Attachment
+				// View-space Position Attachment // Attachment 3
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
@@ -148,8 +148,7 @@ namespace Frost
 		for (auto& indirectCmdBuffer : m_Data->IndirectCmdBuffer)
 		{
 			// Allocating a heap block
-			indirectCmdBuffer.DeviceBuffer = BufferDevice::Create(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes,
-				{ BufferUsage::Storage, BufferUsage::Indirect });
+			indirectCmdBuffer.DeviceBuffer = BufferDevice::Create(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes, { BufferUsage::Storage, BufferUsage::Indirect });
 
 			indirectCmdBuffer.HostBuffer.Allocate(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes);
 		}
@@ -268,11 +267,13 @@ namespace Frost
 			const Vector<Submesh>& submeshes = mesh->GetSubMeshes();
 
 			// Instanced data for submeshes
-			SubmeshInstanced submeshInstanced{};
-			uint32_t vboInstancedDataOffset = 0;
+			//SubmeshInstanced submeshInstanced{};
+			//uint32_t vboInstancedDataOffset = 0;
 
 			// Count how many meshes were submitted (for calculating offsets)
 			uint32_t submittedSubmeshes = 0;
+
+			mesh->UpdateInstancedVertexBuffer(renderQueue.m_Data[i].Transform, viewProjectionMatrix, currentFrameIndex);
 
 			// Set commands for the submeshes
 			for (uint32_t k = 0; k < submeshes.size(); k++)
@@ -280,6 +281,7 @@ namespace Frost
 				const Submesh& submesh = submeshes[k];
 
 				glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
+				//glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform;
 
 
 				// TODO: Fix frustum culling
@@ -305,21 +307,21 @@ namespace Frost
 				m_Data->MeshSpecs.HostBuffer.Write((void*)&meshData, sizeof(MeshData_OC), meshDataOffset);
 
 				// Submit instanced data into a cpu buffer (which will be later sent to the gpu's instanced vbo)
-				submeshInstanced.ModelSpaceMatrix = modelMatrix;
-				submeshInstanced.WorldSpaceMatrix = viewProjectionMatrix * modelMatrix;
-				mesh->GetVertexBufferInstanced_CPU(currentFrameIndex).Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
+				//submeshInstanced.ModelSpaceMatrix = modelMatrix;
+				//submeshInstanced.WorldSpaceMatrix = viewProjectionMatrix * modelMatrix;
+				//mesh->GetVertexBufferInstanced_CPU(currentFrameIndex).Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
 
 
 				// Adding up the offset
 				meshDataOffset     += sizeof(MeshData_OC);
 				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
 				submittedSubmeshes += 1;
-				vboInstancedDataOffset += sizeof(SubmeshInstanced);
+				//vboInstancedDataOffset += sizeof(SubmeshInstanced);
 			}
 
 			// Submit instanced data from a cpu buffer to gpu vertex buffer
-			auto vulkanVBOInstanced = mesh->GetVertexBufferInstanced(currentFrameIndex).As<VulkanBufferDevice>();
-			vulkanVBOInstanced->SetData(vboInstancedDataOffset, mesh->GetVertexBufferInstanced_CPU(currentFrameIndex).Data);
+			//auto vulkanVBOInstanced = mesh->GetVertexBufferInstanced(currentFrameIndex).As<VulkanBufferDevice>();
+			//vulkanVBOInstanced->SetData(vboInstancedDataOffset, mesh->GetVertexBufferInstanced_CPU(currentFrameIndex).Data);
 
 
 			for (uint32_t k = 0; k < mesh->GetMaterialCount(); k++)
@@ -562,6 +564,11 @@ namespace Frost
 #endif
 		// End the renderpass
 		m_Data->RenderPass->Unbind();
+	}
+
+	void VulkanGeometryPass::OnRenderDebug()
+	{
+
 	}
 
 	void VulkanGeometryPass::OcclusionCullUpdate(const RenderQueue& renderQueue, uint64_t indirectCmdsOffset)

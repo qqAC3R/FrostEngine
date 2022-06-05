@@ -144,7 +144,7 @@ namespace Frost
 					ImGui::SetCursorPosY(startPosY + 45);
 
 					float& emission = materialData.Get<float>("EmissionFactor");
-					UserInterface::SliderFloat(" ", emission, 0.0f, 10.0f);
+					UserInterface::DragFloat(" ", emission, 0.1f, 0.0f, 1000.0f);
 				}
 
 				{

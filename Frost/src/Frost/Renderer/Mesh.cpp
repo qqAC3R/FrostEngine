@@ -511,6 +511,32 @@ namespace Frost
 			TraverseNodes(node->mChildren[i], transform, level + 1);
 	}
 
+	void Mesh::UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex)
+	{
+		// Instanced data for submeshes
+		SubmeshInstanced submeshInstanced{};
+		uint32_t vboInstancedDataOffset = 0;
+
+		//for (uint32_t i = 0; i < m_Submeshes.size(); i++)
+		for (auto& submesh : m_Submeshes)
+		{
+			glm::mat4 modelMatrix = transform * submesh.Transform;
+
+			// Submit instanced data into a cpu buffer (which will be later sent to the gpu's instanced vbo)
+			submeshInstanced.ModelSpaceMatrix = modelMatrix;
+			submeshInstanced.WorldSpaceMatrix = viewProjMatrix * modelMatrix;
+
+			m_VertexBufferInstanced_CPU[currentFrameIndex].Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
+
+			vboInstancedDataOffset += sizeof(SubmeshInstanced);
+		}
+
+		// Submit instanced data from a cpu buffer to gpu vertex buffer
+		auto vulkanVBOInstanced = m_VertexBufferInstanced[currentFrameIndex];
+		vulkanVBOInstanced->SetData(vboInstancedDataOffset, m_VertexBufferInstanced_CPU[currentFrameIndex].Data);
+
+	}
+
 	void Mesh::SetNewTexture(uint32_t textureId, Ref<Texture2D> texture)
 	{
 		if (texture->Loaded())

@@ -17,11 +17,16 @@ namespace Frost
 
 	}
 
+	void VulkanRendererDebugger::Init(SceneRenderPassPipeline* renderPassPipeline)
+	{
+		m_SceneRenderPassPipeline = renderPassPipeline;
+	}
+
 	void VulkanRendererDebugger::ImGuiRender()
 	{
 		ImGui::Begin("Renderer Debugger");
 
-
+		m_SceneRenderPassPipeline->UpdateRendererDebugger();
 
 		//bool* lightHeatMap = 
 		//ImGui::Checkbox("Light Heat Map", )

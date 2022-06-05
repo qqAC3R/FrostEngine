@@ -42,6 +42,11 @@ namespace Frost
 					m_SelectedEntity = m_SceneContext->CreateEntity("Point Light");
 					m_SelectedEntity.AddComponent<PointLightComponent>();
 				}
+				if (ImGui::MenuItem("Directional Light"))
+				{
+					m_SelectedEntity = m_SceneContext->CreateEntity("Drectional Light");
+					m_SelectedEntity.AddComponent<DirectionalLightComponent>();
+				}
 				ImGui::EndPopup();
 			}
 

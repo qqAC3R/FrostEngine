@@ -57,6 +57,14 @@ namespace Frost
 		}
 	}
 
+	void SceneRenderPassPipeline::UpdateRendererDebugger()
+	{
+		for (auto& renderPass : m_RenderPasses)
+		{
+			renderPass->OnRenderDebug();
+		}
+	}
+
 	void SceneRenderPassPipeline::InitLateRenderPasses()
 	{
 		for (auto& renderPass : m_RenderPasses)

@@ -21,8 +21,10 @@ namespace Frost
 		ImageFormat imageFormat;
 
 		void* textureData = nullptr;
+
 		if (stbi_is_hdr(filepath.c_str()))
 		{
+			stbi_set_flip_vertically_on_load(false);
 			textureData = (void*)stbi_loadf(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
 			imageFormat = ImageFormat::RGBA32F;
 		}

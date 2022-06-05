@@ -1,12 +1,14 @@
 #include "frostpch.h"
 #include "VulkanPostFXPass.h"
 
+#include "Frost/Core/Application.h"
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/Platform/Vulkan/VulkanRenderer.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
 #include "Frost/Platform/Vulkan/VulkanImage.h"
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
+#include "Frost/Platform/Vulkan/VulkanSceneEnvironment.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanCompositePass.h"
 
@@ -41,17 +43,19 @@ namespace Frost
 		m_Data->AO_Shader = Renderer::GetShaderLibrary()->Get("GroundTruthAO_V2");
 		m_Data->DenoiserShader = Renderer::GetShaderLibrary()->Get("SpatialDenoiser");
 		m_Data->BloomShader = Renderer::GetShaderLibrary()->Get("Bloom");
+		m_Data->ApplyAerialShader = Renderer::GetShaderLibrary()->Get("ApplyAerial");
 		m_Data->ColorCorrectionShader = Renderer::GetShaderLibrary()->Get("ColorCorrection");
 
-		CalculateMipLevels(1600, 900);
-		Bloom_InitData(1600, 900);
-		ColorCorrection_InitData(1600, 900);
-		HZB_InitData(1600, 900);
-		BlurColorBuffer_InitData(1600, 900);
-		Visibility_InitData(1600, 900);
-		AO_InitData(1600, 900);
-		SpatialDenoiser_InitData(1600, 900);
-		SSR_InitData(1600, 900);
+		CalculateMipLevels       (1600, 900);
+		Bloom_InitData           (1600, 900);
+		ApplyAerial_InitData     (1600, 900);
+		ColorCorrection_InitData (1600, 900);
+		HZB_InitData             (1600, 900);
+		BlurColorBuffer_InitData (1600, 900);
+		Visibility_InitData      (1600, 900);
+		AO_InitData              (1600, 900);
+		SpatialDenoiser_InitData (1600, 900);
+		SSR_InitData             (1600, 900);
 	}
 
 	void VulkanPostFXPass::InitLate()
@@ -635,6 +639,55 @@ namespace Frost
 		}
 	}
 
+	void VulkanPostFXPass::ApplyAerial_InitData(uint32_t width, uint32_t height)
+	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		// Pipeline creation
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_Data->ApplyAerialShader;
+		if (!m_Data->ApplyAerialPipeline)
+			m_Data->ApplyAerialPipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+
+		m_Data->ApplyAerialImage.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			ImageSpecification imageSpec{};
+			imageSpec.Width = width;
+			imageSpec.Height = height;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+
+			imageSpec.Format = ImageFormat::RGBA8;
+			imageSpec.Usage = ImageUsage::Storage;
+
+			m_Data->ApplyAerialImage[i] = Image2D::Create(imageSpec);
+		}
+
+		m_Data->ApplyAerialDescriptor.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			if (!m_Data->ApplyAerialDescriptor[i])
+				m_Data->ApplyAerialDescriptor[i] = Material::Create(m_Data->ApplyAerialShader, "ApplyAerialPerspective");
+
+			Ref<VulkanSceneEnvironment> vulkanSceneEnv = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>();
+			Ref<VulkanMaterial> vulkanApplyAerialDescriptor = m_Data->ApplyAerialDescriptor[i].As<VulkanMaterial>();
+
+			Ref<Texture3D> aerialLUT = vulkanSceneEnv->GetAerialPerspectiveLUT();
+			Ref<Image2D> depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetDepthAttachment(i);
+			Ref<Image2D> viewPos = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, i);
+			
+			vulkanApplyAerialDescriptor->Set("u_AerialLUT", aerialLUT);
+			vulkanApplyAerialDescriptor->Set("u_ViewPos", viewPos);
+			vulkanApplyAerialDescriptor->Set("u_DepthBuffer", depthBuffer);
+			vulkanApplyAerialDescriptor->Set("o_Image", m_Data->ApplyAerialImage[i]);
+
+			vulkanApplyAerialDescriptor->UpdateVulkanDescriptorIfNeeded();
+		}
+	}
+
 	void VulkanPostFXPass::ColorCorrection_InitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
@@ -681,6 +734,7 @@ namespace Frost
 			//vulkanColorCorrectionDescriptor->Set("u_SSRTexture", m_Data->SSRTexture[i]);
 			vulkanColorCorrectionDescriptor->Set("o_Texture_ForSSR", m_Data->ColorCorrectionTexture[i]);
 			vulkanColorCorrectionDescriptor->Set("o_Texture_Final", m_Data->FinalTexture[i]);
+			vulkanColorCorrectionDescriptor->Set("o_AerialImage", m_Data->ApplyAerialImage[i]);
 
 			vulkanColorCorrectionDescriptor->UpdateVulkanDescriptorIfNeeded();
 		}
@@ -703,7 +757,27 @@ namespace Frost
 		AO_Update(renderQueue);
 		SpatialDenoiser_Update(renderQueue);
 		SSR_Update(renderQueue);
+		ApplyAerial_Update(renderQueue);
 		ColorCorrection_Update(renderQueue, TARGET_COMPOSITE);
+	}
+
+	void VulkanPostFXPass::OnRenderDebug()
+	{
+		if(ImGui::CollapsingHeader("Ambient Occlusion"))
+		{
+			ImGui::Text("AO Mode (0 - HBAO; 1 - GTAO)");
+			ImGui::SliderInt(" ", &m_AOSettings.AOMode, 0, 1);
+
+			ImGui::Text("AO Texture");
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			Application::Get().GetImGuiLayer()->RenderTexture(m_Data->DenoiserImage[currentFrameIndex], 300, 200);
+		}
+		if (ImGui::CollapsingHeader("Bloom"))
+		{
+			ImGui::DragFloat("Threshold", &m_BloomSettings.Threshold, 0.1f, 0.0f, 1000.0f);
+			ImGui::SliderFloat("Knee", &m_BloomSettings.Knee, 0.1f, 1.0f);
+			ImGui::DragFloat("Intensity", &m_BloomSettings.Intensity, 0.1f, 0.0f, 1000.0f);
+		}
 	}
 
 	void VulkanPostFXPass::BlurColorBuffer_Update(const RenderQueue& renderQueue)
@@ -715,7 +789,7 @@ namespace Frost
 		auto vulkan_BlurPipeline = m_Data->BlurPipeline.As<VulkanComputePipeline>();
 		auto vulkan_BlurColorTexture = m_Data->BlurredColorBuffer[currentFrameIndex].As<VulkanImage2D>();
 
-		glm::vec3 currentRes = glm::vec3(renderQueue.ViewPortWidth, renderQueue.ViewPortHeight, 0);
+		glm::vec4 currentRes = glm::vec4(renderQueue.ViewPortWidth, renderQueue.ViewPortHeight, 0.0f, 0.0f);
 		for (uint32_t mipLevel = 0; mipLevel < m_Data->ScreenMipLevel; mipLevel++)
 		{
 			auto vulkan_BlurDescriptor = m_Data->BlurShaderDescriptor[currentFrameIndex][mipLevel].As<VulkanMaterial>();
@@ -726,6 +800,7 @@ namespace Frost
 				currentRes.y /= 2;
 			}
 			currentRes.z = static_cast<float>(mipLevel);
+			currentRes.w = mipLevel == 0 ? 0.0f : 1.0f;
 
 			vulkan_BlurDescriptor->Bind(cmdBuf, m_Data->BlurPipeline);
 			vulkan_BlurPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &currentRes);
@@ -906,7 +981,7 @@ namespace Frost
 		glm::vec3 AO_Data = glm::vec3(0.0f); // ProjectionScale || ScreenSize
 		int32_t AO_Mode = 1; // 0 = HBAO || 1 = GTAO
 
-	} s_AO_pushConstant;
+	} static s_AO_pushConstant;
 
 	void VulkanPostFXPass::AO_Update(const RenderQueue& renderQueue)
 	{
@@ -928,6 +1003,7 @@ namespace Frost
 
 
 		float projectionScale = (height / (2.0f * tanf(fov * 0.5f)));
+		s_AO_pushConstant.AO_Mode = m_AOSettings.AOMode;
 		s_AO_pushConstant.AO_Data = { projectionScale, width, height };
 		s_AO_pushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 		s_AO_pushConstant.InvProjMatrix = glm::inverse(projMatrix);
@@ -1019,6 +1095,32 @@ namespace Frost
 		vulkan_cc_Pipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
+	void VulkanPostFXPass::ApplyAerial_Update(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		auto vulkanApplyAerialPipeline = m_Data->ApplyAerialPipeline.As<VulkanComputePipeline>();
+		auto vulkanApplyAerialDescriptor = m_Data->ApplyAerialDescriptor[currentFrameIndex].As<VulkanMaterial>();
+
+		vulkanApplyAerialDescriptor->Bind(cmdBuf, m_Data->ApplyAerialPipeline);
+
+		vulkanApplyAerialDescriptor->Set("CameraBlock.ViewMatrix", renderQueue.CameraViewMatrix);
+		vulkanApplyAerialDescriptor->Set("CameraBlock.ProjMatrix", renderQueue.CameraProjectionMatrix);
+		vulkanApplyAerialDescriptor->Set("CameraBlock.InvViewProjMatrix", glm::inverse(renderQueue.m_Camera.GetViewProjection()));
+		vulkanApplyAerialDescriptor->Set("CameraBlock.CamPosition", glm::vec4(renderQueue.CameraPosition, 0.0f));
+		vulkanApplyAerialDescriptor->Set("CameraBlock.NearFarPlane", glm::vec4(renderQueue.m_Camera.GetNearClip(), renderQueue.m_Camera.GetFarClip(), 0.0f, 0.0f));
+
+		float width = renderQueue.ViewPortWidth;
+		float height = renderQueue.ViewPortHeight;
+
+		uint32_t groupX = std::ceil(width / 32.0f);
+		uint32_t groupY = std::ceil(height / 32.0f);
+		vulkanApplyAerialPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+	}
+
 	void VulkanPostFXPass::Bloom_Update(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
@@ -1049,15 +1151,6 @@ namespace Frost
 		
 		bloomComputePushConstants.Params = { m_BloomSettings.Threshold, m_BloomSettings.Threshold - m_BloomSettings.Knee, m_BloomSettings.Knee * 2.0f, 0.25f / m_BloomSettings.Knee };
 #endif
-		struct BloomSettings
-		{
-			bool Enabled = true;
-			float Threshold = 1.0f;
-			float Knee = 0.1f;
-			float UpsampleScale = 1.0f;
-			float Intensity = 1.0f;
-			float DirtIntensity = 1.0f;
-		} m_BloomSettings;
 
 
 
@@ -1410,15 +1503,16 @@ namespace Frost
 
 	void VulkanPostFXPass::OnResize(uint32_t width, uint32_t height)
 	{
-		CalculateMipLevels(width, height);
-		Bloom_InitData(width, height);
-		ColorCorrection_InitData(width, height);
-		BlurColorBuffer_InitData(width, height);
-		HZB_InitData(width, height);
-		Visibility_InitData(width, height);
-		AO_InitData(width, height);
-		SpatialDenoiser_InitData(width, height);
-		SSR_InitData(width, height);
+		CalculateMipLevels       (width, height);
+		Bloom_InitData           (width, height);
+		ApplyAerial_InitData     (width, height);
+		ColorCorrection_InitData (width, height);
+		BlurColorBuffer_InitData (width, height);
+		HZB_InitData             (width, height);
+		Visibility_InitData      (width, height);
+		AO_InitData              (width, height);
+		SpatialDenoiser_InitData (width, height);
+		SSR_InitData             (width, height);
 	}
 
 	void VulkanPostFXPass::OnResizeLate(uint32_t width, uint32_t height)

@@ -62,6 +62,7 @@ namespace Frost
 
 		ImGui::SameLine();
 		ImGui::DragFloat("##Y", &values.y, 0.1f, 0.0f, 0.0f, "%.2f");
+		//bool ImGui::DragFloat(const char* label, float* v, float v_speed, float v_min, float v_max, const char* format, ImGuiSliderFlags flags)
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
 
@@ -137,8 +138,8 @@ namespace Frost
 		ImGui::SliderFloat(name.c_str(), reinterpret_cast<float*>(&value), min, max);
 	}
 
-	void UserInterface::DragFloat(const std::string& name, float& value, float speed)
+	void UserInterface::DragFloat(const std::string& name, float& value, float speed, float minValue, float maxValue)
 	{
-		ImGui::DragFloat(name.c_str(), &value, speed);
+		ImGui::DragFloat(name.c_str(), &value, speed, minValue, maxValue);
 	}
 }

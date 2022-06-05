@@ -10,7 +10,7 @@ namespace Frost
 		static void Text(const std::string& text);
 
 		static void SliderFloat(const std::string& name, float& value, float min, float max);
-		static void DragFloat(const std::string& name, float& value, float speed);
+		static void DragFloat(const std::string& name, float& value, float speed, float minValue = FLT_MIN, float maxValue = FLT_MAX);
 
 		static void DrawVec3ColorEdit(const std::string& name, glm::vec3& values);
 		static void DrawVec4ColorEdit(const std::string& name, glm::vec4& values);

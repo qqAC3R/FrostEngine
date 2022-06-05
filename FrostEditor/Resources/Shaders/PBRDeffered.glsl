@@ -78,6 +78,7 @@ layout(binding = 9) uniform CameraData {
 
 layout(push_constant) uniform PushConstant {
     vec4 CameraPosition; // vec4 - camera position + float pointLightCount + lightCullingWorkgroup.x
+	vec3 DirectionalLightDir;
 	float UseLightHeatMap;
 } u_PushConstant;
 
@@ -389,11 +390,7 @@ void main()
 	m_Surface.F0 = mix(Fdielectric, m_Surface.Albedo.rgb, m_Surface.Metalness);
 
 
-	DirectionalLight dirLight;
-	dirLight.Direction = vec3(0.9f, 0.5f, 0.9f);
-	dirLight.Radiance = vec3(1.0f);
-	dirLight.Multiplier = 0.05f;
-
+	
 	// Calculating all point lights contribution
 	vec3 Lo = vec3(0.0f);
 
@@ -414,13 +411,17 @@ void main()
 
 
 	// Calculating all directional lights contribution
+	DirectionalLight dirLight;
+	dirLight.Direction = u_PushConstant.DirectionalLightDir;
+	dirLight.Radiance = vec3(1.0f);
+	dirLight.Multiplier = 0.05f;
 	vec3 Ld = ComputeDirectionalLightContribution(dirLight);
 
 	// Adding up the point light and directional light contribution
     vec3 result = Lo + Ld;
 
 	// Adding up the ibl
-	float IBLIntensity = 1.0f;
+	float IBLIntensity = 2.0f;
 	result += ComputeIBLContriubtion() * IBLIntensity;
 
 	// Calculating the result with the camera exposure

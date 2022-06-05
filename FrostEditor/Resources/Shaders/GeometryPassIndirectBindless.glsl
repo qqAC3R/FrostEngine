@@ -204,7 +204,7 @@ void main()
 
 	// Albedo color
 	vec3 albedoTextureColor = SampleTexture(albedoTextureID).rgb;
-	o_Albedo = vec4(albedoTextureColor * albedoFactor * (1.0f + emissionFactor), 1.0f);
+	o_Albedo = vec4(albedoTextureColor * albedoFactor + (emissionFactor), 1.0f);
 	
 	// Composite (roughness and metalness)
 	float metalness = metalnessFactor * SampleTexture(metalnessTextureID).r;

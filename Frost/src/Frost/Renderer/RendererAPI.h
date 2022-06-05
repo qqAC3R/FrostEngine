@@ -25,6 +25,7 @@ namespace Frost
 		virtual void Init() = 0;
 		virtual void InitRenderPasses() = 0; // TODO: This is temporary
 		virtual void Render() = 0;
+		virtual void RenderDebugger() = 0;
 		virtual void ShutDown() = 0;
 
 		virtual void BeginFrame() = 0;
@@ -36,6 +37,7 @@ namespace Frost
 		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform) = 0;
 		virtual void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform) = 0;
 		virtual void Submit(const PointLightComponent& pointLight, const glm::vec3& position) = 0;
+		virtual void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction) = 0;
 
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const = 0;
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
@@ -54,7 +56,7 @@ namespace Frost
 
 		void Add(Ref<Mesh> mesh, const glm::mat4& transform);
 		void AddPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
-		//void AddDirectionalLight(Ref<Mesh> mesh, const glm::mat4& transform);
+		void SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
 
 		void Reset();
 		uint32_t GetQueueSize() const { return static_cast<uint32_t>(m_Data.size()); }
@@ -77,6 +79,7 @@ namespace Frost
 			};
 
 			Vector<PointLight> PointLights;
+			DirectionalLightComponent DirectionalLight;
 		};
 		LightData m_LightData;
 

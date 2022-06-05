@@ -18,7 +18,7 @@ namespace Frost
 		glm::vec4 OzoneAbsorption = glm::vec4(0.650f, 1.881f, 0.085f, 0.002f);
 		glm::vec4 PlanetAbledo_Radius = glm::vec4(0.0f, 0.0f, 0.0f, 6.360f);
 
-		glm::vec4 SunDirection_Intensity = glm::vec4(0.45f, -0.5f, -0.65f, 1.0f);
+		glm::vec4 SunDirection_Intensity = glm::vec4(0.45f, -0.5f, -0.65f, 10.0f);
 
 		glm::vec4 ViewPos_SunSize = glm::vec4(0.0f, 6.360f + 0.0002f, 0.0f, 2.0f);    // View position (x, y, z). w is unused.
 
@@ -32,18 +32,25 @@ namespace Frost
 	class SceneEnvironment
 	{
 	public:
+		enum class Type
+		{
+			HDRMap = 0, Hillaire = 1
+		};
+
 		virtual ~SceneEnvironment() {}
 
-		virtual Ref<Texture2D> GetEnvironmentMap() = 0;
-		virtual Ref<TextureCubeMap> GetRadianceMap() = 0;
-		virtual Ref<TextureCubeMap> GetIrradianceMap() = 0;
-		virtual Ref<TextureCubeMap> GetPrefilteredMap() = 0;
+		virtual void InitCallbacks() = 0;
 
 		virtual void RenderSkyBox(const RenderQueue& renderQueue) = 0;
 		virtual void UpdateAtmosphere(const RenderQueue& renderQueue) = 0;
 
-		virtual void Load(const std::string& filepath) = 0;
-		virtual void SetEnvironmentMapCallback(std::function<void()> func) = 0;
+		virtual void LoadEnvMap(const std::string& filepath) = 0;
+		virtual void SetEnvironmentMapCallback(const std::function<void(const Ref<TextureCubeMap>& /*Prefiltered*/, const Ref<TextureCubeMap>& /*Irradiance*/)>& func) = 0;
+
+		virtual void SetType(SceneEnvironment::Type type) = 0;
+
+		virtual glm::vec3 GetSunDirection() = 0;
+		virtual void SetSunDirection(glm::vec3 sunDir) = 0;
 
 		virtual	AtmosphereParams& GetAtmoshpereParams() = 0;
 

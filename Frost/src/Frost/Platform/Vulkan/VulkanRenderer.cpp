@@ -19,12 +19,9 @@
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanCompositePass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanRayTracingPass.h"
-#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanDynamicSkyPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanVoxelizationPass.h"
 
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
-
-#include <imgui.h>
-#include <backends/imgui_impl_vulkan.h>
 
 namespace Frost
 {
@@ -35,6 +32,7 @@ namespace Frost
 		{
 			/* The engine can support multiple renderpasses */
 			Ref<SceneRenderPassPipeline> SceneRenderPasses;
+			Ref<RendererDebugger> s_RendererDebugger;
 
 			/* Camera related */
 			glm::mat4 ProjectionMatrix;
@@ -107,17 +105,21 @@ namespace Frost
 
 	void VulkanRenderer::InitRenderPasses()
 	{
-		// Init scene render passes
+		/// Init scene render passes
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
-		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanDynamicSkyPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanVoxelizationPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanPostFXPass>::Create());
 		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputePass>::Create());
 		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
 
-		// Late init for scene render passes
+		/// Late init for scene render passes
 		s_Data->SceneRenderPasses->InitLateRenderPasses();
+
+		/// Create the renderer debugger
+		s_Data->s_RendererDebugger = RendererDebugger::Create();
+		s_Data->s_RendererDebugger->Init(s_Data->SceneRenderPasses.Raw());
 	}
 
 	void VulkanRenderer::BeginFrame()
@@ -163,7 +165,7 @@ namespace Frost
 			VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 			FROST_VKCHECK(vkBeginCommandBuffer(cmdBuf, &beginInfo));
 
-			// Update the sky
+			/* Update the sky */
 			Renderer::GetSceneEnvironment()->UpdateAtmosphere(s_RenderQueue[currentFrameIndex]);
 
 			/* Updating all the graphics passes */
@@ -237,6 +239,15 @@ namespace Frost
 		});
 	}
 
+	void VulkanRenderer::Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, directionalLight, direction, currentFrameIndex]()
+		{
+			s_RenderQueue[currentFrameIndex].SetDirectionalLight(directionalLight, direction);
+		});
+	}
+
 	void VulkanRenderer::Resize(uint32_t width, uint32_t height)
 	{
 		Renderer::Submit([width, height]()
@@ -270,6 +281,11 @@ namespace Frost
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VulkanContext::GetSwapChain()->Present(s_Data->FinishedSemapore[currentFrameIndex], s_ImageIndex);
+	}
+
+	void VulkanRenderer::RenderDebugger()
+	{
+		s_Data->s_RendererDebugger->ImGuiRender();
 	}
 
 	Ref<Image2D> VulkanRenderer::GetFinalImage(uint32_t id) const

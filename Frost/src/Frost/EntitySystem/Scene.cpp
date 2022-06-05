@@ -35,8 +35,18 @@ namespace Frost
 				auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
 				Renderer::Submit(pointLight, transformComponent.Translation);
 			}
+
 		}
 
+		{
+			// Directional light
+			auto group = m_Registry.group<DirectionalLightComponent>(entt::get<TransformComponent>);
+			for (auto& entity : group)
+			{
+				auto [directionalLight, transformComponent] = group.get<DirectionalLightComponent, TransformComponent>(entity);
+				Renderer::Submit(directionalLight, transformComponent.GetTransform()[2]);
+			}
+		}
 	}
 
 	Entity Scene::CreateEntity(const std::string name)

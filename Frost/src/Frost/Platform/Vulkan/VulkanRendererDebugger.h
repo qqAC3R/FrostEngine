@@ -10,9 +10,10 @@ namespace Frost
 		VulkanRendererDebugger();
 		virtual ~VulkanRendererDebugger();
 
+		virtual void Init(SceneRenderPassPipeline* renderPassPipeline) override;
 		virtual void ImGuiRender() override;
 
 	private:
-
+		SceneRenderPassPipeline* m_SceneRenderPassPipeline;
 	};
 }

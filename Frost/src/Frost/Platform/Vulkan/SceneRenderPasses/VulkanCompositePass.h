@@ -14,7 +14,8 @@ namespace Frost
 
 		virtual void Init(SceneRenderPassPipeline* renderPassPipeline) override;
 		virtual void InitLate() override;
-		virtual void OnUpdate(const RenderQueue& renderQueue);
+		virtual void OnUpdate(const RenderQueue& renderQueue) override;
+		virtual void OnRenderDebug() override;
 		virtual void OnResize(uint32_t width, uint32_t height) override;
 		virtual void OnResizeLate(uint32_t width, uint32_t height) override;
 		virtual void ShutDown() override;
@@ -26,6 +27,8 @@ namespace Frost
 		void TiledLightCulling_DataInit();
 		void TiledLightCulling_OnUpdate(const RenderQueue& renderQueue);
 		void LightBufferBlur_OnUpdate(const RenderQueue& renderQueue);
+
+		void OnEnvMapChangeCallback(const Ref<TextureCubeMap>& prefiltered, const Ref<TextureCubeMap>& irradiance);
 	private:
 		std::string m_Name;
 		SceneRenderPassPipeline* m_RenderPassPipeline;
@@ -60,6 +63,7 @@ namespace Frost
 		struct PushConstantData
 		{
 			glm::vec4 CameraPosition;
+			glm::vec3 DirectionalLightDir;
 			float UseLightHeatMap = 0.0f;
 		};
 		PushConstantData m_PushConstantData;

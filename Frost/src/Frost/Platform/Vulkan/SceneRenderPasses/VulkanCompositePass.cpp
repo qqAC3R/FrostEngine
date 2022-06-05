@@ -12,8 +12,9 @@
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
-#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanDynamicSkyPass.h"
 #include "Frost/Platform/Vulkan/VulkanSceneEnvironment.h"
+
+#include <imgui.h>
 
 namespace Frost
 {
@@ -110,8 +111,9 @@ namespace Frost
 				//Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
 				//Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
 				//Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment()->GetIrradianceMap();
-				Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetAtmoshperePrefilterMap();
-				Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetAtmoshpereIrradianceMap();
+				
+				//Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetAtmoshperePrefilterMap();
+				//Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetAtmoshpereIrradianceMap();
 
 				Ref<Texture2D> brdfLut = Renderer::GetBRDFLut();
 
@@ -122,8 +124,8 @@ namespace Frost
 				descriptor->Set("u_AlbedoTexture", albedoTexture);
 				//descriptor->Set("u_CompositeTexture", compositeTexture);
 
-				descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
-				descriptor->Set("u_IrradianceMap", irradianceMap);
+				//descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
+				//descriptor->Set("u_IrradianceMap", irradianceMap);
 				descriptor->Set("u_BRDFLut", brdfLut);
 				
 				descriptor->Set("u_LightData", m_Data->PointLightBufferData[index].DeviceBuffer);
@@ -135,7 +137,17 @@ namespace Frost
 			}
 		}
 
+		Renderer::GetSceneEnvironment()->SetEnvironmentMapCallback(std::bind(&VulkanCompositePass::OnEnvMapChangeCallback, this, std::placeholders::_1, std::placeholders::_2));
+	}
 
+	void VulkanCompositePass::OnEnvMapChangeCallback(const Ref<TextureCubeMap>& prefiltered, const Ref<TextureCubeMap>& irradiance)
+	{
+		for (auto& descriptor : m_Data->Descriptor)
+		{
+			descriptor->Set("u_RadianceFilteredMap", prefiltered);
+			descriptor->Set("u_IrradianceMap", irradiance);
+			descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
+		}
 	}
 
 	void VulkanCompositePass::InitLate()
@@ -194,6 +206,7 @@ namespace Frost
 
 		// Updating the push constant data from the renderQueue
 		m_PushConstantData.CameraPosition = glm::vec4(renderQueue.CameraPosition, 1.0f);
+		m_PushConstantData.DirectionalLightDir = renderQueue.m_LightData.DirectionalLight.Direction;
 
 		{
 			auto vulkanDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
@@ -260,6 +273,14 @@ namespace Frost
 		Renderer::GetSceneEnvironment()->RenderSkyBox(renderQueue);
 
 		m_Data->RenderPass->Unbind();
+	}
+
+	void VulkanCompositePass::OnRenderDebug()
+	{
+		if (ImGui::CollapsingHeader("Deffered Tiled Pipeline"))
+		{
+			ImGui::SliderFloat("Light's HeatMap", &m_PushConstantData.UseLightHeatMap, 0.0f, 1.0f, nullptr, 1.0f);
+		}
 	}
 
 	void VulkanCompositePass::TiledLightCulling_OnUpdate(const RenderQueue& renderQueue)

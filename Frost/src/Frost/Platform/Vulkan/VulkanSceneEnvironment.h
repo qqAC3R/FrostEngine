@@ -15,12 +15,19 @@ namespace Frost
 		VulkanSceneEnvironment();
 		virtual ~VulkanSceneEnvironment();
 
-		virtual void Load(const std::string& filepath) override;
+		virtual void InitCallbacks() override;
 
-		virtual Ref<Texture2D> GetEnvironmentMap() override { return m_EnvironmentMap; }
-		virtual Ref<TextureCubeMap> GetRadianceMap() override { return m_RadianceMap; }
-		virtual Ref<TextureCubeMap> GetIrradianceMap() override { return m_IrradianceMap; }
-		virtual Ref<TextureCubeMap> GetPrefilteredMap() override { return m_PrefilteredMap; }
+		virtual void LoadEnvMap(const std::string& filepath) override;
+
+		Ref<Texture2D> GetEnvironmentMap() { return m_EnvironmentMap; }
+		Ref<TextureCubeMap> GetRadianceMap() { return m_RadianceMap; }
+		Ref<TextureCubeMap> GetIrradianceMap() { return m_IrradianceMap; }
+		Ref<TextureCubeMap> GetPrefilteredMap() { return m_PrefilteredMap; }
+
+		virtual void SetType(SceneEnvironment::Type type) override;
+		
+		virtual glm::vec3 GetSunDirection() override { return m_SunDir; }
+		virtual void SetSunDirection(glm::vec3 sunDir) override { m_SunDir = sunDir; }
 
 		Ref<Image2D> GetTransmittanceLUT() const { return m_TransmittanceLUT; }
 		Ref<Image2D> GetMultiScatterLUT() const { return m_MultiScatterLUT; }
@@ -32,13 +39,16 @@ namespace Frost
 		virtual void RenderSkyBox(const RenderQueue& renderQueue) override;
 		virtual void UpdateAtmosphere(const RenderQueue& renderQueue) override;
 
-		virtual void SetEnvironmentMapCallback(std::function<void()> func) override;
+		virtual void SetEnvironmentMapCallback(const std::function<void(const Ref<TextureCubeMap>&, const Ref<TextureCubeMap>&)>& func) override;
 		virtual AtmosphereParams& GetAtmoshpereParams() override { return m_AtmosphereParams; }
 
 		/* This should be called by the composite pass, because we are rendering on the PBR renderpass */
 		void InitSkyBoxPipeline(Ref<RenderPass> renderPass);
 	private:
-		void InitHDRMaps_ShadersAndPipeline();
+		void HDRMaps_Init();
+		void RadianceMapCompute();
+		void PrefilteredMapCompute();
+		void IrradianceMapCompute();
 
 		void TransmittanceLUT_InitData();
 		void TransmittanceLUT_Update();
@@ -64,6 +74,9 @@ namespace Frost
 		Ref<TextureCubeMap> m_PrefilteredMap;
 
 		std::string m_Filepath;
+		SceneEnvironment::Type m_Type;
+		std::vector<std::function<void(const Ref<TextureCubeMap>&, const Ref<TextureCubeMap>&)>> m_EnvMapChangeCallback;
+		glm::vec3 m_SunDir;
 
 		Ref<Shader> m_RadianceShader;
 		Ref<Shader> m_IrradianceShader;

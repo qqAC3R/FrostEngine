@@ -11,6 +11,7 @@ namespace Frost
 		virtual void Init() override;
 		virtual void InitRenderPasses() override;
 		virtual void Render() override;
+		virtual void RenderDebugger() override;
 		virtual void ShutDown() override;
 
 		virtual void BeginFrame() override;
@@ -22,6 +23,7 @@ namespace Frost
 		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform) override;
 		virtual void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform) override;
 		virtual void Submit(const PointLightComponent& pointLight, const glm::vec3& position) override;
+		virtual void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction) override;
 
 		virtual void Resize(uint32_t width, uint32_t height) override;
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const override;

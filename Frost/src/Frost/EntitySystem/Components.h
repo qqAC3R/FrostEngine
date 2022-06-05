@@ -76,4 +76,18 @@ namespace Frost
 		float Radius = 3.0f;
 		float Falloff = 0.0f;
 	};
+
+	struct DirectionalLightComponent
+	{
+		DirectionalLightComponent() = default;
+		DirectionalLightComponent(glm::vec3 direction)
+			: Direction(direction)
+		{
+		}
+
+		glm::vec3 Direction = { 1.0f, 1.0f, 1.0f };
+		glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
+		float Intensity = 10.0f;
+		float Size = 2.0f;
+	};
 }

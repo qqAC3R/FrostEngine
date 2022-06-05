@@ -73,6 +73,11 @@ namespace Frost
 				auto& sponzaEntity = m_EditorScene->CreateEntity("Plane");
 				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
 				meshComponent.Mesh = Mesh::Load("Resources/Meshes/Plane.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
+
+				//meshComponent.Mesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
+				//
+				//auto& transformComponent = sponzaEntity.GetComponent<TransformComponent>();
+				//transformComponent.Scale = { 2.0f, 2.0f, 2.0f };
 			}
 
 
@@ -205,6 +210,7 @@ namespace Frost
 							m_EditorCamera.GetPosition()) * glm::toMat4(m_EditorCamera.GetOrientation())
 						);
 
+
 						// Entity
 						TransformComponent& tc = selectedEntity.GetComponent<TransformComponent>();
 						glm::mat4 transform = tc.GetTransform();
@@ -235,8 +241,8 @@ namespace Frost
 							Math::DecomposeTransform(transform, translation, rotation, scale);
 
 							glm::vec3 deltaRotation = glm::degrees(rotation) - tc.Rotation;
-							tc.Rotation += deltaRotation;
 							tc.Translation = translation;
+							tc.Rotation += deltaRotation;
 							tc.Scale = scale;
 						}
 
@@ -248,7 +254,15 @@ namespace Frost
 			
 			ImGui::Begin("Settings");
 			//UserInterface::CheckMark("Camera Properties");
-			//ImGui::Checkbox("Use raytracing", &m_UseRT);
+			if (ImGui::Checkbox("UseHillaire", &m_UseHillaire))
+			{
+				if (m_UseHillaire)
+					Renderer::GetSceneEnvironment()->SetType(SceneEnvironment::Type::Hillaire);
+				else
+				{
+					Renderer::GetSceneEnvironment()->SetType(SceneEnvironment::Type::HDRMap);
+				}
+			}
 			//ImGui::Separator();
 			UserInterface::Text("Camera Properties");
 			UserInterface::SliderFloat("Exposure", m_EditorCamera.GetExposure(), 0.0f, 10.0f);
@@ -301,6 +315,7 @@ namespace Frost
 		int m_GuizmoMode = -1;
 
 		bool m_UseRT = false;
+		bool m_UseHillaire = true;
 
 		Ref<Scene> m_EditorScene;
 		Ref<SceneHierarchyPanel> m_SceneHierarchyPanel;

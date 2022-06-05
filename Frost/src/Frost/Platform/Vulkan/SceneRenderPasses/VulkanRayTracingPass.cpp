@@ -264,6 +264,10 @@ namespace Frost
 		bufferGeometrySubmeshCount.Initialize();
 	}
 
+	void VulkanRayTracingPass::OnRenderDebug()
+	{
+	}
+
 	void VulkanRayTracingPass::OnResize(uint32_t width, uint32_t height)
 	{
 		ImageSpecification imageSpec{};

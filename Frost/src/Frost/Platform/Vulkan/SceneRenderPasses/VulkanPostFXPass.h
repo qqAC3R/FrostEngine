@@ -12,7 +12,8 @@ namespace Frost
 
 		virtual void Init(SceneRenderPassPipeline* renderPassPipeline) override;
 		virtual void InitLate() override;
-		virtual void OnUpdate(const RenderQueue& renderQueue);
+		virtual void OnUpdate(const RenderQueue& renderQueue) override;
+		virtual void OnRenderDebug() override;
 		virtual void OnResize(uint32_t width, uint32_t height) override;
 		virtual void OnResizeLate(uint32_t width, uint32_t height) override;
 		virtual void ShutDown() override;
@@ -42,6 +43,9 @@ namespace Frost
 
 		void Bloom_InitData(uint32_t width, uint32_t height);
 		void Bloom_Update(const RenderQueue& renderQueue);
+
+		void ApplyAerial_InitData(uint32_t width, uint32_t height);
+		void ApplyAerial_Update(const RenderQueue& renderQueue);
 
 		void ColorCorrection_InitData(uint32_t width, uint32_t height);
 		void ColorCorrection_Update(const RenderQueue& renderQueue, uint32_t target);
@@ -99,6 +103,12 @@ namespace Frost
 			Vector<Ref<Image2D>> Bloom_DownsampledTexture;
 			Vector<Ref<Image2D>> Bloom_UpsampledTexture;
 
+			// Apply Aerial Perspective + Exponential fog
+			Ref<Shader> ApplyAerialShader;
+			Ref<ComputePipeline> ApplyAerialPipeline;
+			Vector<Ref<Material>> ApplyAerialDescriptor;
+			Vector<Ref<Image2D>> ApplyAerialImage;
+
 			// Color correction
 			Ref<Shader> ColorCorrectionShader;
 			Ref<ComputePipeline> ColorCorrectionPipeline;
@@ -109,6 +119,22 @@ namespace Frost
 
 		InternalData* m_Data;
 		std::string m_Name;
+
+
+		struct BloomSettings
+		{
+			bool Enabled = true;
+			float Threshold = 1.0f;
+			float Knee = 0.1f;
+			float UpsampleScale = 1.0f;
+			float Intensity = 1.0f;
+			float DirtIntensity = 1.0f;
+		} m_BloomSettings;
+
+		struct AmbientOcclussionSettings
+		{
+			int32_t AOMode = 1; // 0 = HBAO || 1 = GTAO
+		} m_AOSettings;
 
 		friend class SceneRenderPassPipeline;
 	};

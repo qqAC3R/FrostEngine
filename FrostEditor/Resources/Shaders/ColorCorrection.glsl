@@ -9,6 +9,7 @@ layout(binding = 2) uniform sampler2D u_SSRTexture;
 layout(binding = 3) uniform sampler2D u_AOTexture;
 layout(binding = 4, rgba8) uniform writeonly image2D o_Texture_ForSSR;
 layout(binding = 5, rgba8) uniform writeonly image2D o_Texture_Final;
+layout(binding = 6) uniform sampler2D o_AerialImage;
 
 #define TONE_MAP_FRAME          0
 #define TONE_MAP_FRAME_WITH_SSR 1
@@ -54,12 +55,6 @@ void main()
 
 		color += bloomFactor;
 
-		// Tonemapping (ACES algorithm)
-		//color = AcesApprox(color);
-
-		// Gamma correction
-		//color = pow(color, vec3(1.0f / u_PushConstant.Gamma));
-
 		imageStore(o_Texture_ForSSR, loc, vec4(color, 1.0f));
 	}
 	else if(u_PushConstant.Stage == TONE_MAP_FRAME_WITH_SSR)
@@ -80,6 +75,7 @@ void main()
 		vec3 ao_contribution = AO_MultiBounce(ao, color);
 		color = color * ao_contribution;
 
+		color += texelFetch(o_AerialImage, loc, 0).rgb;
 
 		// Tonemapping (ACES algorithm)
 		color = AcesApprox(color);

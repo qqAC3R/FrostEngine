@@ -13,8 +13,10 @@ namespace Frost
 {
 
 	VulkanSceneEnvironment::VulkanSceneEnvironment()
+		: m_Type(SceneEnvironment::Type::Hillaire)
 	{
-		InitHDRMaps_ShadersAndPipeline();
+		HDRMaps_Init();
+		LoadEnvMap("");
 
 		TransmittanceLUT_InitData();
 		MultiScatterLUT_InitData();
@@ -28,8 +30,6 @@ namespace Frost
 
 	void VulkanSceneEnvironment::InitSkyBoxPipeline(Ref<RenderPass> renderPass)
 	{
-		m_SkyboxShader = Renderer::GetShaderLibrary()->Get("RenderSkybox");
-
 		// Skybox pipeline/descriptors
 		BufferLayout bufferLayout = {};
 		Pipeline::CreateInfo pipelineCreateInfo{};
@@ -41,9 +41,8 @@ namespace Frost
 		pipelineCreateInfo.Topology = PrimitiveTopology::Triangles;
 		pipelineCreateInfo.DepthCompareOperation = DepthCompare::LessOrEqual;
 		m_SkyboxPipeline = Pipeline::Create(pipelineCreateInfo);
-		m_SkyboxDescriptor = Material::Create(m_SkyboxShader);
-
-		auto envCubeMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
+		
+		auto envCubeMap = m_PrefilteredMap;
 		auto skyViewLut = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetSkyViewLUT();
 		auto transmittanceLut = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetTransmittanceLUT();
 
@@ -54,7 +53,7 @@ namespace Frost
 		m_SkyboxDescriptor->Set("CameraData.Gamma", 2.2f);
 		m_SkyboxDescriptor->Set("CameraData.Exposure", 0.1f);
 		m_SkyboxDescriptor->Set("CameraData.Lod", 3.0f);
-		m_SkyboxDescriptor->Set("CameraData.SkyMode", 1.0f);
+		m_SkyboxDescriptor->Set("CameraData.SkyMode", (float)m_Type);
 
 		AtmosphereParams& atmosphereParams = m_AtmosphereParams;
 
@@ -67,10 +66,13 @@ namespace Frost
 
 		m_SkyboxDescriptor->Set("CameraData.GroundRadius", atmosphereParams.PlanetAbledo_Radius.w);
 		m_SkyboxDescriptor->Set("CameraData.AtmosphereRadius", atmosphereParams.AtmosphereRadius);
+
+		m_SkyboxDescriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 	}
 
-	void VulkanSceneEnvironment::InitHDRMaps_ShadersAndPipeline()
+	void VulkanSceneEnvironment::HDRMaps_Init()
 	{
+		// Shaders
 		m_RadianceShader = Renderer::GetShaderLibrary()->Get("EquirectangularToCubeMap");
 		m_IrradianceShader = Renderer::GetShaderLibrary()->Get("EnvironmentIrradiance");
 		m_PrefilteredMap = Renderer::GetShaderLibrary()->Get("EnvironmentMipFilter");
@@ -83,174 +85,226 @@ namespace Frost
 		m_AP_Shader = Renderer::GetShaderLibrary()->Get("AerialPerspective");
 
 
+		// Pipelines
 		m_RadianceCompute = ComputePipeline::Create({ m_RadianceShader });
 		m_IrradianceCompute = ComputePipeline::Create({ m_IrradianceShader });
 		m_PrefilteredCompute = ComputePipeline::Create({ m_PrefilteredMap });
 
-
+		// Descriptors
 		m_RadianceShaderDescriptor = Material::Create(m_RadianceShader, "EquirectangularToCubeMap");
 		m_IrradianceShaderDescriptor = Material::Create(m_IrradianceShader, "EnvironmentIrradiance");
 		m_PrefilteredShaderDescriptor = Material::Create(m_PrefilteredMap, "EnvironmentMipFilter");
+
+		// Skybox renderer
+		m_SkyboxShader = Renderer::GetShaderLibrary()->Get("RenderSkybox");
+		m_SkyboxDescriptor = Material::Create(m_SkyboxShader);
 	}
 
-	void VulkanSceneEnvironment::Load(const std::string& filepath)
+	void VulkanSceneEnvironment::RadianceMapCompute()
 	{
-		// Creating the equirectangular map
-		TextureSpecification textureSpec{};
-		textureSpec.Usage = ImageUsage::Storage;
-		m_EnvironmentMap = Texture2D::Create(filepath, textureSpec);
-
 		// --------------------------------- RADIANCE MAP --------------------------------
+		uint32_t envCubeMapSize = Renderer::GetRendererConfig().EnvironmentMapResolution;
+
+		// Creating the radiance cube map
+		ImageSpecification imageSpec{};
+		imageSpec.Format = ImageFormat::RGBA16F;
+		imageSpec.Usage = ImageUsage::Storage;
+		imageSpec.Width = envCubeMapSize;
+		imageSpec.Height = envCubeMapSize;
+		//imageSpec.Mips = UINT32_MAX;
+		m_RadianceMap = TextureCubeMap::Create(imageSpec);
+
+		// Recording a cmdbuf for the compute shader
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Compute, true);
+
+		// Setting up the textures
+		auto vulkanMaterial = m_RadianceShaderDescriptor.As<VulkanMaterial>();
+		vulkanMaterial->Set("u_EquirectangularTex", m_EnvironmentMap);
+		vulkanMaterial->Set("o_CubeMap", m_RadianceMap);
+
+		vulkanMaterial->Bind(cmdBuf, m_RadianceCompute);
+
+		// Disptaching the compute shader
+		auto vulkanComputePipeline = m_RadianceCompute.As<VulkanComputePipeline>();
+		vulkanComputePipeline->Dispatch(cmdBuf, envCubeMapSize / 32, envCubeMapSize / 32, 6);
+
+		// Wait till the compute shader will finish
+		auto vulkanRadianceMap = m_RadianceMap.As<VulkanTextureCubeMap>();
+		vulkanRadianceMap->TransitionLayout(cmdBuf, vulkanRadianceMap->GetVulkanImageLayout(),
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT
+		);
+
+		// Generating the mip maps for the environment map (this is mostly for debugging)
+		vulkanRadianceMap->GenerateMipMaps(cmdBuf, vulkanRadianceMap->GetVulkanImageLayout());
+
+		// Flush the compute command buffer
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
+	}
+
+	void VulkanSceneEnvironment::PrefilteredMapCompute()
+	{
+		// --------------------------------- PREFILTERED MAP --------------------------------
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		uint32_t prefilteredCubeMapSize = Renderer::GetRendererConfig().EnvironmentMapResolution;
+
+		// Creating the prefiltered cube map
+		ImageSpecification imageSpec{};
+		imageSpec.Format = ImageFormat::RGBA16F;
+		imageSpec.Usage = ImageUsage::Storage;
+		imageSpec.Width = prefilteredCubeMapSize;
+		imageSpec.Height = prefilteredCubeMapSize;
+		m_PrefilteredMap = TextureCubeMap::Create(imageSpec);
+
+		const float deltaRoughness = 1.0f / glm::max((float)m_PrefilteredMap->GetMipChainLevels() - 1.0f, 1.0f);
+
+		// Setting up the textures
+		auto vulkanMaterial = m_PrefilteredShaderDescriptor.As<VulkanMaterial>();
+		vulkanMaterial->Set("u_RadianceMap", m_RadianceMap);
+
+		// Getting the vulkan compute pipeline
+		auto vulkanComputePipeline = m_PrefilteredCompute.As<VulkanComputePipeline>();
+
+		// Get the shader location of the prefiltered map
+		VulkanMaterial::ShaderLocation shaderLocation = vulkanMaterial->GetShaderLocationFromString("o_PrefilteredMap");
+		VkDescriptorSet descriptorSet = vulkanMaterial->GetVulkanDescriptorSet(0);
+		auto prefilteredMap = m_PrefilteredMap.As<VulkanTextureCubeMap>();
+
+		for (uint32_t i = 0; i < m_PrefilteredMap->GetMipChainLevels(); i++)
 		{
-			uint32_t envCubeMapSize = Renderer::GetRendererConfig().EnvironmentMapResolution;
-
-			// Creating the radiance cube map
-			ImageSpecification imageSpec{};
-			imageSpec.Format = ImageFormat::RGBA16F;
-			imageSpec.Usage = ImageUsage::Storage;
-			imageSpec.Width = envCubeMapSize;
-			imageSpec.Height = envCubeMapSize;
-			//imageSpec.Mips = UINT32_MAX;
-			m_RadianceMap = TextureCubeMap::Create(imageSpec);
-
 			// Recording a cmdbuf for the compute shader
 			VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Compute, true);
 
-			// Setting up the textures
-			auto vulkanMaterial = m_RadianceShaderDescriptor.As<VulkanMaterial>();
-			vulkanMaterial->Set("u_EquirectangularTex", m_EnvironmentMap);
-			vulkanMaterial->Set("o_CubeMap", m_RadianceMap);
+			// Setting up the texture (for every mip)
+			VkDescriptorImageInfo imageDescriptorInfo{};
+			imageDescriptorInfo.imageLayout = prefilteredMap->GetVulkanImageLayout();
+			imageDescriptorInfo.imageView = prefilteredMap->GetVulkanImageViewMip(i);
+			imageDescriptorInfo.sampler = nullptr;
 
-			vulkanMaterial->Bind(cmdBuf, m_RadianceCompute);
-
-			// Disptaching the compute shader
-			auto vulkanComputePipeline = m_RadianceCompute.As<VulkanComputePipeline>();
-			vulkanComputePipeline->Dispatch(cmdBuf, envCubeMapSize / 32, envCubeMapSize / 32, 6);
-
-			// Wait till the compute shader will finish
-			auto vulkanRadianceMap = m_RadianceMap.As<VulkanTextureCubeMap>();
-			vulkanRadianceMap->TransitionLayout(cmdBuf, vulkanRadianceMap->GetVulkanImageLayout(),
-				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_PIPELINE_STAGE_TRANSFER_BIT
-			);
-
-			// Generating the mip maps for the environment map (this is mostly for debugging)
-			vulkanRadianceMap->GenerateMipMaps(cmdBuf, vulkanRadianceMap->GetVulkanImageLayout());
-
-			// Flush the compute command buffer
-			VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
-		}
-
-		// --------------------------------- IRRADIANCE MAP --------------------------------
-		{
-			uint32_t irradianceCubeMapSize = Renderer::GetRendererConfig().IrradianceMapResolution;
-			uint32_t samples = Renderer::GetRendererConfig().IrradianceMapSamples;
-
-			// Creating the irradiance cube map
-			ImageSpecification imageSpec{};
-			imageSpec.Format = ImageFormat::RGBA16F;
-			imageSpec.Usage = ImageUsage::Storage;
-			imageSpec.Width = irradianceCubeMapSize;
-			imageSpec.Height = irradianceCubeMapSize;
-			m_IrradianceMap = TextureCubeMap::Create(imageSpec);
-
-			// Recording a cmdbuf for the compute shader
-			VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Compute, true);
-
-			// Setting up the textures
-			auto vulkanMaterial = m_IrradianceShaderDescriptor.As<VulkanMaterial>();
-			vulkanMaterial->Set("o_IrradianceMap", m_IrradianceMap);
-			vulkanMaterial->Set("u_RadianceMap", m_RadianceMap);
+			// Writting and updating the descriptor with the texture mip
+			VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+			writeDescriptorSet.dstBinding = shaderLocation.Binding;
+			writeDescriptorSet.dstArrayElement = 0;
+			writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
+			writeDescriptorSet.descriptorCount = 1;
+			writeDescriptorSet.dstSet = descriptorSet;
+			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
 
 			vulkanMaterial->Bind(cmdBuf, m_IrradianceCompute);
 
-			// Disptaching the compute shader
-			auto vulkanComputePipeline = m_IrradianceCompute.As<VulkanComputePipeline>();
-			vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_Uniforms", &samples);
-			vulkanComputePipeline->Dispatch(cmdBuf, irradianceCubeMapSize / 32, irradianceCubeMapSize / 32, 6);
+			// Setting up the push constant
+			float roughness = i * deltaRoughness;
+			roughness = glm::max(roughness, 0.05f);
+			vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_Uniforms", &roughness);
 
-			// Wait till the compute shader will finish
-			auto vulkanIrradianceMap = m_IrradianceMap.As<VulkanTextureCubeMap>();
-			vulkanIrradianceMap->TransitionLayout(cmdBuf, vulkanIrradianceMap->GetVulkanImageLayout(),
-				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_PIPELINE_STAGE_TRANSFER_BIT
-			);
+			// Dispatching the compute shader
+			uint32_t numGroups = glm::max(1u, prefilteredCubeMapSize / 32);
+			vulkanComputePipeline->Dispatch(cmdBuf, numGroups, numGroups, 6);
 
-			// Generating the mip maps for the environment map (this is mostly for debugging)
-			vulkanIrradianceMap->GenerateMipMaps(cmdBuf, vulkanIrradianceMap->GetVulkanImageLayout());
-
+			prefilteredMap->TransitionLayout(cmdBuf, prefilteredMap->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
 			// Flush the compute command buffer
 			VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
+
+			prefilteredCubeMapSize /= 2;
 		}
+	}
 
-		// --------------------------------- PREFILTERED MAP --------------------------------
+	void VulkanSceneEnvironment::IrradianceMapCompute()
+	{
+		// --------------------------------- IRRADIANCE MAP --------------------------------
+		uint32_t irradianceCubeMapSize = Renderer::GetRendererConfig().IrradianceMapResolution;
+		uint32_t samples = Renderer::GetRendererConfig().IrradianceMapSamples;
+
+		// Creating the irradiance cube map
+		ImageSpecification imageSpec{};
+		imageSpec.Format = ImageFormat::RGBA16F;
+		imageSpec.Usage = ImageUsage::Storage;
+		imageSpec.Width = irradianceCubeMapSize;
+		imageSpec.Height = irradianceCubeMapSize;
+		m_IrradianceMap = TextureCubeMap::Create(imageSpec);
+
+		// Recording a cmdbuf for the compute shader
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Compute, true);
+
+		// Setting up the textures
+		auto vulkanMaterial = m_IrradianceShaderDescriptor.As<VulkanMaterial>();
+		vulkanMaterial->Set("o_IrradianceMap", m_IrradianceMap);
+		vulkanMaterial->Set("u_RadianceMap", m_RadianceMap);
+
+		vulkanMaterial->Bind(cmdBuf, m_IrradianceCompute);
+
+		// Disptaching the compute shader
+		auto vulkanComputePipeline = m_IrradianceCompute.As<VulkanComputePipeline>();
+		vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_Uniforms", &samples);
+		vulkanComputePipeline->Dispatch(cmdBuf, irradianceCubeMapSize / 32, irradianceCubeMapSize / 32, 6);
+
+		// Wait till the compute shader will finish
+		auto vulkanIrradianceMap = m_IrradianceMap.As<VulkanTextureCubeMap>();
+		vulkanIrradianceMap->TransitionLayout(cmdBuf, vulkanIrradianceMap->GetVulkanImageLayout(),
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT
+		);
+
+		// Generating the mip maps for the environment map (this is mostly for debugging)
+		vulkanIrradianceMap->GenerateMipMaps(cmdBuf, vulkanIrradianceMap->GetVulkanImageLayout());
+
+
+		// Flush the compute command buffer
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
+	}
+
+	void VulkanSceneEnvironment::InitCallbacks()
+	{
+		SetType(m_Type);
+	}
+
+	void VulkanSceneEnvironment::SetType(SceneEnvironment::Type type)
+	{
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		vkDeviceWaitIdle(device);
+
+		m_SkyboxDescriptor->Set("CameraData.SkyMode", (float)type);
+
+		for (auto& func : m_EnvMapChangeCallback)
 		{
-			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-			uint32_t prefilteredCubeMapSize = Renderer::GetRendererConfig().EnvironmentMapResolution;
-
-			// Creating the prefiltered cube map
-			ImageSpecification imageSpec{};
-			imageSpec.Format = ImageFormat::RGBA16F;
-			imageSpec.Usage = ImageUsage::Storage;
-			imageSpec.Width = prefilteredCubeMapSize;
-			imageSpec.Height = prefilteredCubeMapSize;
-			m_PrefilteredMap = TextureCubeMap::Create(imageSpec);
-
-			const float deltaRoughness = 1.0f / glm::max((float)m_PrefilteredMap->GetMipChainLevels() - 1.0f, 1.0f);
-
-			// Setting up the textures
-			auto vulkanMaterial = m_PrefilteredShaderDescriptor.As<VulkanMaterial>();
-			vulkanMaterial->Set("u_RadianceMap", m_RadianceMap);
-
-			// Getting the vulkan compute pipeline
-			auto vulkanComputePipeline = m_PrefilteredCompute.As<VulkanComputePipeline>();
-
-			// Get the shader location of the prefiltered map
-			VulkanMaterial::ShaderLocation shaderLocation = vulkanMaterial->GetShaderLocationFromString("o_PrefilteredMap");
-			VkDescriptorSet descriptorSet = vulkanMaterial->GetVulkanDescriptorSet(0);
-			auto prefilteredMap = m_PrefilteredMap.As<VulkanTextureCubeMap>();
-
-			for (uint32_t i = 0; i < m_PrefilteredMap->GetMipChainLevels(); i++)
+			switch (type)
 			{
-				// Recording a cmdbuf for the compute shader
-				VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Compute, true);
-
-				// Setting up the texture (for every mip)
-				VkDescriptorImageInfo imageDescriptorInfo{};
-				imageDescriptorInfo.imageLayout = prefilteredMap->GetVulkanImageLayout();
-				imageDescriptorInfo.imageView = prefilteredMap->GetVulkanImageViewMip(i);
-				imageDescriptorInfo.sampler = nullptr;
-
-				// Writting and updating the descriptor with the texture mip
-				VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-				writeDescriptorSet.dstBinding = shaderLocation.Binding;
-				writeDescriptorSet.dstArrayElement = 0;
-				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-				writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
-				writeDescriptorSet.descriptorCount = 1;
-				writeDescriptorSet.dstSet = descriptorSet;
-				vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-
-				vulkanMaterial->Bind(cmdBuf, m_IrradianceCompute);
-
-				// Setting up the push constant
-				float roughness = i * deltaRoughness;
-				roughness = glm::max(roughness, 0.05f);
-				vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_Uniforms", &roughness);
-
-				// Dispatching the compute shader
-				uint32_t numGroups = glm::max(1u, prefilteredCubeMapSize / 32);
-				vulkanComputePipeline->Dispatch(cmdBuf, numGroups, numGroups, 6);
-
-				prefilteredMap->TransitionLayout(cmdBuf, prefilteredMap->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-
-				// Flush the compute command buffer
-				VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
-
-				prefilteredCubeMapSize /= 2;
+				case SceneEnvironment::Type::HDRMap:    func(m_PrefilteredMap, m_IrradianceMap); break;
+				case SceneEnvironment::Type::Hillaire:	func(m_SkyPrefilterMap, m_SkyIrradianceMap); break;
 			}
+		}
+	}
 
+	void VulkanSceneEnvironment::LoadEnvMap(const std::string& filepath)
+	{
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		vkDeviceWaitIdle(device);
+
+		// Creating the equirectangular map
+		TextureSpecification textureSpec{};
+		textureSpec.Usage = ImageUsage::Storage;
+
+		if (!filepath.empty())
+			m_EnvironmentMap = Texture2D::Create(filepath, textureSpec);
+		else
+			m_EnvironmentMap = Renderer::GetWhiteLUT();
+
+
+
+		RadianceMapCompute();
+		IrradianceMapCompute();
+		PrefilteredMapCompute();
+
+
+		m_Type = SceneEnvironment::Type::HDRMap;
+
+		if (m_SkyboxDescriptor)
+		{
+			SetType(m_Type);
+			m_SkyboxDescriptor->Set("u_EnvTexture", m_PrefilteredMap);
+			m_SkyboxDescriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 		}
 	}
 
@@ -429,9 +483,10 @@ namespace Frost
 		vulkanMaterial->UpdateVulkanDescriptorIfNeeded();
 	}
 
-	void VulkanSceneEnvironment::SetEnvironmentMapCallback(std::function<void()> func)
+	void VulkanSceneEnvironment::SetEnvironmentMapCallback(const std::function<void(const Ref<TextureCubeMap>&, const Ref<TextureCubeMap>&)>& func)
 	{
 		// TODO
+		m_EnvMapChangeCallback.push_back(func);
 	}
 
 	void VulkanSceneEnvironment::RenderSkyBox(const RenderQueue& renderQueue)
@@ -444,8 +499,22 @@ namespace Frost
 		Ref<VulkanPipeline> vulkanSkyboxPipeline = m_SkyboxPipeline.As<VulkanPipeline>();
 		vulkanSkyboxPipeline->Bind();
 		
+		AtmosphereParams& atmosphereParams = m_AtmosphereParams;
+
+		glm::vec3 sunDir = glm::radians(-renderQueue.m_LightData.DirectionalLight.Direction);
+		atmosphereParams.SunDirection_Intensity = glm::vec4(sunDir.x, sunDir.y, sunDir.z, renderQueue.m_LightData.DirectionalLight.Intensity);
+		atmosphereParams.ViewPos_SunSize.w = renderQueue.m_LightData.DirectionalLight.Size;
+
+		m_SkyboxDescriptor->Set("CameraData.SunDir", glm::vec3(atmosphereParams.SunDirection_Intensity));
+		m_SkyboxDescriptor->Set("CameraData.SunIntensity", atmosphereParams.SunDirection_Intensity.w);
+		m_SkyboxDescriptor->Set("CameraData.SunSize", atmosphereParams.ViewPos_SunSize.w);
+
+
 		m_SkyboxDescriptor->Set("CameraData.Exposure", renderQueue.m_Camera.GetExposure());
 		m_SkyboxDescriptor->Set("CameraData.Lod", renderQueue.m_Camera.GetDOF());
+
+
+
 
 		m_SkyboxDescriptor->Bind(m_SkyboxPipeline);
 		Vector<glm::mat4> pushConstant(2);
