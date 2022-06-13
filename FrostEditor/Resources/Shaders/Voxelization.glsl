@@ -28,7 +28,8 @@ layout(push_constant) uniform Constants
 	mat4 ViewMatrix;
 	uint MaterialIndex;
 	uint64_t VertexBufferBDA;
-	uint VoxelDimensions;
+	int VoxelDimensions;
+	int AxisToShow;
 } u_PushConstant;
 
 layout(location = 0) out vData {
@@ -40,6 +41,7 @@ layout(location = 2) out vec4 v_WorldPos;
 
 layout(location = 3) out flat int v_BufferIndex;
 layout(location = 4) out flat int v_TextureIndex;
+layout(location = 5) out flat int v_AxisToShow;
 
 
 void main()
@@ -53,6 +55,7 @@ void main()
 	int meshIndex = int(u_PushConstant.MaterialIndex + vertex.MaterialIndex);
 	v_BufferIndex = int(meshIndex);
 	v_TextureIndex = int(vertex.MaterialIndex);
+	v_AxisToShow = u_PushConstant.AxisToShow;
 
 	// Compute world position
 	vec4 worldPos = a_ModelSpaceMatrix * vec4(vertex.Position, 1.0f);
@@ -77,6 +80,7 @@ layout(location = 2) in vec4 v_WorldPos[];
 
 layout(location = 3) in flat int v_BufferIndex[];
 layout(location = 4) in flat int v_TextureIndex[];
+layout(location = 5) in flat int v_AxisToShow[];
 
 
 // Data that will be sent to fragment shader
@@ -127,27 +131,69 @@ void main()
 	//						      gl_in[2].gl_Position.xyz);
 
 	// calculate triangle normal
-	vec3 tNorm         = normalize(cross( gl_in[1].gl_Position.xyz-gl_in[0].gl_Position.xyz, gl_in[2].gl_Position.xyz-gl_in[0].gl_Position.xyz));
-	vec3 tn            = abs( tNorm );
-
-	uint maxIndex = (tn.y>tn.x) ? ( (tn.z>tn.y) ? 3 : 2 ) : ( (tn.z>tn.x) ? 3 : 1 );
-
-	f_Axis = int(maxIndex);
-
-	//vec3 p1 = v_WorldPos[1].xyz - v_WorldPos[0].xyz;
-    //vec3 p2 = v_WorldPos[2].xyz - v_WorldPos[0].xyz;
-    //vec3 normal = normalize(cross(p1,p2));
+	//vec3 tNorm         = normalize(cross( gl_in[1].gl_Position.xyz-gl_in[0].gl_Position.xyz, gl_in[2].gl_Position.xyz-gl_in[0].gl_Position.xyz));
+	//vec3 tn            = abs( tNorm );
 	//
-	//float NdotX = abs(normal.x);
-    //float NdotY = abs(normal.y);
-    //float NdotZ = abs(normal.z);
+	//uint maxIndex = (tn.y>tn.x) ? ( (tn.z>tn.y) ? 3 : 2 ) : ( (tn.z>tn.x) ? 3 : 1 );
 	//
-	//// 1 = x axis dominant, 2 = y axis dominant, 3 = z axis dominant
-    //f_Axis = (NdotX >= NdotY && NdotX >= NdotZ) ? 1 : (NdotY >= NdotX && NdotY >= NdotZ) ? 2 : 3;
-    //f_Data.ProjectionMatrix = f_Data.Axis == 1 ? m_VoxelProjections.AxisX : f_Data.Axis == 2 ? m_VoxelProjections.AxisY : m_VoxelProjections.AxisZ;
-    //f_Axis = 1;
+	//f_Axis = int(maxIndex);
+
+
+
+	/*
+	vec3 p1 = v_WorldPos[1].xyz - v_WorldPos[0].xyz;
+    vec3 p2 = v_WorldPos[2].xyz - v_WorldPos[0].xyz;
+    vec3 normal = normalize(cross(p1,p2));
+	
+	float NdotX = abs(normal.x);
+    float NdotY = abs(normal.y);
+    float NdotZ = abs(normal.z);
+	
+	// 1 = x axis dominant, 2 = y axis dominant, 3 = z axis dominant
+    f_Axis = (NdotX >= NdotY && NdotX >= NdotZ) ? 1 : (NdotY >= NdotX && NdotY >= NdotZ) ? 2 : 3;
+    f_Axis = 1;
     f_ProjectionMatrix = f_Axis == 1 ? m_VoxelProjections.AxisX : f_Axis == 2 ? m_VoxelProjections.AxisY : m_VoxelProjections.AxisZ;
-    
+    */
+
+	//Find the axis for the maximize the projected area of this triangle
+
+	vec3 faceNormal = abs( normalize( cross( gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz, gl_in[2].gl_Position.xyz -gl_in[0].gl_Position.xyz) ) );
+	
+	float maxi = max(faceNormal.x, max(faceNormal.y, faceNormal.z));
+
+	if( maxi == faceNormal.x )
+    {
+	    f_ProjectionMatrix = m_VoxelProjections.AxisX;	
+		f_Axis = 0;	
+	}
+	else if( maxi == faceNormal.y )
+    {
+	    f_ProjectionMatrix = m_VoxelProjections.AxisY;	
+		f_Axis = 1;	
+    }
+	else
+    {
+	     f_ProjectionMatrix = m_VoxelProjections.AxisZ;	
+		 f_Axis = 2;
+	} 
+
+
+
+	// Manual
+	//f_Axis = v_AxisToShow[0];
+	//if(f_Axis == 0)
+    //{
+	//    f_ProjectionMatrix = m_VoxelProjections.AxisX;	
+	//}
+	//else if(f_Axis == 1)
+    //{
+	//    f_ProjectionMatrix = m_VoxelProjections.AxisY;	
+    //}
+	//else
+    //{
+	//     f_ProjectionMatrix = m_VoxelProjections.AxisZ;	
+	//}   
+
 
 	// For every vertex sent in vertices
     for(int i = 0; i < 3; i++)
@@ -162,9 +208,17 @@ void main()
 		g_BufferIndex = v_BufferIndex[i];
 		g_TextureIndex = v_TextureIndex[i];
 
-		//vec4 position = f_ProjectionMatrix * v_WorldPos[i];
-		vec4 position = f_ProjectionMatrix * gl_in[i].gl_Position;
+		vec4 position = f_ProjectionMatrix * v_WorldPos[i];
+		//vec4 position = f_ProjectionMatrix * gl_in[i].gl_Position;
         gl_Position = position;
+
+		// https://github.com/cpvrlab/SLProject
+		//if(f_Axis == 1)
+		//	gl_Position = vec4(worldPos.z, worldPos.y, 0, 1);
+		//else if (f_Axis == 2)
+		//	gl_Position = vec4(worldPos.x, worldPos.z, 0, 1);
+		//else
+		//	gl_Position = vec4(worldPos.x, worldPos.y, 0, 1);
 
         EmitVertex();
     }
@@ -181,6 +235,8 @@ void main()
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 layout(location = 0) out vec4 o_UselessAttachment;
+//layout(pixel_center_integer) in vec4 gl_FragCoord;
+
 
 //layout(location = 1) in fData {
 //    vec2 TexCoord;
@@ -239,6 +295,8 @@ layout(push_constant) uniform Constants
 	uint MaterialIndex;
 	uint64_t VertexBufferBDA;
 	int VoxelDimensions;
+	int AxisToShow;
+	vec3 VoxelOffsets;
 } u_PushConstant;
 
 
@@ -268,7 +326,41 @@ void main()
 	vec4 o_Albedo = vec4(albedoTextureColor * albedoFactor + (emissionFactor), 1.0f);
 	
 
+	int voxelDimensions = u_PushConstant.VoxelDimensions;
+	uvec4 temp = uvec4(gl_FragCoord.x, voxelDimensions - gl_FragCoord.y, float(voxelDimensions) * gl_FragCoord.z, 0);
+	uvec4 texcoord;
 
+	if(f_Axis == 0 )
+	{
+	    //texcoord.x = temp.z;
+	    //texcoord.x = temp.z - (voxelDimensions / 2);
+		texcoord.x = voxelDimensions - temp.z;
+		//texcoord.x = temp.z;
+		texcoord.y = temp.y;
+		texcoord.z = temp.x;
+		
+	}
+	else if(f_Axis == 1)
+	{
+		texcoord.x = temp.x;
+		texcoord.y = voxelDimensions - temp.z;
+	    texcoord.z = temp.y;
+	}
+	else
+	{
+		//texcoord.x = temp.x - (voxelDimensions / 2);
+		texcoord.x = temp.x;
+		texcoord.y = temp.y;
+		texcoord.z = temp.z;
+		//texcoord.z = temp.z - (voxelDimensions / 2);
+	}
+
+	texcoord.z = u_PushConstant.VoxelDimensions - texcoord.z - 1;
+
+	imageStore(u_VoxelTexture, ivec3(texcoord.xyz), vec4(vec3(o_Albedo.xyz), 1.0f));
+
+
+	/*
 	int voxelDimensions = u_PushConstant.VoxelDimensions;
 
 	ivec3 camPos = ivec3(gl_FragCoord.x, gl_FragCoord.y, voxelDimensions * gl_FragCoord.z);
@@ -289,9 +381,12 @@ void main()
 	}
 
 	// Flip it!
-	//texPos.z = u_PushConstant.VoxelDimensions - texPos.z - 1;
+	texPos.z = u_PushConstant.VoxelDimensions - texPos.z - 1;
 
 	imageStore(u_VoxelTexture, texPos, vec4(vec3(o_Albedo.xyz), 1.0f));
+	*/
+
+
 
 	//u_DebugBuffer.Values[0].x += 1.0f;
 	//

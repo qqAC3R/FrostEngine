@@ -40,6 +40,13 @@ namespace Frost
 			Vector<Ref<Texture3D>> VoxelizationTexture;
 			Vector<Ref<BufferDevice>> VoxelizationDebugBuffer;
 
+			Ref<Shader> VoxelVisualizerShader;
+			Ref<Pipeline> VoxelVisualizerPipeline;
+			Ref<RenderPass> VoxelVisualizerRenderPass;
+			Vector<Ref<Material>> VoxelVisualizerDescriptor;
+
+			Ref<BufferDevice> ClearBuffer;
+
 			Vector<HeapBlock> IndirectVoxelCmdBuffer;
 		};
 
@@ -50,15 +57,19 @@ namespace Frost
 			glm::mat4 Z;
 		} VoxelProj;
 
-		int32_t VoxelVolumeDimensions = 64;
+		int32_t VoxelVolumeDimensions = 128;
 
 		struct PushConstant
 		{
 			glm::mat4 ViewMatrix;
 			uint32_t MaterialIndex;
 			uint64_t VertexBufferBDA;
-			int32_t VoxelDimensions = 64;
+			int32_t VoxelDimensions = 128;
+			int32_t AxisToShow;
+			glm::vec3 VoxelOffset;
 		};
+		glm::vec3 VoxelOffset = { 0.0f, 0.0f, 0.0f };
+		int32_t m_AxisToShow = 1;
 
 		InternalData* m_Data;
 		std::string m_Name;

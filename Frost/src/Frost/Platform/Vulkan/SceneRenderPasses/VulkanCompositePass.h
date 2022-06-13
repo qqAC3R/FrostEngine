@@ -65,6 +65,7 @@ namespace Frost
 			glm::vec4 CameraPosition;
 			glm::vec3 DirectionalLightDir;
 			float UseLightHeatMap = 0.0f;
+			glm::vec4 VoxelSampleOffset = { 0.0f, 0.0f, 0.0f, 128.0f };
 		};
 		PushConstantData m_PushConstantData;
 

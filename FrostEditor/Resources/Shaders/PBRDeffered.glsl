@@ -75,11 +75,14 @@ layout(binding = 9) uniform CameraData {
 	float LightCullingWorkgroup;
 } m_CameraData;
 
+// Voxel texture
+layout(binding = 11) uniform sampler3D u_VoxelTexture;
 
 layout(push_constant) uniform PushConstant {
     vec4 CameraPosition; // vec4 - camera position + float pointLightCount + lightCullingWorkgroup.x
 	vec3 DirectionalLightDir;
 	float UseLightHeatMap;
+	vec4 VoxelSampleOffset;
 } u_PushConstant;
 
 
@@ -106,6 +109,35 @@ int GetLightBufferIndex(int i)
 
     uint offset = index * 1024;
     return VisibleLightData.Indices[offset + i];
+}
+
+vec4 SampleVoxels(vec3 worldPosition, float lod) {
+    //worldPosition.x -= u_PushConstant.VoxelSampleOffset.x;
+    //worldPosition.y -= u_PushConstant.VoxelSampleOffset.y;
+    //worldPosition.z -= u_PushConstant.VoxelSampleOffset.z;
+
+	worldPosition.x -= (u_PushConstant.CameraPosition.x - u_PushConstant.VoxelSampleOffset.x);
+	worldPosition.y -= (u_PushConstant.CameraPosition.y - u_PushConstant.VoxelSampleOffset.y);
+	worldPosition.z -= (u_PushConstant.CameraPosition.z - u_PushConstant.VoxelSampleOffset.z);
+
+
+	float VoxelDimensions = u_PushConstant.VoxelSampleOffset.w;
+	float VoxelGridWorldSize = u_PushConstant.VoxelSampleOffset.w;
+
+    vec3 offset = vec3(1.0 / VoxelDimensions, 1.0 / VoxelDimensions, 0); // Why??
+    vec3 voxelTextureUV = worldPosition / (VoxelGridWorldSize * 0.5);
+    voxelTextureUV = voxelTextureUV * 0.5 + 0.5 + offset;
+
+    if(voxelTextureUV.x > 1.0f || voxelTextureUV.x < 0.0f) return vec4(0.0f);
+    if(voxelTextureUV.y > 1.0f || voxelTextureUV.y < 0.0f) return vec4(0.0f);
+    if(voxelTextureUV.z > 1.0f || voxelTextureUV.z < 0.0f) return vec4(0.0f);
+    //return vec4(voxelTextureUV, 1.0f);
+
+    lod = clamp(lod, 0.0f, 5.0f);
+
+	voxelTextureUV.y *= 1.0f;
+
+    return textureLod(u_VoxelTexture, voxelTextureUV, lod);
 }
 
 
@@ -426,6 +458,8 @@ void main()
 
 	// Calculating the result with the camera exposure
 	result *= m_CameraData.Exposure;
+
+	result = SampleVoxels(m_Surface.WorldPos, 0.0f).xyz;
 
 	// Outputting the result
     o_Color = vec4(result, 1.0f);

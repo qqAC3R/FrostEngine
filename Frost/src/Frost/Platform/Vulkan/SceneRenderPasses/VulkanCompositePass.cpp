@@ -12,9 +12,11 @@
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanVoxelizationPass.h"
 #include "Frost/Platform/Vulkan/VulkanSceneEnvironment.h"
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 namespace Frost
 {
@@ -107,6 +109,7 @@ namespace Frost
 				Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, index);
 				Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
 				Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
+				Ref<Texture3D> voxelTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVoxelizationPass>()->VoxelizationTexture[index];
 
 				//Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
 				//Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
@@ -122,6 +125,7 @@ namespace Frost
 				descriptor->Set("u_PositionTexture", positionTexture);
 				descriptor->Set("u_NormalTexture", normalTexture);
 				descriptor->Set("u_AlbedoTexture", albedoTexture);
+				descriptor->Set("u_VoxelTexture", voxelTexture);
 				//descriptor->Set("u_CompositeTexture", compositeTexture);
 
 				//descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
@@ -239,7 +243,6 @@ namespace Frost
 
 		m_PushConstantData.CameraPosition.w = static_cast<float>(pointLightCount);
 
-
 		m_Data->RenderPass->Bind();
 		vulkanPipeline->Bind();
 		vulkanPipeline->BindVulkanPushConstant("u_PushConstant", &m_PushConstantData);
@@ -275,11 +278,81 @@ namespace Frost
 		m_Data->RenderPass->Unbind();
 	}
 
+	// TODO: TEMP!
+	static void DrawVec3CoordsEdit(const std::string& name, glm::vec3& values, float resetValue = 0.0f, float columnWidth = 100.0f)
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		auto boldFont = io.Fonts->Fonts[0];
+
+		ImGui::PushID(name.c_str());
+
+		ImGui::Columns(2);
+		ImGui::SetColumnWidth(0, columnWidth);
+		ImGui::Text(name.c_str());
+		ImGui::NextColumn();
+
+		ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ 0, 0.5f });
+
+		float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+		ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
+
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.9f, 0.2f, 0.2f, 1.0f });
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
+		ImGui::PushFont(boldFont);
+		if (ImGui::Button("X", buttonSize))
+			values.x = resetValue;
+		ImGui::PopFont();
+		ImGui::PopStyleColor(3);
+
+		ImGui::SameLine();
+		ImGui::DragFloat("##X", &values.x, 0.1f, 0.0f, 0.0f, "%.2f");
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.3f, 0.8f, 0.3f, 1.0f });
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
+		ImGui::PushFont(boldFont);
+		if (ImGui::Button("Y", buttonSize))
+			values.y = resetValue;
+		ImGui::PopFont();
+		ImGui::PopStyleColor(3);
+
+		ImGui::SameLine();
+		ImGui::DragFloat("##Y", &values.y, 0.1f, 0.0f, 0.0f, "%.2f");
+		//bool ImGui::DragFloat(const char* label, float* v, float v_speed, float v_min, float v_max, const char* format, ImGuiSliderFlags flags)
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.2f, 0.35f, 0.9f, 1.0f });
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
+		ImGui::PushFont(boldFont);
+		if (ImGui::Button("Z", buttonSize))
+			values.z = resetValue;
+		ImGui::PopFont();
+		ImGui::PopStyleColor(3);
+
+		ImGui::SameLine();
+		ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f");
+		ImGui::PopItemWidth();
+
+		ImGui::PopStyleVar();
+
+		ImGui::Columns(1);
+
+		ImGui::PopID();
+	}
+
 	void VulkanCompositePass::OnRenderDebug()
 	{
 		if (ImGui::CollapsingHeader("Deffered Tiled Pipeline"))
 		{
 			ImGui::SliderFloat("Light's HeatMap", &m_PushConstantData.UseLightHeatMap, 0.0f, 1.0f, nullptr, 1.0f);
+
+			DrawVec3CoordsEdit("Voxel Offset", *(glm::vec3*)&m_PushConstantData.VoxelSampleOffset.x);
 		}
 	}
 

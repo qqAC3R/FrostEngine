@@ -50,6 +50,9 @@ namespace Frost
 			bool UseDepthTest = true;
 			bool UseDepthWrite = true;
 			bool UseStencil = false;
+
+			// Optional
+			bool ConservativeRasterization = false;
 		};
 
 		virtual void Bind() = 0;

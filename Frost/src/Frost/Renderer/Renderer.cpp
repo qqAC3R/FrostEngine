@@ -69,6 +69,7 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/AerialPerspective.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ApplyAerial.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Voxelization.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VoxelVisualizer.glsl");
 
 		
 		// Init the pools

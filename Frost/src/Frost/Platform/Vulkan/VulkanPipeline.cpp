@@ -9,6 +9,8 @@
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferLayout.h"
 
+#include <vulkan/vulkan.h>
+
 namespace Frost
 {
 
@@ -176,6 +178,27 @@ namespace Frost
 		pipelineInfo.layout = m_PipelineLayout;
 		pipelineInfo.renderPass = createInfo.RenderPass.As<VulkanRenderPass>()->GetVulkanRenderPass();
 		pipelineInfo.subpass = 0;
+
+		if (createInfo.ConservativeRasterization)
+		{
+			VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
+			VkInstance instance = VulkanContext::GetInstance();
+
+			VkPhysicalDeviceConservativeRasterizationPropertiesEXT conservativeRasterProps{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONSERVATIVE_RASTERIZATION_PROPERTIES_EXT };
+
+			PFN_vkGetPhysicalDeviceProperties2KHR vkGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>(vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR"));
+
+			VkPhysicalDeviceProperties2KHR deviceProps2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR };
+			deviceProps2.pNext = &conservativeRasterProps;
+			vkGetPhysicalDeviceProperties2KHR(physicalDevice, &deviceProps2);
+
+			VkPipelineRasterizationConservativeStateCreateInfoEXT conservativeRasterStateCI{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT };
+			conservativeRasterStateCI.conservativeRasterizationMode = VK_CONSERVATIVE_RASTERIZATION_MODE_OVERESTIMATE_EXT;
+			conservativeRasterStateCI.extraPrimitiveOverestimationSize = conservativeRasterProps.maxExtraPrimitiveOverestimationSize;
+
+			// Conservative rasterization state has to be chained into the pipeline rasterization state create info structure
+			rasterizer.pNext = &conservativeRasterStateCI;
+		}
 
 		FROST_VKCHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline));
 		VulkanContext::SetStructDebugName("Pipeline", VK_OBJECT_TYPE_PIPELINE, m_Pipeline);
