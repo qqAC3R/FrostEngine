@@ -10,8 +10,9 @@
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 
+#include "Frost/Platform/Vulkan/VulkanImage.h"
+
 #include <imgui.h>
-#include <imgui_internal.h>
 
 namespace Frost
 {
@@ -31,32 +32,21 @@ namespace Frost
 
 		m_Data->VoxelizationShader = Renderer::GetShaderLibrary()->Get("Voxelization");
 
-		Voxelization_Init();
-
-
-		uint32_t cpuBufferSize = std::pow(VoxelVolumeDimensions, 3) * 4;
-		uint8_t* cpuBuffer = new uint8_t[cpuBufferSize];
-		memset(cpuBuffer, 0, cpuBufferSize);
-
-
-		uint32_t clearBufferSize = std::pow(VoxelVolumeDimensions, 3) * sizeof(uint8_t) * 4;
-		m_Data->ClearBuffer = BufferDevice::Create(clearBufferSize, { BufferUsage::TransferSrc });
-
-		m_Data->ClearBuffer->SetData(cpuBuffer);
-
-		delete cpuBuffer;
+		VoxelizationInit();
+		ClearBufferInit();
 	}
 
-	void VulkanVoxelizationPass::Voxelization_Init()
+	void VulkanVoxelizationPass::VoxelizationInit()
 	{
 		// Getting all the needed information
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		uint64_t maxCountMeshes = Renderer::GetRendererConfig().GeometryPass_Mesh_Count;
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 		// RenderPass
 		RenderPassSpecification renderPassSpecs =
 		{
-			(uint32_t)VoxelVolumeDimensions, (uint32_t)VoxelVolumeDimensions, 3,
+			(uint32_t)m_VoxelVolumeDimensions, (uint32_t)m_VoxelVolumeDimensions, 3,
 			{
 				{
 					FramebufferTextureFormat::R8, ImageUsage::Storage,
@@ -87,39 +77,59 @@ namespace Frost
 		m_Data->VoxelizationPipeline = Pipeline::Create(pipelineCreateInfo);
 
 		m_Data->VoxelizationTexture.resize(framesInFlight);
+		m_Data->VoxelTexture_R32UI.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = VoxelVolumeDimensions;
-			imageSpec.Height = VoxelVolumeDimensions;
-			imageSpec.Depth = VoxelVolumeDimensions;
+			imageSpec.Width = m_VoxelVolumeDimensions;
+			imageSpec.Height = m_VoxelVolumeDimensions;
+			imageSpec.Depth = m_VoxelVolumeDimensions;
 			imageSpec.Format = ImageFormat::RGBA8;
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
 			imageSpec.UseMipChain = false;
+			imageSpec.MutableFormat = true;
 
 			m_Data->VoxelizationTexture[i] = Texture3D::Create(imageSpec);
-		}
 
-		m_Data->VoxelizationDebugBuffer.resize(framesInFlight);
-		for (uint32_t i = 0; i < framesInFlight; i++)
-		{
-			m_Data->VoxelizationDebugBuffer[i] = BufferDevice::Create(32 * 32 * sizeof(glm::vec3), { BufferUsage::Storage });
+
+			Ref<VulkanTexture3D> vulkanVoxelTexture = m_Data->VoxelizationTexture[i].As<VulkanTexture3D>();
+
+			VkImageUsageFlags usageFlags = Utils::GetImageUsageFlags(imageSpec.Usage);
+			Utils::CreateImageView(m_Data->VoxelTexture_R32UI[i], vulkanVoxelTexture->GetVulkanImage(), usageFlags, VK_FORMAT_R32_UINT, 1, m_VoxelVolumeDimensions);
 		}
 
 		m_Data->VoxelizationDescriptor.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			m_Data->VoxelizationDescriptor[i] = Material::Create(m_Data->VoxelizationShader, "Voxelization_Material");
-			
+
 			auto& instanceSpec = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->MaterialSpecs[i];
 
 			Ref<VulkanMaterial> descriptor = m_Data->VoxelizationDescriptor[i].As<VulkanMaterial>();
+			VkDescriptorSet descriptorSet = descriptor->GetVulkanDescriptorSet(0);
 
-			descriptor->Set("u_VoxelTexture", m_Data->VoxelizationTexture[i]);
-			descriptor->Set("DebugBuffer", m_Data->VoxelizationDebugBuffer[i]);
+			descriptor->Set("u_VoxelTexture_NonAtomic", m_Data->VoxelizationTexture[i]);
 			descriptor->Set("u_MaterialUniform", instanceSpec.DeviceBuffer);
 			descriptor->UpdateVulkanDescriptorIfNeeded();
+
+
+			// Voxel texture with R32UI format
+			Ref<VulkanTexture3D> vulkanVoxelTexture = m_Data->VoxelizationTexture[i].As<VulkanTexture3D>();
+			VkDescriptorImageInfo imageInfo{};
+			imageInfo.imageLayout = vulkanVoxelTexture->GetVulkanImageLayout();
+			imageInfo.imageView = m_Data->VoxelTexture_R32UI[i];
+			imageInfo.sampler = nullptr;
+
+			VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+			writeDescriptorSet.dstBinding = 2;
+			writeDescriptorSet.dstArrayElement = 0;
+			writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			writeDescriptorSet.pImageInfo = &imageInfo;
+			writeDescriptorSet.descriptorCount = 1;
+			writeDescriptorSet.dstSet = descriptorSet;
+
+			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
 		}
 
 		m_Data->IndirectVoxelCmdBuffer.resize(framesInFlight);
@@ -131,7 +141,25 @@ namespace Frost
 		}
 	}
 
-	void VulkanVoxelizationPass::Voxelization_Update(const RenderQueue& renderQueue)
+	void VulkanVoxelizationPass::ClearBufferInit()
+	{
+		// Allocating a cpu buffer (same size as the 3d texture)
+		uint32_t cpuBufferSize = std::pow(m_VoxelVolumeDimensions, 3) * 4;
+		uint8_t* cpuBuffer = new uint8_t[cpuBufferSize];
+		memset(cpuBuffer, 0, cpuBufferSize); // Setting everything to 0
+
+		// Create a gpu buffer
+		uint32_t clearBufferSize = std::pow(m_VoxelVolumeDimensions, 3) * sizeof(uint8_t) * 4;
+		m_Data->ClearBuffer = BufferDevice::Create(clearBufferSize, { BufferUsage::TransferSrc });
+
+		// Copy the data from the cpu buffer into the gpu
+		m_Data->ClearBuffer->SetData(cpuBuffer);
+
+		// Delete the cpu buffer
+		delete cpuBuffer;
+	}
+
+	void VulkanVoxelizationPass::VoxelizationUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -149,9 +177,9 @@ namespace Frost
 
 		region.imageOffset = { 0, 0, 0 };
 		region.imageExtent = {
-			(uint32_t)VoxelVolumeDimensions,
-			(uint32_t)VoxelVolumeDimensions,
-			(uint32_t)VoxelVolumeDimensions
+			(uint32_t)m_VoxelVolumeDimensions,
+			(uint32_t)m_VoxelVolumeDimensions,
+			(uint32_t)m_VoxelVolumeDimensions
 		};
 		
 		Ref<VulkanTexture3D> voxelTexture = m_Data->VoxelizationTexture[currentFrameIndex].As<VulkanTexture3D>();
@@ -163,20 +191,10 @@ namespace Frost
 
 		voxelTexture->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
-		//VkImageSubresourceRange subresourceRange{};
-		//subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		//subresourceRange.baseMipLevel = 0;
-		//subresourceRange.levelCount = voxelTexture->GetMipChainLevels();
-		//subresourceRange.layerCount = 1;
-		//Utils::SetImageLayout(
-		//	cmdBuf, voxelTexture->GetVulkanImage(),
-		//	VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-		//	subresourceRange,
-		//	VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
-		//);
 
-		float size = VoxelVolumeDimensions;
 
+
+		float size = glm::ceil(m_Data->m_VoxelGrid * m_Data->m_VoxelSize);
 
 		glm::vec3 camPos = renderQueue.CameraPosition;
 		
@@ -184,23 +202,11 @@ namespace Frost
 		float camPosY = camPos.y;
 		float camPosZ = camPos.z;
 
-		//FROST_CORE_INFO("X: {0}   Y: {1}   Z: {2}", camPosX, camPosY, camPosZ);
-
-
-		// X
-		glm::mat4 projectionMatrix = glm::orthoRH(
-			-size * 0.5f, size * 0.5f,
-			-size * 0.5f, size * 0.5f,
-			 size * 0.5f, size * 1.5f
-		);
-
-		projectionMatrix[1][1] *= -1.0f;
-
 
 		// X
 		glm::mat4 projectionMatrix_X = glm::ortho(
 			(-(size) * 0.5f) - camPosZ, ((size) * 0.5f) - camPosZ,
-			(-size * 0.5f) - camPosY, (size * 0.5f) - camPosY,
+			( -size * 0.5f)  - camPosY,  (size * 0.5f)  - camPosY,
 			(size * 0.5f), (size * 1.5f)
 		);
 		projectionMatrix_X[1][1] *= -1.0f;
@@ -208,7 +214,7 @@ namespace Frost
 		// Y
 		glm::mat4 projectionMatrix_Y = glm::ortho(
 			(-(size) * 0.5f) + camPosX, ((size) * 0.5f) + camPosX,
-			(-size * 0.5f) + camPosZ, (size * 0.5f) + camPosZ,
+			( -size * 0.5f)  + camPosZ,  (size * 0.5f)  + camPosZ,
 			(size * 0.5f), (size * 1.5f)
 		);
 		projectionMatrix_Y[1][1] *= -1.0f;
@@ -216,7 +222,7 @@ namespace Frost
 		// Z
 		glm::mat4 projectionMatrix_Z = glm::ortho(
 			(-(size) * 0.5f) + camPosX, ((size) * 0.5f) + camPosX,
-			(-size * 0.5f) - camPosY, (size * 0.5f) - camPosY,
+			( -size * 0.5f)  - camPosY,  (size * 0.5f)  - camPosY,
 			(size * 0.5f), (size * 1.5f)
 		);
 		projectionMatrix_Z[1][1] *= -1.0f;
@@ -228,10 +234,6 @@ namespace Frost
 		VoxelProj.X = projectionMatrix_X * viewX;
 		VoxelProj.Y = projectionMatrix_Y * viewY;
 		VoxelProj.Z = projectionMatrix_Z * viewZ;
-
-		//VoxelProj.X[1][1] *= -1.0f;
-		//VoxelProj.Y[1][1] *= -1.0f;
-		//VoxelProj.Z[1][1] *= -1.0f;
 
 		m_Data->VoxelizationDescriptor[currentFrameIndex]->Set("VoxelProjections.AxisX", VoxelProj.X);
 		m_Data->VoxelizationDescriptor[currentFrameIndex]->Set("VoxelProjections.AxisY", VoxelProj.Y);
@@ -334,7 +336,7 @@ namespace Frost
 
 
 		
-		Voxelization_Update(renderQueue);
+		VoxelizationUpdate(renderQueue);
 
 		// Bind the pipeline and renderpass
 		m_Data->VoxelizationRenderPass->Bind();
@@ -342,14 +344,14 @@ namespace Frost
 
 		// Set the viewport and scrissors
 		VkViewport viewport{};
-		viewport.width = (float)VoxelVolumeDimensions;
-		viewport.height = (float)VoxelVolumeDimensions;
+		viewport.width = (float)m_VoxelVolumeDimensions;
+		viewport.height = (float)m_VoxelVolumeDimensions;
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 		vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
 
 		VkRect2D scissor{};
-		scissor.extent = { (uint32_t)VoxelVolumeDimensions, (uint32_t)VoxelVolumeDimensions };
+		scissor.extent = { (uint32_t)m_VoxelVolumeDimensions, (uint32_t)m_VoxelVolumeDimensions };
 		scissor.offset = { 0, 0 };
 		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
@@ -379,9 +381,6 @@ namespace Frost
 
 
 		
-#if 1
-
-
 		// Sending the indirect draw commands to the command buffer
 		for (uint32_t i = 0; i < meshIndirectData.size(); i++)
 		{
@@ -406,8 +405,7 @@ namespace Frost
 			pushConstant.MaterialIndex = meshIndirectData[i].MaterialOffset;
 			pushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 			pushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
-			pushConstant.AxisToShow = m_AxisToShow;
-			pushConstant.VoxelOffset = VoxelOffset;
+			pushConstant.AtomicOperation = m_AtomicOperation;
 			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
 
 			uint32_t submeshCount = meshData.SubmeshCount;
@@ -415,7 +413,6 @@ namespace Frost
 			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
 
 		}
-#endif
 
 		// End the renderpass
 		m_Data->VoxelizationRenderPass->Unbind();
@@ -425,7 +422,8 @@ namespace Frost
 	{
 		if (ImGui::CollapsingHeader("Voxelization Pass"))
 		{
-			ImGui::SliderInt("Axis", &m_AxisToShow, 0, 2);
+			ImGui::SliderInt("Atomic Operation (bool)", &m_AtomicOperation, 0, 1);
+			ImGui::DragFloat("Voxel Size", &m_Data->m_VoxelSize, 0.01f, 0.5f, 2.0f);
 		}
 	}
 
@@ -441,6 +439,14 @@ namespace Frost
 
 	void VulkanVoxelizationPass::ShutDown()
 	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		for (auto voxelTextureImageView : m_Data->VoxelTexture_R32UI)
+		{
+			vkDestroyImageView(device, voxelTextureImageView, nullptr);
+		}
+
 		delete m_Data;
 	}
 

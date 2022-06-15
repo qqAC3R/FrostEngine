@@ -3,6 +3,8 @@
 #include "Frost/Renderer/SceneRenderPass.h"
 #include "Frost/Renderer/Renderer.h"
 
+typedef struct VkImageView_T* VkImageView;
+
 namespace Frost
 {
 
@@ -24,9 +26,13 @@ namespace Frost
 
 		virtual const std::string& GetName() override { return m_Name; }
 
+		float GetVoxelGrid() { return glm::ceil(m_Data->m_VoxelGrid * m_Data->m_VoxelSize); }
+
 	private:
-		void Voxelization_Init();
-		void Voxelization_Update(const RenderQueue& renderQueue);
+		void VoxelizationInit();
+		void VoxelizationUpdate(const RenderQueue& renderQueue);
+
+		void ClearBufferInit();
 
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
@@ -38,7 +44,7 @@ namespace Frost
 			Ref<RenderPass> VoxelizationRenderPass;
 			Vector<Ref<Material>> VoxelizationDescriptor;
 			Vector<Ref<Texture3D>> VoxelizationTexture;
-			Vector<Ref<BufferDevice>> VoxelizationDebugBuffer;
+			Vector<VkImageView> VoxelTexture_R32UI; // This is used for atomic operations (R32UI = Red channel 32 bits unsigned int)
 
 			Ref<Shader> VoxelVisualizerShader;
 			Ref<Pipeline> VoxelVisualizerPipeline;
@@ -48,6 +54,9 @@ namespace Frost
 			Ref<BufferDevice> ClearBuffer;
 
 			Vector<HeapBlock> IndirectVoxelCmdBuffer;
+
+			int32_t m_VoxelGrid = 256;
+			float m_VoxelSize = 1.0f;
 		};
 
 		struct VoxelProjections
@@ -57,19 +66,17 @@ namespace Frost
 			glm::mat4 Z;
 		} VoxelProj;
 
-		int32_t VoxelVolumeDimensions = 128;
-
+		int32_t m_VoxelVolumeDimensions = 256;
+		
 		struct PushConstant
 		{
 			glm::mat4 ViewMatrix;
 			uint32_t MaterialIndex;
 			uint64_t VertexBufferBDA;
-			int32_t VoxelDimensions = 128;
-			int32_t AxisToShow;
-			glm::vec3 VoxelOffset;
+			int32_t VoxelDimensions = 256;
+			int32_t AtomicOperation;
 		};
-		glm::vec3 VoxelOffset = { 0.0f, 0.0f, 0.0f };
-		int32_t m_AxisToShow = 1;
+		int32_t m_AtomicOperation = 1;
 
 		InternalData* m_Data;
 		std::string m_Name;

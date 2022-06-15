@@ -241,7 +241,12 @@ namespace Frost
 		// Copying the cpu buffer into the gpu
 		m_Data->PointLightBufferData[currentFrameIndex].DeviceBuffer->SetData(pointLightDataSize, pointLightDataCPUPointer);
 
+		
 		m_PushConstantData.CameraPosition.w = static_cast<float>(pointLightCount);
+
+		auto voxelizationPassData = m_RenderPassPipeline->GetRenderPassData<VulkanVoxelizationPass>();
+		m_PushConstantData.VoxelSampleOffset = glm::vec4(renderQueue.CameraPosition, 0.0f);
+		m_PushConstantData.VoxelSampleOffset.w = glm::ceil(voxelizationPassData->m_VoxelGrid * voxelizationPassData->m_VoxelSize);
 
 		m_Data->RenderPass->Bind();
 		vulkanPipeline->Bind();
@@ -352,7 +357,7 @@ namespace Frost
 		{
 			ImGui::SliderFloat("Light's HeatMap", &m_PushConstantData.UseLightHeatMap, 0.0f, 1.0f, nullptr, 1.0f);
 
-			DrawVec3CoordsEdit("Voxel Offset", *(glm::vec3*)&m_PushConstantData.VoxelSampleOffset.x);
+			//DrawVec3CoordsEdit("Voxel Offset", *(glm::vec3*)&m_PushConstantData.VoxelSampleOffset.x);
 		}
 	}
 

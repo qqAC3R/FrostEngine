@@ -56,6 +56,7 @@ namespace Frost
 		uint32_t Height = 0;
 		uint32_t Depth = 1;
 		bool UseMipChain = true;
+		bool MutableFormat = false; // Optional: Currently works only for 3D textures
 	};
 
 	class Image

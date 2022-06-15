@@ -504,7 +504,8 @@ namespace Frost
 		void CreateImage(uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels,
 						 VkImageType type, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
 						 VkMemoryPropertyFlags properties,
-						 VkImage& image, VulkanMemoryInfo& imageMemory)
+						 VkImage& image, VulkanMemoryInfo& imageMemory,
+						 VkImageCreateFlags optionalFlags)
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -521,7 +522,7 @@ namespace Frost
 			imageInfo.usage = usage;
 			imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 			imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			imageInfo.flags = depth == 6 ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0; // If the image has 6 faces, then it is a cubemap
+			imageInfo.flags = optionalFlags | (depth == 6 ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0); // If the image has 6 faces, then it is a cubemap
 			// https://stackoverflow.com/questions/46186474/write-a-rgba8-image-as-a-r32ui
 			// TODO: This should be added if we want to add atomic increment in the voxel texture
 

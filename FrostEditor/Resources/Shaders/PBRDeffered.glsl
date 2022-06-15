@@ -111,14 +111,11 @@ int GetLightBufferIndex(int i)
     return VisibleLightData.Indices[offset + i];
 }
 
-vec4 SampleVoxels(vec3 worldPosition, float lod) {
-    //worldPosition.x -= u_PushConstant.VoxelSampleOffset.x;
-    //worldPosition.y -= u_PushConstant.VoxelSampleOffset.y;
-    //worldPosition.z -= u_PushConstant.VoxelSampleOffset.z;
-
-	worldPosition.x -= (u_PushConstant.CameraPosition.x - u_PushConstant.VoxelSampleOffset.x);
-	worldPosition.y -= (u_PushConstant.CameraPosition.y - u_PushConstant.VoxelSampleOffset.y);
-	worldPosition.z -= (u_PushConstant.CameraPosition.z - u_PushConstant.VoxelSampleOffset.z);
+vec4 SampleVoxels(vec3 worldPosition, float lod)
+{
+	worldPosition.x -= (u_PushConstant.VoxelSampleOffset.x);
+	worldPosition.y -= (u_PushConstant.VoxelSampleOffset.y);
+	worldPosition.z -= (u_PushConstant.VoxelSampleOffset.z);
 
 
 	float VoxelDimensions = u_PushConstant.VoxelSampleOffset.w;

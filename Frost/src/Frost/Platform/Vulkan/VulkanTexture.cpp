@@ -483,12 +483,19 @@ namespace Frost
 		else
 			m_MipLevelCount = 1;
 
+		
+		VkImageCreateFlags optionalFlags = 0;
+
+		if (imageSpecification.MutableFormat)
+			optionalFlags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+
 		Utils::CreateImage(imageSpecification.Width, imageSpecification.Height, imageSpecification.Depth, m_MipLevelCount,
 			VK_IMAGE_TYPE_3D, textureFormat,
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | usageFlags,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			m_Image, m_ImageMemory
+			m_Image, m_ImageMemory,
+			optionalFlags
 		);
 
 		VkImageLayout textureLayout = Utils::GetImageLayout(imageSpecification.Usage);

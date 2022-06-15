@@ -78,7 +78,8 @@ namespace Frost
 		void CreateImage(uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels,
 			VkImageType type, VkFormat format, VkImageTiling tiling,
 			VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-			VkImage& image, VulkanMemoryInfo& imageMemory
+			VkImage& image, VulkanMemoryInfo& imageMemory,
+			VkImageCreateFlags optionalFlags = 0
 		);
 		void CreateImageView(VkImageView& imageView, VkImage image, VkImageUsageFlags imageUsage, VkFormat format, uint32_t mipLevels, uint32_t textureDepth);
 		void CreateImageSampler(VkSampler& sampler, VkFilter filtering, VkSamplerAddressMode samplerAdressMode, VkSamplerMipmapMode samplerMipMapMode, uint32_t mipLevels, VkSamplerReductionMode reductionMode = VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE);
