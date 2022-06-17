@@ -77,6 +77,41 @@ layout(location = 3) out mat4 f_ProjectionMatrix;
 layout(location = 7) out vec4 f_PositionDepth;
 
 
+// Computation of an extended triangle in clip space based on 
+// "Conservative Rasterization", GPU Gems 2 Chapter 42 by Jon Hasselgren, Tomas Akenine-Möller and Lennart Ohlsson:
+// http://http.developer.nvidia.com/GPUGems2/gpugems2_chapter42.html
+void ComputeExtendedTriangle(vec2 halfPixelSize, vec3 triangleNormalClip, inout vec4 trianglePositionsClip[3], out vec4 triangleAABBClip)
+{
+	float trianglePlaneD = dot(trianglePositionsClip[0].xyz, triangleNormalClip); 
+    float nSign = sign(triangleNormalClip.z);
+        
+    // Compute plane equations
+    vec3 plane[3];
+    plane[0] = cross(trianglePositionsClip[0].xyw - trianglePositionsClip[2].xyw, trianglePositionsClip[2].xyw);
+    plane[1] = cross(trianglePositionsClip[1].xyw - trianglePositionsClip[0].xyw, trianglePositionsClip[0].xyw);
+    plane[2] = cross(trianglePositionsClip[2].xyw - trianglePositionsClip[1].xyw, trianglePositionsClip[1].xyw);
+    
+    // Move the planes by the appropriate semidiagonal
+    plane[0].z -= nSign * dot(halfPixelSize, abs(plane[0].xy));
+    plane[1].z -= nSign * dot(halfPixelSize, abs(plane[1].xy));
+    plane[2].z -= nSign * dot(halfPixelSize, abs(plane[2].xy));
+	
+	// Compute triangle AABB in clip space
+    triangleAABBClip.xy = min(trianglePositionsClip[0].xy, min(trianglePositionsClip[1].xy, trianglePositionsClip[2].xy));
+	triangleAABBClip.zw = max(trianglePositionsClip[0].xy, max(trianglePositionsClip[1].xy, trianglePositionsClip[2].xy));
+    
+    triangleAABBClip.xy -= halfPixelSize;
+    triangleAABBClip.zw += halfPixelSize;
+	
+	for (int i = 0; i < 3; ++i)
+    {
+        // Compute intersection of the planes
+        trianglePositionsClip[i].xyw = cross(plane[i], plane[(i + 1) % 3]);
+        trianglePositionsClip[i].xyw /= trianglePositionsClip[i].w;
+        trianglePositionsClip[i].z = -(trianglePositionsClip[i].x * triangleNormalClip.x + trianglePositionsClip[i].y * triangleNormalClip.y - trianglePlaneD) / triangleNormalClip.z;
+    }
+}
+
 layout(set = 0, binding = 0) uniform VoxelProjections
 {
 	mat4 AxisX;
@@ -109,15 +144,85 @@ void main()
 	     f_ProjectionMatrix = m_VoxelProjections.AxisZ;	
 	} 
 
+	vec4 pos[3];
+	for(int i = 0; i < 3; i++)
+	{
+		pos[i] = f_ProjectionMatrix * gl_in[i].gl_Position;
+	}
+
+	//vec2 halfPixelSize = 1.0f / vec2(256.0f);
+
+	//vec4 triangleAABB;
+	//ComputeExtendedTriangle(halfPixelSize, faceNormal, pos, triangleAABB);
+
+	/*
+	vec4 trianglePlane;
+	trianglePlane.xyz = cross(pos[1].xyz - pos[0].xyz, pos[2].xyz - pos[0].xyz);
+	trianglePlane.xyz = normalize(trianglePlane.xyz);
+	trianglePlane.w = -dot(pos[0].xyz, trianglePlane.xyz);
+
+
+	vec2 texCoords[3];
+
+    // change winding, otherwise there are artifacts for the back faces.
+    if (dot(trianglePlane.xyz, vec3(0.0, 0.0, 1.0)) < 0.0)
+    {
+		texCoords[0] = v_Data[0].TexCoord;
+
+        vec4 vertexTemp = pos[2];
+        vec2 texCoordTemp = v_Data[2].TexCoord;
+        
+        pos[2] = pos[1];
+        texCoords[2] = v_Data[1].TexCoord;
+    
+        pos[1] = vertexTemp;
+        texCoords[1] = texCoordTemp;
+    }
+
+	float volumeDimension = 256;
+	vec2 halfPixel = vec2(1.0f / volumeDimension);
+
+	if(trianglePlane.z == 0.0f) return;
+	// expanded aabb for triangle
+	//Out.triangleAABB = AxisAlignedBoundingBox(pos, halfPixel);
+	// calculate the plane through each edge of the triangle
+	// in normal form for dilatation of the triangle
+	vec3 planes[3];
+	planes[0] = cross(pos[0].xyw - pos[2].xyw, pos[2].xyw);
+	planes[1] = cross(pos[1].xyw - pos[0].xyw, pos[0].xyw);
+	planes[2] = cross(pos[2].xyw - pos[1].xyw, pos[1].xyw);
+	planes[0].z -= dot(halfPixel, abs(planes[0].xy));
+	planes[1].z -= dot(halfPixel, abs(planes[1].xy));
+	planes[2].z -= dot(halfPixel, abs(planes[2].xy));
+	// calculate intersection between translated planes
+	vec3 intersection[3];
+	intersection[0] = cross(planes[0], planes[1]);
+	intersection[1] = cross(planes[1], planes[2]);
+	intersection[2] = cross(planes[2], planes[0]);
+	intersection[0] /= intersection[0].z;
+	intersection[1] /= intersection[1].z;
+	intersection[2] /= intersection[2].z;
+	// calculate dilated triangle vertices
+	float z[3];
+	z[0] = -(intersection[0].x * trianglePlane.x + intersection[0].y * trianglePlane.y + trianglePlane.w) / trianglePlane.z;
+	z[1] = -(intersection[1].x * trianglePlane.x + intersection[1].y * trianglePlane.y + trianglePlane.w) / trianglePlane.z;
+	z[2] = -(intersection[2].x * trianglePlane.x + intersection[2].y * trianglePlane.y + trianglePlane.w) / trianglePlane.z;
+	pos[0].xyz = vec3(intersection[0].xy, z[0]);
+	pos[1].xyz = vec3(intersection[1].xy, z[1]);
+	pos[2].xyz = vec3(intersection[2].xy, z[2]);
+	*/
+
 	// For every vertex sent in vertices
     for(int i = 0; i < 3; i++)
 	{
         f_TexCoord = v_Data[i].TexCoord;
+        //f_TexCoord = texCoords[i];
         f_PositionDepth = v_Data[i].PositionDepth;
 
 		g_BufferIndex = v_BufferIndex[i];
 
-		vec4 position = f_ProjectionMatrix * gl_in[i].gl_Position;
+		//vec4 position = f_ProjectionMatrix * gl_in[i].gl_Position;
+		vec4 position = pos[i];
         gl_Position = position;
 
         EmitVertex();
@@ -213,7 +318,7 @@ void imageAtomicRGBA8Avg(ivec3 coords, vec4 value)
 	//"Spin" while threads are trying to change the voxel
     while((curStoredVal = imageAtomicCompSwap(u_VoxelTexture, coords, prevStoredVal, newVal)) 
             != prevStoredVal
-            && numIterations < 5) // iterations are used to limit the time for waiting
+            && numIterations < 10) // iterations are used to limit the time for waiting
 			                      // (because otherwise the hit into the performance will be huge)
     {
         prevStoredVal = curStoredVal; //store packed rgb average
@@ -224,11 +329,48 @@ void imageAtomicRGBA8Avg(ivec3 coords, vec4 value)
         vec4 curValF = rval + value;    // Add
         curValF.rgb /= curValF.a;       // Renormalize
 
+		//curValF.a = 1.0f;
+
         newVal = convVec4ToRGBA8(curValF); // pack the rgb average
 
         ++numIterations;
     }
 }
+
+
+
+// https://rauwendaal.net/2013/02/07/glslrunningaverage/ (for understanding the algorithm)
+void imageAtomicRGBA8Avg_2(ivec3 coords, vec4 value)
+{
+    uint nextUint = packUnorm4x8(vec4(value.xyz,1.0f/255.0f));
+    uint prevUint = 0;
+    uint currUint;
+ 
+    vec4 currVec4;
+ 
+    vec3 average;
+    uint count;
+ 
+    //"Spin" while threads are trying to change the voxel
+    while((currUint = imageAtomicCompSwap(u_VoxelTexture, coords, prevUint, nextUint)) != prevUint)
+    {
+        prevUint = currUint;                    //store packed rgb average and count
+        currVec4 = unpackUnorm4x8(currUint);    //unpack stored rgb average and count
+ 
+        average =      currVec4.rgb;        //extract rgb average
+        count   = uint(currVec4.a*255.0f);  //extract count
+ 
+        //Compute the running average
+        average = (average*count + value.xyz) / (count+1);
+ 
+		//average.a = 1.0f;
+
+        //Pack new average and incremented count back into a uint
+        nextUint = packUnorm4x8(vec4(average, (count+1)/255.0f));
+    }
+}
+
+
 
 void main()
 {

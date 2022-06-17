@@ -74,6 +74,7 @@ void main()
 		float ao = texelFetch(u_AOTexture, loc, 0).r;
 		vec3 ao_contribution = AO_MultiBounce(ao, color);
 		color = color * ao_contribution;
+		color = color;
 
 		color += texelFetch(o_AerialImage, loc, 0).rgb;
 

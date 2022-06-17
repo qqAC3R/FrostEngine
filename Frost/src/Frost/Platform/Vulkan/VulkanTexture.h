@@ -123,7 +123,7 @@ namespace Frost
 
 
 		// TODO??????
-		virtual uint32_t GetMipChainLevels() const override { return 0; } // TODO:??
+		virtual uint32_t GetMipChainLevels() const override { return m_MipLevelCount; }
 		virtual std::tuple<uint32_t, uint32_t> GetTextureSize() const override {
 			return std::make_tuple(0, 0);
 		}
@@ -141,7 +141,7 @@ namespace Frost
 		VkImage GetVulkanImage() const { return m_Image; }
 		VkImageView GetVulkanImageView() const { return m_ImageView; }
 		VkImageLayout GetVulkanImageLayout() const { return m_ImageLayout; }
-		VkImageView GetVulkanImageViewMip(uint32_t mip) { return VK_NULL_HANDLE; }
+		VkImageView GetVulkanImageViewMip(uint32_t mip) { return m_Mips[mip]; }
 
 		VkDescriptorImageInfo& GetVulkanDescriptorInfo(DescriptorImageType imageType) {
 			FROST_ASSERT_INTERNAL((m_DescriptorInfo.find(imageType) != m_DescriptorInfo.end()));

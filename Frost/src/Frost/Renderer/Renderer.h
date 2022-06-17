@@ -35,6 +35,8 @@ namespace Frost
 		} RayTracing;
 
 		uint32_t MaxPointLightCount = static_cast<uint32_t>(std::pow(2, 10)); // 1024
+
+		uint32_t VoxelTextureResolution = 256;
 	};
 
 	// Forward declaration

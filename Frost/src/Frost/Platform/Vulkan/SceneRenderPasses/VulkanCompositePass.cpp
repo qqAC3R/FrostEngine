@@ -245,8 +245,8 @@ namespace Frost
 		m_PushConstantData.CameraPosition.w = static_cast<float>(pointLightCount);
 
 		auto voxelizationPassData = m_RenderPassPipeline->GetRenderPassData<VulkanVoxelizationPass>();
-		m_PushConstantData.VoxelSampleOffset = glm::vec4(renderQueue.CameraPosition, 0.0f);
-		m_PushConstantData.VoxelSampleOffset.w = glm::ceil(voxelizationPassData->m_VoxelGrid * voxelizationPassData->m_VoxelSize);
+		m_PushConstantData.VoxelSampleOffset = glm::vec4(voxelizationPassData->CameraPosition, 0.0f);
+		m_PushConstantData.VoxelSampleOffset.w = (voxelizationPassData->m_VoxelGrid * voxelizationPassData->m_VoxelSize);
 
 		m_Data->RenderPass->Bind();
 		vulkanPipeline->Bind();

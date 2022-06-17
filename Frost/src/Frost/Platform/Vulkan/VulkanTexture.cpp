@@ -598,6 +598,7 @@ namespace Frost
 	{
 		int32_t mipWidth = m_ImageSpecification.Width;
 		int32_t mipHeight = m_ImageSpecification.Height;
+		int32_t mipDepth = m_ImageSpecification.Depth;
 
 		TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
@@ -619,7 +620,7 @@ namespace Frost
 			// Src
 			blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			blit.srcOffsets[0] = { 0, 0, 0 };
-			blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+			blit.srcOffsets[1] = { mipWidth, mipHeight, mipDepth };
 			blit.srcSubresource.baseArrayLayer = 0;
 			blit.srcSubresource.layerCount = 1;
 			blit.srcSubresource.mipLevel = i - 1;
@@ -627,7 +628,7 @@ namespace Frost
 			// Dst
 			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			blit.dstOffsets[0] = { 0, 0, 0 };
-			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, mipDepth > 1 ? mipDepth / 2 : 1 };
 			blit.dstSubresource.baseArrayLayer = 0;
 			blit.dstSubresource.layerCount = 1;
 			blit.dstSubresource.mipLevel = i;
@@ -663,6 +664,7 @@ namespace Frost
 
 			if (mipWidth > 1) mipWidth /= 2;
 			if (mipHeight > 1) mipHeight /= 2;
+			if (mipDepth > 1) mipDepth /= 2;
 		}
 
 		VkImageSubresourceRange subresourceRange{};
@@ -688,7 +690,7 @@ namespace Frost
 
 	void VulkanTexture3D::CalculateMipSizes()
 	{
-		m_MipLevelCount = Utils::CalculateMipMapLevels(m_ImageSpecification.Width, m_ImageSpecification.Height);
+		m_MipLevelCount = Utils::CalculateMipMapLevels(Utils::CalculateMipMapLevels(m_ImageSpecification.Width, m_ImageSpecification.Height), m_ImageSpecification.Depth);
 
 		uint32_t mipWidth = m_ImageSpecification.Width;
 		uint32_t mipHeight = m_ImageSpecification.Height;
@@ -700,6 +702,7 @@ namespace Frost
 			{
 				mipWidth /= 2;
 				mipHeight /= 2;
+				mipDepth /= 2;
 			}
 			glm::vec3 mipSize = { mipWidth, mipHeight, mipDepth };
 			m_MipSizes[mip] = mipSize;

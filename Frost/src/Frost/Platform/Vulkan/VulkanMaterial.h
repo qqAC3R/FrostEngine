@@ -17,11 +17,8 @@ namespace Frost
 		virtual void Bind(Ref<RayTracingPipeline> rayTracingPipeline) override;
 		void Bind(VkCommandBuffer cmdBuf, Ref<ComputePipeline> computePipeline);
 
-		Vector<VkDescriptorSetLayout> GetVulkanDescriptorLayout() const {
-			Vector<VkDescriptorSetLayout> descriptorSetLayouts;
-			for (auto& descriptorSetLayout : m_DescriptorSetLayouts)
-				descriptorSetLayouts.push_back(descriptorSetLayout.second);
-			return descriptorSetLayouts;
+		const Vector<VkDescriptorSetLayout>& GetVulkanDescriptorLayout() const {
+			return m_CachedDescriptorSetLayouts;
 		}
 		VkDescriptorSet GetVulkanDescriptorSet(uint32_t set) { return m_DescriptorSets[set]; }
 		Vector<VkDescriptorSet> GetVulkanDescriptorSets() { return m_CachedDescriptorSets; }
@@ -33,6 +30,7 @@ namespace Frost
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) override;
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex) override;
 		virtual void Set(const std::string& name, const Ref<Texture3D>& texture) override;
+		virtual void Set(const std::string& name, const Ref<Texture3D>& texture, uint32_t arrayIndex) override;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) override;
 		virtual void Set(const std::string& name, const Ref<TextureCubeMap>& cubeMap) override;
 		virtual void Set(const std::string& name, const Ref<BufferDevice>& storageBuffer) override;
@@ -102,6 +100,8 @@ namespace Frost
 		HashMap<std::string, ShaderLocation> m_ShaderLocations;
 		
 		std::unordered_map<uint32_t, VkDescriptorSetLayout> m_DescriptorSetLayouts;
+		std::vector<VkDescriptorSetLayout> m_CachedDescriptorSetLayouts;
+
 		std::unordered_map<uint32_t, VkDescriptorSet> m_DescriptorSets;
 		Vector<VkDescriptorSet> m_CachedDescriptorSets;
 
