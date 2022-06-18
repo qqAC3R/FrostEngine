@@ -75,21 +75,18 @@ const float relfectionSpecularFalloffExponent = 6.0f;
 #define BS_DELTA_EPSILON 0.0002
 
 
-// https://aras-p.info/texts/CompactNormalStorage.html
-vec3 DecodeNormals(vec2 enc)
+// Fast octahedron normal vector decoding.
+// https://jcgt.org/published/0003/02/01/
+vec2 SignNotZero(vec2 v)
 {
-    float scale = 1.7777f;
-    vec3 nn = vec3(enc, 0.0f) * vec3(2 * scale, 2 * scale,0) + vec3(-scale, -scale,1);
-    
-	float g = 2.0 / dot(nn.xyz,nn.xyz);
-
-    vec3 n;
-    n.xy = g*nn.xy;
-    n.z = g-1;
-
-	n = clamp(n, vec3(-1.0f), vec3(1.0f));
-
-    return n;
+	return vec2((v.x >= 0.0) ? 1.0 : -1.0, (v.y >= 0.0) ? 1.0 : -1.0);
+}
+vec3 DecodeNormal(vec2 e)
+{
+	vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
+	if (v.z < 0)
+		v.xy = (1.0 - abs(v.yx)) * SignNotZero(v.xy);
+	return normalize(v);
 }
 
 // Random hash function
@@ -696,7 +693,7 @@ void main()
 
 	// Decode normals and calculate normals in view space (from model space)
 	vec2 decodedNormals = texelFetch(u_NormalTex, pixelCoord, 0).xy;
-    vec3 normal = DecodeNormals(decodedNormals);
+    vec3 normal = DecodeNormal(decodedNormals);
 	vec3 viewNormal = transpose(inverse(mat3(u_UniformBuffer.ViewMatrix))) * normal;
 
 	// Fresnel factor

@@ -86,23 +86,23 @@ void main()
 
 #if 1
 
-	//imageStore(o_VoxelTexture, writePos, 
-	//	(
-	//	values[0] + values[4] +
-	//	values[1] + values[5] +
-	//	values[2] + values[6] +
-	//	values[3] + values[7]
-	//	) / 8.0f
-	//);
-
 	imageStore(o_VoxelTexture, writePos, 
 		(
-		values[0] + values[4] * (1 - values[0].a) + 
-		values[1] + values[5] * (1 - values[1].a) +
-		values[2] + values[6] * (1 - values[2].a) +
-		values[3] + values[7] * (1 - values[3].a)
-		) * 0.25f
+		values[0] + values[4] +
+		values[1] + values[5] +
+		values[2] + values[6] +
+		values[3] + values[7]
+		) / 8.0f
 	);
+
+	//imageStore(o_VoxelTexture, writePos, 
+	//	(
+	//	values[0] + values[4] * (1 - values[0].a) + 
+	//	values[1] + values[5] * (1 - values[1].a) +
+	//	values[2] + values[6] * (1 - values[2].a) +
+	//	values[3] + values[7] * (1 - values[3].a)
+	//	) * 0.25f
+	//);
 #endif
 
 

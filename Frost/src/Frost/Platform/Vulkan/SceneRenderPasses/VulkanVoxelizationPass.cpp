@@ -226,7 +226,9 @@ namespace Frost
 
 
 
-		float size = (m_Data->m_VoxelGrid * m_Data->m_VoxelSize);
+		float size = glm::round(m_Data->m_VoxelGrid * m_Data->m_VoxelSize);
+		size = size + float(int32_t(size) % 2);
+
 
 		glm::vec3 camPos = renderQueue.CameraPosition;
 		

@@ -153,16 +153,19 @@ float GetFloatValueFromTexture(sampler2D textureSample, float value)
 		return value;
 }
 
-// https://aras-p.info/texts/CompactNormalStorage.html
-vec2 EncodeNormals(vec3 n)
+// Fast octahedron normal vector encoding.
+// https://jcgt.org/published/0003/02/01/
+vec2 SignNotZero(vec2 v)
 {
-    float scale = 1.7777f;
-    vec2 enc = n.xy / (n.z+1);
-
-    enc /= scale;
-    enc = enc*0.5+0.5;
-    
-	return enc;
+	return vec2((v.x >= 0.0) ? +1.0 : -1.0, (v.y >= 0.0) ? +1.0 : -1.0);
+}
+// Assume normalized input. Output is on [-1, 1] for each component.
+vec2 EncodeNormal(vec3 v)
+{
+	// Project the sphere onto the octahedron, and then onto the xy plane
+	vec2 p = v.xy * (1.0 / (abs(v.x) + abs(v.y) + abs(v.z)));
+	// Reflect the folds of the lower hemisphere over the diagonals
+	return (v.z <= 0.0) ? ((1.0 - abs(p.yx)) * SignNotZero(p)) : p;
 }
 
 
@@ -198,7 +201,7 @@ void main()
 		o_Normals = vec4(v_Normal, 1.0f);
 
 	// Encode normals (from a vec3 to vec2)
-	vec2 encodedNormals = EncodeNormals(normalize(vec3(o_Normals)));
+	vec2 encodedNormals = EncodeNormal(normalize(vec3(o_Normals)));
 	o_Normals = vec4(encodedNormals, 0.0f, 0.0f);
 	
 

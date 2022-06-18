@@ -100,6 +100,8 @@ struct SurfaceProperties
     vec3 F0;
 } m_Surface;
 
+vec3 s_IndirectDiffuse = vec3(1.0f);
+vec3 s_IndirectSpecular = vec3(1.0f);
 
 
 int GetLightBufferIndex(int i)
@@ -143,7 +145,7 @@ vec4 SampleVoxels(vec3 worldPosition, float lod)
 
 vec4 ConeTrace(vec3 worldPos, vec3 normal, vec3 direction, float tanHalfAngle, out float occlusion)
 {
-#define MAX_DIST 1000.0
+#define MAX_DIST 200.0
 #define ALPHA_THRESH 0.90
 #define MAX_STEPS 100
 
@@ -158,7 +160,7 @@ vec4 ConeTrace(vec3 worldPos, vec3 normal, vec3 direction, float tanHalfAngle, o
 	float voxelWorldSize = VoxelGridWorldSize / 256;
 	float dist = voxelWorldSize; // Start one voxel away to avoid self occlusion
 	vec3 startPos = worldPos + normal * (2.0f * voxelWorldSize); // Plus move away slightly in the normal direction to avoid
-														// self occlusion in flat surfaces
+														         // self occlusion in flat surfaces
 
 
 	while(dist < MAX_DIST && alpha < ALPHA_THRESH && steps < MAX_STEPS)
@@ -476,6 +478,7 @@ vec3 ComputeIBLContriubtion()
 
 	// Compute the irradiance factor
 	vec3 irradiance = texture(u_IrradianceMap, N).rgb * diffuseAlbedo;
+	irradiance *= s_IndirectDiffuse;
 
 
 	// Compute the radiance factor (depedent on the roughness)
@@ -488,7 +491,7 @@ vec3 ComputeIBLContriubtion()
 	//vec3 brdf = mix(vec3(splitSums.x), vec3(splitSums.y), F0);
 	vec3 brdf = vec3(F0 * splitSums.x + splitSums.y);
 
-	vec3 specularRadiance = brdf * specularDecomp;
+	vec3 specularRadiance = brdf * specularDecomp * (2.0f * s_IndirectSpecular);
 
 	return (irradiance + specularRadiance);
 }
@@ -507,21 +510,18 @@ vec3 AcesApprox(vec3 v)
     return clamp((v*(a*v+b))/(v*(c*v+d)+e), 0.0f, 1.0f);
 }
 
-// https://aras-p.info/texts/CompactNormalStorage.html
-vec3 DecodeNormals(vec2 enc)
+// Fast octahedron normal vector decoding.
+// https://jcgt.org/published/0003/02/01/
+vec2 SignNotZero(vec2 v)
 {
-    float scale = 1.7777f;
-    vec3 nn = vec3(enc, 1.0f) * vec3(2 * scale, 2 * scale,0) + vec3(-scale, -scale,1);
-    
-	float g = 2.0 / dot(nn.xyz,nn.xyz);
-
-    vec3 n;
-    n.xy = g*nn.xy;
-    n.z = g-1;
-
-	n = clamp(n, vec3(-1.0f), vec3(1.0f));
-
-    return n;
+	return vec2((v.x >= 0.0) ? 1.0 : -1.0, (v.y >= 0.0) ? 1.0 : -1.0);
+}
+vec3 DecodeNormal(vec2 e)
+{
+	vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
+	if (v.z < 0)
+		v.xy = (1.0 - abs(v.yx)) * SignNotZero(v.xy);
+	return normalize(v);
 }
 
 void main()
@@ -532,7 +532,7 @@ void main()
 
 	// Decode normals
 	vec2 encodedNormals =   texture(u_NormalTexture, v_TexCoord).rg;
-    m_Surface.Normal =      DecodeNormals(encodedNormals);
+    m_Surface.Normal =      DecodeNormal(encodedNormals);
 
 
     // Sampling the textures from gbuffer
@@ -543,6 +543,10 @@ void main()
 
     // Fresnel approximation
 	m_Surface.F0 = mix(Fdielectric, m_Surface.Albedo.rgb, m_Surface.Metalness);
+
+	float temp;
+	s_IndirectDiffuse = ComputeIndirectDiffuse(m_Surface.WorldPos.xyz, m_Surface.Normal, temp).xyz;
+	s_IndirectSpecular = ComputeIndirectSpecular(m_Surface.WorldPos.xyz, m_Surface.Normal, m_Surface.Roughness, temp);
 
 
 	
@@ -578,23 +582,6 @@ void main()
 	// Adding up the ibl
 	float IBLIntensity = 5.0f;
 	result += ComputeIBLContriubtion() * IBLIntensity;
-
-
-	float specularOcclusion;
-	vec3 indirectSpecular = ComputeIndirectSpecular(m_Surface.WorldPos.xyz, m_Surface.Normal, m_Surface.Roughness, specularOcclusion);
-	//result += vec3(indirectSpecular.xyz);
-	result = mix(result, (1.0f - m_Surface.Roughness) * indirectSpecular, 0.4f);
-
-
-
-
-
-
-
-	float occlusion;
-	vec3 indirectDiffuse = ComputeIndirectDiffuse(m_Surface.WorldPos.xyz, m_Surface.Normal, occlusion).xyz;
-
-	result *= indirectDiffuse;
 
 
 	// Calculating the result with the camera exposure
