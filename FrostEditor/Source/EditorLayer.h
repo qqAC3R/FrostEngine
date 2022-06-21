@@ -30,7 +30,7 @@ namespace Frost
 	{
 	public:
 		EditorLayer()
-			: Layer("Example"), m_EditorCamera(85.0f, 1600.0f / 900.0f, 0.1f, 10000.0f)
+			: Layer("Example"), m_EditorCamera(85.0f, 1600.0f / 900.0f, 0.1f, 1000.0f)
 		{
 		}
 
@@ -70,15 +70,21 @@ namespace Frost
 			//}
 
 			{
-				auto& sponzaEntity = m_EditorScene->CreateEntity("Plane");
+				auto& sponzaEntity = m_EditorScene->CreateEntity("Sponza");
 				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
 				meshComponent.Mesh = Mesh::Load("Resources/Meshes/Plane.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
-
 				//meshComponent.Mesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
-				//
-				//auto& transformComponent = sponzaEntity.GetComponent<TransformComponent>();
-				//transformComponent.Scale = { 2.0f, 2.0f, 2.0f };
+
+				auto& transformComponent = sponzaEntity.GetComponent<TransformComponent>();
+				transformComponent.Scale = { 4.0f, 4.0f, 4.0f };
 			}
+
+			{
+				auto& directionalLight = m_EditorScene->CreateEntity("Directional Light");
+				auto& meshComponent = directionalLight.AddComponent<DirectionalLightComponent>();
+			}
+
+			m_UseHillaire = false;
 
 
 		}
@@ -315,7 +321,7 @@ namespace Frost
 		int m_GuizmoMode = -1;
 
 		bool m_UseRT = false;
-		bool m_UseHillaire = true;
+		bool m_UseHillaire = false;
 
 		Ref<Scene> m_EditorScene;
 		Ref<SceneHierarchyPanel> m_SceneHierarchyPanel;

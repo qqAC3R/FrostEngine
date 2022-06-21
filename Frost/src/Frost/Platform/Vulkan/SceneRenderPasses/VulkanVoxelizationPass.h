@@ -26,8 +26,6 @@ namespace Frost
 
 		virtual const std::string& GetName() override { return m_Name; }
 
-		float GetVoxelGrid() { return glm::ceil(m_Data->m_VoxelGrid * m_Data->m_VoxelSize); }
-
 	private:
 		void VoxelizationInit();
 		void VoxelizationUpdate(const RenderQueue& renderQueue);

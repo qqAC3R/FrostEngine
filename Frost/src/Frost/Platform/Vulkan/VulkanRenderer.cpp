@@ -14,12 +14,15 @@
 #include "Frost/Platform/Vulkan/VulkanImage.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
+
+// Render Passes
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanPostFXPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanComputePass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanCompositePass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanRayTracingPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanVoxelizationPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanShadowPass.h"
 
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 
@@ -109,6 +112,7 @@ namespace Frost
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanVoxelizationPass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanShadowPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanPostFXPass>::Create());
 		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputePass>::Create());

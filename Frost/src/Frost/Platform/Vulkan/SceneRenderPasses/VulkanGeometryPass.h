@@ -44,8 +44,8 @@ namespace Frost
 		virtual const std::string& GetName() override { return m_Name; }
 
 	private:
-		void Geometry_DataInit();
-		void LateCull_DataInit(uint32_t width, uint32_t height);
+		void GeometryDataInit();
+		void LateCullDataInit(uint32_t width, uint32_t height);
 
 		void OcclusionCullUpdate(const RenderQueue& renderQueue, uint64_t indirectCmdsOffset);
 

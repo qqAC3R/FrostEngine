@@ -47,15 +47,15 @@ namespace Frost
 		m_Data->ColorCorrectionShader = Renderer::GetShaderLibrary()->Get("ColorCorrection");
 
 		CalculateMipLevels       (1600, 900);
-		Bloom_InitData           (1600, 900);
-		ApplyAerial_InitData     (1600, 900);
-		ColorCorrection_InitData (1600, 900);
-		HZB_InitData             (1600, 900);
-		BlurColorBuffer_InitData (1600, 900);
-		Visibility_InitData      (1600, 900);
-		AO_InitData              (1600, 900);
-		SpatialDenoiser_InitData (1600, 900);
-		SSR_InitData             (1600, 900);
+		BloomInitData            (1600, 900);
+		ApplyAerialInitData      (1600, 900);
+		ColorCorrectionInitData  (1600, 900);
+		HZBInitData              (1600, 900);
+		SSRFilterInitData        (1600, 900);
+		VisibilityInitData       (1600, 900);
+		AmbientOcclusionInitData (1600, 900);
+		SpatialDenoiserInitData  (1600, 900);
+		SSRInitData              (1600, 900);
 	}
 
 	void VulkanPostFXPass::InitLate()
@@ -72,7 +72,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanPostFXPass::BlurColorBuffer_InitData(uint32_t width, uint32_t height)
+	void VulkanPostFXPass::SSRFilterInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -185,7 +185,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanPostFXPass::SSR_InitData(uint32_t width, uint32_t height)
+	void VulkanPostFXPass::SSRInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 
@@ -242,7 +242,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanPostFXPass::HZB_InitData(uint32_t width, uint32_t height)
+	void VulkanPostFXPass::HZBInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -362,7 +362,7 @@ namespace Frost
 
 	}
 
-	void VulkanPostFXPass::Visibility_InitData(uint32_t width, uint32_t height)
+	void VulkanPostFXPass::VisibilityInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -497,7 +497,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanPostFXPass::AO_InitData(uint32_t width, uint32_t height)
+	void VulkanPostFXPass::AmbientOcclusionInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -553,7 +553,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanPostFXPass::SpatialDenoiser_InitData(uint32_t width, uint32_t height)
+	void VulkanPostFXPass::SpatialDenoiserInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -600,7 +600,7 @@ namespace Frost
 
 	}
 
-	void VulkanPostFXPass::Bloom_InitData(uint32_t width, uint32_t height)
+	void VulkanPostFXPass::BloomInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -639,7 +639,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanPostFXPass::ApplyAerial_InitData(uint32_t width, uint32_t height)
+	void VulkanPostFXPass::ApplyAerialInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -688,7 +688,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanPostFXPass::ColorCorrection_InitData(uint32_t width, uint32_t height)
+	void VulkanPostFXPass::ColorCorrectionInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		uint32_t mipLevels = m_Data->ScreenMipLevel;
@@ -749,16 +749,23 @@ namespace Frost
 		auto finalImage = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex).As<VulkanImage2D>();
 		finalImage->TransitionLayout(cmdBuf, finalImage->GetVulkanImageLayout());
 
-		Bloom_Update(renderQueue);
-		ColorCorrection_Update(renderQueue, TARGET_BLOOM);
-		HZB_Update(renderQueue);
-		BlurColorBuffer_Update(renderQueue);
-		Visibility_Update(renderQueue);
-		AO_Update(renderQueue);
-		SpatialDenoiser_Update(renderQueue);
-		SSR_Update(renderQueue);
-		ApplyAerial_Update(renderQueue);
-		ColorCorrection_Update(renderQueue, TARGET_COMPOSITE);
+		BloomUpdate(renderQueue);
+
+		ColorCorrectionUpdate(renderQueue, TARGET_BLOOM);
+		
+		HZBUpdate(renderQueue);
+		
+		SSRFilterUpdate(renderQueue);
+		VisibilityUpdate(renderQueue);
+		
+		AmbientOcclusionUpdate(renderQueue);
+		SpatialDenoiserUpdate(renderQueue);
+		
+		SSRUpdate(renderQueue);
+		
+		ApplyAerialUpdate(renderQueue);
+		
+		ColorCorrectionUpdate(renderQueue, TARGET_COMPOSITE);
 	}
 
 	void VulkanPostFXPass::OnRenderDebug()
@@ -780,7 +787,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanPostFXPass::BlurColorBuffer_Update(const RenderQueue& renderQueue)
+	void VulkanPostFXPass::SSRFilterUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -830,7 +837,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanPostFXPass::SSR_Update(const RenderQueue& renderQueue)
+	void VulkanPostFXPass::SSRUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -863,7 +870,7 @@ namespace Frost
 		ssrPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
-	void VulkanPostFXPass::HZB_Update(const RenderQueue& renderQueue)
+	void VulkanPostFXPass::HZBUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -917,7 +924,7 @@ namespace Frost
 		}
 	}
 
-	void VulkanPostFXPass::Visibility_Update(const RenderQueue& renderQueue)
+	void VulkanPostFXPass::VisibilityUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -983,7 +990,7 @@ namespace Frost
 
 	} static s_AO_pushConstant;
 
-	void VulkanPostFXPass::AO_Update(const RenderQueue& renderQueue)
+	void VulkanPostFXPass::AmbientOcclusionUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -1034,7 +1041,7 @@ namespace Frost
 		);
 	}
 
-	void VulkanPostFXPass::SpatialDenoiser_Update(const RenderQueue& renderQueue)
+	void VulkanPostFXPass::SpatialDenoiserUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -1071,7 +1078,7 @@ namespace Frost
 		);
 	}
 
-	void VulkanPostFXPass::ColorCorrection_Update(const RenderQueue& renderQueue, uint32_t target)
+	void VulkanPostFXPass::ColorCorrectionUpdate(const RenderQueue& renderQueue, uint32_t target)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -1095,7 +1102,7 @@ namespace Frost
 		vulkan_cc_Pipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
-	void VulkanPostFXPass::ApplyAerial_Update(const RenderQueue& renderQueue)
+	void VulkanPostFXPass::ApplyAerialUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -1121,7 +1128,7 @@ namespace Frost
 		vulkanApplyAerialPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
-	void VulkanPostFXPass::Bloom_Update(const RenderQueue& renderQueue)
+	void VulkanPostFXPass::BloomUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -1498,15 +1505,15 @@ namespace Frost
 	void VulkanPostFXPass::OnResize(uint32_t width, uint32_t height)
 	{
 		CalculateMipLevels       (width, height);
-		Bloom_InitData           (width, height);
-		ApplyAerial_InitData     (width, height);
-		ColorCorrection_InitData (width, height);
-		BlurColorBuffer_InitData (width, height);
-		HZB_InitData             (width, height);
-		Visibility_InitData      (width, height);
-		AO_InitData              (width, height);
-		SpatialDenoiser_InitData (width, height);
-		SSR_InitData             (width, height);
+		BloomInitData            (width, height);
+		ApplyAerialInitData      (width, height);
+		ColorCorrectionInitData  (width, height);
+		SSRFilterInitData        (width, height);
+		HZBInitData              (width, height);
+		VisibilityInitData       (width, height);
+		AmbientOcclusionInitData (width, height);
+		SpatialDenoiserInitData  (width, height);
+		SSRInitData              (width, height);
 	}
 
 	void VulkanPostFXPass::OnResizeLate(uint32_t width, uint32_t height)

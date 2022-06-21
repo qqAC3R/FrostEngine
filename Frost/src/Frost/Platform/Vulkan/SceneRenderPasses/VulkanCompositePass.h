@@ -24,9 +24,14 @@ namespace Frost
 
 		virtual const std::string& GetName() override { return m_Name; }
 	private:
-		void TiledLightCulling_DataInit();
-		void TiledLightCulling_OnUpdate(const RenderQueue& renderQueue);
-		void LightBufferBlur_OnUpdate(const RenderQueue& renderQueue);
+
+		void PBRInitData();
+		void PBRUpdate();
+
+		void TiledLightCullingInitData();
+		void TiledLightCullingUpdate(const RenderQueue& renderQueue);
+
+		
 
 		void OnEnvMapChangeCallback(const Ref<TextureCubeMap>& prefiltered, const Ref<TextureCubeMap>& irradiance);
 	private:
@@ -50,12 +55,6 @@ namespace Frost
 			Ref<ComputePipeline> LightCullingPipeline;
 			Vector<Ref<Material>> LightCullingDescriptor;
 			Vector<Ref<BufferDevice>> CullingDataBuffer;
-
-			// Skybox pass
-			//Ref<Shader> SkyboxShader;
-			//Ref<Pipeline> SkyboxPipeline;
-			//Ref<Material> SkyboxDescriptor;
-			//Ref<VertexBuffer> SkyBoxVertexBuffer;
 		};
 		InternalData* m_Data;
 
@@ -64,8 +63,10 @@ namespace Frost
 		{
 			glm::vec4 CameraPosition;
 			glm::vec3 DirectionalLightDir;
-			float UseLightHeatMap = 0.0f;
-			glm::vec4 VoxelSampleOffset = { 0.0f, 0.0f, 0.0f, 0.0f };
+			int32_t UseLightHeatMap = 0.0f;
+			glm::vec3 VoxelSampleOffset = { 0.0f, 0.0f, 0.0f };
+			float VoxelGrid;
+			float VoxelTextureSize;
 		};
 		PushConstantData m_PushConstantData;
 

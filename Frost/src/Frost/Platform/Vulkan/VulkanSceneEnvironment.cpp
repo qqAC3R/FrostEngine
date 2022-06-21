@@ -255,7 +255,7 @@ namespace Frost
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
 	}
 
-	void VulkanSceneEnvironment::InitCallbacks()
+	void VulkanSceneEnvironment::InitCallbackFunctions()
 	{
 		SetType(m_Type);
 	}

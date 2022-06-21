@@ -259,7 +259,7 @@ namespace Frost
 					ImGui::Text("Size");
 
 					ImGui::TableNextColumn();
-					UserInterface::DragFloat("", component.Size, 0.055f);
+					UserInterface::DragFloat("", component.Size, 0.01f, 0.0f, 1.0f);
 
 					ImGui::PopID();
 				}

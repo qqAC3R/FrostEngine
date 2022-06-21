@@ -150,68 +150,6 @@ void main()
 		pos[i] = f_ProjectionMatrix * gl_in[i].gl_Position;
 	}
 
-	//vec2 halfPixelSize = 1.0f / vec2(256.0f);
-
-	//vec4 triangleAABB;
-	//ComputeExtendedTriangle(halfPixelSize, faceNormal, pos, triangleAABB);
-
-	/*
-	vec4 trianglePlane;
-	trianglePlane.xyz = cross(pos[1].xyz - pos[0].xyz, pos[2].xyz - pos[0].xyz);
-	trianglePlane.xyz = normalize(trianglePlane.xyz);
-	trianglePlane.w = -dot(pos[0].xyz, trianglePlane.xyz);
-
-
-	vec2 texCoords[3];
-
-    // change winding, otherwise there are artifacts for the back faces.
-    if (dot(trianglePlane.xyz, vec3(0.0, 0.0, 1.0)) < 0.0)
-    {
-		texCoords[0] = v_Data[0].TexCoord;
-
-        vec4 vertexTemp = pos[2];
-        vec2 texCoordTemp = v_Data[2].TexCoord;
-        
-        pos[2] = pos[1];
-        texCoords[2] = v_Data[1].TexCoord;
-    
-        pos[1] = vertexTemp;
-        texCoords[1] = texCoordTemp;
-    }
-
-	float volumeDimension = 256;
-	vec2 halfPixel = vec2(1.0f / volumeDimension);
-
-	if(trianglePlane.z == 0.0f) return;
-	// expanded aabb for triangle
-	//Out.triangleAABB = AxisAlignedBoundingBox(pos, halfPixel);
-	// calculate the plane through each edge of the triangle
-	// in normal form for dilatation of the triangle
-	vec3 planes[3];
-	planes[0] = cross(pos[0].xyw - pos[2].xyw, pos[2].xyw);
-	planes[1] = cross(pos[1].xyw - pos[0].xyw, pos[0].xyw);
-	planes[2] = cross(pos[2].xyw - pos[1].xyw, pos[1].xyw);
-	planes[0].z -= dot(halfPixel, abs(planes[0].xy));
-	planes[1].z -= dot(halfPixel, abs(planes[1].xy));
-	planes[2].z -= dot(halfPixel, abs(planes[2].xy));
-	// calculate intersection between translated planes
-	vec3 intersection[3];
-	intersection[0] = cross(planes[0], planes[1]);
-	intersection[1] = cross(planes[1], planes[2]);
-	intersection[2] = cross(planes[2], planes[0]);
-	intersection[0] /= intersection[0].z;
-	intersection[1] /= intersection[1].z;
-	intersection[2] /= intersection[2].z;
-	// calculate dilated triangle vertices
-	float z[3];
-	z[0] = -(intersection[0].x * trianglePlane.x + intersection[0].y * trianglePlane.y + trianglePlane.w) / trianglePlane.z;
-	z[1] = -(intersection[1].x * trianglePlane.x + intersection[1].y * trianglePlane.y + trianglePlane.w) / trianglePlane.z;
-	z[2] = -(intersection[2].x * trianglePlane.x + intersection[2].y * trianglePlane.y + trianglePlane.w) / trianglePlane.z;
-	pos[0].xyz = vec3(intersection[0].xy, z[0]);
-	pos[1].xyz = vec3(intersection[1].xy, z[1]);
-	pos[2].xyz = vec3(intersection[2].xy, z[2]);
-	*/
-
 	// For every vertex sent in vertices
     for(int i = 0; i < 3; i++)
 	{

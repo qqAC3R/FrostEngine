@@ -68,21 +68,38 @@ layout(binding = 6) uniform samplerCube u_RadianceFilteredMap;
 layout(binding = 7) uniform samplerCube u_IrradianceMap;
 layout(binding = 8) uniform sampler2D u_BRDFLut;
 
-layout(binding = 9) uniform CameraData {
+layout(binding = 9) uniform CameraData
+{
 	float Gamma;
 	float Exposure;
 	float PointLightCount;
 	float LightCullingWorkgroup;
 } m_CameraData;
 
-// Voxel texture
+// Voxel texture (TODO: Separate compute shader)
 layout(binding = 11) uniform sampler3D u_VoxelTexture;
 
-layout(push_constant) uniform PushConstant {
+layout(binding = 12) uniform sampler2D u_ShadowTexture;
+// Shadow depth texture (TODO: Separate compute shader)
+//layout(binding = 12) uniform sampler2D u_ShadowDepthTexture;
+//layout(binding = 13) uniform sampler2D u_ViewPosition;
+
+//layout(binding = 14) uniform DirectionaLightData
+//{
+//	vec3 DirectionalLightDir;
+//	float CascadeDepthSplit[4];
+//} u_DirLightData;
+
+layout(push_constant) uniform PushConstant
+{
     vec4 CameraPosition; // vec4 - camera position + float pointLightCount + lightCullingWorkgroup.x
 	vec3 DirectionalLightDir;
-	float UseLightHeatMap;
-	vec4 VoxelSampleOffset;
+	
+	int UseLightHeatMap;
+
+	vec3 VoxelSampleOffset;
+	float VoxelGrid;
+	float VoxelTextureSize;
 } u_PushConstant;
 
 
@@ -115,7 +132,6 @@ int GetLightBufferIndex(int i)
 
 
 
-
 vec4 SampleVoxels(vec3 worldPosition, float lod)
 {
 	worldPosition.x -= (u_PushConstant.VoxelSampleOffset.x);
@@ -123,8 +139,8 @@ vec4 SampleVoxels(vec3 worldPosition, float lod)
 	worldPosition.z -= (u_PushConstant.VoxelSampleOffset.z);
 
 
-	float VoxelDimensions = 256;
-	float VoxelGridWorldSize = u_PushConstant.VoxelSampleOffset.w;
+	float VoxelDimensions = u_PushConstant.VoxelTextureSize;
+	float VoxelGridWorldSize = u_PushConstant.VoxelGrid;
 
     vec3 offset = vec3(0, 1.0 / VoxelDimensions, 0); // Why??
     vec3 voxelTextureUV = worldPosition / (VoxelGridWorldSize * 0.5);
@@ -155,7 +171,7 @@ vec4 ConeTrace(vec3 worldPos, vec3 normal, vec3 direction, float tanHalfAngle, o
     occlusion = 0.0;
 	uint steps = 0;
 
-	float VoxelGridWorldSize = u_PushConstant.VoxelSampleOffset.w;
+	float VoxelGridWorldSize = u_PushConstant.VoxelGrid;
 	
 	float voxelWorldSize = VoxelGridWorldSize / 256;
 	float dist = voxelWorldSize; // Start one voxel away to avoid self occlusion
@@ -583,6 +599,7 @@ void main()
 	float IBLIntensity = 5.0f;
 	result += ComputeIBLContriubtion() * IBLIntensity;
 
+	result *= texture(u_ShadowTexture, v_TexCoord).rgb;
 
 	// Calculating the result with the camera exposure
 	result *= m_CameraData.Exposure;
@@ -590,9 +607,10 @@ void main()
 	//result = SampleVoxels(m_Surface.WorldPos, 0.0f).xyz;
 
 
+
 	// Outputting the result
     o_Color = vec4(result, 1.0f);
 
-	if(u_PushConstant.UseLightHeatMap == 1.0f)
+	if(u_PushConstant.UseLightHeatMap == 1)
 		o_Color.rgb += + vec3(heatMap);
 }

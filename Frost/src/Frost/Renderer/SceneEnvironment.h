@@ -39,7 +39,7 @@ namespace Frost
 
 		virtual ~SceneEnvironment() {}
 
-		virtual void InitCallbacks() = 0;
+		virtual void InitCallbackFunctions() = 0;
 
 		virtual void RenderSkyBox(const RenderQueue& renderQueue) = 0;
 		virtual void UpdateAtmosphere(const RenderQueue& renderQueue) = 0;

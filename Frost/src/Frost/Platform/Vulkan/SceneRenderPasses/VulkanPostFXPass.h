@@ -23,32 +23,51 @@ namespace Frost
 		virtual const std::string& GetName() override { return m_Name; }
 
 	private:
-		void SSR_InitData(uint32_t width, uint32_t height);
-		void SSR_Update(const RenderQueue& renderQueue);
 
-		void BlurColorBuffer_InitData(uint32_t width, uint32_t height);
-		void BlurColorBuffer_Update(const RenderQueue& renderQueue);
+		// ---------------------- SSR ----------------------------
+		// SSR + Cone Tracing
+		void SSRInitData(uint32_t width, uint32_t height);
+		void SSRUpdate(const RenderQueue& renderQueue);
 
-		void HZB_InitData(uint32_t width, uint32_t height);
-		void HZB_Update(const RenderQueue& renderQueue);
+		// SSR Gaussian Blur
+		void SSRFilterInitData(uint32_t width, uint32_t height);
+		void SSRFilterUpdate(const RenderQueue& renderQueue);
 
-		void Visibility_InitData(uint32_t width, uint32_t height);
-		void Visibility_Update(const RenderQueue& renderQueue);
+		// Hierarchal Z Buffer
+		void HZBInitData(uint32_t width, uint32_t height);
+		void HZBUpdate(const RenderQueue& renderQueue);
 
-		void AO_InitData(uint32_t width, uint32_t height);
-		void AO_Update(const RenderQueue& renderQueue);
+		// Visibility Buffer for the SSR
+		void VisibilityInitData(uint32_t width, uint32_t height);
+		void VisibilityUpdate(const RenderQueue& renderQueue);
+		// --------------------------------------------------------
 
-		void SpatialDenoiser_InitData(uint32_t width, uint32_t height);
-		void SpatialDenoiser_Update(const RenderQueue& renderQueue);
 
-		void Bloom_InitData(uint32_t width, uint32_t height);
-		void Bloom_Update(const RenderQueue& renderQueue);
+		// ----------------- Ambient Occlusion --------------------
+		void AmbientOcclusionInitData(uint32_t width, uint32_t height);
+		void AmbientOcclusionUpdate(const RenderQueue& renderQueue);
 
-		void ApplyAerial_InitData(uint32_t width, uint32_t height);
-		void ApplyAerial_Update(const RenderQueue& renderQueue);
+		void SpatialDenoiserInitData(uint32_t width, uint32_t height);
+		void SpatialDenoiserUpdate(const RenderQueue& renderQueue);
+		// --------------------------------------------------------
 
-		void ColorCorrection_InitData(uint32_t width, uint32_t height);
-		void ColorCorrection_Update(const RenderQueue& renderQueue, uint32_t target);
+
+		// ------------------- Bloom ------------------------------
+		void BloomInitData(uint32_t width, uint32_t height);
+		void BloomUpdate(const RenderQueue& renderQueue);
+		// --------------------------------------------------------
+
+
+		// ---------------- Hillaire 2020 -------------------------
+		void ApplyAerialInitData(uint32_t width, uint32_t height);
+		void ApplyAerialUpdate(const RenderQueue& renderQueue);
+		// --------------------------------------------------------
+
+
+		// ------------------ Composite ---------------------------
+		void ColorCorrectionInitData(uint32_t width, uint32_t height);
+		void ColorCorrectionUpdate(const RenderQueue& renderQueue, uint32_t target);
+		// --------------------------------------------------------
 
 		void CalculateMipLevels(uint32_t width, uint32_t height);
 
@@ -66,7 +85,7 @@ namespace Frost
 			Vector<Ref<Material>> SSRDescriptor;
 			Vector<Ref<Image2D>> SSRTexture;
 
-			// Pre-filtered color buffer
+			// Pre-filtered SSR color buffer
 			Vector<Ref<Image2D>> BlurredColorBuffer;
 			Ref<Shader> BlurShader;
 			Ref<ComputePipeline> BlurPipeline;

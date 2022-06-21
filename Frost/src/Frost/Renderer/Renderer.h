@@ -19,24 +19,31 @@ namespace Frost
 	{
 		uint32_t FramesInFlight = FRAMES_IN_FLIGHT;
 		
-		uint32_t EnvironmentMapResolution = 1024;
-		uint32_t IrradianceMapResolution = 32;
-		uint32_t IrradianceMapSamples = 512;
-
-
-		uint32_t MaxMesh = static_cast<uint32_t>(std::pow(2, 12)); // 4096
-
-		uint64_t GeometryPass_Mesh_Count = static_cast<uint64_t>(std::pow(2, 14)); // 16834
 
 		struct RayTracingSettings
 		{
 			// TODO: The rasterizer and the rt should have the same number of instances support (currently the rt has 2k, rasterizer has 16k)
+			uint32_t MaxMesh = static_cast<uint32_t>(std::pow(2, 12)); // 4096
 			uint32_t MaxInstance = static_cast<uint32_t>(std::pow(2, 10)); // 1024
 		} RayTracing;
 
+		// Maximum amount of meshes for the indirect drawing buffer
+		uint64_t MaxMeshCount_GeometryPass = static_cast<uint64_t>(std::pow(2, 14)); // 16834
+
+		// Environment Maps
+		uint32_t EnvironmentMapResolution = 1024;
+		uint32_t IrradianceMapResolution = 32;
+		uint32_t IrradianceMapSamples = 512;
+
+		// Forward+
 		uint32_t MaxPointLightCount = static_cast<uint32_t>(std::pow(2, 10)); // 1024
 
+		// Shadow Pass
+		uint32_t ShadowTextureResolution = 2048;
+
+		// Voxelization Pass
 		uint32_t VoxelTextureResolution = 256;
+
 	};
 
 	// Forward declaration

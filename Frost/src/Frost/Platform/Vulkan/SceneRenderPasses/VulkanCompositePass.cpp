@@ -13,6 +13,7 @@
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanVoxelizationPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanShadowPass.h"
 #include "Frost/Platform/Vulkan/VulkanSceneEnvironment.h"
 
 #include <imgui.h>
@@ -35,16 +36,14 @@ namespace Frost
 		m_RenderPassPipeline = renderPassPipeline;
 		m_Data = new InternalData();
 
-		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-
 		m_Data->CompositeShader = Renderer::GetShaderLibrary()->Get("PBRDeffered");
 		m_Data->LightCullingShader = Renderer::GetShaderLibrary()->Get("TiledLightCulling");
 
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 
-		
 		RenderPassSpecification renderPassSpec =
 		{
-			1600, 900, 3,
+			1600, 900, framesInFlight,
 			{
 				// Color Attachment
 				{
@@ -67,89 +66,69 @@ namespace Frost
 		vulkanSceneEnvironment->InitSkyBoxPipeline(m_Data->RenderPass);
 
 
-		// Point lights
-		{
-			uint32_t maxPointLightCount = Renderer::GetRendererConfig().MaxPointLightCount;
+		TiledLightCullingInitData();
 
 
-			m_Data->PointLightBufferData.resize(framesInFlight);
-			for (auto& pointLightBufferData : m_Data->PointLightBufferData)
-			{
-				// sizeof(uint32_t) - Number of point lights in the scene 
-				// (maxPointLightCount * sizeof(RenderQueue::LightData::PointLight) - Size of 1024 point lights
-				uint32_t lightDataSize = maxPointLightCount * sizeof(RenderQueue::LightData::PointLight);
-
-				pointLightBufferData.DeviceBuffer = BufferDevice::Create(lightDataSize, { BufferUsage::Storage });
-				pointLightBufferData.HostBuffer.Allocate(lightDataSize);
-			}
-
-			TiledLightCulling_DataInit();
-		}
-
-
-		{
-			// Composite pipeline
-			BufferLayout bufferLayout = {};
-			Pipeline::CreateInfo pipelineCreateInfo{};
-			pipelineCreateInfo.Shader = m_Data->CompositeShader;
-			pipelineCreateInfo.UseDepthTest = false;
-			pipelineCreateInfo.UseDepthWrite = false;
-			pipelineCreateInfo.RenderPass = m_Data->RenderPass;
-			pipelineCreateInfo.VertexBufferLayout = bufferLayout;
-			pipelineCreateInfo.Topology = PrimitiveTopology::TriangleStrip;
-			m_Data->CompositePipeline = Pipeline::Create(pipelineCreateInfo);
-
-			// Composite pipeline descriptor
-			uint32_t index = 0;
-			m_Data->Descriptor.resize(framesInFlight);
-			for (auto& descriptor : m_Data->Descriptor)
-			{
-				descriptor = Material::Create(m_Data->CompositeShader, "CompositePass-Material");
-
-				Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, index);
-				Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, index);
-				Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, index);
-				Ref<Texture3D> voxelTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVoxelizationPass>()->VoxelizationTexture[index];
-
-				//Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
-				//Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
-				//Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment()->GetIrradianceMap();
-				
-				//Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetAtmoshperePrefilterMap();
-				//Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetAtmoshpereIrradianceMap();
-
-				Ref<Texture2D> brdfLut = Renderer::GetBRDFLut();
-
-				descriptor->Set("CameraData.Gamma", 2.2f);
-				
-				descriptor->Set("u_PositionTexture", positionTexture);
-				descriptor->Set("u_NormalTexture", normalTexture);
-				descriptor->Set("u_AlbedoTexture", albedoTexture);
-				descriptor->Set("u_VoxelTexture", voxelTexture);
-				//descriptor->Set("u_CompositeTexture", compositeTexture);
-
-				//descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
-				//descriptor->Set("u_IrradianceMap", irradianceMap);
-				descriptor->Set("u_BRDFLut", brdfLut);
-				
-				descriptor->Set("u_LightData", m_Data->PointLightBufferData[index].DeviceBuffer);
-				descriptor->Set("u_VisibleLightData", m_Data->PointLightIndices[index]);
-
-				descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
-
-				index++;
-			}
-		}
+		PBRInitData();
 
 		Renderer::GetSceneEnvironment()->SetEnvironmentMapCallback(std::bind(&VulkanCompositePass::OnEnvMapChangeCallback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	void VulkanCompositePass::OnEnvMapChangeCallback(const Ref<TextureCubeMap>& prefiltered, const Ref<TextureCubeMap>& irradiance)
+	void VulkanCompositePass::PBRInitData()
 	{
-		for (auto& descriptor : m_Data->Descriptor)
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		uint32_t voxelTextureSize = Renderer::GetRendererConfig().VoxelTextureResolution;
+		m_PushConstantData.VoxelTextureSize = voxelTextureSize;
+
+		// Composite pipeline
+		BufferLayout bufferLayout = {};
+		Pipeline::CreateInfo pipelineCreateInfo{};
+		pipelineCreateInfo.Shader = m_Data->CompositeShader;
+		pipelineCreateInfo.UseDepthTest = false;
+		pipelineCreateInfo.UseDepthWrite = false;
+		pipelineCreateInfo.RenderPass = m_Data->RenderPass;
+		pipelineCreateInfo.VertexBufferLayout = bufferLayout;
+		pipelineCreateInfo.Topology = PrimitiveTopology::TriangleStrip;
+		m_Data->CompositePipeline = Pipeline::Create(pipelineCreateInfo);
+
+		// Composite pipeline descriptor
+		m_Data->Descriptor.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
-			descriptor->Set("u_RadianceFilteredMap", prefiltered);
-			descriptor->Set("u_IrradianceMap", irradiance);
+			m_Data->Descriptor[i] = Material::Create(m_Data->CompositeShader, "CompositePass-Material");
+			auto descriptor = m_Data->Descriptor[i];
+
+			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, i);
+			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, i);
+			Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, i);
+			Ref<Texture3D> voxelTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVoxelizationPass>()->VoxelizationTexture[i];
+			Ref<Image2D> shadowTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowComputeTexture[i];
+
+			//Ref<Image2D> compositeTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, index);
+			//Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment()->GetPrefilteredMap();
+			//Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment()->GetIrradianceMap();
+
+			//Ref<TextureCubeMap> prefilteredMap = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetAtmoshperePrefilterMap();
+			//Ref<TextureCubeMap> irradianceMap = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetAtmoshpereIrradianceMap();
+
+			Ref<Texture2D> brdfLut = Renderer::GetBRDFLut();
+
+			descriptor->Set("CameraData.Gamma", 2.2f);
+
+			descriptor->Set("u_PositionTexture", positionTexture);
+			descriptor->Set("u_NormalTexture", normalTexture);
+			descriptor->Set("u_AlbedoTexture", albedoTexture);
+			descriptor->Set("u_VoxelTexture", voxelTexture);
+			descriptor->Set("u_ShadowTexture", shadowTexture);
+			//descriptor->Set("u_CompositeTexture", compositeTexture);
+
+			//descriptor->Set("u_RadianceFilteredMap", prefilteredMap);
+			//descriptor->Set("u_IrradianceMap", irradianceMap);
+			descriptor->Set("u_BRDFLut", brdfLut);
+
+			descriptor->Set("u_LightData", m_Data->PointLightBufferData[i].DeviceBuffer);
+			descriptor->Set("u_VisibleLightData", m_Data->PointLightIndices[i]);
+
 			descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 		}
 	}
@@ -158,14 +137,29 @@ namespace Frost
 	{
 	}
 
-	void VulkanCompositePass::TiledLightCulling_DataInit()
+	void VulkanCompositePass::TiledLightCullingInitData()
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		uint32_t maxPointLightCount = Renderer::GetRendererConfig().MaxPointLightCount;
 
+		// Allocating data for lights
+		m_Data->PointLightBufferData.resize(framesInFlight);
+		for (auto& pointLightBufferData : m_Data->PointLightBufferData)
+		{
+			// sizeof(uint32_t) - Number of point lights in the scene 
+			// (maxPointLightCount * sizeof(RenderQueue::LightData::PointLight) - Size of 1024 point lights
+			uint32_t lightDataSize = maxPointLightCount * sizeof(RenderQueue::LightData::PointLight);
+
+			pointLightBufferData.DeviceBuffer = BufferDevice::Create(lightDataSize, { BufferUsage::Storage });
+			pointLightBufferData.HostBuffer.Allocate(lightDataSize);
+		}
+
+		// Pipeline
 		ComputePipeline::CreateInfo computePipelineCI{};
 		computePipelineCI.Shader = m_Data->LightCullingShader;
 		m_Data->LightCullingPipeline = ComputePipeline::Create(computePipelineCI);
 
+		// Descriptor
 		m_Data->PointLightIndices.resize(framesInFlight);
 		m_Data->CullingDataBuffer.resize(framesInFlight);
 		m_Data->LightCullingDescriptor.resize(framesInFlight);
@@ -197,6 +191,16 @@ namespace Frost
 		}
 	}
 
+	void VulkanCompositePass::OnEnvMapChangeCallback(const Ref<TextureCubeMap>& prefiltered, const Ref<TextureCubeMap>& irradiance)
+	{
+		for (auto& descriptor : m_Data->Descriptor)
+		{
+			descriptor->Set("u_RadianceFilteredMap", prefiltered);
+			descriptor->Set("u_IrradianceMap", irradiance);
+			descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
+		}
+	}
+
 	void VulkanCompositePass::OnUpdate(const RenderQueue& renderQueue)
 	{
 		// If we have 0 meshes, we shouldnt render this pass
@@ -218,7 +222,7 @@ namespace Frost
 		}
 
 
-		TiledLightCulling_OnUpdate(renderQueue);
+		TiledLightCullingUpdate(renderQueue);
 
 		{
 			// From the GBuffer, blit the depth texture to render the environment cubemap
@@ -245,8 +249,8 @@ namespace Frost
 		m_PushConstantData.CameraPosition.w = static_cast<float>(pointLightCount);
 
 		auto voxelizationPassData = m_RenderPassPipeline->GetRenderPassData<VulkanVoxelizationPass>();
-		m_PushConstantData.VoxelSampleOffset = glm::vec4(voxelizationPassData->CameraPosition, 0.0f);
-		m_PushConstantData.VoxelSampleOffset.w = (voxelizationPassData->m_VoxelGrid * voxelizationPassData->m_VoxelSize);
+		m_PushConstantData.VoxelSampleOffset = voxelizationPassData->CameraPosition;
+		m_PushConstantData.VoxelGrid = (voxelizationPassData->m_VoxelGrid * voxelizationPassData->m_VoxelSize);
 
 		m_Data->RenderPass->Bind();
 		vulkanPipeline->Bind();
@@ -283,85 +287,7 @@ namespace Frost
 		m_Data->RenderPass->Unbind();
 	}
 
-	// TODO: TEMP!
-	static void DrawVec3CoordsEdit(const std::string& name, glm::vec3& values, float resetValue = 0.0f, float columnWidth = 100.0f)
-	{
-		ImGuiIO& io = ImGui::GetIO();
-		auto boldFont = io.Fonts->Fonts[0];
-
-		ImGui::PushID(name.c_str());
-
-		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, columnWidth);
-		ImGui::Text(name.c_str());
-		ImGui::NextColumn();
-
-		ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ 0, 0.5f });
-
-		float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
-		ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.9f, 0.2f, 0.2f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
-		ImGui::PushFont(boldFont);
-		if (ImGui::Button("X", buttonSize))
-			values.x = resetValue;
-		ImGui::PopFont();
-		ImGui::PopStyleColor(3);
-
-		ImGui::SameLine();
-		ImGui::DragFloat("##X", &values.x, 0.1f, 0.0f, 0.0f, "%.2f");
-		ImGui::PopItemWidth();
-		ImGui::SameLine();
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.3f, 0.8f, 0.3f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
-		ImGui::PushFont(boldFont);
-		if (ImGui::Button("Y", buttonSize))
-			values.y = resetValue;
-		ImGui::PopFont();
-		ImGui::PopStyleColor(3);
-
-		ImGui::SameLine();
-		ImGui::DragFloat("##Y", &values.y, 0.1f, 0.0f, 0.0f, "%.2f");
-		//bool ImGui::DragFloat(const char* label, float* v, float v_speed, float v_min, float v_max, const char* format, ImGuiSliderFlags flags)
-		ImGui::PopItemWidth();
-		ImGui::SameLine();
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.2f, 0.35f, 0.9f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
-		ImGui::PushFont(boldFont);
-		if (ImGui::Button("Z", buttonSize))
-			values.z = resetValue;
-		ImGui::PopFont();
-		ImGui::PopStyleColor(3);
-
-		ImGui::SameLine();
-		ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f");
-		ImGui::PopItemWidth();
-
-		ImGui::PopStyleVar();
-
-		ImGui::Columns(1);
-
-		ImGui::PopID();
-	}
-
-	void VulkanCompositePass::OnRenderDebug()
-	{
-		if (ImGui::CollapsingHeader("Deffered Tiled Pipeline"))
-		{
-			ImGui::SliderFloat("Light's HeatMap", &m_PushConstantData.UseLightHeatMap, 0.0f, 1.0f, nullptr, 1.0f);
-
-			//DrawVec3CoordsEdit("Voxel Offset", *(glm::vec3*)&m_PushConstantData.VoxelSampleOffset.x);
-		}
-	}
-
-	void VulkanCompositePass::TiledLightCulling_OnUpdate(const RenderQueue& renderQueue)
+	void VulkanCompositePass::TiledLightCullingUpdate(const RenderQueue& renderQueue)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
@@ -402,9 +328,18 @@ namespace Frost
 		);
 	}
 
-	void VulkanCompositePass::LightBufferBlur_OnUpdate(const RenderQueue& renderQueue)
+	void VulkanCompositePass::PBRUpdate()
 	{
 
+	}
+
+	void VulkanCompositePass::OnRenderDebug()
+	{
+		if (ImGui::CollapsingHeader("Deffered Tiled Pipeline"))
+		{
+			//ImGui::SliderFloat("Light's HeatMap", &m_PushConstantData.UseLightHeatMap, 0.0f, 1.0f, nullptr, 1.0f);
+			ImGui::SliderInt("Light HeatMap", &m_PushConstantData.UseLightHeatMap, 0, 1);
+		}
 	}
 
 	void VulkanCompositePass::OnResize(uint32_t width, uint32_t height)
@@ -413,7 +348,7 @@ namespace Frost
 
 		RenderPassSpecification renderPassSpec =
 		{
-			width, height, 3,
+			width, height, framesInFlight,
 			{
 				// Color Attachment
 				{
@@ -462,10 +397,12 @@ namespace Frost
 			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, i);
 			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, i);
 			Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(2, i);
+			Ref<Image2D> shadowTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowComputeTexture[i];
 
 			descriptor->Set("u_PositionTexture", positionTexture);
 			descriptor->Set("u_NormalTexture", normalTexture);
 			descriptor->Set("u_AlbedoTexture", albedoTexture);
+			descriptor->Set("u_ShadowTexture", shadowTexture);
 			descriptor->Set("u_VisibleLightData", m_Data->PointLightIndices[i]); // This is obtained from the light culling compute shader
 
 			descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();

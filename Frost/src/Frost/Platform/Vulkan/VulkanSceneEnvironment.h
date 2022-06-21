@@ -15,7 +15,7 @@ namespace Frost
 		VulkanSceneEnvironment();
 		virtual ~VulkanSceneEnvironment();
 
-		virtual void InitCallbacks() override;
+		virtual void InitCallbackFunctions() override;
 
 		virtual void LoadEnvMap(const std::string& filepath) override;
 

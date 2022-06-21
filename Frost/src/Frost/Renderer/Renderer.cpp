@@ -70,6 +70,8 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ApplyAerial.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Voxelization.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VoxelFilter.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowDepthPass.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowCompute.glsl");
 
 		
 		// Init the pools
@@ -99,7 +101,7 @@ namespace Frost
 		//s_Data->m_RendererDebugger = RendererDebugger::Create();
 		//s_Data->m_RendererDebugger->Init();
 
-		s_Data->m_Environment->InitCallbacks();
+		s_Data->m_Environment->InitCallbackFunctions();
 		//s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/pink_sunrise_4k.hdr");
 		s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/dikhololo_night_4k.hdr");
 		//s_Data->m_Environment->SetType(SceneEnvironment::Type::Hillaire);

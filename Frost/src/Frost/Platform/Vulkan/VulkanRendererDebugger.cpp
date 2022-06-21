@@ -25,11 +25,7 @@ namespace Frost
 	void VulkanRendererDebugger::ImGuiRender()
 	{
 		ImGui::Begin("Renderer Debugger");
-
 		m_SceneRenderPassPipeline->UpdateRendererDebugger();
-
-		//bool* lightHeatMap = 
-		//ImGui::Checkbox("Light Heat Map", )
 		ImGui::End();
 	}
 }

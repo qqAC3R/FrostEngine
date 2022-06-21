@@ -40,7 +40,7 @@ namespace Frost
 
 		auto cubeMapTexture = m_RenderPassPipeline->GetRenderPassData<VulkanComputePass>()->CubeMap;
 		uint32_t maxInstances = Renderer::GetRendererConfig().RayTracing.MaxInstance;
-		uint32_t maxMeshes = Renderer::GetRendererConfig().MaxMesh;
+		uint32_t maxMeshes = Renderer::GetRendererConfig().RayTracing.MaxMesh;
 
 
 		for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)

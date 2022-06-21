@@ -30,14 +30,13 @@ namespace Frost
 
 	VulkanGeometryPass::~VulkanGeometryPass()
 	{
-		delete m_Data;
 	}
 
 	static RenderPassSpecification s_RenderPassSpec;
 
 	void VulkanGeometryPass::Init(SceneRenderPassPipeline* renderPassPipeline)
 	{
-		uint64_t maxCountMeshes = Renderer::GetRendererConfig().GeometryPass_Mesh_Count;
+		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 
 		m_RenderPassPipeline = renderPassPipeline;
@@ -48,25 +47,25 @@ namespace Frost
 		m_Data->HZBShader = Renderer::GetShaderLibrary()->Get("HiZBufferBuilder");
 
 
-		Geometry_DataInit();
+		GeometryDataInit();
 	}
 
 
 	void VulkanGeometryPass::InitLate()
 	{
-		LateCull_DataInit(1600, 900);
+		LateCullDataInit(1600, 900);
 	}
 
 	/// Geometry pass initialization
-	void VulkanGeometryPass::Geometry_DataInit()
+	void VulkanGeometryPass::GeometryDataInit()
 	{
-		uint64_t maxCountMeshes = Renderer::GetRendererConfig().GeometryPass_Mesh_Count;
+		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 
 
 		s_RenderPassSpec =
 		{
-			1600, 900, 3,
+			1600, 900, framesInFlight,
 			{
 				// Position Attachment // Attachment 0
 				{
@@ -169,9 +168,9 @@ namespace Frost
 
 	}
 
-	void VulkanGeometryPass::LateCull_DataInit(uint32_t width, uint32_t height)
+	void VulkanGeometryPass::LateCullDataInit(uint32_t width, uint32_t height)
 	{
-		uint64_t maxCountMeshes = Renderer::GetRendererConfig().GeometryPass_Mesh_Count;
+		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 
 
@@ -617,12 +616,11 @@ namespace Frost
 
 	void VulkanGeometryPass::OnResizeLate(uint32_t width, uint32_t height)
 	{
-		LateCull_DataInit(width, height);
+		LateCullDataInit(width, height);
 	}
 
 	void VulkanGeometryPass::ShutDown()
 	{
 		delete m_Data;
 	}
-
 }

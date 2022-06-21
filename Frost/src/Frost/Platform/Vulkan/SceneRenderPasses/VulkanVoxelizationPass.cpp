@@ -46,7 +46,7 @@ namespace Frost
 	{
 		// Getting all the needed information
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-		uint64_t maxCountMeshes = Renderer::GetRendererConfig().GeometryPass_Mesh_Count;
+		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		uint32_t voxelVolumeDimensions = Renderer::GetRendererConfig().VoxelTextureResolution;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -560,9 +560,6 @@ namespace Frost
 		// End the renderpass
 		m_Data->VoxelizationRenderPass->Unbind();
 
-
-		//Ref<VulkanTexture3D> vulkanVoxelTexture = m_Data->VoxelizationTexture[currentFrameIndex].As<VulkanTexture3D>();
-		//vulkanVoxelTexture->GenerateMipMaps(cmdBuf, vulkanVoxelTexture->GetVulkanImageLayout());
 		VoxelFilterUpdate();
 	}
 
