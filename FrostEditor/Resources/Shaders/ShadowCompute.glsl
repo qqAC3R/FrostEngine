@@ -51,7 +51,7 @@ vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
 
 float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex)
 {
-	vec2 coords = ComputeShadowCoord(shadowCoords.xy * 0.5f + 0.5f, cascadeIndex);
+	vec2 coords = ComputeShadowCoord(shadowCoords.xy, cascadeIndex);
 	float dist = texture(u_ShadowDepthTexture, coords).r;
 	return dist;
 }
@@ -115,7 +115,7 @@ float HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 
 	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
 	{
-		float dist = SampleShadowMap(shadowCoord.xy, cascadeIndex);
+		float dist = SampleShadowMap(shadowCoord.xy * 0.5 + 0.5, cascadeIndex);
 
 		if (shadowCoord.w > 0 && dist < shadowCoord.z - bias)
 		{
@@ -216,7 +216,7 @@ float FindBlockerDistance_DirectionalLight(vec4 shadowCoords, uint cascadeIndex,
 	float searchWidth = SearchRegionRadiusUV(shadowCoords.z);
 	for (int i = 0; i < numBlockerSearchSamples; i++)
 	{
-		float z = SampleShadowMap(shadowCoords.xy + SamplePoisson(i) * searchWidth, cascadeIndex);
+		float z = SampleShadowMap((shadowCoords.xy * 0.5 + 0.5) + SamplePoisson(i) * searchWidth, cascadeIndex);
 
 		if (z < (shadowCoords.z - bias))
 		{
@@ -240,7 +240,7 @@ float PCF_DirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius)
 	for (int i = 0; i < numPCFSamples; i++)
 	{
 		vec2 offset = SamplePoisson(i) * uvRadius;
-		float z = SampleShadowMap(shadowCoords.xy + offset, cascadeIndex);
+		float z = SampleShadowMap((shadowCoords.xy * 0.5 + 0.5) + offset, cascadeIndex);
 		sum += step(shadowCoords.z - bias, z);
 	}
 	return sum / float(numPCFSamples);

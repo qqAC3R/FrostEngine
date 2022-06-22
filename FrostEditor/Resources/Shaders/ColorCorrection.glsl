@@ -64,7 +64,7 @@ void main()
 
 		// Contribution from the screen space reflections
 		vec3 reflectionContribution = texelFetch(u_SSRTexture, loc, 0).rgb;
-		color = mix(color, reflectionContribution.xyz, 0.4f);
+		//color = mix(color, reflectionContribution.xyz, 0.4f);
 
 		// Bloom factor
 		vec3 bloomFactor = texelFetch(u_BloomTexture, loc, 0).rgb;

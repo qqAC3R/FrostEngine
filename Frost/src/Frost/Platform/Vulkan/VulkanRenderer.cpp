@@ -111,8 +111,8 @@ namespace Frost
 		/// Init scene render passes
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
-		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanVoxelizationPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanShadowPass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanVoxelizationPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanPostFXPass>::Create());
 		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputePass>::Create());

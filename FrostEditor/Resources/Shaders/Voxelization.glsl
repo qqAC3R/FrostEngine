@@ -26,6 +26,7 @@ layout(buffer_reference, scalar) buffer Vertices { Vertex v[]; }; // Positions o
 layout(push_constant) uniform Constants
 {
 	mat4 ViewMatrix;
+	mat4 LightViewProjMatrix;
 	uint MaterialIndex;
 	uint64_t VertexBufferBDA;
 	int VoxelDimensions;
@@ -46,13 +47,15 @@ void main()
 	Vertex vertex = verticies.v[gl_VertexIndex];
 
 	v_Data.TexCoord = vertex.TexCoord;
-	v_Data.PositionDepth = vec4(0.0f); // TODO: Add the light view matrix to get depth coords
+	//v_Data.PositionDepth = vec4(0.0f); // TODO: Add the light view matrix to get depth coords
 
 	int meshIndex = int(u_PushConstant.MaterialIndex + vertex.MaterialIndex);
 	v_BufferIndex = int(meshIndex);
 
 	// Compute world position
 	vec4 worldPos = a_ModelSpaceMatrix * vec4(vertex.Position, 1.0f);
+	v_Data.PositionDepth = u_PushConstant.LightViewProjMatrix * worldPos; // TODO: Add the light view matrix to get depth coords
+	
 	gl_Position = worldPos;
 }
 
@@ -122,7 +125,6 @@ layout(set = 0, binding = 0) uniform VoxelProjections
 void main()
 {
 	//Find the axis for the maximize the projected area of this triangle
-
 	vec3 faceNormal = abs( normalize( cross( gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz, gl_in[2].gl_Position.xyz -gl_in[0].gl_Position.xyz) ) );
 	
 	// 0 = x axis dominant, 1 = y axis dominant, 2 = z axis dominant
@@ -189,6 +191,7 @@ layout(location = 7) in vec4 f_PositionDepth;
 // The same texture but with different formats (for atomic operations)
 layout(set = 0, binding = 1) writeonly uniform image3D u_VoxelTexture_NonAtomic;
 layout(set = 0, binding = 2, r32ui) uniform volatile coherent uimage3D u_VoxelTexture;
+layout(set = 0, binding = 4) uniform sampler2D u_ShadowDepthTexture;
 
 struct MaterialData
 {
@@ -214,6 +217,7 @@ layout(set = 0, binding = 3) readonly buffer u_MaterialUniform
 layout(push_constant) uniform Constants
 {
 	mat4 ViewMatrix;
+	mat4 LightViewProjMatrix;
 	uint MaterialIndex;
 	uint64_t VertexBufferBDA;
 	int VoxelDimensions;
@@ -310,6 +314,46 @@ void imageAtomicRGBA8Avg_2(ivec3 coords, vec4 value)
 
 
 
+vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
+{
+	switch(cascadeIndex)
+	{
+	case 1:
+		return coord * vec2(0.5f);
+	case 2:
+		return vec2(coord.x * 0.5f + 0.5f, coord.y * 0.5f);
+	case 3:
+		return vec2(coord.x * 0.5f, coord.y * 0.5f + 0.5f);
+	case 4:
+		return coord * vec2(0.5f) + vec2(0.5f);
+	}
+}
+
+float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex)
+{
+	vec2 coords = ComputeShadowCoord(shadowCoords.xy, cascadeIndex);
+	float dist = texture(u_ShadowDepthTexture, coords).r;
+	return dist;
+}
+
+float SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
+{
+	float shadow = 1.0;
+	float bias = 0.003;
+
+	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
+	{
+		float dist = SampleShadowMap(shadowCoord.xy * 0.5 + 0.5, cascadeIndex);
+
+		if (shadowCoord.w > 0 && dist < shadowCoord.z - bias)
+		{
+			shadow = 0.1f;
+		}
+	}
+	return shadow;
+}
+
+
 void main()
 {
 	
@@ -368,6 +412,12 @@ void main()
 	// Flip the Z
 	texcoord.z = u_PushConstant.VoxelDimensions - texcoord.z - 1;
 
+
+	// Inject directional light
+	vec4 shadwPos = f_PositionDepth / f_PositionDepth.w;
+	float shadowFactor = SampleShadowTexture(shadwPos, 2);
+	
+	o_Albedo.xyz *= shadowFactor;
 
 	// Atomic operations to get an averaged value, described in OpenGL insights about voxelization
 	// Required to avoid flickering when voxelizing every frame

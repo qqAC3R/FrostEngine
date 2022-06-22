@@ -31,7 +31,7 @@ namespace Frost
 		void VoxelizationUpdate(const RenderQueue& renderQueue);
 
 		void VoxelFilterInit();
-		void VoxelFilterUpdate();
+		void VoxelFilterUpdate(const RenderQueue& renderQueue);
 
 		void ClearBufferInit();
 
@@ -64,6 +64,7 @@ namespace Frost
 			int32_t m_VoxelGrid = 256;
 			float m_VoxelSize = 1.0f;
 			glm::vec3 CameraPosition = { 0.0f, 0.0f, 0.0f };
+			float m_VoxelAABB = 0.0f;
 		};
 
 		struct VoxelProjections
@@ -76,15 +77,15 @@ namespace Frost
 		struct PushConstant
 		{
 			glm::mat4 ViewMatrix;
+			glm::mat4 LightViewProj;
 			uint32_t MaterialIndex;
 			uint64_t VertexBufferBDA;
 			int32_t VoxelDimensions = 256;
 			int32_t AtomicOperation;
 		};
-		int32_t m_AtomicOperation = 1;
+		VulkanVoxelizationPass::PushConstant m_PushConstant;
 
-		int32_t m_Frame[3] = { 0, 0, 0 };
-		int32_t m_PingPongVoxelTexture = 0;
+		int32_t m_AtomicOperation = 1;
 
 		InternalData* m_Data;
 		std::string m_Name;
