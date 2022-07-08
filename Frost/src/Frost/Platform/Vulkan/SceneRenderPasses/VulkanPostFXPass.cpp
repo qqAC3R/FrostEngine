@@ -36,11 +36,11 @@ namespace Frost
 		m_RenderPassPipeline = renderPassPipeline;
 		m_Data = new InternalData();
 
-		m_Data->SSRShader = Renderer::GetShaderLibrary()->Get("SSCT");
+		m_Data->SSRShader = Renderer::GetShaderLibrary()->Get("ScreenSpaceReflections");
 		m_Data->BlurShader = Renderer::GetShaderLibrary()->Get("GaussianBlur");
 		m_Data->HZBShader = Renderer::GetShaderLibrary()->Get("HiZBufferBuilder");
 		m_Data->VisibilityShader = Renderer::GetShaderLibrary()->Get("VisibilityBuffer");
-		m_Data->AO_Shader = Renderer::GetShaderLibrary()->Get("GroundTruthAO_V2");
+		m_Data->AO_Shader = Renderer::GetShaderLibrary()->Get("AmbientOcclusion");
 		m_Data->DenoiserShader = Renderer::GetShaderLibrary()->Get("SpatialDenoiser");
 		m_Data->BloomShader = Renderer::GetShaderLibrary()->Get("Bloom");
 		m_Data->ApplyAerialShader = Renderer::GetShaderLibrary()->Get("ApplyAerial");
@@ -52,7 +52,7 @@ namespace Frost
 		ColorCorrectionInitData  (1600, 900);
 		HZBInitData              (1600, 900);
 		SSRFilterInitData        (1600, 900);
-		VisibilityInitData       (1600, 900);
+		//VisibilityInitData       (1600, 900);
 		AmbientOcclusionInitData (1600, 900);
 		SpatialDenoiserInitData  (1600, 900);
 		SSRInitData              (1600, 900);
@@ -220,8 +220,8 @@ namespace Frost
 
 			auto& vulkanMaterial = m_Data->SSRDescriptor[i].As<VulkanMaterial>();
 
-			auto viewPosTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, i);
-			auto normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, i);
+			auto viewPosTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(3, i);
+			auto normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
 			//auto finalImage = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, i);
 
 			// Textures
@@ -231,9 +231,6 @@ namespace Frost
 			vulkanMaterial->Set("u_NormalTex", normalTexture);
 			vulkanMaterial->Set("o_FrameTex", m_Data->SSRTexture[i]);
 			vulkanMaterial->Set("u_PrefilteredColorBuffer", m_Data->BlurredColorBuffer[i]);
-			vulkanMaterial->Set("u_VisibilityBuffer", m_Data->VisibilityImage[i]);
-			vulkanMaterial->Set("u_AOBuffer", m_Data->DenoiserImage[i]);
-			vulkanMaterial->Set("u_BloomTexture", m_Data->Bloom_UpsampledTexture[i]);
 
 			// Uniform buffer data
 			vulkanMaterial->Set("UniformBuffer.ScreenSize", glm::vec4(width, height, 0.0f, 0.0f));
@@ -311,7 +308,7 @@ namespace Frost
 					vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
 
 					// `i_Depth`
-					auto renderPass = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass;
+					auto renderPass = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass;
 					auto geometryDepthAttachment = renderPass->GetDepthAttachment(frame);
 
 					vulkanDescriptor->Set("i_Depth", geometryDepthAttachment);
@@ -502,13 +499,11 @@ namespace Frost
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-		{
-			// Pipeline creation
-			ComputePipeline::CreateInfo computePipelineCreateInfo{};
-			computePipelineCreateInfo.Shader = m_Data->AO_Shader;
-			if (!m_Data->AO_Pipeline)
-				m_Data->AO_Pipeline = ComputePipeline::Create(computePipelineCreateInfo);
-		}
+		// Pipeline creation
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_Data->AO_Shader;
+		if (!m_Data->AO_Pipeline)
+			m_Data->AO_Pipeline = ComputePipeline::Create(computePipelineCreateInfo);
 
 
 		m_Data->AO_Image.resize(framesInFlight);
@@ -538,8 +533,8 @@ namespace Frost
 			auto& vulkanDescriptor = descriptor.As<VulkanMaterial>();
 
 			auto noiseTexture = Renderer::GetNoiseLut();
-			auto viewPosTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, i);
-			auto normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, i);
+			auto viewPosTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(3, i);
+			auto normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
 
 			descriptor->Set("u_ViewPositionTex", viewPosTexture);
 			descriptor->Set("u_DepthPyramid", m_Data->DepthPyramid[i]);
@@ -676,8 +671,8 @@ namespace Frost
 			Ref<VulkanMaterial> vulkanApplyAerialDescriptor = m_Data->ApplyAerialDescriptor[i].As<VulkanMaterial>();
 
 			Ref<Texture3D> aerialLUT = vulkanSceneEnv->GetAerialPerspectiveLUT();
-			Ref<Image2D> depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetDepthAttachment(i);
-			Ref<Image2D> viewPos = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, i);
+			Ref<Image2D> depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(i);
+			Ref<Image2D> viewPos = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(3, i);
 			
 			vulkanApplyAerialDescriptor->Set("u_AerialLUT", aerialLUT);
 			vulkanApplyAerialDescriptor->Set("u_ViewPos", viewPos);
@@ -749,42 +744,32 @@ namespace Frost
 		auto finalImage = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex).As<VulkanImage2D>();
 		finalImage->TransitionLayout(cmdBuf, finalImage->GetVulkanImageLayout());
 
-		BloomUpdate(renderQueue);
+		if (m_CompositeSetings.UseBloom)
+		{
+			BloomUpdate(renderQueue);
+		}
 
 		ColorCorrectionUpdate(renderQueue, TARGET_BLOOM);
 		
 		HZBUpdate(renderQueue);
 		
-		SSRFilterUpdate(renderQueue);
-		VisibilityUpdate(renderQueue);
+		if (m_CompositeSetings.UseSSR)
+		{
+			SSRFilterUpdate(renderQueue);
+			SSRUpdate(renderQueue);
+		}
 		
-		AmbientOcclusionUpdate(renderQueue);
-		SpatialDenoiserUpdate(renderQueue);
+		if (m_CompositeSetings.UseAO)
+		{
+			AmbientOcclusionUpdate(renderQueue);
+			SpatialDenoiserUpdate(renderQueue);
+		}
 		
-		SSRUpdate(renderQueue);
-		
+#if 0
 		ApplyAerialUpdate(renderQueue);
-		
+#endif
+
 		ColorCorrectionUpdate(renderQueue, TARGET_COMPOSITE);
-	}
-
-	void VulkanPostFXPass::OnRenderDebug()
-	{
-		if(ImGui::CollapsingHeader("Ambient Occlusion"))
-		{
-			ImGui::Text("AO Mode (0 - HBAO; 1 - GTAO)");
-			ImGui::SliderInt(" ", &m_AOSettings.AOMode, 0, 1);
-
-			ImGui::Text("AO Texture");
-			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-			Application::Get().GetImGuiLayer()->RenderTexture(m_Data->DenoiserImage[currentFrameIndex], 300, 200);
-		}
-		if (ImGui::CollapsingHeader("Bloom"))
-		{
-			ImGui::DragFloat("Threshold", &m_BloomSettings.Threshold, 0.1f, 0.0f, 1000.0f);
-			ImGui::SliderFloat("Knee", &m_BloomSettings.Knee, 0.1f, 1.0f);
-			ImGui::DragFloat("Intensity", &m_BloomSettings.Intensity, 0.1f, 0.0f, 1000.0f);
-		}
 	}
 
 	void VulkanPostFXPass::SSRFilterUpdate(const RenderQueue& renderQueue)
@@ -797,7 +782,8 @@ namespace Frost
 		auto vulkan_BlurColorTexture = m_Data->BlurredColorBuffer[currentFrameIndex].As<VulkanImage2D>();
 
 		glm::vec4 currentRes = glm::vec4(renderQueue.ViewPortWidth, renderQueue.ViewPortHeight, 0.0f, 0.0f);
-		for (uint32_t mipLevel = 0; mipLevel < m_Data->ScreenMipLevel; mipLevel++)
+		uint32_t screenMipLevels = m_SSRSettings.UseConeTracing ? m_Data->ScreenMipLevel : 1;
+		for (uint32_t mipLevel = 0; mipLevel < screenMipLevels; mipLevel++)
 		{
 			auto vulkan_BlurDescriptor = m_Data->BlurShaderDescriptor[currentFrameIndex][mipLevel].As<VulkanMaterial>();
 			
@@ -812,8 +798,8 @@ namespace Frost
 			vulkan_BlurDescriptor->Bind(cmdBuf, m_Data->BlurPipeline);
 			vulkan_BlurPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &currentRes);
 
-			uint32_t groupX = std::floor(currentRes.x / 32.0f) + 1;
-			uint32_t groupY = std::floor(currentRes.y / 32.0f) + 1;
+			uint32_t groupX = std::ceil(currentRes.x / 32.0f);
+			uint32_t groupY = std::ceil(currentRes.y / 32.0f);
 			vulkan_BlurPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 
@@ -850,23 +836,25 @@ namespace Frost
 		projectionMatrix[1][1] *= -1;
 		glm::mat4 invProjectionMatrix = glm::inverse(projectionMatrix);
 
-
-		glm::mat4 viewMatrix = renderQueue.CameraViewMatrix;
-		glm::mat4 invViewMatrix = glm::inverse(viewMatrix);
+		glm::mat4 invViewMatrix = glm::inverse(renderQueue.CameraViewMatrix);
 
 
 
 		ssrMaterial->Set("UniformBuffer.ProjectionMatrix", projectionMatrix);
-		ssrMaterial->Set("UniformBuffer.InvProjectionMatrix", invProjectionMatrix);
+		ssrMaterial->Set("UniformBuffer.InvProjectionMatrix", glm::inverse(projectionMatrix));
 
-		ssrMaterial->Set("UniformBuffer.ViewMatrix", viewMatrix);
+		ssrMaterial->Set("UniformBuffer.ViewMatrix", renderQueue.CameraViewMatrix);
 		ssrMaterial->Set("UniformBuffer.InvViewMatrix", invViewMatrix);
+
+		ssrMaterial->Set("UniformBuffer.UseConeTracing", m_SSRSettings.UseConeTracing);
+		ssrMaterial->Set("UniformBuffer.RayStepCount", m_SSRSettings.RayStepCount);
+		ssrMaterial->Set("UniformBuffer.RayStepSize", m_SSRSettings.RayStepSize);
 
 
 		ssrMaterial->Bind(cmdBuf, m_Data->SSRPipeline);
 
-		uint32_t groupX = (renderQueue.ViewPortWidth  / 32.0f) + 1;
-		uint32_t groupY = (renderQueue.ViewPortHeight / 32.0f) + 1;
+		uint32_t groupX = std::ceil(renderQueue.ViewPortWidth  / 32.0f);
+		uint32_t groupY = std::ceil(renderQueue.ViewPortHeight / 32.0f);
 		ssrPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
@@ -877,7 +865,7 @@ namespace Frost
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 
 		// `i_Depth`
-		auto renderPass = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass;
+		auto renderPass = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass;
 		auto geometryDepthAttachment = renderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
 
 
@@ -901,8 +889,8 @@ namespace Frost
 
 			vulkanHZB_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &currentHZB_Dimensions);
 
-			uint32_t groupX = std::floor(currentHZB_Dimensions.x / 32.0f) + 1;
-			uint32_t groupY = std::floor(currentHZB_Dimensions.y / 32.0f) + 1;
+			uint32_t groupX = std::ceil(currentHZB_Dimensions.x / 32.0f);
+			uint32_t groupY = std::ceil(currentHZB_Dimensions.y / 32.0f);
 			vulkanHZB_Pipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 
@@ -984,7 +972,7 @@ namespace Frost
 		glm::mat4 ViewMatrix;
 		glm::mat4 InvProjMatrix;
 
-		// vec4:                                       x        ||     y,z   
+		// vec3:                                       x        ||     y,z   
 		glm::vec3 AO_Data = glm::vec3(0.0f); // ProjectionScale || ScreenSize
 		int32_t AO_Mode = 1; // 0 = HBAO || 1 = GTAO
 
@@ -1019,8 +1007,8 @@ namespace Frost
 
 		vulkan_AO_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_AO_pushConstant);
 
-		uint32_t groupX = static_cast<uint32_t>(std::floor(width / 32.0f)) + 1;
-		uint32_t groupY = static_cast<uint32_t>(std::floor(height / 32.0f)) + 1;
+		uint32_t groupX = static_cast<uint32_t>(std::ceil(width / 32.0f));
+		uint32_t groupY = static_cast<uint32_t>(std::ceil(height / 32.0f));
 		vulkan_AO_Pipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 
@@ -1055,8 +1043,8 @@ namespace Frost
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
 		
-		uint32_t groupX = std::floor(width / 32.0f) + 1;
-		uint32_t groupY = std::floor(height / 32.0f) + 1;
+		uint32_t groupX = std::ceil(width / 32.0f);
+		uint32_t groupY = std::ceil(height / 32.0f);
 		vulkan_denoiser_Pipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 
@@ -1091,14 +1079,16 @@ namespace Frost
 
 		vulkan_cc_Descriptor->Bind(cmdBuf, m_Data->ColorCorrectionPipeline);
 
-		glm::vec3 pushConstant = { 2.2f, renderQueue.m_Camera.GetExposure(), static_cast<float>(target) };
-		vulkan_cc_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant);
+		m_CompositeSetings.Gamma = 2.2f;
+		m_CompositeSetings.Exposure = renderQueue.m_Camera.GetExposure();
+		m_CompositeSetings.Stage = static_cast<float>(target);
+		vulkan_cc_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_CompositeSetings);
 
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
 
-		uint32_t groupX = std::floor(width / 32.0f) + 1;
-		uint32_t groupY = std::floor(height / 32.0f) + 1;
+		uint32_t groupX = std::ceil(width / 32.0f);
+		uint32_t groupY = std::ceil(height / 32.0f);
 		vulkan_cc_Pipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
@@ -1211,8 +1201,8 @@ namespace Frost
 			uint32_t width = renderQueue.ViewPortWidth;
 			uint32_t height = renderQueue.ViewPortHeight;
 
-			uint32_t workGroupsX = std::floor(width / workGroupSize) + 1;
-			uint32_t workGroupsY = std::floor(height / workGroupSize) + 1;
+			uint32_t workGroupsX = std::ceil(width / workGroupSize);
+			uint32_t workGroupsY = std::ceil(height / workGroupSize);
 			vulkanBloomPipeline->Dispatch(cmdBuf, workGroupsX, workGroupsY, 1);
 
 			VkImageSubresourceRange imageSubrange{};
@@ -1289,8 +1279,8 @@ namespace Frost
 
 				vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, vulkanBloomPipeline->GetVulkanPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
 
-				uint32_t workGroupsX = (uint32_t)std::floor((float)mipWidth / workGroupSize) + 1;
-				uint32_t workGroupsY = (uint32_t)std::floor((float)mipHeight / workGroupSize) + 1;
+				uint32_t workGroupsX = (uint32_t)std::ceil((float)mipWidth / workGroupSize);
+				uint32_t workGroupsY = (uint32_t)std::ceil((float)mipHeight / workGroupSize);
 
 
 				vulkanBloomPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &bloomPushConstant);
@@ -1379,8 +1369,8 @@ namespace Frost
 
 			auto [mipWidth, mipHeight] = vulkanUpscaleBloomTex->GetMipSize(mip);
 
-			uint32_t workGroupsX = (uint32_t)std::floor((float)mipWidth / workGroupSize) + 1;
-			uint32_t workGroupsY = (uint32_t)std::floor((float)mipHeight / workGroupSize) + 1;
+			uint32_t workGroupsX = (uint32_t)std::ceil((float)mipWidth / workGroupSize);
+			uint32_t workGroupsY = (uint32_t)std::ceil((float)mipHeight / workGroupSize);
 			vulkanBloomPipeline->Dispatch(cmdBuf, workGroupsX, workGroupsY, 1);
 
 			VkImageSubresourceRange imageSubrange{};
@@ -1474,8 +1464,8 @@ namespace Frost
 
 				vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, vulkanBloomPipeline->GetVulkanPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
 
-				uint32_t workGroupsX = (uint32_t)std::floor((float)mipWidth / workGroupSize) + 1;
-				uint32_t workGroupsY = (uint32_t)std::floor((float)mipHeight / workGroupSize) + 1;
+				uint32_t workGroupsX = (uint32_t)std::ceil((float)mipWidth / workGroupSize);
+				uint32_t workGroupsY = (uint32_t)std::ceil((float)mipHeight / workGroupSize);
 
 
 				vulkanBloomPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &bloomPushConstant);
@@ -1510,7 +1500,7 @@ namespace Frost
 		ColorCorrectionInitData  (width, height);
 		SSRFilterInitData        (width, height);
 		HZBInitData              (width, height);
-		VisibilityInitData       (width, height);
+		//VisibilityInitData       (width, height);
 		AmbientOcclusionInitData (width, height);
 		SpatialDenoiserInitData  (width, height);
 		SSRInitData              (width, height);
@@ -1527,6 +1517,36 @@ namespace Frost
 			vulkanColorCorrectionDescriptor->Set("u_SSRTexture", m_Data->SSRTexture[i]);
 			vulkanColorCorrectionDescriptor->Set("u_AOTexture", m_Data->DenoiserImage[i]);
 			vulkanColorCorrectionDescriptor->UpdateVulkanDescriptorIfNeeded();
+		}
+	}
+
+	void VulkanPostFXPass::OnRenderDebug()
+	{
+		if (ImGui::CollapsingHeader("Screen Space Reflections"))
+		{
+			ImGui::SliderInt("Enable", &m_CompositeSetings.UseSSR, 0, 1);
+			ImGui::Separator();
+			ImGui::SliderInt("Cone Tracing", &m_SSRSettings.UseConeTracing, 0, 1);
+			ImGui::SliderInt("RayStep Count", &m_SSRSettings.RayStepCount, 5, 10);
+			ImGui::DragFloat("RayStep Size", &m_SSRSettings.RayStepSize, 0.001f, 0.04f, 0.1f);
+		}
+		if (ImGui::CollapsingHeader("Ambient Occlusion"))
+		{
+			ImGui::SliderInt("Enable", &m_CompositeSetings.UseAO, 0, 1);
+			ImGui::Separator();
+			ImGui::Text("AO Mode (0 - HBAO; 1 - GTAO)");
+			ImGui::SliderInt(" ", &m_AOSettings.AOMode, 0, 1);
+
+			ImGui::Text("AO Texture");
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			Application::Get().GetImGuiLayer()->RenderTexture(m_Data->DenoiserImage[currentFrameIndex], 300, 200);
+		}
+		if (ImGui::CollapsingHeader("Bloom"))
+		{
+			ImGui::SliderInt("Enable", &m_CompositeSetings.UseBloom, 0, 1);
+			ImGui::Separator();
+			ImGui::DragFloat("Threshold", &m_BloomSettings.Threshold, 0.1f, 0.0f, 1000.0f);
+			ImGui::SliderFloat("Knee", &m_BloomSettings.Knee, 0.1f, 1.0f);
 		}
 	}
 

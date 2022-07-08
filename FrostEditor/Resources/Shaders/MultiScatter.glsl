@@ -249,10 +249,6 @@ void main()
 	params.MieAbsorption = m_SkyParams.MieAbsorption;
 	params.OzoneAbsorption = m_SkyParams.OzoneAbsorption;
 
-	//float groundRadius = m_SkyParams.PlanetAbledo_Radius.w;
-	//float atmosphereRadius = m_SkyParams.SunDir_AtmRadius.w;
-	//vec3 groundAlbedo = m_SkyParams.PlanetAbledo_Radius.rgb;
-
 	float groundRadius = m_SkyParams.PlanetAbledo_Radius.w;
 	float atmosphereRadius = m_SkyParams.AtmosphereRadius;
 	vec3 groundAlbedo = m_SkyParams.PlanetAbledo_Radius.rgb;

@@ -60,8 +60,8 @@ namespace Frost
 			glm::vec2 MaxResCascade[SHADOW_MAP_CASCADE_COUNT];
 		};
 
-		float CascadeSplitLambda = 0.97f;
-		float CameraFarClip = 2000.0f;
+		float CascadeSplitLambda = 0.95f;
+		float CameraFarClip = 5000.0f;
 		float CameraNearClip = 0.1f;
 		float CascadeFarPlaneOffset = 0.0f, CascadeNearPlaneOffset = 0.0f;
 		int32_t FadeCascades = 1;

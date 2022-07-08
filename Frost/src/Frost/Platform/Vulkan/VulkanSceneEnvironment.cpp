@@ -485,7 +485,6 @@ namespace Frost
 
 	void VulkanSceneEnvironment::SetEnvironmentMapCallback(const std::function<void(const Ref<TextureCubeMap>&, const Ref<TextureCubeMap>&)>& func)
 	{
-		// TODO
 		m_EnvMapChangeCallback.push_back(func);
 	}
 
@@ -501,10 +500,7 @@ namespace Frost
 		
 		AtmosphereParams& atmosphereParams = m_AtmosphereParams;
 
-		glm::vec3 sunDir = glm::radians(-renderQueue.m_LightData.DirectionalLight.Direction);
-		atmosphereParams.SunDirection_Intensity = glm::vec4(sunDir.x, sunDir.y, sunDir.z, renderQueue.m_LightData.DirectionalLight.Intensity);
-		atmosphereParams.ViewPos_SunSize.w = renderQueue.m_LightData.DirectionalLight.Size;
-
+		
 		m_SkyboxDescriptor->Set("CameraData.SunDir", glm::vec3(atmosphereParams.SunDirection_Intensity));
 		m_SkyboxDescriptor->Set("CameraData.SunIntensity", atmosphereParams.SunDirection_Intensity.w);
 		m_SkyboxDescriptor->Set("CameraData.SunSize", atmosphereParams.ViewPos_SunSize.w);
@@ -528,7 +524,24 @@ namespace Frost
 
 	void VulkanSceneEnvironment::UpdateAtmosphere(const RenderQueue& renderQueue)
 	{
-		m_AtmosphereParams.ViewPos_SunSize.y = (6.360f + 0.0002f) + glm::clamp(renderQueue.CameraPosition.y / 100000.0f, 0.0f, 0.099f);
+		AtmosphereParams& atmosphereParams = m_AtmosphereParams;
+
+		glm::vec3 sunDir = glm::radians(-renderQueue.m_LightData.DirectionalLight.Direction);
+
+		glm::vec4 sunDir_Intensity = { sunDir.x, sunDir.y, sunDir.z, renderQueue.m_LightData.DirectionalLight.Intensity };
+		//float viewPosY = (6.360f + 0.0002f) + glm::clamp(renderQueue.CameraPosition.y / 100000.0f, 0.0f, 0.099f);
+
+		float sunSize = renderQueue.m_LightData.DirectionalLight.Size;
+		atmosphereParams.ViewPos_SunSize.w = sunSize;
+
+		// If nothing changed since the last frame, don't compute it again since its useless
+		if (atmosphereParams.SunDirection_Intensity == sunDir_Intensity)
+		{
+			return;
+		}
+
+		atmosphereParams.SunDirection_Intensity = sunDir_Intensity;
+		//atmosphereParams.ViewPos_SunSize.y = viewPosY;
 
 		TransmittanceLUT_Update();
 		MultiScatterLUT_Update();

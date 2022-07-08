@@ -46,6 +46,19 @@ namespace Frost
 
 	};
 
+	// Memory Usage:
+	/*
+		Shadow Map = 64mb * 3 = 192mb
+		3D Voxel texture = 73.15mb * 3 = 219.45mb
+	
+		GBuffer = (8mb * 4 attachments + 4mb (depth) ) * 3 = 108mb
+	
+		Radiance Map = 64mb
+	
+		All RGBA8 Images (from compute shaders) = 5mb * 7 * 3 = 105mb
+		2 Bloom textures 16F = 10mb * 2 * 3 = 60mb
+	*/
+
 	// Forward declaration
 	struct PointLightComponent;
 

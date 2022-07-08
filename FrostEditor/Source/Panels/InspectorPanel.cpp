@@ -132,9 +132,8 @@ namespace Frost
 		{
 			UserInterface::DrawVec3CoordsEdit("Translation", component.Translation);
 
-			glm::vec3 rotation = component.Rotation;
 			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
-			UserInterface::DrawVec3CoordsEdit("Rotation", rotation);
+			UserInterface::DrawVec3CoordsEdit("Rotation", component.Rotation);
 			
 			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
 			UserInterface::DrawVec3CoordsEdit("Scale", component.Scale, 1.0f);

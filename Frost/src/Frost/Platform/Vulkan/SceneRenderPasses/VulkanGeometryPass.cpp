@@ -44,20 +44,19 @@ namespace Frost
 
 		m_Data->GeometryShader = Renderer::GetShaderLibrary()->Get("GeometryPassIndirectBindless");
 		m_Data->LateCullShader = Renderer::GetShaderLibrary()->Get("OcclusionCulling_V2");
-		m_Data->HZBShader = Renderer::GetShaderLibrary()->Get("HiZBufferBuilder");
 
 
-		GeometryDataInit();
+		GeometryDataInit(1600, 900);
 	}
 
 
 	void VulkanGeometryPass::InitLate()
 	{
-		LateCullDataInit(1600, 900);
+		OcclusionCullDataInit(1600, 900);
 	}
 
 	/// Geometry pass initialization
-	void VulkanGeometryPass::GeometryDataInit()
+	void VulkanGeometryPass::GeometryDataInit(uint32_t width, uint32_t height)
 	{
 		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
@@ -65,7 +64,7 @@ namespace Frost
 
 		s_RenderPassSpec =
 		{
-			1600, 900, framesInFlight,
+			width, height, framesInFlight,
 			{
 				// Position Attachment // Attachment 0
 				{
@@ -103,7 +102,7 @@ namespace Frost
 				}
 			}
 		};
-		m_Data->RenderPass = RenderPass::Create(s_RenderPassSpec);
+		m_Data->GeometryRenderPass = RenderPass::Create(s_RenderPassSpec);
 
 
 		// Pipeline creations
@@ -129,46 +128,49 @@ namespace Frost
 		pipelineCreateInfo.UseDepthWrite = true;
 		pipelineCreateInfo.UseStencil = false;
 		pipelineCreateInfo.Cull = CullMode::Back;
-		pipelineCreateInfo.RenderPass = m_Data->RenderPass;
+		pipelineCreateInfo.RenderPass = m_Data->GeometryRenderPass;
 		pipelineCreateInfo.VertexBufferLayout = bufferLayout;
-		m_Data->Pipeline = Pipeline::Create(pipelineCreateInfo);
+		if(!m_Data->GeometryPipeline)
+			m_Data->GeometryPipeline = Pipeline::Create(pipelineCreateInfo);
 
 
 		/// Geometry pass descriptors (from PBR Shader)
-		m_Data->Descriptor.resize(framesInFlight);
-		for (auto& material : m_Data->Descriptor)
+		m_Data->GeometryDescriptor.resize(framesInFlight);
+		for (auto& material : m_Data->GeometryDescriptor)
 		{
-			material = Material::Create(m_Data->GeometryShader, "GeometryPassIndirectBindless");
+			if(!material) material = Material::Create(m_Data->GeometryShader, "GeometryPassIndirectBindless");
 		}
 
-
-		/// Indirect drawing buffer
-		m_Data->IndirectCmdBuffer.resize(framesInFlight);
-		for (auto& indirectCmdBuffer : m_Data->IndirectCmdBuffer)
+		if (m_Data->IndirectCmdBuffer.empty())
 		{
-			// Allocating a heap block
-			indirectCmdBuffer.DeviceBuffer = BufferDevice::Create(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes, { BufferUsage::Storage, BufferUsage::Indirect });
+			/// Indirect drawing buffer
+			m_Data->IndirectCmdBuffer.resize(framesInFlight);
+			for (auto& indirectCmdBuffer : m_Data->IndirectCmdBuffer)
+			{
+				// Allocating a heap block
+				indirectCmdBuffer.DeviceBuffer = BufferDevice::Create(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes, { BufferUsage::Storage, BufferUsage::Indirect });
 
-			indirectCmdBuffer.HostBuffer.Allocate(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes);
-		}
+				indirectCmdBuffer.HostBuffer.Allocate(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes);
+			}
 
-		/// Instance data storage buffer
-		m_Data->MaterialSpecs.resize(framesInFlight);
-		for (uint32_t i = 0; i < m_Data->MaterialSpecs.size(); i++)
-		{
-			auto& instanceSpec = m_Data->MaterialSpecs[i];
+			/// Instance data storage buffer
+			m_Data->MaterialSpecs.resize(framesInFlight);
+			for (uint32_t i = 0; i < m_Data->MaterialSpecs.size(); i++)
+			{
+				auto& instanceSpec = m_Data->MaterialSpecs[i];
 
-			// Allocating a heap block
-			instanceSpec.DeviceBuffer = BufferDevice::Create(sizeof(MaterialData) * maxCountMeshes, { BufferUsage::Storage });
-			instanceSpec.HostBuffer.Allocate(sizeof(MaterialData) * maxCountMeshes);
+				// Allocating a heap block
+				instanceSpec.DeviceBuffer = BufferDevice::Create(sizeof(MaterialData) * maxCountMeshes, { BufferUsage::Storage });
+				instanceSpec.HostBuffer.Allocate(sizeof(MaterialData) * maxCountMeshes);
 
-			// Setting the storage buffer into the descriptor
-			m_Data->Descriptor[i]->Set("u_MaterialUniform", instanceSpec.DeviceBuffer);
+				// Setting the storage buffer into the descriptor
+				m_Data->GeometryDescriptor[i]->Set("u_MaterialUniform", instanceSpec.DeviceBuffer);
+			}
 		}
 
 	}
 
-	void VulkanGeometryPass::LateCullDataInit(uint32_t width, uint32_t height)
+	void VulkanGeometryPass::OcclusionCullDataInit(uint32_t width, uint32_t height)
 	{
 		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
@@ -229,8 +231,6 @@ namespace Frost
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
-		Ref<Framebuffer> framebuffer = m_Data->RenderPass->GetFramebuffer(currentFrameIndex);
-		Ref<VulkanPipeline> vulkanPipeline = m_Data->Pipeline.As<VulkanPipeline>();
 
 		// Get the needed matricies from the camera
 		glm::mat4 projectionMatrix = renderQueue.CameraProjectionMatrix;
@@ -350,31 +350,6 @@ namespace Frost
 				materialDataOffset += sizeof(MaterialData);
 			}
 
-#if 0
-			if (!meshIndirectData.size())
-			{
-				if (submittedSubmeshes != 0)
-				{
-					meshIndirectData.emplace_back(IndirectMeshData(0, submittedSubmeshes, i));
-				}
-			}
-			else
-			{
-
-				if (i != renderQueue.GetQueueSize() - 1)
-				{
-					if (submittedSubmeshes != 0)
-					{
-						uint32_t previousMeshOffset = meshIndirectData[i - 1].SubmeshOffset;
-						uint32_t previousMeshCount = meshIndirectData[i - 1].SubmeshCount;
-
-						uint32_t currentOffset = previousMeshOffset + previousMeshCount;
-
-						meshIndirectData.emplace_back(IndirectMeshData(currentOffset, submittedSubmeshes, i));
-					}
-				}
-			}
-#else
 			// If we are submitting the first mesh, we don't need any offset
 			if (meshIndirectData.size() == 0)
 			{
@@ -392,18 +367,7 @@ namespace Frost
 
 				meshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
 
-				// If it is not the first mesh, then we set the offset as the last mesh's submesh count
-				//auto previousMesh = renderQueue.m_Data[i - 1].Mesh;
-				//auto previousSubmeshes = previousMesh->GetSubMeshes();
-				//
-				//uint32_t previousSubmeshCount = previousSubmeshes.size();
-
-				//meshIndirectData.emplace_back(meshOffsets[meshOffsets.size() - 1] + previousSubmeshCount);
-
 			}
-#endif
-
-
 		}
 
 		// Sending the data into the gpu buffer
@@ -425,14 +389,25 @@ namespace Frost
 
 		//OcclusionCullUpdate(renderQueue, indirectCmdsOffset);
 
+		GeometryUpdate(renderQueue, meshIndirectData);
 
 
 
 
+	}
+
+	void VulkanGeometryPass::GeometryUpdate(const RenderQueue& renderQueue, const Vector<IndirectMeshData>& indirectMeshData)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		Ref<Framebuffer> framebuffer = m_Data->GeometryRenderPass->GetFramebuffer(currentFrameIndex);
+		Ref<VulkanPipeline> vulkanPipeline = m_Data->GeometryPipeline.As<VulkanPipeline>();
+		auto vulkanIndirectCmdBuffer = m_Data->IndirectCmdBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
 
 		// Bind the pipeline and renderpass
-		m_Data->RenderPass->Bind();
-		m_Data->Pipeline->Bind();
+		m_Data->GeometryRenderPass->Bind();
+		m_Data->GeometryPipeline->Bind();
 
 		// Set the viewport and scrissors
 		VkViewport viewport{};
@@ -449,13 +424,13 @@ namespace Frost
 
 
 		// TODO: This is so bad, pls fix this
-		VkPipelineLayout pipelineLayout = m_Data->Pipeline.As<VulkanPipeline>()->GetVulkanPipelineLayout();
+		VkPipelineLayout pipelineLayout = m_Data->GeometryPipeline.As<VulkanPipeline>()->GetVulkanPipelineLayout();
 
-		auto vulkanDescriptor = m_Data->Descriptor[currentFrameIndex].As<VulkanMaterial>();
+		auto vulkanDescriptor = m_Data->GeometryDescriptor[currentFrameIndex].As<VulkanMaterial>();
 		vulkanDescriptor->UpdateVulkanDescriptorIfNeeded();
 		Vector<VkDescriptorSet> descriptorSets = vulkanDescriptor->GetVulkanDescriptorSets();
 		descriptorSets[1] = VulkanBindlessAllocator::GetVulkanDescriptorSet(currentFrameIndex);
-		
+
 		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 		//m_Data->Descriptor[currentFrameIndex]->Bind(m_Data->Pipeline);
 
@@ -463,9 +438,9 @@ namespace Frost
 
 
 		// Sending the indirect draw commands to the command buffer
-		for (uint32_t i = 0; i < meshIndirectData.size(); i++)
+		for (uint32_t i = 0; i < indirectMeshData.size(); i++)
 		{
-			auto& meshData = meshIndirectData[i];
+			auto& meshData = indirectMeshData[i];
 			uint32_t meshIndex = meshData.MeshIndex;
 
 			// Get the mesh
@@ -473,7 +448,7 @@ namespace Frost
 
 			// Bind the index buffer
 			mesh->GetIndexBuffer()->Bind();
-			
+
 			// Bind the vertex buffer (only the instanced one, since for the "per vertex" one, we are using BDAs
 			auto vulkanVertexBufferInstanced = mesh->GetVertexBufferInstanced(currentFrameIndex).As<VulkanBufferDevice>();
 			VkBuffer vertexBufferInstanced = vulkanVertexBufferInstanced->GetVulkanBuffer();
@@ -483,86 +458,18 @@ namespace Frost
 
 			// Set the transform matrix and model matrix of the submesh into a constant buffer
 			PushConstant pushConstant;
-			pushConstant.MaterialIndex = meshIndirectData[i].MaterialOffset;
+			pushConstant.MaterialIndex = indirectMeshData[i].MaterialOffset;
 			pushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 			pushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
 
 			uint32_t submeshCount = meshData.SubmeshCount;
-			uint32_t offset = meshIndirectData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
+			uint32_t offset = indirectMeshData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
 			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
 
 		}
-
-#if 0
-		// Sending the indirect draw commands to the command buffer
-		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
-		{
-
-			// Get the mesh
-			auto mesh = renderQueue.m_Data[i].Mesh;
-
-			// Bind the vertex/index buffers
-			mesh->GetVertexBuffer()->Bind();
-			mesh->GetIndexBuffer()->Bind();
-
-			// Set the transform matrix and model matrix of the submesh into a constant buffer
-			PushConstant pushConstant;
-			pushConstant.MaterialIndex = meshIndirectData[i].SubmeshOffset;
-			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
-
-			uint32_t submeshCount = mesh->GetSubMeshes().size();
-			uint32_t offset = meshIndirectData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
-			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
-
-
-#if 0
-			// TODO: Do this if multi-draw isn't detected
-			uint32_t offset = (i + j) * sizeof(VkDrawIndexedIndirectCommand);
-			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, 1, sizeof(VkDrawIndexedIndirectCommand));
-#endif
-		}
-#endif
-
-
-		// DrawIndexed
-#if 0
-		{
-
-			for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
-			{
-				// Get the mesh
-				auto mesh = renderQueue.m_Data[i].Mesh;
-
-				// Bind the vertex/index buffers
-				mesh->GetVertexBuffer()->Bind();
-				mesh->GetIndexBuffer()->Bind();
-
-				// Draw every submesh
-				for (auto& submesh : mesh->GetSubMeshes())
-				{
-					// Check if the submesh is seen by the camera (frustum culling)
-					glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
-					if (!submesh.BoundingBox.IsOnFrustum(renderQueue.Camera.GetFrustum(), modelMatrix)) continue;
-
-					// Get the submesh material and bind it
-					Ref<VulkanMaterial> material = mesh->GetVulkanMaterial()[submesh.MaterialIndex].As<VulkanMaterial>();
-					material->Bind(m_Data->Pipeline);
-
-					// Set the transform matrix and model matrix of the submesh into a constant buffer
-					PushConstant pushConstant;
-					pushConstant.TransformMatrix = viewProjectionMatrix * modelMatrix;
-					pushConstant.ModelMatrix = modelMatrix;
-					vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
-
-					// Draw the submesh
-					vkCmdDrawIndexed(cmdBuf, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
-				}
-			}
-		}
-#endif
 		// End the renderpass
-		m_Data->RenderPass->Unbind();
+		m_Data->GeometryRenderPass->Unbind();
 	}
 
 	void VulkanGeometryPass::OnRenderDebug()
@@ -609,14 +516,12 @@ namespace Frost
 
 	void VulkanGeometryPass::OnResize(uint32_t width, uint32_t height)
 	{
-		s_RenderPassSpec.FramebufferSpecification.Width = width;
-		s_RenderPassSpec.FramebufferSpecification.Height = height;
-		m_Data->RenderPass = RenderPass::Create(s_RenderPassSpec);
+		GeometryDataInit(width, height);
 	}
 
 	void VulkanGeometryPass::OnResizeLate(uint32_t width, uint32_t height)
 	{
-		LateCullDataInit(width, height);
+		OcclusionCullDataInit(width, height);
 	}
 
 	void VulkanGeometryPass::ShutDown()

@@ -5,7 +5,7 @@
 		https://lukas-hermanns.info/download/bachelorthesis_ssct_lhermanns.pdf
 
 
-	// TODO: Maybe add a visibility buffer for better cone weight distribuiton. Look into:
+	Visibility buffer for better cone weight distribuiton. Look into:
 		https://github.com/LukasBanana/ForkENGINE/blob/master/shaders/SSCTVisibilityMapPixelShader.glsl
 		http://what-when-how.com/Tutorial/topic-547pjramj8/GPU-Pro-Advanced-Rendering-Techniques-192.html
 		https://lukas-hermanns.info/download/bachelorthesis_ssct_lhermanns.pdf (p.32)
@@ -20,28 +20,24 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 layout(binding = 0) uniform sampler2D u_ColorFrameTex;
 
 layout(binding = 1) uniform sampler2D u_ViewPosTex;
-layout(binding = 2) uniform sampler2D u_DepthTex;
-layout(binding = 3) uniform sampler2D u_NormalTex; // inclues compressed vec2 normals + metalness + roughness
+layout(binding = 2) uniform sampler2D u_HiZBuffer;
+layout(binding = 3) uniform sampler2D u_NormalTex; // includes compressed vec2 normals + metalness + roughness
 layout(binding = 4) uniform sampler2D u_PrefilteredColorBuffer;
+//layout(binding = 5) uniform sampler2D u_VisibilityBuffer;
 
-layout(binding = 5, rgba16f) uniform writeonly image2D o_FrameTex;
+layout(binding = 6, rgba8) uniform writeonly image2D o_FrameTex;
 
-layout(binding = 6) uniform UniformBuffer {
+layout(binding = 7) uniform UniformBuffer {
 	mat4 ProjectionMatrix;
 	mat4 InvProjectionMatrix;
 	mat4 ViewMatrix;
 	mat4 InvViewMatrix;
 	vec4 ScreenSize;
-	
-	float SampleCount;
-	float RayStep;
-	float IterationCount;
-	float DistanceBias;
-	
-	float DebugDraw;
-	float IsBinarySearchEnabled;
-	float IsAdaptiveStepEnabled;
-	float IsExponentialStepEnabled;
+
+	int UseConeTracing;
+	int RayStepCount;
+	float RayStepSize;
+	float Padding0;
 } u_UniformBuffer;
 
 // Global variables
@@ -49,27 +45,34 @@ vec2 s_UV;
 
 
 // Constants
-const float rayStep = 0.1f;
-const float minRaySteps = 0.1f;
-const float maxRayStep = 1.2f;
-const int maxSteps = 30;
-const float searchDist = 5.0f;
-const int numBinarySearchSteps = 5;
 const float relfectionSpecularFalloffExponent = 6.0f;
 
-// https://aras-p.info/texts/CompactNormalStorage.html
-vec3 DecodeNormals(vec2 enc)
+
+// Defines
+#define HIZ_CROSS_EPSILON		(vec2(0.5f) / u_UniformBuffer.ScreenSize.xy)
+
+#define INVALID_HIT_POINT		vec3(-1.0)
+#define HIZ_VIEWDIR_EPSILON		0.00001
+
+#define SIGN(x)                 ((x) >= 0.0 ? 1.0 : -1.0)
+#define saturate(x)             clamp(x, 0.0, 1.0)
+
+#define BS_DELTA_EPSILON 0.0002
+
+
+// ======================================================
+// Fast octahedron normal vector decoding.
+// https://jcgt.org/published/0003/02/01/
+vec2 SignNotZero(vec2 v)
 {
-    float scale = 1.7777f;
-    vec3 nn = vec3(enc, 0.0f) * vec3(2 * scale, 2 * scale,0) + vec3(-scale, -scale,1);
-    
-	float g = 2.0 / dot(nn.xyz,nn.xyz);
-
-    vec3 n;
-    n.xy = g*nn.xy;
-    n.z = g-1;
-
-    return n;
+	return vec2((v.x >= 0.0) ? 1.0 : -1.0, (v.y >= 0.0) ? 1.0 : -1.0);
+}
+vec3 DecodeNormal(vec2 e)
+{
+	vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
+	if (v.z < 0)
+		v.xy = (1.0 - abs(v.yx)) * SignNotZero(v.xy);
+	return normalize(v);
 }
 
 // Random hash function
@@ -79,10 +82,10 @@ vec3 HashFunc(vec3 a)
 {
 	a = fract(a * r_Scale);
 	a += dot(a, a.xyz + r_K);
-	return fract((a.xxy + a.yxx));
+	return fract((a.xxy + a.yxx) * a.zyx);
 }
 
-uvec3 murmurHash33(uvec3 src) {
+uvec3 MurmurHash33(uvec3 src) {
     const uint M = 0x5bd1e995u;
     uvec3 h = uvec3(1190494759u, 2147483647u, 3559788179u);
     src *= M; src ^= src>>24u; src *= M;
@@ -92,288 +95,205 @@ uvec3 murmurHash33(uvec3 src) {
 }
 
 // 3 outputs, 3 inputs
-vec3 hash33(vec3 src) {
-    uvec3 h = murmurHash33(floatBitsToUint(src));
+vec3 Hash33(vec3 src) {
+    uvec3 h = MurmurHash33(floatBitsToUint(src));
     return uintBitsToFloat(h & 0x007fffffu | 0x3f800000u) - 1.0;
 }
 
-vec3 BinarySearch(inout vec3 dir, inout vec3 hitCoord, out float dDepth)
+// From https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+vec3 AcesApprox(vec3 v)
 {
-	float depth;
-	vec4 projectedCoord;
-	
-	for(int i = 0; i < numBinarySearchSteps; i++)
+    v *= 0.6f;
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((v*(a*v+b))/(v*(c*v+d)+e), 0.0f, 1.0f);
+}
+// ======================================================
+vec3 ProjectPoint(vec3 viewPoint)
+{
+	vec4 projPoint = u_UniformBuffer.ProjectionMatrix * vec4(viewPoint, 1.0f);
+	projPoint.xyz /= projPoint.w;
+	projPoint.xy = projPoint.xy * 0.5f + 0.5f;
+	return projPoint.xyz;
+}
+// ======================================================
+// Binary search for the alternative ray tracing function.
+void LinearRayTraceBinarySearch(inout vec3 rayPos, vec3 rayDir)
+{
+	for (uint i = 0; i < 5; ++i)
 	{
-		projectedCoord = u_UniformBuffer.ProjectionMatrix * vec4(hitCoord, 1.0f);
-		projectedCoord.xy /= projectedCoord.w;
-		projectedCoord.xy = projectedCoord.xy * 0.5f + 0.5f;
-
-		vec3 viewPos = texture(u_ViewPosTex, projectedCoord.xy).xyz;
-		depth = viewPos.z;
-
-		dDepth = hitCoord.z - depth;
-
-		dir *= 0.5f;
-
-		if(dDepth > 0.0f)
-			hitCoord += dir;
+		/* Check if we are out of screen */
+		if (rayPos.x < 0.0 || rayPos.x > 1.0 || rayPos.y < 0.0 || rayPos.y > 1.0)
+			break;
+		
+		/* Check if we found our final hit point */
+		float depth = textureLod(u_HiZBuffer, rayPos.xy, 0.0f).r;
+		float depthDelta = depth - rayPos.z;
+		
+		if (abs(depthDelta) < BS_DELTA_EPSILON)
+			break;
+		
+		/*
+		Move ray forwards if we are in front of geometry and
+		move backwards, if we are behind geometry
+		*/
+		if (depthDelta > 0.0)
+			rayPos += rayDir;
 		else
-			hitCoord -= dir;
-
+			rayPos -= rayDir;
+		
+		rayDir *= 0.5;
 	}
-
-	projectedCoord = u_UniformBuffer.ProjectionMatrix * vec4(hitCoord, 1.0f);
-	projectedCoord.xy /= projectedCoord.w;
-	projectedCoord.xy = projectedCoord.xy * 0.5f + 0.5f;
-
-	return vec3(projectedCoord.xy, dDepth);
 }
 
-vec4 RayCast(in vec3 dir, inout vec3 hitCoord, out float dDepth)
+// Alternative ray tracing function.
+bool LinearRayTrace(inout vec3 rayPos, vec3 rayDir)
 {
-	dir *= rayStep;
-
-	float depth = 0.0f;
-	int steps = 0;
-
-	vec4 projectedCoord = vec4(0.0f);
-
-	vec4 result = vec4(0.0f);
-
-	for(int i = 0; i < maxSteps; i++)
+	vec3 prevPos = rayPos;
+	rayDir = normalize(rayDir);
+	float stepSize = u_UniformBuffer.RayStepSize;
+	int numScreenEdgeHits = 0;
+	
+	for (uint i = 0; i < u_UniformBuffer.RayStepCount; ++i)
 	{
-		hitCoord += dir;
-
-		projectedCoord = u_UniformBuffer.ProjectionMatrix * vec4(hitCoord, 1.0f);
-		projectedCoord.xy /= projectedCoord.w;
-		projectedCoord.xy = projectedCoord.xy * 0.5f + 0.5f;
-
-		if(projectedCoord.x > 1.0f || projectedCoord.x < 0.0f) continue;
-		if(projectedCoord.y > 1.0f || projectedCoord.y < 0.0f) continue;
-
-		vec3 position = texture(u_ViewPosTex, projectedCoord.xy).xyz;
-		depth = position.z;
-
-		if(depth > 1000.0f)
-			continue;
-
-		dDepth = hitCoord.z - depth;
-
-		if((dir.z - dDepth) < maxRayStep)
+		/* Move to the next sample point */
+		prevPos = rayPos;
+		rayPos += rayDir * stepSize;
+		
+		if (rayPos.x < 0.0 || rayPos.x > 1.0 || rayPos.y < 0.0 || rayPos.y > 1.0)
 		{
-			if(dDepth <= 0.0f)
+			if (numScreenEdgeHits < 3)
 			{
-				vec3 binarySearchResult = BinarySearch(dir, hitCoord, dDepth);
-				result = vec4(binarySearchResult, 1.0f);
-
-				break;
+				/* Move ray back if the jump was too long */
+				numScreenEdgeHits++;
+				rayPos = prevPos;
+				stepSize *= 0.5;
+				continue;
 			}
+			else
+				break;
 		}
+		else
+			numScreenEdgeHits = 0;
+		
+		/* Check if the ray hit any geometry (delta < 0) */
+		float depth = textureLod(u_HiZBuffer, rayPos.xy, 0.0f).r;
+		float depthDelta = depth - rayPos.z;
+		
+		if (depthDelta < 0.0)
+		{
+//			if (Linearize(depthDelta) < -0.01)
+//				break;
+			
+			/*
+			Move between the current and previous point and
+			make a binary search, to quickly find the final hit point
+			*/
+			rayPos = (rayPos + prevPos) * 0.5;
+			LinearRayTraceBinarySearch(rayPos, rayDir * (stepSize * 0.25));
+			return true;
+		}
+		
+		stepSize *= 1.5;
 	}
-	return vec4(result);
+	
+	rayPos = INVALID_HIT_POINT;
+	return false;
+}
+
+// -----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------------
+
+vec3 IntersectDepthPlane(vec3 rayOrigin, vec3 rayDir, float t)
+{
+	return rayOrigin + rayDir * t;
+}
+
+vec2 GetCellCount(vec2 size, float level)
+{
+	return floor(size / (level > 0.0 ? exp2(level) : 1.0));
+}
+
+vec2 GetCell(vec2 ray, vec2 cellCount)
+{
+	return floor(ray * cellCount);
 }
 
 
-float IsoscelesTriangleBase(float adjacentLength, float coneTheta)
+/*
+	This function computes the new ray position where
+	the ray intersects with the specified cell's boundary.
+*/
+vec3 IntersectCellBoundary(vec3 rayOrigin, vec3 rayDir, vec2 cellIndex, vec2 cellCount, vec2 crossStep, vec2 crossOffset)
 {
 	/*
-		Simple trig and algebra - soh, cah, toa - tan(theta) = opp/adj,
-		opp = tan(theta) * adj, then multiply by 2 for isosceles triangle base
+		Determine in which adjacent cell the ray resides.
+		The cell index always refers to the left-top corner of a cell.
+		So add "crossStep" whose components are either 1.0
+		(for positive direction) or 0.0 (for negative direction),
+		and then add "crossOffset" so that we are in the center of that cell.
 	*/
-	//return 2.0 * coneTheta * adjacentLength;
-	return 2.0 * tan(coneTheta) * adjacentLength;
-}
-
-float IsoscelesTriangleInRadius(float a, float h)
-{
-	float h4 = h * 4.0f;
-	return (a * (sqrt(a * a + h4 * h) - a)) / max(h4, 0.00001);
-}
-
-
-//http://simonstechblog.blogspot.com/2011/12/microfacet-brdf.html
-// temporay use Beckmann Distribution to convert, this may change later 
-float RoughnessToSpecularPower(float roughness)
-{
-#define MAX_SPEC_POWER 2048.0f
-    return clamp(2.0f / (roughness * roughness) - 2.0f, 0.0f, MAX_SPEC_POWER);
-}
-
-float SpecularPowerToConeAngle(float specularPower)
-{
-#define CNST_MAX_SPECULAR_EXP 64
-
-    // based on phong distribution model
-    if(specularPower >= exp2(CNST_MAX_SPECULAR_EXP))
-    {
-        return 0.0f;
-    }
-    const float xi = 0.244f;
-    float exponent = 1.0f / (specularPower + 1.0f);
-    return acos(pow(xi, exponent));
-}
-
-// Temporary: weights for the cones
-float weight[10] = float[] (0.427027, 0.2945946, 0.216216, 0.194054, 0.166216, 0.126216, 0.0946216, 0.0626216, 0.0416216, 0.0296216);
-
-// https://github.com/LukasBanana/ForkENGINE/blob/master/shaders/SSCTReflectionPixelShader.glsl#L600
-vec4 ConeTrace(vec3 dir, float tanHalfAngle, vec3 startPos, out vec2 lastProjCoord, float roughness)
-{
-	float lod = 0.0f;
-	vec4 color = vec4(0.0f);
-	float dist = 1.0f;
-	float remainingAlpha = 1.0f;
-
-	float gloss = 1.0f - roughness;
-	float glossMult = gloss;
-	float specularPower = RoughnessToSpecularPower(roughness);
-
-	float coneTheta = SpecularPowerToConeAngle(specularPower) * 0.5f;
-
-
-	for(uint i = 0; i < 20; i++)
-	{
-		float diameter = IsoscelesTriangleBase(dist, coneTheta);
-		float inCircleSize = IsoscelesTriangleInRadius(diameter, dist);
-
-        float mipLevel = log2(inCircleSize * max(u_UniformBuffer.ScreenSize.x, u_UniformBuffer.ScreenSize.y));
-
-		vec3 currentPos = startPos + (dir * dist);
-
-		vec4 projectedCoord = vec4(0.0f);
-		projectedCoord = u_UniformBuffer.ProjectionMatrix * vec4(currentPos, 1.0f);
-		projectedCoord.xy /= projectedCoord.w;
-		projectedCoord.xy = projectedCoord.xy * 0.5f + 0.5f;
-
-		if(projectedCoord.x > 1.0f || projectedCoord.x < 0.0f) continue;
-		if(projectedCoord.y > 1.0f || projectedCoord.y < 0.0f) continue;
-
-
-		float currentWeight = glossMult;
-
-		vec3 newColor = (textureLod(u_PrefilteredColorBuffer, projectedCoord.xy, mipLevel).xyz * currentWeight);
-
-		remainingAlpha -= currentWeight;
-		if(remainingAlpha < 0.0f)
-		{
-			newColor *= (1.0f - abs(remainingAlpha));
-		}
-		color += vec4(newColor, currentWeight);
-
-		if(color.a > 1.0f)
-		{
-			break;
-		}
-
-		glossMult *= gloss;
-		dist += diameter * 0.86f;
-		lastProjCoord = projectedCoord.xy;
-	}
-
-
-	return vec4(vec3(color), 1.0f);
-}
-
-vec3 fresnelShlick(in float cosTheta, in vec3 F0)
-{
-	return F0 + (1.0f - F0) * pow(1.0f - cosTheta, 5.0f);
-}
-
-void main()
-{
-	s_UV = vec2(gl_GlobalInvocationID.xy) / u_UniformBuffer.ScreenSize.xy;
-	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
-
-	// Sample information from the gbuffer
-	vec3 viewPos = texture(u_ViewPosTex, s_UV).xyz;
-	vec3 currentColor = texture(u_ColorFrameTex, s_UV).rgb;
-	float metallic = texture(u_NormalTex, s_UV).z;
-	float roughness = texture(u_NormalTex, s_UV).w;
-
-	metallic = 1.0f;
-	roughness = 0.0f;
+	vec2 cell = cellIndex + crossStep;
+	cell /= cellCount;
+	cell += crossOffset;
 	
-	if(viewPos.x == 0.0f && viewPos.y == 0.0f && viewPos.z == 0.0f) {
-		imageStore(o_FrameTex, pixelCoord, vec4(currentColor, 1.0f));
-		return; 
-	}
-
-	if(metallic <= 0.1f || roughness > 0.8f)
-	{
-		imageStore(o_FrameTex, pixelCoord, vec4(currentColor, 1.0f));
-		return;
-	}
-
-
-	// Decode normals and calculate normals in view space (from model space)
-	vec2 decodedNormals = texture(u_NormalTex, s_UV).xy;
-    vec3 normal = DecodeNormals(decodedNormals);
-	vec3 viewNormal = transpose(inverse(mat3(u_UniformBuffer.ViewMatrix))) * normal;
-
-	// Fresnel factor
-	vec3 F0 = vec3(0.04f);
-	F0      = mix(F0, currentColor, metallic);
-	vec3 fresnel = fresnelShlick(max(dot(normalize(viewPos), normalize(viewNormal)), 0.0f), F0);
-
-	// SSR
-	float depth = 0.0f;
-	vec3 hitPos = viewPos.xyz;
-
-	vec3 worldPos = vec3(vec4(viewPos, 1.0f) * u_UniformBuffer.InvViewMatrix);
-	vec3 jitter = mix(vec3(0.0f), vec3(hash33(worldPos)), roughness);
-	vec3 reflectionDir = normalize(reflect(normalize(viewPos), normalize(viewNormal)));
-
+	/* Now compute interpolation factor "t" with this cell position and the ray origin */
+	vec2 delta = cell - rayOrigin.xy;
+	delta /= rayDir.xy;
 	
-#if 0
-	vec4 finalCoords = RayCast(normalize(jitter + reflectionDir) * max(1.0f, -viewPos.z), hitPos, depth);
-
-
-	// Fix artifacts
-	vec2 dCoords = smoothstep(0.2, 0.6, abs(vec2(0.5f) - finalCoords.xy));
-	float screenEdgeFactor = clamp(1.0f - (dCoords.x + dCoords.y), 0.0f, 1.0f);
-	float multipler = pow(1.0f,
-						  relfectionSpecularFalloffExponent) *
-						  screenEdgeFactor *
-						  -reflectionDir.z;
-
-
-	vec3 resultingColor = texture(u_ColorFrameTex, finalCoords.xy).rgb * clamp(multipler, 0.0f, 0.9f) * fresnel;
-#endif
-
+	float t = min(delta.x, delta.y);
 	
-#if 1
-	// 0.2 = 22.6 degrees, 0.1 = 11.4 degrees, 0.07 = 8 degrees angle
-	vec2 lastProjCoord;
-	vec4 coneTracedColor = ConeTrace(normalize(reflectionDir) * max(0.1f, -viewPos.z), 0.030f, hitPos, lastProjCoord, 0.01f);
-
-	// Fix artifacts
-	vec2 dCoords = smoothstep(0.2, 0.6, abs(vec2(0.5f) - lastProjCoord.xy));
-	float screenEdgeFactor = clamp(1.0f - (dCoords.x + dCoords.y), 0.0f, 1.0f);
-	float multipler = pow(1.0f,
-						  relfectionSpecularFalloffExponent) *
-						  screenEdgeFactor *
-						  -reflectionDir.z;
-
-	vec3 resultingColor = coneTracedColor.xyz * clamp(multipler, 0.0f, 0.9f);
-#endif
-
-	// Calculate the final result
-	vec3 finalColor = mix(currentColor, resultingColor.xyz, 0.4f);
-
-	// Store the values
-	imageStore(o_FrameTex, pixelCoord, vec4(vec3(finalColor.xyz), 1.0f));
+	/* Return final ray position */
+	return IntersectDepthPlane(rayOrigin, rayDir, t);
 }
 
-#if 0
+float GetDepthPlanes(vec2 pos, float level)
+{
+	/* Texture lookup with <linear-clamp> sampler */
+	return textureLod(u_HiZBuffer, pos, level).r;
+}
+
+bool CrossedCellBoundary(vec2 cellIndexA, vec2 cellIndexB)
+{
+	return cellIndexA.x != cellIndexB.x || cellIndexA.y != cellIndexB.y;
+}
+
+/*
+	Hi-Z ray tracing function.
+	rayOrigin: Ray start position (in screen space).
+	rayDir: Ray reflection vector (in screen space).
+*/
 vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 {
-	const vec2 hiZSize = resolution;
+	const vec2 hiZSize = u_UniformBuffer.ScreenSize.xy;
+	const float maxMipLevel = floor(log2(max(hiZSize.x, hiZSize.y))) - 1;
+
 	
 	/* Check if ray points towards the camera */
 	if (rayDir.z <= HIZ_VIEWDIR_EPSILON)
 	{
+		if (LinearRayTrace(rayOrigin, rayDir))
+		{
+			return rayOrigin;
+		}
 		return INVALID_HIT_POINT;
 	}
+
+
+	vec3 rayOrigin_begin = rayOrigin;
+	vec3 rayDir_begin = rayDir;
+	
+	if(LinearRayTrace(rayOrigin_begin, rayDir_begin))
+	{
+		return vec3(rayOrigin_begin.xy, 0.0f);
+	}
+
 	
 	/*
 	Get the cell cross direction and a small offset
@@ -390,72 +310,294 @@ vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 	rayDir = rayDir / rayDir.z;
 	
 	/* Set starting point to the point where z equals 0.0 (minimum depth) */
-	rayOrigin = IntersectDepthPlane(rayOrigin, rayDir, -rayOrigin.z);
+	rayOrigin = IntersectDepthPlane(rayOrigin, rayDir, -rayOrigin.z); // rayOrigin + rayDir * (-rayOrigin.z)
 	
 	/* Cross to next cell so that we don't get a self-intersection immediately */
-	float level = HIZ_START_LEVEL;
+	float level = 2.0f;
 	
 	vec2 firstCellCount = GetCellCount(hiZSize, level);
 	vec2 rayCell = GetCell(rayPos.xy, firstCellCount);
-	rayPos = IntersectCellBoundary(rayOrigin, rayDir, rayCell, firstCellCount, crossStep, crossOffset);//*16.0);
+	rayPos = IntersectCellBoundary(rayOrigin, rayDir, rayCell, firstCellCount, crossStep, crossOffset);
 
 
 	
 	/* Main tracing iteration loop */
 	uint i = 0;
 	
-	for (; level >= HIZ_STOP_LEVEL && i < HIZ_MAX_ITERATIONS; ++i)
+#define HIZ_STOP_LEVEL      2.0f
+#define HIZ_MAX_ITERATIONS  32
+
+	for (; level >= HIZ_STOP_LEVEL && i < HIZ_MAX_ITERATIONS; i++)
 	{
+		if (rayPos.x < 0.0 || rayPos.x > 1.0 || rayPos.y < 0.0 || rayPos.y > 1.0)
+		{
+			break;
+		}
+
 		/* Get cell number of our current ray */
-		const vec2 cellCount = GetCellCount(hiZSize, level);
-		const vec2 oldCellIndex = GetCell(rayPos.xy, cellCount);
+		vec2 cellCount = GetCellCount(hiZSize, level);
+		vec2 oldCellIndex = GetCell(rayPos.xy, cellCount);
 		
 		/* Get minimum depth plane in which the current ray resides */
-		#if 1
-		vec2 zMinMax = GetDepthPlanes(rayPos.xy, level);
-		#else
-		vec2 zMinMax = GetDepthPlanesFromCell(level, oldCellIndex, cellCount, crossStep, crossOffset);
-		#endif
+		float zMin = GetDepthPlanes(rayPos.xy, level);
 		
 		
 		/* Intersect only if ray depth is between minimum and maximum depth planes */
-		#if 1
-		vec3 tmpRay = IntersectDepthPlane(rayOrigin, rayDir, max(rayPos.z, zMinMax.r)); // MIN
-		#else
-		vec3 tmpRay = IntersectDepthPlane(rayOrigin, rayDir, clamp(rayPos.z, zMinMax.r, zMinMax.g)); // MIN/MAX
-		#endif
+		vec3 tmpRay = IntersectDepthPlane(rayOrigin, rayDir, max(rayPos.z, zMin)); // MIN
 		
 		/* Get new cell number */
-		const vec2 newCellIndex = GetCell(tmpRay.xy, cellCount);
+		vec2 newCellIndex = GetCell(tmpRay.xy, cellCount);
 		
 		/* If the new cell number is different from the old cell number, we know we crossed a cell */
-		if (CrossedCellBoundary(oldCellIndex, newCellIndex))// || tmpRay.z > zMinMax.g + 0.001)
+		if (CrossedCellBoundary(oldCellIndex, newCellIndex))
 		{
 			/*
 			Intersect the boundary of that cell instead,
 			and go up a level for taking a larger step next iteration
 			*/
 			tmpRay = IntersectCellBoundary(rayOrigin, rayDir, oldCellIndex, cellCount, crossStep, crossOffset);
-			level = min(HIZ_MAX_LEVEL, level + 2.0);
-			
+			level = min(maxMipLevel, level + 2.0);
 		}
 		
 		rayPos = tmpRay;
 		
-		#if 1
-		if (rayPos.x < 0.0 || rayPos.x > 1.0 || rayPos.y < 0.0 || rayPos.y > 1.0)
-		{
-			rayPos = INVALID_HIT_POINT;
-			break;
-		}
-		#endif
+		
 		
 		/* Go down a level in the Hi-Z */
 		level -= 1.0;
-		
 	}
 
-	
-	return rayPos;
+	return vec3(rayPos.xy, 0.0f);
 }
-#endif
+
+// -----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------------
+float IsoscelesTriangleBase(float adjacentLength, float coneTheta)
+{
+	/*
+		Simple trig and algebra - soh, cah, toa - tan(theta) = opp/adj,
+		opp = tan(theta) * adj, then multiply by 2 for isosceles triangle base
+	*/
+	return 2.0 * tan(coneTheta) * adjacentLength;
+}
+
+float IsoscelesTriangleInRadius(float a, float h)
+{
+	float h4 = h * 4.0f;
+	return (a * (sqrt(a * a + h4 * h) - a)) / max(h4, 0.00001);
+}
+
+float IsoscelesTriangleNextAdjacent(float adjacentLength, float incircleRadius)
+{
+	/*
+	Subtract the diameter of the incircle
+	to get the adjacent side of the next level on the cone
+	*/
+	return adjacentLength - (incircleRadius * 2.0);
+}
+
+
+//http://simonstechblog.blogspot.com/2011/12/microfacet-brdf.html
+// temporay use Beckmann Distribution to convert, this may change later 
+float RoughnessToSpecularPower(float roughness)
+{
+#define MAX_SPEC_POWER 2048.0f
+    return clamp(2.0f / (roughness * roughness) - 2.0f, 0.0f, MAX_SPEC_POWER);
+}
+
+float SpecularPowerToConeAngle(float specularPower)
+{
+#define CNST_MAX_SPECULAR_EXP 1024.0
+
+	if (specularPower < CNST_MAX_SPECULAR_EXP)
+	{
+		/* Based on phong reflection model */
+		const float xi = 0.244;
+		float exponent = 1.0 / (specularPower + 1.0);
+		return acos(pow(xi, exponent));
+	}
+	return 0.0;
+}
+
+/*  // Old Concept
+vec4 ConeSampleWeightedColor(vec2 samplePos, float mipLevel)
+{
+	// Sample color buffer with pre-integrated visibility
+	vec3 color = textureLod(u_PrefilteredColorBuffer, samplePos, mipLevel).rgb;
+	float visibility = textureLod(u_VisibilityBuffer, samplePos, mipLevel).r;
+	return vec4(color * visibility, visibility);
+}
+*/
+
+vec4 ConeSampleWeightRoughness(vec2 samplePos, float mipLevel, float roughness)
+{
+	/* Sample color buffer with pre-integrated visibility */
+	vec3 color = textureLod(u_PrefilteredColorBuffer, samplePos, mipLevel).rgb;
+	return vec4(color * roughness, roughness);
+}
+
+// https://github.com/LukasBanana/ForkENGINE/blob/master/shaders/SSCTReflectionPixelShader.glsl#L600
+vec4 ConeTrace(vec2 startPos, vec2 endPos, float roughness)
+{
+	float lod = 0.0f;
+
+	float specularPower = RoughnessToSpecularPower(roughness);
+
+	/* Information */
+	vec4 reflectionColor = vec4(0.0f);
+	float coneTheta = SpecularPowerToConeAngle(specularPower) * 0.5f;
+
+	
+	/* Cone tracing using an isosceles triangle to approximate a cone in screen space */
+	vec2 deltaPos = endPos.xy - startPos.xy;
+	
+	float adjacentLength = length(deltaPos);
+	vec2 adjacentUnit = normalize(deltaPos);
+
+
+	/* Append offset to adjacent length, so we have our first inner circle */
+	adjacentLength += IsoscelesTriangleBase(adjacentLength, coneTheta);
+	
+	vec4 reflectionColorArray[7];
+
+	for(uint i = 0; i < 7; i++)
+	{
+		/* Intersection length is the adjacent side, get the opposite side using trigonometry */
+		float oppositeLength = IsoscelesTriangleBase(adjacentLength, coneTheta);
+		
+		/* Calculate in-radius of the isosceles triangle now */
+		float incircleSize = IsoscelesTriangleInRadius(oppositeLength, adjacentLength);
+		
+		/* Get the sample position in screen space */
+		vec2 samplePos = startPos.xy + adjacentUnit * (adjacentLength - incircleSize);
+		
+		/* Clamp the sample pos coord */
+		//if(samplePos.x > 1.0f || samplePos.x < 0.0f) continue;
+		//if(samplePos.y > 1.0f || samplePos.y < 0.0f) continue;
+
+
+		/*
+		Convert the in-radius into screen space and then check what power N
+		we have to raise 2 to reach it. That power N becomes our mip level to sample from.
+		*/
+		float mipLevel = log2(incircleSize * max(u_UniformBuffer.ScreenSize.x, u_UniformBuffer.ScreenSize.y));
+		lod = mipLevel;
+
+		/* Sample the color buffer (using visibility buffer) */
+		reflectionColorArray[i] = ConeSampleWeightRoughness(samplePos, mipLevel, specularPower);
+		
+
+		if (reflectionColor.a > 1.0f)
+			break;
+		
+		/* Calculate next smaller triangle that approximates the cone in screen space */
+		adjacentLength = IsoscelesTriangleNextAdjacent(adjacentLength, incircleSize);
+	}
+
+	reflectionColor = vec4(0.0f);
+	
+	// Reverse the operation
+	for(uint i = 6; i >= 0; i--)
+	{
+		reflectionColor += reflectionColorArray[i];
+	
+		if (reflectionColor.a > 1.0f)
+			break;
+	}
+
+	// Normalize the values
+	reflectionColor /= reflectionColor.a;
+
+	return vec4(vec3(reflectionColor), lod);
+}
+
+vec3 FresnelShlick(in float cosTheta, in vec3 F0)
+{
+	return F0 + (1.0f - F0) * pow(1.0f - cosTheta, 5.0f);
+}
+
+// ======================================================
+// ======================================================
+
+void main()
+{
+	s_UV = vec2(gl_GlobalInvocationID.xy) / u_UniformBuffer.ScreenSize.xy;
+	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+	if(gl_GlobalInvocationID.x > u_UniformBuffer.ScreenSize.x || gl_GlobalInvocationID.y > u_UniformBuffer.ScreenSize.y) return;
+
+	// Sample information from the gbuffer
+	vec3 viewPos = texelFetch(u_ViewPosTex, pixelCoord, 0).xyz;
+	vec3 currentColor = texelFetch(u_ColorFrameTex, pixelCoord, 0).rgb;
+	float metallic = texelFetch(u_NormalTex, pixelCoord, 0).z;
+	float roughness = texelFetch(u_NormalTex, pixelCoord, 0).w;
+	float roughnessFactor = roughness / 2.0f;
+
+	if(viewPos.x == 0.0f && viewPos.y == 0.0f && viewPos.z == 0.0f) {
+		imageStore(o_FrameTex, pixelCoord, vec4(currentColor, 1.0f));
+		return; 
+	}
+
+	// Decode normals and calculate normals in view space (from model space)
+	vec2 decodedNormal = texelFetch(u_NormalTex, pixelCoord, 0).xy;
+    vec3 normal = DecodeNormal(decodedNormal);
+	vec3 viewNormal = transpose(inverse(mat3(u_UniformBuffer.ViewMatrix))) * normal;
+
+	// Fresnel factor
+	vec3 F0 = vec3(0.04f);
+	F0      = mix(F0, currentColor, metallic);
+	vec3 fresnel = FresnelShlick(max(dot(normalize(viewPos), normalize(viewNormal)), 0.0f), F0);
+
+	// SSR
+	float depth = 0.0f;
+	vec3 hitPos = viewPos.xyz;
+
+
+	vec3 worldPos = vec3(vec4(viewPos, 1.0f) * u_UniformBuffer.InvViewMatrix);
+	vec3 reflectionDir = normalize(reflect(normalize(viewPos), normalize(viewNormal)));
+	
+	
+	const float nearPlane = 0.1f;
+	vec3 currentCoords = vec3(s_UV, textureLod(u_HiZBuffer, s_UV, 0.0f).r);
+
+	
+	vec3 hitCoords;
+	vec3 reflectionColor;
+	if(u_UniformBuffer.UseConeTracing == 0)
+	{
+		vec3 jitter = mix(vec3(0.0f), vec3(HashFunc(worldPos)), roughnessFactor);
+
+		vec3 reflectVector = normalize(reflectionDir + jitter) * max(1.0f, -viewPos.z);
+		vec3 screenReflectVector = ProjectPoint(viewPos.xyz + reflectVector * nearPlane) - currentCoords;
+
+		hitCoords = HiZRayTrace(currentCoords, normalize(screenReflectVector));
+		reflectionColor = texture(u_PrefilteredColorBuffer, hitCoords.xy).rgb;
+	}
+	else
+	{
+		vec3 reflectVector = normalize(reflectionDir) * max(1.0f, -viewPos.z);
+		vec3 screenReflectVector = ProjectPoint(viewPos.xyz + reflectVector * nearPlane) - currentCoords;
+	
+		hitCoords = HiZRayTrace(currentCoords, normalize(screenReflectVector));
+		reflectionColor = ConeTrace(s_UV, hitCoords.xy, roughnessFactor).xyz;
+	}
+
+	// Fix artifacts
+	vec2 dCoords = smoothstep(0.2f, 0.5f, abs(vec2(0.5f) - hitCoords.xy));
+	float screenEdgeFactor = clamp(1.0f - (dCoords.x + dCoords.y), 0.0f, 1.0f);
+	float multipler = pow(1.0f,
+						  relfectionSpecularFalloffExponent) *
+						  screenEdgeFactor *
+						  -reflectionDir.z;
+
+	vec3 resultingColor = reflectionColor * clamp(multipler, 0.0f, 0.9f);
+
+	// Custom made function for the roughness weight
+	float roughnessWeight = exp(roughness * 0.6f) * (1 - roughness);
+
+	// Store the values
+	imageStore(o_FrameTex, pixelCoord, vec4(vec3(resultingColor * roughnessWeight), 1.0f));
+}

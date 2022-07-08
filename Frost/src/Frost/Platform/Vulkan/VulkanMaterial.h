@@ -24,6 +24,7 @@ namespace Frost
 		Vector<VkDescriptorSet> GetVulkanDescriptorSets() { return m_CachedDescriptorSets; }
 
 		virtual void Set(const std::string& name, float value) override;
+		virtual void Set(const std::string& name, int32_t value) override;
 		virtual void Set(const std::string& name, uint32_t value) override;
 		virtual void Set(const std::string& name, const glm::vec3& value) override;
 		virtual void Set(const std::string& name, const glm::mat4& value) override;
@@ -93,6 +94,8 @@ namespace Frost
 
 		static void AllocateDescriptorPool();
 		static void DeallocateDescriptorPool();
+
+		bool CheckIfTextureIsValidOrUsed(const std::string& name, void* texture);
 	private:
 		Ref<Shader> m_Shader;
 		ShaderReflectionData m_ReflectedData;

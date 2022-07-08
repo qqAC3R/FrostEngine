@@ -54,10 +54,10 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling_V2.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/HiZBufferBuilder.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledLightCulling.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SSCT.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ScreenSpaceReflections.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GaussianBlur.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VisibilityBuffer.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GroundTruthAO_V2.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/AmbientOcclusion.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SpatialDenoiser.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Bloom.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ColorCorrection.glsl");
@@ -72,6 +72,7 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VoxelFilter.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowDepthPass.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowCompute.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VoxelConeTracing.glsl");
 
 		
 		// Init the pools

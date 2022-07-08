@@ -1,6 +1,7 @@
 #include "frostpch.h"
 #include "VulkanMaterial.h"
 
+#include "Frost/Renderer/Renderer.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanShader.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
@@ -76,6 +77,25 @@ namespace Frost
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		vkDestroyDescriptorPool(device, s_DescriptorPool, nullptr);
+	}
+
+	bool VulkanMaterial::CheckIfTextureIsValidOrUsed(const std::string& name, void* texture)
+	{
+		if (texture == nullptr)
+		{
+			Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
+			Set(name, whiteTexture);
+			FROST_CORE_WARN("Texture Shader ('{0}') has been set with a invalid texture", name);
+			return false;
+		}
+		else if (m_MaterialData[name].Pointer)
+		{
+			if (m_MaterialData[name].Pointer.AsRef<void*>().Raw() == texture)
+			{
+				return false;
+			}
+		}
+		return true;
 	}
 
 	void VulkanMaterial::UpdateVulkanDescriptorIfNeeded()
@@ -321,6 +341,10 @@ namespace Frost
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<Texture2D>& texture)
 	{
+		// Firstly checking if the texture is valid
+		if (!CheckIfTextureIsValidOrUsed(name, (void*)texture.Raw()))
+			return;
+
 		// Allocate a PendingDescriptor and find the location (in the shader) of the member
 		PendingDescriptor& pendingDescriptor = m_PendingDescriptor.emplace_back();
 		auto location = GetShaderLocationFromString(name);
@@ -352,6 +376,10 @@ namespace Frost
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex)
 	{
+		// Firstly checking if the texture is valid
+		if (!CheckIfTextureIsValidOrUsed(name, (void*)texture.Raw()))
+			return;
+
 		// Allocate a PendingDescriptor and find the location (in the shader) of the member
 		PendingDescriptor& pendingDescriptor = m_PendingDescriptor.emplace_back();
 		auto location = GetShaderLocationFromString(name);
@@ -381,6 +409,10 @@ namespace Frost
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<Texture3D>& texture)
 	{
+		// Firstly checking if the texture is valid
+		if (!CheckIfTextureIsValidOrUsed(name, (void*)texture.Raw()))
+			return;
+
 		// Allocate a PendingDescriptor and find the location (in the shader) of the member
 		PendingDescriptor& pendingDescriptor = m_PendingDescriptor.emplace_back();
 		auto location = GetShaderLocationFromString(name);
@@ -423,6 +455,10 @@ namespace Frost
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<Texture3D>& texture, uint32_t arrayIndex)
 	{
+		// Firstly checking if the texture is valid
+		if (!CheckIfTextureIsValidOrUsed(name, (void*)texture.Raw()))
+			return;
+
 		// Allocate a PendingDescriptor and find the location (in the shader) of the member
 		PendingDescriptor& pendingDescriptor = m_PendingDescriptor.emplace_back();
 		auto location = GetShaderLocationFromString(name);
@@ -464,6 +500,10 @@ namespace Frost
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<Image2D>& image)
 	{
+		// Firstly checking if the image is valid
+		if (!CheckIfTextureIsValidOrUsed(name, (void*)image.Raw()))
+			return;
+
 		// Allocate a PendingDescriptor and find the location (in the shader) of the member
 		PendingDescriptor& pendingDescriptor = m_PendingDescriptor.emplace_back();
 		auto location = GetShaderLocationFromString(name);
@@ -505,6 +545,10 @@ namespace Frost
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<TextureCubeMap>& cubeMap)
 	{
+		// Firstly checking if the cubemap is valid
+		if (!CheckIfTextureIsValidOrUsed(name, (void*)cubeMap.Raw()))
+			return;
+
 		// Allocate a PendingDescriptor and find the location (in the shader) of the member
 		PendingDescriptor& pendingDescriptor = m_PendingDescriptor.emplace_back();
 		auto location = GetShaderLocationFromString(name);
@@ -576,6 +620,11 @@ namespace Frost
 	void VulkanMaterial::Set(const std::string& name, const glm::vec3& value)
 	{
 		Set<glm::vec3>(name, value);
+	}
+
+	void VulkanMaterial::Set(const std::string& name, int32_t value)
+	{
+		Set<uint32_t>(name, value);
 	}
 
 	void VulkanMaterial::Set(const std::string& name, uint32_t value)

@@ -24,6 +24,12 @@ namespace Frost
 
 	private:
 
+		// -------------- Hierarchal Z Buffer --------------------
+		void HZBInitData(uint32_t width, uint32_t height);
+		void HZBUpdate(const RenderQueue& renderQueue);
+		// --------------------------------------------------------
+
+
 		// ---------------------- SSR ----------------------------
 		// SSR + Cone Tracing
 		void SSRInitData(uint32_t width, uint32_t height);
@@ -33,13 +39,9 @@ namespace Frost
 		void SSRFilterInitData(uint32_t width, uint32_t height);
 		void SSRFilterUpdate(const RenderQueue& renderQueue);
 
-		// Hierarchal Z Buffer
-		void HZBInitData(uint32_t width, uint32_t height);
-		void HZBUpdate(const RenderQueue& renderQueue);
-
 		// Visibility Buffer for the SSR
-		void VisibilityInitData(uint32_t width, uint32_t height);
-		void VisibilityUpdate(const RenderQueue& renderQueue);
+		void VisibilityInitData(uint32_t width, uint32_t height); // Deprecated
+		void VisibilityUpdate(const RenderQueue& renderQueue);    // Deprecated
 		// --------------------------------------------------------
 
 
@@ -145,15 +147,30 @@ namespace Frost
 			bool Enabled = true;
 			float Threshold = 1.0f;
 			float Knee = 0.1f;
-			float UpsampleScale = 1.0f;
-			float Intensity = 1.0f;
-			float DirtIntensity = 1.0f;
 		} m_BloomSettings;
 
 		struct AmbientOcclussionSettings
 		{
 			int32_t AOMode = 1; // 0 = HBAO || 1 = GTAO
 		} m_AOSettings;
+
+		struct SSRSettings
+		{
+			int32_t UseConeTracing = true;
+			int32_t RayStepCount = 5;
+			float RayStepSize = 0.04f;
+		} m_SSRSettings;
+
+		struct CompositePassSettings {
+			float Gamma;
+			float Exposure;
+			float Stage;
+
+			int32_t UseSSR = 1;
+			int32_t UseAO = 1;
+			int32_t UseBloom = 1;
+		} m_CompositeSetings;
+
 
 		friend class SceneRenderPassPipeline;
 	};

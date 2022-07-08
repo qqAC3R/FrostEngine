@@ -36,11 +36,13 @@ namespace Frost
 
 		m_Data->VoxelizationShader = Renderer::GetShaderLibrary()->Get("Voxelization");
 		m_Data->VoxelFilterShader = Renderer::GetShaderLibrary()->Get("VoxelFilter");
+		m_Data->VoxelConeTracingShader = Renderer::GetShaderLibrary()->Get("VoxelConeTracing");
 
 		VoxelizationInit();
 		ClearBufferInit();
 
 		VoxelFilterInit();
+		VoxelConeTracingInit(1600, 900);
 	}
 
 	void VulkanVoxelizationPass::VoxelizationInit()
@@ -50,6 +52,8 @@ namespace Frost
 		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		uint32_t voxelVolumeDimensions = Renderer::GetRendererConfig().VoxelTextureResolution;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		m_VoxelizationPushConstant.VoxelDimensions = voxelVolumeDimensions;
 
 		// RenderPass
 		RenderPassSpecification renderPassSpecs =
@@ -185,19 +189,82 @@ namespace Frost
 		createInfo.Shader = m_Data->VoxelFilterShader;
 		m_Data->VoxelFilterPipeline = ComputePipeline::Create(createInfo);
 
-		m_Data->VoxelFilterDescriptor.resize(3);
+		m_Data->VoxelFilterDescriptor.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			m_Data->VoxelFilterDescriptor[i] = Material::Create(m_Data->VoxelFilterShader, "VoxelFilter");
-
-			//auto descriptor = m_Data->VoxelFilterDescriptor[i];
-			//Ref<Image2D> shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetDepthAttachment(i);
-
-			//descriptor->Set("u_ShadowDepthTexture", shadowDepthTexture);
 		}
 	}
 
-	void VulkanVoxelizationPass::VoxelizationUpdate(const RenderQueue& renderQueue)
+	void VulkanVoxelizationPass::InitLate()
+	{
+	}
+
+	void VulkanVoxelizationPass::OnUpdate(const RenderQueue& renderQueue)
+	{
+		// If we have 0 meshes, we shouldnt render this pass
+		if (renderQueue.GetQueueSize() == 0) return;
+
+		if(m_EnableVoxelization)
+			VoxelizationUpdateRendering(renderQueue);
+
+		VoxelFilterUpdate(renderQueue);
+		VoxelConeTracingUpdate(renderQueue);
+	}
+
+	void VulkanVoxelizationPass::VoxelConeTracingInit(uint32_t width, uint32_t height)
+	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+
+		// Setting up the voxel volume texture at the start (since this wont get changed during run time)
+		float voxelTextureSize = Renderer::GetRendererConfig().VoxelTextureResolution;
+		m_VCTPushConstant.VoxelTextureSize = voxelTextureSize;
+
+		// Voxel Filter Compute pipeline
+		ComputePipeline::CreateInfo createInfo{};
+		createInfo.Shader = m_Data->VoxelConeTracingShader;
+		if (!m_Data->VoxelConeTracingPipeline)
+			m_Data->VoxelConeTracingPipeline = ComputePipeline::Create(createInfo);
+
+		m_Data->VCT_IndirectDiffuseTexture.resize(framesInFlight);
+		m_Data->VCT_IndirectSpecularTexture.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			ImageSpecification imageSpec{};
+			imageSpec.Width = width;
+			imageSpec.Height = height;
+			imageSpec.Format = ImageFormat::RGBA8;
+			imageSpec.Usage = ImageUsage::Storage;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+
+			m_Data->VCT_IndirectDiffuseTexture[i] = Image2D::Create(imageSpec);
+			m_Data->VCT_IndirectSpecularTexture[i] = Image2D::Create(imageSpec);
+		}
+
+		m_Data->VoxelConeTracingDescriptor.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			if (!m_Data->VoxelConeTracingDescriptor[i])
+				m_Data->VoxelConeTracingDescriptor[i] = Material::Create(m_Data->VoxelConeTracingShader, "VoxelConeTracing");
+
+			auto descriptor = m_Data->VoxelConeTracingDescriptor[i].As<VulkanMaterial>();
+
+			auto positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
+			auto normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
+
+			descriptor->Set("u_VoxelTexture", m_Data->VoxelizationTexture[i]);
+			descriptor->Set("u_PositionTexture", positionTexture);
+			descriptor->Set("u_NormalTexture", normalTexture);
+			descriptor->Set("u_IndirectDiffuseTexture", m_Data->VCT_IndirectDiffuseTexture[i]);
+			descriptor->Set("u_IndirectSpecularTexture", m_Data->VCT_IndirectSpecularTexture[i]);
+
+			descriptor->UpdateVulkanDescriptorIfNeeded();
+
+		}
+	}
+
+	void VulkanVoxelizationPass::VoxelizationUpdateData(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -220,14 +287,12 @@ namespace Frost
 			voxelVolumeDimensions,
 			voxelVolumeDimensions
 		};
-		
+
 		Ref<VulkanTexture3D> voxelTexture = m_Data->VoxelizationTexture[currentFrameIndex].As<VulkanTexture3D>();
 		Ref<VulkanBufferDevice> clearBufferDevice = m_Data->ClearBuffer.As<VulkanBufferDevice>();
-		
+
 		voxelTexture->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-
 		vkCmdCopyBufferToImage(cmdBuf, clearBufferDevice->GetVulkanBuffer(), voxelTexture->GetVulkanImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
 		voxelTexture->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
 
@@ -238,40 +303,27 @@ namespace Frost
 		m_Data->m_VoxelAABB = size;
 
 		glm::vec3 camPos = renderQueue.CameraPosition;
-		
+
 		float camPosX = glm::round(camPos.x);
 		float camPosY = glm::round(camPos.y);
 		float camPosZ = glm::round(camPos.z);
-		
-		//FROST_CORE_INFO("X: {0}  Y: {1}   Z: {2}", m_Data->CameraPosition.x, m_Data->CameraPosition.y, m_Data->CameraPosition.z);
 
 
-		//if (static_cast<uint32_t>(camPosX) % 2 != 0
-		//	&& static_cast<uint32_t>(camPosY) % 2 != 0 && static_cast<uint32_t>(camPosZ) % 2 != 0)
-		//	return;
-		
-		//if (static_cast<uint32_t>(glm::round(camPosX)) % 2 != 0)
-		//	camPosX += 1.0f;
-		//if (static_cast<uint32_t>(glm::round(camPosY)) % 2 != 0)
-		//	camPosY += 1.0f;
-		//if (static_cast<uint32_t>(glm::round(camPosZ)) % 2 != 0)
-		//	camPosZ += 1.0f;
+		int32_t offsetFactor = int32_t(8.0f * m_Data->m_VoxelSize);
 
-		int32_t offsetFactor = 8;
-
-		camPosX = camPosX + (offsetFactor - float(int32_t(camPosX) % offsetFactor));
-		camPosY = camPosY + (offsetFactor - float(int32_t(camPosY) % offsetFactor));
-		camPosZ = camPosZ + (offsetFactor - float(int32_t(camPosZ) % offsetFactor));
+		camPosX = camPosX + abs(int32_t(camPosX) % offsetFactor - offsetFactor);
+		camPosY = camPosY + abs(int32_t(camPosY) % offsetFactor - offsetFactor);
+		camPosZ = camPosZ + abs(int32_t(camPosZ) % offsetFactor - offsetFactor);
 
 		//FROST_CORE_INFO("X: {0}  Y: {1}   Z: {2}", camPosX, camPosY, camPosZ);
 
-		m_Data->CameraPosition = { camPosX, camPosY, camPosZ };
+		m_Data->VoxelCameraPosition = { camPosX, camPosY, camPosZ };
 
 
 		// X
 		glm::mat4 projectionMatrix_X = glm::ortho(
 			(-(size) * 0.5f) - camPosZ, ((size) * 0.5f) - camPosZ,
-			( -size * 0.5f)  - camPosY,  (size * 0.5f)  - camPosY,
+			(-size * 0.5f) - camPosY, (size * 0.5f) - camPosY,
 			(size * 0.5f), (size * 1.5f)
 		);
 		projectionMatrix_X[1][1] *= -1.0f;
@@ -279,7 +331,7 @@ namespace Frost
 		// Y
 		glm::mat4 projectionMatrix_Y = glm::ortho(
 			(-(size) * 0.5f) + camPosX, ((size) * 0.5f) + camPosX,
-			( -size * 0.5f)  + camPosZ,  (size * 0.5f)  + camPosZ,
+			(-size * 0.5f) + camPosZ, (size * 0.5f) + camPosZ,
 			(size * 0.5f), (size * 1.5f)
 		);
 		projectionMatrix_Y[1][1] *= -1.0f;
@@ -287,7 +339,7 @@ namespace Frost
 		// Z
 		glm::mat4 projectionMatrix_Z = glm::ortho(
 			(-(size) * 0.5f) + camPosX, ((size) * 0.5f) + camPosX,
-			( -size * 0.5f)  - camPosY,  (size * 0.5f)  - camPosY,
+			(-size * 0.5f) - camPosY, (size * 0.5f) - camPosY,
 			(size * 0.5f), (size * 1.5f)
 		);
 		projectionMatrix_Z[1][1] *= -1.0f;
@@ -310,7 +362,7 @@ namespace Frost
 
 
 		// Update Voxelization parameters :
-		https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/wiRenderer.cpp#L2953
+	https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/wiRenderer.cpp#L2953
 		if (scene.objects.GetCount() > 0)
 		{
 			// We don't update it if the scene is empty, this even makes it easier to debug
@@ -330,161 +382,8 @@ namespace Frost
 #endif
 	}
 
-	void VulkanVoxelizationPass::VoxelFilterUpdate(const RenderQueue& renderQueue)
+	void VulkanVoxelizationPass::VoxelizationUpdateRendering(const RenderQueue& renderQueue)
 	{
-		// Getting all the needed information
-		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-		Ref<VulkanMaterial> vulkanDescriptor = m_Data->VoxelFilterDescriptor[currentFrameIndex].As<VulkanMaterial>();
-		Ref<VulkanComputePipeline> vulkanPipeline = m_Data->VoxelFilterPipeline.As<VulkanComputePipeline>();
-		//VkDescriptorSet descriptorSet = vulkanDescriptor->GetVulkanDescriptorSet(0);
-
-		struct PushConstant_VoxelFilter
-		{
-			glm::mat4 LightViewProjMatrix;
-
-			glm::vec4 CameraPosition_SampleMipLevel;
-			//int SampleMipLevel;
-			//glm::vec3 CameraPosition;
-			
-			float ProjectionExtents;
-			int CascadeSampleIndex;
-			//int Padding0 = 0;
-			//int Padding1 = 0;
-		};
-		PushConstant_VoxelFilter pushConstantData{};
-		//pushConstantData.CameraPosition = m_Data->CameraPosition;
-		pushConstantData.ProjectionExtents = m_Data->m_VoxelAABB / 2.0f;
-		pushConstantData.CameraPosition_SampleMipLevel = glm::vec4(m_Data->CameraPosition, 1.0f);
-		pushConstantData.CascadeSampleIndex = 1;
-		//pushConstantData.CameraPosition_SampleMipLevel.w = 1.0f;
-		pushConstantData.LightViewProjMatrix = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->CascadeViewProjMatrix[1];
-
-
-		Ref<VulkanTexture3D> vulkanVoxelTexture = m_Data->VoxelizationTexture[currentFrameIndex].As<VulkanTexture3D>();
-		vulkanVoxelTexture->TransitionLayout(cmdBuf, vulkanVoxelTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-
-		Ref<VulkanImage2D> shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
-		shadowDepthTexture->TransitionLayout(cmdBuf, shadowDepthTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-
-		
-		uint32_t mipWidth = vulkanVoxelTexture->GetWidth();
-		uint32_t mipHeight = vulkanVoxelTexture->GetHeight();
-		uint32_t mipDepth = vulkanVoxelTexture->GetDepth();
-		for (uint32_t mip = 0; mip < vulkanVoxelTexture->GetMipChainLevels(); mip++)
-		{
-
-			VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-			allocInfo.descriptorSetCount = 1;
-			allocInfo.pSetLayouts = &vulkanDescriptor->GetVulkanDescriptorLayout()[0];
-			VkDescriptorSet descriptorSet = VulkanRenderer::AllocateDescriptorSet(allocInfo);
-
-
-			pushConstantData.CameraPosition_SampleMipLevel.w = mip;
-			
-			// Voxel Sampler
-			{
-				uint32_t sampleMip = (int32_t(mip) - 1) < 0 ? 0 : (mip - 1);
-
-				VkDescriptorImageInfo imageInfo{};
-				imageInfo.imageLayout = vulkanVoxelTexture->GetVulkanImageLayout();
-				imageInfo.imageView = vulkanVoxelTexture->GetVulkanImageViewMip(sampleMip);
-				imageInfo.sampler = vulkanVoxelTexture->GetVulkanSampler();
-
-				VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-				writeDescriptorSet.dstBinding = 1;
-				writeDescriptorSet.dstArrayElement = 0;
-				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				writeDescriptorSet.pImageInfo = &imageInfo;
-				writeDescriptorSet.descriptorCount = 1;
-				writeDescriptorSet.dstSet = descriptorSet;
-
-				vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-			}
-
-			// Voxel Image
-			{
-				VkDescriptorImageInfo imageInfo{};
-				imageInfo.imageLayout = vulkanVoxelTexture->GetVulkanImageLayout();
-				imageInfo.imageView = vulkanVoxelTexture->GetVulkanImageViewMip(mip);
-				imageInfo.sampler = nullptr;
-
-				VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-				writeDescriptorSet.dstBinding = 0;
-				writeDescriptorSet.dstArrayElement = 0;
-				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-				writeDescriptorSet.pImageInfo = &imageInfo;
-				writeDescriptorSet.descriptorCount = 1;
-				writeDescriptorSet.dstSet = descriptorSet;
-
-				vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-			}
-
-			// Shadow Map
-			{
-				VkDescriptorImageInfo imageInfo{};
-				imageInfo.imageLayout = shadowDepthTexture->GetVulkanImageLayout();
-				imageInfo.imageView = shadowDepthTexture->GetVulkanImageView();
-				imageInfo.sampler = shadowDepthTexture->GetVulkanSampler();
-
-				VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-				writeDescriptorSet.dstBinding = 2;
-				writeDescriptorSet.dstArrayElement = 0;
-				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				writeDescriptorSet.pImageInfo = &imageInfo;
-				writeDescriptorSet.descriptorCount = 1;
-				writeDescriptorSet.dstSet = descriptorSet;
-
-				vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-			}
-
-
-
-			//vulkanDescriptor->Bind(cmdBuf, m_Data->VoxelFilterPipeline);
-			vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, vulkanPipeline->GetVulkanPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
-
-			vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstantData);
-
-			uint32_t groupX = glm::ceil(mipWidth  / 8.0f);
-			uint32_t groupY = glm::ceil(mipHeight / 8.0f);
-			uint32_t groupZ = glm::ceil(mipDepth  / 8.0f);
-			vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, groupZ);
-
-
-			// Set a barrier
-			VkImageSubresourceRange imageSubrange{};
-			imageSubrange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			imageSubrange.baseArrayLayer = 0;
-			imageSubrange.baseMipLevel = mip;
-			imageSubrange.layerCount = 1;
-			imageSubrange.levelCount = 1;
-
-			Utils::InsertImageMemoryBarrier(cmdBuf, vulkanVoxelTexture->GetVulkanImage(),
-				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-				vulkanVoxelTexture->GetVulkanImageLayout(), vulkanVoxelTexture->GetVulkanImageLayout(),
-				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				imageSubrange
-			);
-
-
-			mipWidth /= 2;
-			mipHeight /= 2;
-			mipDepth /= 2;
-		}
-
-	}
-
-	void VulkanVoxelizationPass::InitLate()
-	{
-	}
-
-	void VulkanVoxelizationPass::OnUpdate(const RenderQueue& renderQueue)
-	{
-		// If we have 0 meshes, we shouldnt render this pass
-		if (renderQueue.GetQueueSize() == 0) return;
-
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
@@ -496,7 +395,7 @@ namespace Frost
 		projectionMatrix[1][1] *= -1; // GLM uses opengl style of rendering, where the y coordonate is inverted
 		glm::mat4 viewProjectionMatrix = projectionMatrix * renderQueue.CameraViewMatrix;
 
-
+		VoxelizationUpdateData(renderQueue);
 
 		/*
 			Each mesh might have a set of submeshes which are sent to render individualy.
@@ -505,7 +404,7 @@ namespace Frost
 		*/
 		Vector<IndirectMeshData> meshIndirectData;
 
-		// `Indirect draw commands` offset
+		// `Indirect draw commands` offsets
 		uint64_t indirectCmdsOffset = 0;
 
 		// Get all the indirect draw commands
@@ -572,8 +471,6 @@ namespace Frost
 		shadowDepthTexture->TransitionLayout(cmdBuf, shadowDepthTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
 
-		
-		VoxelizationUpdate(renderQueue);
 
 		// Bind the pipeline and renderpass
 		m_Data->VoxelizationRenderPass->Bind();
@@ -607,7 +504,7 @@ namespace Frost
 
 
 
-		
+
 		// Sending the indirect draw commands to the command buffer
 		for (uint32_t i = 0; i < meshIndirectData.size(); i++)
 		{
@@ -628,13 +525,11 @@ namespace Frost
 
 
 			// Set the transform matrix and model matrix of the submesh into a constant buffer
-			//VulkanVoxelizationPass::PushConstant pushConstant;
-			m_PushConstant.LightViewProj = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->CascadeViewProjMatrix[1];
-			m_PushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
-			m_PushConstant.MaterialIndex = meshIndirectData[i].MaterialOffset;
-			m_PushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
-			m_PushConstant.AtomicOperation = m_AtomicOperation;
-			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_PushConstant);
+			m_VoxelizationPushConstant.LightViewProj = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->CascadeViewProjMatrix[1];
+			m_VoxelizationPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
+			m_VoxelizationPushConstant.MaterialIndex = meshIndirectData[i].MaterialOffset;
+			m_VoxelizationPushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
+			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_VoxelizationPushConstant);
 
 			uint32_t submeshCount = meshData.SubmeshCount;
 			uint32_t offset = meshIndirectData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
@@ -644,22 +539,201 @@ namespace Frost
 
 		// End the renderpass
 		m_Data->VoxelizationRenderPass->Unbind();
-
-		VoxelFilterUpdate(renderQueue);
 	}
+
+	struct PushConstant_VoxelFilter
+	{
+		glm::mat4 LightViewProjMatrix;
+
+		glm::vec4 CameraPosition_SampleMipLevel;
+		//int SampleMipLevel;
+		//glm::vec3 CameraPosition;
+
+		float ProjectionExtents;
+		int CascadeSampleIndex;
+		//int Padding0 = 0;
+		//int Padding1 = 0;
+	};
+	static PushConstant_VoxelFilter s_VoxelFilterPushConstant;
+
+	void VulkanVoxelizationPass::VoxelFilterUpdate(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		Ref<VulkanMaterial> vulkanDescriptor = m_Data->VoxelFilterDescriptor[currentFrameIndex].As<VulkanMaterial>();
+		Ref<VulkanComputePipeline> vulkanPipeline = m_Data->VoxelFilterPipeline.As<VulkanComputePipeline>();
+
+		s_VoxelFilterPushConstant.ProjectionExtents = m_Data->m_VoxelAABB / 2.0f;
+		s_VoxelFilterPushConstant.CameraPosition_SampleMipLevel = glm::vec4(m_Data->VoxelCameraPosition, 1.0f);
+		s_VoxelFilterPushConstant.CascadeSampleIndex = 1;
+		s_VoxelFilterPushConstant.LightViewProjMatrix = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->CascadeViewProjMatrix[1];
+
+
+		Ref<VulkanTexture3D> vulkanVoxelTexture = m_Data->VoxelizationTexture[currentFrameIndex].As<VulkanTexture3D>();
+		vulkanVoxelTexture->TransitionLayout(cmdBuf, vulkanVoxelTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+		Ref<VulkanImage2D> shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
+		shadowDepthTexture->TransitionLayout(cmdBuf, shadowDepthTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+
+		uint32_t mipWidth = vulkanVoxelTexture->GetWidth();
+		uint32_t mipHeight = vulkanVoxelTexture->GetHeight();
+		uint32_t mipDepth = vulkanVoxelTexture->GetDepth();
+
+		//for (uint32_t mip = 0; mip < vulkanVoxelTexture->GetMipChainLevels(); mip++)
+		for (uint32_t mip = 0; mip < 6; mip++)
+		{
+
+			VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+			allocInfo.descriptorSetCount = 1;
+			allocInfo.pSetLayouts = &vulkanDescriptor->GetVulkanDescriptorLayout()[0];
+			VkDescriptorSet descriptorSet = VulkanRenderer::AllocateDescriptorSet(allocInfo);
+
+
+			s_VoxelFilterPushConstant.CameraPosition_SampleMipLevel.w = mip;
+
+			// Voxel Sampler
+			{
+				uint32_t sampleMip = (int32_t(mip) - 1) < 0 ? 0 : (mip - 1);
+
+				VkDescriptorImageInfo imageInfo{};
+				imageInfo.imageLayout = vulkanVoxelTexture->GetVulkanImageLayout();
+				imageInfo.imageView = vulkanVoxelTexture->GetVulkanImageViewMip(sampleMip);
+				imageInfo.sampler = vulkanVoxelTexture->GetVulkanSampler();
+
+				VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				writeDescriptorSet.dstBinding = 1;
+				writeDescriptorSet.dstArrayElement = 0;
+				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				writeDescriptorSet.pImageInfo = &imageInfo;
+				writeDescriptorSet.descriptorCount = 1;
+				writeDescriptorSet.dstSet = descriptorSet;
+
+				vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+			}
+
+			// Voxel Image
+			{
+				VkDescriptorImageInfo imageInfo{};
+				imageInfo.imageLayout = vulkanVoxelTexture->GetVulkanImageLayout();
+				imageInfo.imageView = vulkanVoxelTexture->GetVulkanImageViewMip(mip);
+				imageInfo.sampler = nullptr;
+
+				VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				writeDescriptorSet.dstBinding = 0;
+				writeDescriptorSet.dstArrayElement = 0;
+				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				writeDescriptorSet.pImageInfo = &imageInfo;
+				writeDescriptorSet.descriptorCount = 1;
+				writeDescriptorSet.dstSet = descriptorSet;
+
+				vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+			}
+
+			// Shadow Map
+			{
+				VkDescriptorImageInfo imageInfo{};
+				imageInfo.imageLayout = shadowDepthTexture->GetVulkanImageLayout();
+				imageInfo.imageView = shadowDepthTexture->GetVulkanImageView();
+				imageInfo.sampler = shadowDepthTexture->GetVulkanSampler();
+
+				VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				writeDescriptorSet.dstBinding = 2;
+				writeDescriptorSet.dstArrayElement = 0;
+				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				writeDescriptorSet.pImageInfo = &imageInfo;
+				writeDescriptorSet.descriptorCount = 1;
+				writeDescriptorSet.dstSet = descriptorSet;
+
+				vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+			}
+
+
+
+			//vulkanDescriptor->Bind(cmdBuf, m_Data->VoxelFilterPipeline);
+			vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, vulkanPipeline->GetVulkanPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
+
+			vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VoxelFilterPushConstant);
+
+			uint32_t groupX = glm::ceil(mipWidth / 8.0f);
+			uint32_t groupY = glm::ceil(mipHeight / 8.0f);
+			uint32_t groupZ = glm::ceil(mipDepth / 8.0f);
+			vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, groupZ);
+
+
+			// Set a barrier
+			VkImageSubresourceRange imageSubrange{};
+			imageSubrange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			imageSubrange.baseArrayLayer = 0;
+			imageSubrange.baseMipLevel = mip;
+			imageSubrange.layerCount = 1;
+			imageSubrange.levelCount = 1;
+
+			Utils::InsertImageMemoryBarrier(cmdBuf, vulkanVoxelTexture->GetVulkanImage(),
+				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+				vulkanVoxelTexture->GetVulkanImageLayout(), vulkanVoxelTexture->GetVulkanImageLayout(),
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				imageSubrange
+			);
+
+
+			mipWidth /= 2;
+			mipHeight /= 2;
+			mipDepth /= 2;
+		}
+
+	}
+
+	void VulkanVoxelizationPass::VoxelConeTracingUpdate(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		Ref<VulkanMaterial> vulkanDescriptor = m_Data->VoxelConeTracingDescriptor[currentFrameIndex].As<VulkanMaterial>();
+		Ref<VulkanComputePipeline> vulkanPipeline = m_Data->VoxelConeTracingPipeline.As<VulkanComputePipeline>();
+
+		m_VCTPushConstant.CameraPosition = renderQueue.CameraPosition;
+		m_VCTPushConstant.VoxelSampleOffset = m_Data->VoxelCameraPosition;
+		m_VCTPushConstant.VoxelGrid = glm::round(m_Data->m_VoxelGrid * m_Data->m_VoxelSize);
+
+		vulkanDescriptor->Bind(cmdBuf, m_Data->VoxelConeTracingPipeline);
+		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_VCTPushConstant);
+
+		uint32_t groupX = std::ceil(renderQueue.ViewPortWidth / 32.0f);
+		uint32_t groupY = std::ceil(renderQueue.ViewPortHeight / 32.0f);
+		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+
+		Ref<VulkanImage2D> vulkanIndirectSpecularTexture = m_Data->VCT_IndirectSpecularTexture[currentFrameIndex].As<VulkanImage2D>();
+
+		vulkanIndirectSpecularTexture->TransitionLayout(cmdBuf,
+			vulkanIndirectSpecularTexture->GetVulkanImageLayout(),
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+		);
+	}
+
 
 	void VulkanVoxelizationPass::OnRenderDebug()
 	{
 		if (ImGui::CollapsingHeader("Voxelization Pass"))
 		{
-			ImGui::SliderInt("Atomic Operation (bool)", &m_AtomicOperation, 0, 1);
-			ImGui::DragFloat("Voxel Size", &m_Data->m_VoxelSize, 0.005f, 0.5f, 2.0f);
+			ImGui::SliderInt("Enable Voxelization", &m_EnableVoxelization, 0, 1);
+			ImGui::Separator();
+			ImGui::SliderInt("Atomic Operation (bool)", &m_VoxelizationPushConstant.AtomicOperation, 0, 1);
+			ImGui::DragFloat("Voxel Size", &m_Data->m_VoxelSize, 0.25f, 0.5f, 2.0f);
+			ImGui::Separator();
+			ImGui::SliderInt("Indirect Diffuse", &m_VCTPushConstant.UseIndirectDiffuse, 0, 1);
+			ImGui::SliderInt("Indirect Specular", &m_VCTPushConstant.UseIndirectSpecular, 0, 1);
 		}
 	}
 
 	void VulkanVoxelizationPass::OnResize(uint32_t width, uint32_t height)
 	{
-
+		VoxelConeTracingInit(width, height);
 	}
 
 	void VulkanVoxelizationPass::OnResizeLate(uint32_t width, uint32_t height)

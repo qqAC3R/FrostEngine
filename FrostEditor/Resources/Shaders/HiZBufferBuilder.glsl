@@ -24,7 +24,7 @@ void main()
 #if 0
 	// Method 2:
 	// Texture gather approach
-	vec4 depths = textureGather(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, 0);
+	vec4 depths = textureGather(i_Depth, vec2(pos) / u_PushConstant.u_ImageSize, 0);
 	
 	float depth = max(max(depths.x, depths.y), max(depths.z, depths.w));
 #endif

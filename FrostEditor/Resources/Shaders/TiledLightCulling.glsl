@@ -23,7 +23,8 @@ layout(binding = 1) writeonly buffer u_VisibleLightsBuffer {
 } LightIndices;
 
 
-layout(binding = 2, scalar) readonly buffer u_RendererData { // Using scalar, it will fix our byte padding issues?
+/*
+layout(binding = 2, scalar) readonly buffer u_u_PushConstant { // Using scalar, it will fix our byte padding issues?
     vec2 ScreenSize;
     int PointLightCount;
     int Padding;
@@ -31,7 +32,19 @@ layout(binding = 2, scalar) readonly buffer u_RendererData { // Using scalar, it
     mat4 ViewMatrix;
     mat4 ProjectionMatrix;
     mat4 ViewProjectionMatrix;
-} RendererData;
+} u_PushConstant;
+*/
+
+layout(push_constant) uniform PushConstant
+{
+    mat4 ViewMatrix;
+    mat4 ProjectionMatrix;
+    mat4 ViewProjectionMatrix;
+
+    vec2 ScreenSize;
+    int PointLightCount;
+} u_PushConstant;
+
 
 layout(binding = 3) uniform sampler2D u_DepthBuffer;
 
@@ -67,9 +80,9 @@ void main()
     barrier();
 
     // Calculate the minimum and maximum depth values (from the depth buffer) for this group's tile
-    vec2 textureCoord = vec2(location) / RendererData.ScreenSize;
+    vec2 textureCoord = vec2(location) / u_PushConstant.ScreenSize;
     float depth = texture(u_DepthBuffer, textureCoord).x;
-    depth = RendererData.ProjectionMatrix[3][2] / (depth + RendererData.ProjectionMatrix[2][2]);
+    depth = u_PushConstant.ProjectionMatrix[3][2] / (depth + u_PushConstant.ProjectionMatrix[2][2]);
 
 
     // Convert depth to uint so we can do atomic min and max comparisons between the threads
@@ -104,14 +117,14 @@ void main()
         // Transform the first four planes to the camera's perspective
         for (uint i = 0; i < 4; i++)
         {
-            frustumPlanes[i] *= RendererData.ViewProjectionMatrix;
+            frustumPlanes[i] *= u_PushConstant.ViewProjectionMatrix;
             frustumPlanes[i] /= length(frustumPlanes[i].xyz);
         }
 
         // Transform the depth planes
-        frustumPlanes[4] *= RendererData.ViewMatrix;
+        frustumPlanes[4] *= u_PushConstant.ViewMatrix;
         frustumPlanes[4] /= length(frustumPlanes[4].xyz);
-        frustumPlanes[5] *= RendererData.ViewMatrix;
+        frustumPlanes[5] *= u_PushConstant.ViewMatrix;
         frustumPlanes[5] /= length(frustumPlanes[5].xyz);
     }
     barrier();
@@ -122,11 +135,11 @@ void main()
     // Parallelize the threads against the lights now
     // Can handle 256(TILE_SIZE * TILE_SIZE) simultaniously
     uint threadCount = TILE_SIZE * TILE_SIZE;
-    uint passCount = (RendererData.PointLightCount + threadCount - 1) / threadCount;
+    uint passCount = (u_PushConstant.PointLightCount + threadCount - 1) / threadCount;
     for (uint i = 0; i < passCount; i++)
     {
         uint lightIndex = i * threadCount + gl_LocalInvocationIndex;
-        if(lightIndex >= RendererData.PointLightCount)
+        if(lightIndex >= u_PushConstant.PointLightCount)
             break;
 
         vec4 position = vec4(LightData.u_PointLights[lightIndex].Position, 1.0f);

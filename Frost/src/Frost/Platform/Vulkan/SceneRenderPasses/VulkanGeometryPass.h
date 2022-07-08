@@ -44,10 +44,15 @@ namespace Frost
 		virtual const std::string& GetName() override { return m_Name; }
 
 	private:
-		void GeometryDataInit();
-		void LateCullDataInit(uint32_t width, uint32_t height);
+		// -------------------- Geometry Pass ------------------------
+		void GeometryDataInit(uint32_t width, uint32_t height);
+		void GeometryUpdate(const RenderQueue& renderQueue, const Vector<IndirectMeshData>& indirectMeshData);
+		// -----------------------------------------------------------
 
+		// ------------------- Occlusion Culling ---------------------
+		void OcclusionCullDataInit(uint32_t width, uint32_t height);
 		void OcclusionCullUpdate(const RenderQueue& renderQueue, uint64_t indirectCmdsOffset);
+		// -----------------------------------------------------------
 
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
@@ -89,19 +94,11 @@ namespace Frost
 		struct InternalData
 		{
 			// Geometry pass
-			Ref<Pipeline> Pipeline;
-			Ref<RenderPass> RenderPass;
+			Ref<Pipeline> GeometryPipeline;
+			Ref<RenderPass> GeometryRenderPass;
 			Ref<Shader> GeometryShader;
-			Vector<Ref<Material>> Descriptor;
+			Vector<Ref<Material>> GeometryDescriptor;
 
-
-			// Depth pyramid construction
-			Ref<Shader> HZBShader; // Hi-Z Buffer Builder Compute Shader
-			Ref<ComputePipeline> HZBPipeline;
-			Vector<Vector<Ref<Material>>> HZBDescriptor;
-			Vector<Ref<Image2D>> DepthPyramid;
-			uint32_t HZB_MipLevels;
-			glm::vec2 HZB_Dimensions;
 
 			// For occlusion culling
 			Ref<Shader> LateCullShader;
@@ -114,14 +111,9 @@ namespace Frost
 			ComputeShaderPS ComputeShaderPushConstant; // Push constant data for the occlusion culling shader
 
 
-
-
-
 			// Indirect drawing
 			Vector<HeapBlock> IndirectCmdBuffer;
 			Vector<HeapBlock> MaterialSpecs;
-
-
 		};
 
 		struct PushConstant

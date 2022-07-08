@@ -27,11 +27,21 @@ namespace Frost
 		virtual const std::string& GetName() override { return m_Name; }
 
 	private:
+		// ----------------- Voxelization ------------------------
 		void VoxelizationInit();
-		void VoxelizationUpdate(const RenderQueue& renderQueue);
+		void VoxelizationUpdateData(const RenderQueue& renderQueue);
+		void VoxelizationUpdateRendering(const RenderQueue& renderQueue);
+		// -------------------------------------------------------
 
+		// ------------ Voxel texture filtering ------------------
 		void VoxelFilterInit();
 		void VoxelFilterUpdate(const RenderQueue& renderQueue);
+		// -------------------------------------------------------
+
+		// ------------ Voxel Cone Tracing ------------------
+		void VoxelConeTracingInit(uint32_t width, uint32_t height);
+		void VoxelConeTracingUpdate(const RenderQueue& renderQueue);
+		// -------------------------------------------------------
 
 		void ClearBufferInit();
 
@@ -52,18 +62,20 @@ namespace Frost
 			Vector<Ref<Material>> VoxelFilterDescriptor;
 
 
-			Ref<Shader> VoxelVisualizerShader;
-			Ref<Pipeline> VoxelVisualizerPipeline;
-			Ref<RenderPass> VoxelVisualizerRenderPass;
-			Vector<Ref<Material>> VoxelVisualizerDescriptor;
+			Ref<Shader> VoxelConeTracingShader;
+			Ref<ComputePipeline> VoxelConeTracingPipeline;
+			Vector<Ref<Material>> VoxelConeTracingDescriptor;
+			Vector<Ref<Image2D>> VCT_IndirectDiffuseTexture;
+			Vector<Ref<Image2D>> VCT_IndirectSpecularTexture;
+
 
 			Ref<BufferDevice> ClearBuffer;
-
 			Vector<HeapBlock> IndirectVoxelCmdBuffer;
+
 
 			int32_t m_VoxelGrid = 256;
 			float m_VoxelSize = 1.0f;
-			glm::vec3 CameraPosition = { 0.0f, 0.0f, 0.0f };
+			glm::vec3 VoxelCameraPosition = { 0.0f, 0.0f, 0.0f };
 			float m_VoxelAABB = 0.0f;
 		};
 
@@ -74,18 +86,33 @@ namespace Frost
 			glm::mat4 Z;
 		} VoxelProj;
 
-		struct PushConstant
+		struct VoxelizationPushConstant
 		{
 			glm::mat4 ViewMatrix;
 			glm::mat4 LightViewProj;
+
 			uint32_t MaterialIndex;
 			uint64_t VertexBufferBDA;
-			int32_t VoxelDimensions = 256;
-			int32_t AtomicOperation;
-		};
-		VulkanVoxelizationPass::PushConstant m_PushConstant;
+			int32_t VoxelDimensions;
+			int32_t AtomicOperation = 1;
+		} m_VoxelizationPushConstant;
 
-		int32_t m_AtomicOperation = 1;
+		struct VCTPushConstant
+		{
+			glm::vec3 VoxelSampleOffset;
+			float VoxelGrid;
+
+			glm::vec3 CameraPosition;
+			float VoxelTextureSize;
+
+			int32_t UseIndirectDiffuse = 1;
+			int32_t UseIndirectSpecular = 1;
+
+			float ConeTraceMaxDistance = 200.0f;
+			int32_t ConeTraceMaxSteps = 100;
+		} m_VCTPushConstant;
+
+		int32_t m_EnableVoxelization = 1;
 
 		InternalData* m_Data;
 		std::string m_Name;

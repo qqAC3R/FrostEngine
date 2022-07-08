@@ -25,11 +25,15 @@ namespace Frost
 		virtual const std::string& GetName() override { return m_Name; }
 	private:
 
-		void PBRInitData();
+		// ------------------- PBR Deffered --------------------
+		void PBRInitData(uint32_t width, uint32_t height);
 		void PBRUpdate();
+		// ------------------------------------------------------
 
-		void TiledLightCullingInitData();
+		// --------------- Tiled Light Culling ------------------
+		void TiledLightCullingInitData(uint32_t width, uint32_t height);
 		void TiledLightCullingUpdate(const RenderQueue& renderQueue);
+		// ------------------------------------------------------
 
 		
 
@@ -54,7 +58,6 @@ namespace Frost
 			Ref<Shader> LightCullingShader;
 			Ref<ComputePipeline> LightCullingPipeline;
 			Vector<Ref<Material>> LightCullingDescriptor;
-			Vector<Ref<BufferDevice>> CullingDataBuffer;
 		};
 		InternalData* m_Data;
 
@@ -64,23 +67,24 @@ namespace Frost
 			glm::vec4 CameraPosition;
 			glm::vec3 DirectionalLightDir;
 			int32_t UseLightHeatMap = 0.0f;
-			glm::vec3 VoxelSampleOffset = { 0.0f, 0.0f, 0.0f };
-			float VoxelGrid;
-			float VoxelTextureSize;
+			//glm::vec3 VoxelSampleOffset = { 0.0f, 0.0f, 0.0f };
+			//float VoxelGrid;
+			//float VoxelTextureSize;
 		};
 		PushConstantData m_PushConstantData;
 
-		struct RendererData // For the Tiled LightCulling compute shader
+		struct TiledLightCullPushConstant // For the Tiled LightCulling compute shader
 		{
-			glm::vec2 ScreenSize;
-			int PointLightCount;
-			int Padding;
-
 			glm::mat4 ViewMatrix;
 			glm::mat4 ProjectionMatrix;
 			glm::mat4 ViewProjectionMatrix;
+
+			glm::vec2 ScreenSize;
+			int PointLightCount;
+
 		};
-		RendererData m_RendererData;
+		TiledLightCullPushConstant m_TiledLIghtCullPushConstant;
+
 
 		friend class SceneRenderPassPipeline;
 		friend class VulkanRendererDebugger;

@@ -119,9 +119,9 @@ namespace Frost
 
 			Ref<VulkanMaterial> vulkanDescriptor = m_Data->ShadowComputeDescriptor[i].As<VulkanMaterial>();
 
-			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, i);
-			Ref<Image2D> viewPositionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(3, i);
-			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(1, i);
+			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
+			Ref<Image2D> viewPositionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(3, i);
+			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
 
 			vulkanDescriptor->Set("u_PositionTexture", positionTexture);
 			vulkanDescriptor->Set("u_ViewPositionTexture", viewPositionTexture);
@@ -477,12 +477,6 @@ namespace Frost
 		{
 			ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
 
-			auto shadowDepthTexture = m_Data->ShadowDepthRenderPass->GetDepthAttachment(currentFrameIndex);
-			imguiLayer->RenderTexture(shadowDepthTexture, 256, 256);
-
-			//auto shadowComputeTexture = m_Data->ShadowComputeTexture[currentFrameIndex];
-			//imguiLayer->RenderTexture(m_Data->ShadowComputeTexture[currentFrameIndex], 128, 128);
-
 			ImGui::DragFloat("Cascade Split Factor", &CascadeSplitLambda, 0.005f, 0.1f, 1.5f);
 			ImGui::DragFloat("Camera FarClip", &CameraFarClip, 10.0f, 0.0f, 10000.0f);
 			ImGui::DragFloat("Camera NearClip", &CameraNearClip, 0.05f, 0.05f, 1.0);
@@ -492,6 +486,9 @@ namespace Frost
 			ImGui::SliderInt("Use PCSS", &UsePCSS, 0, 1);
 			ImGui::SliderInt("Fade Cascades", &FadeCascades, 0, 1);
 			ImGui::SliderInt("Show Cascades", &m_ShowCascadesDebug, 0, 1);
+
+			auto shadowDepthTexture = m_Data->ShadowDepthRenderPass->GetDepthAttachment(currentFrameIndex);
+			imguiLayer->RenderTexture(shadowDepthTexture, 256, 256);
 		}
 	}
 

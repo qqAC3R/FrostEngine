@@ -90,7 +90,8 @@ void main()
     uint blurMode = uint(u_PushConstant.Mode);
     switch(blurMode)
     {
-        case MODE_PREFILTER:
+        //case MODE_PREFILTER:
+        default:
         {
 	        result = texture(i_SrcImage, s_UV).rgb * weight[0];
             
@@ -117,13 +118,13 @@ void main()
             }
             result = (horizontalResult + verticalResult) * 0.5f;
         }
-        case MODE_DOWNSAMPLE:
-        {
-            // Downsample
-            vec2 texSize = vec2(textureSize(i_SrcImage, 0));
-            vec2 texelSize = 1.0f / texSize;
-            result = DownSampleBox13(i_SrcImage, 0, s_UV, texelSize);
-        }
+        //case MODE_DOWNSAMPLE:
+        //{
+        //    // Downsample
+        //    vec2 texSize = vec2(textureSize(i_SrcImage, 0));
+        //    vec2 texelSize = 1.0f / texSize;
+        //    result = DownSampleBox13(i_SrcImage, 0, s_UV, texelSize);
+        //}
     }
 
 

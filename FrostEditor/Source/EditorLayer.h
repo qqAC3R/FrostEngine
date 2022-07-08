@@ -82,10 +82,13 @@ namespace Frost
 			{
 				auto& directionalLight = m_EditorScene->CreateEntity("Directional Light");
 				auto& meshComponent = directionalLight.AddComponent<DirectionalLightComponent>();
+				meshComponent.Direction = { -75.0f, 0.0f, 0.0f };
 			}
 
 			m_UseHillaire = false;
-
+			
+			//float& cameraExposure = m_EditorCamera.GetExposure();
+			//cameraExposure = 6.0f;
 
 		}
 

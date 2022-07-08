@@ -347,7 +347,7 @@ float SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 
 		if (shadowCoord.w > 0 && dist < shadowCoord.z - bias)
 		{
-			shadow = 0.1f;
+			shadow = 0.3f;
 		}
 	}
 	return shadow;
@@ -356,23 +356,14 @@ float SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 
 void main()
 {
-	
-	// Albedo color
+	// Material Index
 	uint materialIndex = uint(g_BufferIndex);
 	
 	// PBR textures
 	uint albedoTextureID = MaterialUniform.Data[nonuniformEXT(materialIndex)].AlbedoTextureID;
-	uint roughnessTextureID = MaterialUniform.Data[nonuniformEXT(materialIndex)].RoughessTextureID;
-	uint metalnessTextureID = MaterialUniform.Data[nonuniformEXT(materialIndex)].MetalnessTextureID;
-
-	// Normal map
-	uint useNormalMap = MaterialUniform.Data[nonuniformEXT(materialIndex)].UseNormalMap;
-	uint normalTextureID = MaterialUniform.Data[nonuniformEXT(materialIndex)].NormalTextureID;
-
+	
 	// PBR values
 	vec3 albedoFactor = vec3(MaterialUniform.Data[nonuniformEXT(materialIndex)].AlbedoColor);
-	float metalnessFactor = MaterialUniform.Data[nonuniformEXT(materialIndex)].Metalness;
-	float roughnessFactor = MaterialUniform.Data[nonuniformEXT(materialIndex)].Roughness;
 	float emissionFactor = MaterialUniform.Data[nonuniformEXT(materialIndex)].Emission;
 
 	// Albedo color
@@ -414,10 +405,10 @@ void main()
 
 
 	// Inject directional light
-	vec4 shadwPos = f_PositionDepth / f_PositionDepth.w;
-	float shadowFactor = SampleShadowTexture(shadwPos, 2);
-	
+	vec4 shadowPos = f_PositionDepth / f_PositionDepth.w;
+	float shadowFactor = SampleShadowTexture(shadowPos, 2);
 	o_Albedo.xyz *= shadowFactor;
+
 
 	// Atomic operations to get an averaged value, described in OpenGL insights about voxelization
 	// Required to avoid flickering when voxelizing every frame

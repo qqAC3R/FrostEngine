@@ -56,39 +56,34 @@ layout(binding = 0) uniform sampler2D u_PositionTexture;
 layout(binding = 1) uniform sampler2D u_AlbedoTexture;
 layout(binding = 2) uniform sampler2D u_NormalTexture;
 //layout(binding = 3) uniform sampler2D u_CompositeTexture;
-layout(binding = 4, scalar) readonly buffer u_LightData { // Using scalar, it will fix our byte padding issues?
+layout(binding = 3, scalar) readonly buffer u_LightData { // Using scalar, it will fix our byte padding issues?
 	PointLight u_PointLights[];
 } LightData;
 
-layout(binding = 10, scalar) readonly buffer u_VisibleLightData { // Using scalar, it will fix our byte padding issues?
+layout(binding = 4, scalar) readonly buffer u_VisibleLightData { // Using scalar, it will fix our byte padding issues?
 	int Indices[];
 } VisibleLightData;
 
-layout(binding = 6) uniform samplerCube u_RadianceFilteredMap;
-layout(binding = 7) uniform samplerCube u_IrradianceMap;
-layout(binding = 8) uniform sampler2D u_BRDFLut;
+layout(binding = 5) uniform samplerCube u_RadianceFilteredMap;
+layout(binding = 6) uniform samplerCube u_IrradianceMap;
+layout(binding = 7) uniform sampler2D u_BRDFLut;
 
-layout(binding = 9) uniform CameraData
+layout(binding = 8) uniform UniformBuffer
 {
-	float Gamma;
-	float Exposure;
+	float CameraGamma;
+	float CameraExposure;
 	float PointLightCount;
 	float LightCullingWorkgroup;
-} m_CameraData;
+} u_UniformBuffer;
 
-// Voxel texture (TODO: Separate compute shader)
-layout(binding = 11) uniform sampler3D u_VoxelTexture;
+// Voxel Cone Tracing
+layout(binding = 9) uniform sampler2D u_VoxelIndirectDiffuseTex;
+layout(binding = 10) uniform sampler2D u_VoxelIndirectSpecularTex;
 
-layout(binding = 12) uniform sampler2D u_ShadowTexture;
-// Shadow depth texture (TODO: Separate compute shader)
-//layout(binding = 12) uniform sampler2D u_ShadowDepthTexture;
-//layout(binding = 13) uniform sampler2D u_ViewPosition;
+// Shadow depth texture
+layout(binding = 11) uniform sampler2D u_ShadowTexture;
 
-//layout(binding = 14) uniform DirectionaLightData
-//{
-//	vec3 DirectionalLightDir;
-//	float CascadeDepthSplit[4];
-//} u_DirLightData;
+
 
 layout(push_constant) uniform PushConstant
 {
@@ -96,10 +91,6 @@ layout(push_constant) uniform PushConstant
 	vec3 DirectionalLightDir;
 	
 	int UseLightHeatMap;
-
-	vec3 VoxelSampleOffset;
-	float VoxelGrid;
-	float VoxelTextureSize;
 } u_PushConstant;
 
 
@@ -121,169 +112,16 @@ vec3 s_IndirectDiffuse = vec3(1.0f);
 vec3 s_IndirectSpecular = vec3(1.0f);
 
 
+// =======================================================
 int GetLightBufferIndex(int i)
 {
     ivec2 tileID = ivec2(gl_FragCoord.xy) / ivec2(16, 16); //Current Fragment position / Tile count
-    uint index = tileID.y * uint(m_CameraData.LightCullingWorkgroup) + tileID.x;
+    uint index = tileID.y * uint(u_UniformBuffer.LightCullingWorkgroup) + tileID.x;
 
     uint offset = index * 1024;
     return VisibleLightData.Indices[offset + i];
 }
-
-
-
-vec4 SampleVoxels(vec3 worldPosition, float lod)
-{
-	worldPosition.x -= (u_PushConstant.VoxelSampleOffset.x);
-	worldPosition.y -= (u_PushConstant.VoxelSampleOffset.y);
-	worldPosition.z -= (u_PushConstant.VoxelSampleOffset.z);
-
-
-	float VoxelDimensions = u_PushConstant.VoxelTextureSize;
-	float VoxelGridWorldSize = u_PushConstant.VoxelGrid;
-
-    vec3 offset = vec3(0, 1.0 / VoxelDimensions, 0); // Why??
-    vec3 voxelTextureUV = worldPosition / (VoxelGridWorldSize * 0.5);
-    voxelTextureUV = voxelTextureUV * 0.5 + 0.5 + offset;
-
-    if(voxelTextureUV.x > 1.0f || voxelTextureUV.x < 0.0f) return vec4(0.0f);
-    if(voxelTextureUV.y > 1.0f || voxelTextureUV.y < 0.0f) return vec4(0.0f);
-    if(voxelTextureUV.z > 1.0f || voxelTextureUV.z < 0.0f) return vec4(0.0f);
-    //return vec4(voxelTextureUV, 1.0f);
-
-    lod = clamp(lod, 0.0f, 5.0f);
-
-	//return textureLod(u_VoxelTexture, voxelTextureUV, lod);
-    return (textureLod(u_VoxelTexture, voxelTextureUV, lod) +
-			textureLod(u_VoxelTexture, voxelTextureUV, lod + 1))
-			/ 2.0f;
-}
-
-vec4 ConeTrace(vec3 worldPos, vec3 normal, vec3 direction, float tanHalfAngle, out float occlusion)
-{
-#define MAX_DIST 200.0
-#define ALPHA_THRESH 0.90
-#define MAX_STEPS 100
-
-	float lod = 0.0;
-    vec3 color = vec3(0);
-    float alpha = 0.0;
-    occlusion = 0.0;
-	uint steps = 0;
-
-	float VoxelGridWorldSize = u_PushConstant.VoxelGrid;
-	
-	float voxelWorldSize = VoxelGridWorldSize / 256;
-	float dist = voxelWorldSize; // Start one voxel away to avoid self occlusion
-	vec3 startPos = worldPos + normal * (2.0f * voxelWorldSize); // Plus move away slightly in the normal direction to avoid
-														         // self occlusion in flat surfaces
-
-
-	while(dist < MAX_DIST && alpha < ALPHA_THRESH && steps < MAX_STEPS)
-	{
-		//float diameter = 2.0 * tanHalfAngle * dist;
-		float diameter = 2.0 * tanHalfAngle * dist;
-		float lodLevel = log2(diameter / voxelWorldSize);
-		vec4 voxelColor = SampleVoxels(startPos + dist * direction, lodLevel);
-
-		// front-to-back compositing
-        float a = (1.0 - alpha);
-		color += a * voxelColor.rgb;
-        alpha += a * voxelColor.a;
-        
-		occlusion += (a * voxelColor.a) / (1.0 + 0.03 * diameter);
-
-        dist += diameter * 0.5f; // smoother
-
-		steps++;
-	}
-
-	return vec4(color, alpha);
-}
-
-
-const int NUM_CONES = 6;
-const vec3 diffuseConeDirections[] =
-{
-    vec3(0.0f, 1.0f, 0.0f),
-    vec3(0.0f, 0.5f, 0.866025f),
-    vec3(0.823639f, 0.5f, 0.267617f),
-    vec3(0.509037f, 0.5f, -0.7006629f),
-    vec3(-0.50937f, 0.5f, -0.7006629f),
-    vec3(-0.823639f, 0.5f, 0.267617f)
-};
-
-const float diffuseConeWeights[] =
-{
-    PI / 4.0f,
-    3.0f * PI / 20.0f,
-    3.0f * PI / 20.0f,
-    3.0f * PI / 20.0f,
-    3.0f * PI / 20.0f,
-    3.0f * PI / 20.0f,
-};
-
-vec3 ComputeIndirectDiffuse(vec3 worldPos, vec3 normal, out float occlusion_out)
-{
-    vec4 color = vec4(0);
-    occlusion_out = 0.0;
-
-    for(int i = 0; i < NUM_CONES; i++) {
-        float occlusion = 0.0;
-        // 60 degree cones -> tan(30) = 0.577
-        // 90 degree cones -> tan(45) = 1.0
-
-        color += diffuseConeWeights[i] * ConeTrace(worldPos, normal, normal * diffuseConeDirections[i], 0.577, occlusion);
-        occlusion_out += diffuseConeWeights[i] * occlusion;
-    }
-
-    occlusion_out = 1.0 - occlusion_out;
-
-    return vec3(color);
-}
-
-
-//http://simonstechblog.blogspot.com/2011/12/microfacet-brdf.html
-// temporay use Beckmann Distribution to convert, this may change later 
-float RoughnessToSpecularPower(float roughness)
-{
-#define MAX_SPEC_POWER 2048.0f
-    return clamp(2.0f / (roughness * roughness) - 2.0f, 0.0f, MAX_SPEC_POWER);
-}
-
-float SpecularPowerToConeAngle(float specularPower)
-{
-#define CNST_MAX_SPECULAR_EXP 1024.0
-
-	if (specularPower < CNST_MAX_SPECULAR_EXP)
-	{
-		/* Based on phong reflection model */
-		const float xi = 0.244;
-		float exponent = 1.0 / (specularPower + 1.0);
-		return acos(pow(xi, exponent));
-	}
-	return 0.0;
-}
-
-vec3 ComputeIndirectSpecular(vec3 worldPos, vec3 normal, float roughness, out float occlusion_out)
-{
-	roughness = clamp(roughness, 0.09f, 1.0f);
-	float specularPower = RoughnessToSpecularPower(roughness);
-	float coneTheta = SpecularPowerToConeAngle(specularPower);
-	float tanConeHalfTheta = tan(coneTheta * 0.5);
-	
-	vec3 E = normalize(vec3(u_PushConstant.CameraPosition) - m_Surface.WorldPos);
-	vec3 N = normal;
-	vec3 R = normalize(-E - 2.0 * dot(-E, N) * N);
-	
-	// 0.2 = 22.6 degrees, 0.1 = 11.4 degrees, 0.07 = 8 degrees angle
-	vec4 indirectSpecular = ConeTrace(worldPos, normal, R, tanConeHalfTheta, occlusion_out);
-	
-	return vec3(indirectSpecular);
-}
-
-
-
+// =======================================================
 
 //------------------------------------------------------------------------------
 // Filament PBR.
@@ -507,12 +345,13 @@ vec3 ComputeIBLContriubtion()
 	//vec3 brdf = mix(vec3(splitSums.x), vec3(splitSums.y), F0);
 	vec3 brdf = vec3(F0 * splitSums.x + splitSums.y);
 
-	vec3 specularRadiance = brdf * specularDecomp * (2.0f * s_IndirectSpecular);
+	vec3 specularRadiance = brdf * specularDecomp * (s_IndirectSpecular);
+	//specularRadiance = mix(specularRadiance, brdf * s_IndirectSpecular, 0.4f);
 
 	return (irradiance + specularRadiance);
 }
 
-
+// =======================================================
 
 // From https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 vec3 AcesApprox(vec3 v)
@@ -539,6 +378,7 @@ vec3 DecodeNormal(vec2 e)
 		v.xy = (1.0 - abs(v.yx)) * SignNotZero(v.xy);
 	return normalize(v);
 }
+// =======================================================
 
 void main()
 {
@@ -560,17 +400,17 @@ void main()
     // Fresnel approximation
 	m_Surface.F0 = mix(Fdielectric, m_Surface.Albedo.rgb, m_Surface.Metalness);
 
-	float temp;
-	s_IndirectDiffuse = ComputeIndirectDiffuse(m_Surface.WorldPos.xyz, m_Surface.Normal, temp).xyz;
-	s_IndirectSpecular = ComputeIndirectSpecular(m_Surface.WorldPos.xyz, m_Surface.Normal, m_Surface.Roughness, temp);
+
+	// Sample the Voxel Cone Tracing textures
+	s_IndirectDiffuse = texture(u_VoxelIndirectDiffuseTex, v_TexCoord).rgb;
+	s_IndirectSpecular = texture(u_VoxelIndirectSpecularTex, v_TexCoord).rgb;
 
 
-	
 	// Calculating all point lights contribution
 	vec3 Lo = vec3(0.0f);
 
 	float heatMap = 0.0f;
-	uint pointLightCount = uint(m_CameraData.PointLightCount);
+	uint pointLightCount = uint(u_UniformBuffer.PointLightCount);
 
 	for(uint i = 0; i < pointLightCount; i++)
 	{
@@ -602,11 +442,7 @@ void main()
 	result *= texture(u_ShadowTexture, v_TexCoord).rgb;
 
 	// Calculating the result with the camera exposure
-	result *= m_CameraData.Exposure;
-
-	//result = SampleVoxels(m_Surface.WorldPos, 0.0f).xyz;
-
-
+	result *= u_UniformBuffer.CameraExposure;
 
 	// Outputting the result
     o_Color = vec4(result, 1.0f);

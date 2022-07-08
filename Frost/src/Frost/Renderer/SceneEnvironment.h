@@ -18,9 +18,9 @@ namespace Frost
 		glm::vec4 OzoneAbsorption = glm::vec4(0.650f, 1.881f, 0.085f, 0.002f);
 		glm::vec4 PlanetAbledo_Radius = glm::vec4(0.0f, 0.0f, 0.0f, 6.360f);
 
-		glm::vec4 SunDirection_Intensity = glm::vec4(0.45f, -0.5f, -0.65f, 10.0f);
+		glm::vec4 SunDirection_Intensity = glm::vec4(0.45f, -0.5f, -0.65f, 2.0f);
 
-		glm::vec4 ViewPos_SunSize = glm::vec4(0.0f, 6.360f + 0.0002f, 0.0f, 2.0f);    // View position (x, y, z). w is unused.
+		glm::vec4 ViewPos_SunSize = glm::vec4(0.0f, 6.360f + 0.0002f, 0.0f, 2.0f);
 
 		float AtmosphereRadius = 6.460f;
 
