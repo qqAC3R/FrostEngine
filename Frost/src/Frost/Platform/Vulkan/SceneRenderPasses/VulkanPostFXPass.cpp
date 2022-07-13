@@ -11,6 +11,7 @@
 #include "Frost/Platform/Vulkan/VulkanSceneEnvironment.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanCompositePass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanVolumetricPass.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -52,7 +53,7 @@ namespace Frost
 		ColorCorrectionInitData  (1600, 900);
 		HZBInitData              (1600, 900);
 		SSRFilterInitData        (1600, 900);
-		//VisibilityInitData       (1600, 900);
+		//VisibilityInitData     (1600, 900);
 		AmbientOcclusionInitData (1600, 900);
 		SpatialDenoiserInitData  (1600, 900);
 		SSRInitData              (1600, 900);
@@ -722,14 +723,16 @@ namespace Frost
 
 			auto vulkanColorCorrectionDescriptor = m_Data->ColorCorrectionDescriptor[i].As<VulkanMaterial>();
 
-			auto colorBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, i); // From the pbr shader
+			Ref<Image2D> colorBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, i); // From the pbr shader
+			Ref<Image2D> volumetricTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->VolumetricComputeTexture[i];
 
 			vulkanColorCorrectionDescriptor->Set("u_ColorFrameTexture", colorBuffer);
 			vulkanColorCorrectionDescriptor->Set("u_BloomTexture", m_Data->Bloom_UpsampledTexture[i]);
+			vulkanColorCorrectionDescriptor->Set("u_AerialImage", m_Data->ApplyAerialImage[i]);
+			vulkanColorCorrectionDescriptor->Set("u_VolumetricTexture", volumetricTexture);
 			//vulkanColorCorrectionDescriptor->Set("u_SSRTexture", m_Data->SSRTexture[i]);
 			vulkanColorCorrectionDescriptor->Set("o_Texture_ForSSR", m_Data->ColorCorrectionTexture[i]);
 			vulkanColorCorrectionDescriptor->Set("o_Texture_Final", m_Data->FinalTexture[i]);
-			vulkanColorCorrectionDescriptor->Set("o_AerialImage", m_Data->ApplyAerialImage[i]);
 
 			vulkanColorCorrectionDescriptor->UpdateVulkanDescriptorIfNeeded();
 		}
@@ -1120,6 +1123,8 @@ namespace Frost
 
 	void VulkanPostFXPass::BloomUpdate(const RenderQueue& renderQueue)
 	{
+		if (m_Data->ScreenMipLevel <= 1) return;
+
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
@@ -1223,7 +1228,10 @@ namespace Frost
 
 		/// Part 2: Downsample the prefiltered thresholded texture
 		{
-			uint32_t totalMips = m_Data->ScreenMipLevel - 2;
+			uint32_t totalMips = int32_t(m_Data->ScreenMipLevel - 2) > 1 ?
+							            (m_Data->ScreenMipLevel - 2) :
+							             1;
+
 			for (uint32_t mip = 1; mip < totalMips; mip++)
 			{
 				auto [mipWidth, mipHeight] = vulkanDownscaleBloomTex->GetMipSize(mip);
@@ -1317,7 +1325,9 @@ namespace Frost
 			// which means that it reaches the maximum of "mipLevel - 3" (11-3=8).
 			// Now we want to upsample so we are using for the output the "mipLevel - 4" (11-4=7) and
 			// as input we are using the "mip+1" which is "(mipLevel - 4) + 1" (11-4=7, 7+1=8)
-			uint32_t mip = m_Data->ScreenMipLevel - 4;
+			uint32_t mip = int32_t(m_Data->ScreenMipLevel - 4) > 1 ?
+							      (m_Data->ScreenMipLevel - 4) :
+							       1;
 
 			// Input texture
 			{
@@ -1392,7 +1402,11 @@ namespace Frost
 		/// Part 4: Usample and combine
 		{
 			uint32_t totalMips = m_Data->ScreenMipLevel;
-			for (uint32_t mip = totalMips - 4; mip >= 1; mip--)
+			uint32_t mipInit = int32_t(m_Data->ScreenMipLevel - 4) > 1 ?
+							          (m_Data->ScreenMipLevel - 4) :
+							           1;
+
+			for (uint32_t mip = mipInit; mip >= 1; mip--)
 			{
 				auto [mipWidth, mipHeight] = vulkanUpscaleBloomTex->GetMipSize(mip - 1);
 

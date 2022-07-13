@@ -7,9 +7,10 @@ layout(binding = 0) uniform sampler2D u_ColorFrameTexture;
 layout(binding = 1) uniform sampler2D u_BloomTexture;
 layout(binding = 2) uniform sampler2D u_SSRTexture;
 layout(binding = 3) uniform sampler2D u_AOTexture;
-layout(binding = 4) uniform sampler2D o_AerialImage;
-layout(binding = 5, rgba8) uniform writeonly image2D o_Texture_ForSSR;
-layout(binding = 6, rgba8) uniform writeonly image2D o_Texture_Final;
+layout(binding = 4) uniform sampler2D u_AerialImage;
+layout(binding = 5) uniform sampler2D u_VolumetricTexture;
+layout(binding = 6, rgba8) uniform writeonly image2D o_Texture_ForSSR;
+layout(binding = 7, rgba8) uniform writeonly image2D o_Texture_Final;
 
 #define TONE_MAP_FRAME          0
 #define TONE_MAP_FRAME_WITH_SSR 1
@@ -50,7 +51,7 @@ vec3 AO_MultiBounce(float ao, vec3 albedo)
 void main()
 {
 	ivec2 loc = ivec2(gl_GlobalInvocationID.xy);
-
+	vec2 uv = (vec2(loc) + 0.5f.xx) / vec2(imageSize(o_Texture_Final).xy);
 	
 	if(u_PushConstant.Stage == TONE_MAP_FRAME)
 	{
@@ -74,12 +75,7 @@ void main()
 			color += reflectionContribution.xyz;
 		}
 
-		// Bloom factor
-		if(u_PushConstant.UseBloom == 1)
-		{
-			vec3 bloomFactor = texelFetch(u_BloomTexture, loc, 0).rgb;
-			color += bloomFactor;
-		}
+		
 
 		// Contribution from ambient occlusion
 		if(u_PushConstant.UseAO == 1)
@@ -89,6 +85,19 @@ void main()
 			color = color * ao_contribution;
 			color = color;
 		}
+
+		
+		// Bloom factor
+		if(u_PushConstant.UseBloom == 1)
+		{
+			vec3 bloomFactor = texelFetch(u_BloomTexture, loc, 0).rgb;
+			color += bloomFactor;
+		}
+
+		vec4 volumetricContribution = texture(u_VolumetricTexture, uv);
+		color *= volumetricContribution.a;
+		color += volumetricContribution.rgb;
+
 
 		// Aerial LUT
 		//color += texelFetch(o_AerialImage, loc, 0).rgb;

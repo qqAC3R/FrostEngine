@@ -405,9 +405,9 @@ void main()
 
 
 	// Inject directional light
-	vec4 shadowPos = f_PositionDepth / f_PositionDepth.w;
-	float shadowFactor = SampleShadowTexture(shadowPos, 2);
-	o_Albedo.xyz *= shadowFactor;
+	//vec4 shadowPos = f_PositionDepth / f_PositionDepth.w;
+	//float shadowFactor = SampleShadowTexture(shadowPos, 2);
+	//o_Albedo.xyz *= shadowFactor;
 
 
 	// Atomic operations to get an averaged value, described in OpenGL insights about voxelization

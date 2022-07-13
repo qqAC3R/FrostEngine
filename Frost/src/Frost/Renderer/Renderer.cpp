@@ -13,6 +13,7 @@ namespace Frost
 		Ref<Texture2D> m_WhiteTexture;
 		Ref<Texture2D> m_BRDFLut;
 		Ref<Texture2D> m_NoiseLut;
+		Ref<Texture2D> m_BlueNoiseLut;
 		Ref<SceneEnvironment> m_Environment;
 		//Ref<RendererDebugger> m_RendererDebugger;
 	};
@@ -73,6 +74,9 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowDepthPass.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowCompute.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VoxelConeTracing.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Volumetrics.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/FroxelVolumePopulate.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricCompute.glsl");
 
 		
 		// Init the pools
@@ -83,11 +87,17 @@ namespace Frost
 		textureSpec.Usage = ImageUsage::ReadOnly;
 		textureSpec.UseMips = false;
 
+		// White texture
 		s_Data->m_WhiteTexture = Texture2D::Create("Resources/LUT/White.jpg", textureSpec);
 
+		// BRDF LUT
 		textureSpec.Format = ImageFormat::RGBA16F;
 		s_Data->m_BRDFLut = Texture2D::Create("Resources/LUT/BRDF_LUT.tga", textureSpec);
 
+		// Blue noise
+		s_Data->m_BlueNoiseLut = Texture2D::Create("Resources/LUT/BlueNoise.png", textureSpec);
+
+		// Simple 4x4 noise
 		textureSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
 		textureSpec.Format = ImageFormat::RG32F;
 		s_Data->m_NoiseLut = Texture2D::Create("Resources/LUT/Noise.png", textureSpec);
@@ -136,6 +146,11 @@ namespace Frost
 		s_RendererAPI->Submit(directionalLight, direction);
 	}
 
+	void Renderer::Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform)
+	{
+		s_RendererAPI->Submit(fogVolume, transform);
+	}
+
 	void Renderer::LoadEnvironmentMap(const std::string& filepath)
 	{
 		// TODO: Add some function for the SceneRenderpasses to update the env texture with the new ones
@@ -173,6 +188,11 @@ namespace Frost
 	Ref<Texture2D> Renderer::GetNoiseLut()
 	{
 		return s_Data->m_NoiseLut;
+	}
+
+	Ref<Texture2D> Renderer::GetBlueNoiseLut()
+	{
+		return s_Data->m_BlueNoiseLut;
 	}
 
 	void Renderer::ExecuteCommandBuffer()

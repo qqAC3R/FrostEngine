@@ -4,6 +4,8 @@
 #include "Frost/ImGui/ImGuiLayer.h"
 
 #include "Frost/Core/Application.h"
+#include "Frost/Core/Input.h"
+#include "Frost/InputCodes/MouseButtonCodes.h"
 #include <imgui.h>
 
 namespace Frost
@@ -35,12 +37,31 @@ namespace Frost
 		ImVec2 viewPortSizePanel = ImGui::GetContentRegionAvail();
 		if (m_ViewportSize.x != viewPortSizePanel.x || m_ViewportSize.y != viewPortSizePanel.y)
 		{
-			m_IsResized = true;
+			//m_IsResized = true;
+
+			m_IsResized = false;
+			m_IsResized_Internal = true;
+
 			m_ViewportSize = *(glm::vec2*)&viewPortSizePanel;
 		}
 		else
 		{
-			m_IsResized = false;
+			//if (m_IsResized)
+			//	m_WasResized = true;
+			//else
+			//	m_WasResized = false;
+
+			//if (!Input::IsMouseButtonPressed(Mouse::Button1))
+			if(m_IsResized_Internal && !Input::IsMouseButtonPressed(Mouse::Button0))
+			{
+				m_IsResized = true;
+				m_IsResized_Internal = false;
+			}
+			else
+			{
+				m_IsResized = false;
+			}
+
 		}
 	}
 

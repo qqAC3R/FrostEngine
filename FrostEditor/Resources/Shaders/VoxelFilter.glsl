@@ -9,19 +9,25 @@ layout(binding = 2) uniform sampler2D u_ShadowDepthTexture;
 
 layout(push_constant) uniform Constants
 {
-	mat4 LightViewProjMatrix;
+	mat4 CameraViewMatrix;
 
 	vec4 CameraPosition_SampleMipLevel;
-
-	//int SampleMipLevel;
-	//vec3 CameraPosition;
 	
 	float ProjectionExtents;
-	int CascadeSampleIndex;
-
-
+	float VoxelScale;
 
 } u_PushConstant;
+
+layout(binding = 3) uniform DirectionaLightData
+{
+	mat4 LightViewProjMatrix0;
+	mat4 LightViewProjMatrix1;
+	mat4 LightViewProjMatrix2;
+	mat4 LightViewProjMatrix3;
+
+	float CascadeDepthSplit[4];
+
+} u_DirLightData;
 
 const ivec3 anisoOffsets[] = ivec3[8]
 (
@@ -36,7 +42,7 @@ const ivec3 anisoOffsets[] = ivec3[8]
 );
 
 
-void FetchTexels(ivec3 pos, int dir, inout vec4 val[8]) 
+void FetchTexels(ivec3 pos, int dir6, inout vec4 val[8]) 
 {
 	for(int i = 0; i < 8; i++)
 	{
@@ -59,6 +65,32 @@ vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
 	}
 }
 
+uint GetCascadeIndex(float viewPosZ)
+{
+#define SHADOW_MAP_CASCADE_COUNT 4
+
+	uint cascadeIndex = 1;
+	for(uint i = 0; i < SHADOW_MAP_CASCADE_COUNT - 1; ++i) 
+	{
+		if(viewPosZ < u_DirLightData.CascadeDepthSplit[i])
+		{	
+			cascadeIndex = i + 1;
+		}
+	}
+	return cascadeIndex;
+}
+
+mat4 GetCascadeMatrix(uint cascadeIndex)
+{
+	switch(cascadeIndex)
+	{
+		case 1: return u_DirLightData.LightViewProjMatrix0;
+		case 2: return u_DirLightData.LightViewProjMatrix1;
+		case 3: return u_DirLightData.LightViewProjMatrix2;
+		case 4: return u_DirLightData.LightViewProjMatrix3;
+	}
+}
+
 float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex)
 {
 	vec2 coords = ComputeShadowCoord(shadowCoords.xy, cascadeIndex);
@@ -66,14 +98,24 @@ float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex)
 	return dist;
 }
 
+float SampleGather_ShadowMap(vec2 shadowCoords, uint cascadeIndex)
+{
+	vec2 coords = ComputeShadowCoord(shadowCoords.xy, cascadeIndex);
+	vec4 dist = textureGather(u_ShadowDepthTexture, coords, 0);
+	return (dist.x + dist.y + dist.z + dist.w) / 4.0f;
+}
+
 float HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 {
 	float shadow = 1.0;
-	float bias = 0.001;
+	float bias = 0.01;
 
 	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
 	{
 		float dist = SampleShadowMap(shadowCoord.xy * 0.5 + 0.5, cascadeIndex);
+		float gatherPixels = SampleGather_ShadowMap(shadowCoord.xy * 0.5 + 0.5, cascadeIndex);
+
+		dist = (dist + gatherPixels) / 2.0f;
 
 		if (shadowCoord.w > 0 && dist < shadowCoord.z - bias)
 		{
@@ -98,20 +140,34 @@ void main()
 
 		if(val.r != 0.0f || val.g != 0.0f || val.b != 0.0f)
 		{
-			//vec3 cameraPos = u_PushConstant.CameraPosition_SampleMipLevel.xyz;
-			//float aabbExtents = u_PushConstant.ProjectionExtents;
-			//vec3 voxelPosition = vec3(cameraPos.x - aabbExtents, cameraPos.y - aabbExtents, cameraPos.z - aabbExtents);
-			//
-			//voxelPosition.x += float(writePos.x);
-			//voxelPosition.y += float(writePos.y);
-			//voxelPosition.z += float(writePos.z);
-			//
-			//vec4 shadowPos = u_PushConstant.LightViewProjMatrix * vec4(voxelPosition, 1.0);
-			//shadowPos /= shadowPos.w;
-			//
-			//float shadowFactor = HardShadows_SampleShadowTexture(shadowPos, u_PushConstant.CascadeSampleIndex + 1);
-			//
-			//val.rgb *= shadowFactor;
+			vec3 cameraPos = u_PushConstant.CameraPosition_SampleMipLevel.xyz;
+			float aabbExtents = u_PushConstant.ProjectionExtents;
+			vec3 voxelPosition = vec3(cameraPos.x - aabbExtents, cameraPos.y - aabbExtents, cameraPos.z - aabbExtents);
+			
+			voxelPosition.y += (float(writePos.y) * u_PushConstant.VoxelScale);
+			voxelPosition.x += (float(writePos.x) * u_PushConstant.VoxelScale);
+			voxelPosition.z += (float(writePos.z) * u_PushConstant.VoxelScale);
+			
+			
+			vec4 viewSpacePos = u_PushConstant.CameraViewMatrix * vec4(voxelPosition, 1.0);
+			uint cascadeIndex = GetCascadeIndex(viewSpacePos.z);
+
+			mat4 lightViewProjMat = GetCascadeMatrix(cascadeIndex);
+			vec4 shadowPos = lightViewProjMat * vec4(voxelPosition, 1.0);
+			shadowPos /= shadowPos.w;
+
+			//vec3 shadowFactor;
+			//switch(cascadeIndex)
+			//{
+			//	case 1: shadowFactor = vec3(1.0f, 0.25f, 0.25f); break;
+			//	case 2: shadowFactor = vec3(0.25f, 1.0f, 0.25f); break;
+			//	case 3: shadowFactor = vec3(0.25f, 0.25f, 1.0f); break;
+			//	case 4: shadowFactor = vec3(1.0f, 1.0f, 0.25f);  break;
+			//}
+
+			float shadowFactor = HardShadows_SampleShadowTexture(shadowPos, cascadeIndex);
+			
+			val.rgb *= shadowFactor;
 			//val.rgb = voxelPosition;
 			
 			val.a = 1.0f;

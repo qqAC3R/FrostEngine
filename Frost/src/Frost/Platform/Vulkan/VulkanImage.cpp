@@ -646,6 +646,7 @@ namespace Frost
 				case ImageFormat::RG32F:			return VK_FORMAT_R32G32_SFLOAT;
 				case ImageFormat::RGBA8:            return VK_FORMAT_R8G8B8A8_UNORM;
 				case ImageFormat::RGBA16F:          return VK_FORMAT_R16G16B16A16_SFLOAT;
+				case ImageFormat::RGBA16UNORM:      return VK_FORMAT_R16G16B16A16_UNORM;
 				case ImageFormat::RGBA32F:          return VK_FORMAT_R32G32B32A32_SFLOAT;
 				case ImageFormat::Depth24Stencil8:  return VK_FORMAT_D24_UNORM_S8_UINT;
 				case ImageFormat::Depth32:          return VK_FORMAT_D32_SFLOAT;

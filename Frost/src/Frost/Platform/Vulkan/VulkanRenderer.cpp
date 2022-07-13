@@ -23,6 +23,7 @@
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanRayTracingPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanVoxelizationPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanShadowPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanVolumetricPass.h"
 
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 
@@ -114,6 +115,7 @@ namespace Frost
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanShadowPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanVoxelizationPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanVolumetricPass>::Create());
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanPostFXPass>::Create());
 		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputePass>::Create());
 		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
@@ -249,6 +251,15 @@ namespace Frost
 		Renderer::Submit([&, directionalLight, direction, currentFrameIndex]()
 		{
 			s_RenderQueue[currentFrameIndex].SetDirectionalLight(directionalLight, direction);
+		});
+	}
+
+	void VulkanRenderer::Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, fogVolume, transform, currentFrameIndex]()
+		{
+			s_RenderQueue[currentFrameIndex].AddFogVolume(fogVolume, transform);
 		});
 	}
 

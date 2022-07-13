@@ -121,6 +121,15 @@ namespace Frost
 					FROST_CORE_WARN("This entity already has the Point Light Component!");
 			}
 
+			// Box Fog Volume component
+			if (ImGui::MenuItem("Box Fog Volume"))
+			{
+				if (!selectedEntity.HasComponent<FogBoxVolumeComponent>())
+					selectedEntity.AddComponent<FogBoxVolumeComponent>();
+				else
+					FROST_CORE_WARN("This entity already has the Box Fog Volume Component!");
+			}
+
 			ImGui::EndPopup();
 		}
 
@@ -262,6 +271,67 @@ namespace Frost
 
 					ImGui::PopID();
 				}
+				ImGui::EndTable();
+			}
+			ImGui::PopStyleVar();
+		});
+
+
+		DrawComponent<FogBoxVolumeComponent>("Box Fog Volume", entity, [](auto& component)
+		{
+			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+			if (ImGui::BeginTable("DirectionalLightProperties", 2, flags))
+			{
+				{
+					ImGui::PushID(0);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Mie Scattering");
+
+					ImGui::TableNextColumn();
+					UserInterface::DrawVec3ColorEdit("", component.MieScattering);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(1);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Emission");
+
+					ImGui::TableNextColumn();
+					UserInterface::DrawVec3ColorEdit("", component.Emission);
+
+					ImGui::PopID();
+				}
+
+
+				{
+					ImGui::PushID(2);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Phase");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.PhaseValue, 0.01f, 0.0f, 1.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(3);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Absorption");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Absorption, 0.01f, 0.0f, 10.0f);
+
+					ImGui::PopID();
+				}
+
 				ImGui::EndTable();
 			}
 			ImGui::PopStyleVar();

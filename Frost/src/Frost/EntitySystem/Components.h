@@ -87,7 +87,21 @@ namespace Frost
 
 		glm::vec3 Direction = { 45.0f, 0.0f, 0.0f };
 		glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
-		float Intensity = 10.0f;
+		float Intensity = 5.0f;
 		float Size = 2.0f;
+	};
+
+	struct FogBoxVolumeComponent
+	{
+		FogBoxVolumeComponent() = default;
+		FogBoxVolumeComponent(glm::vec3 mieScattering, float phaseValue, glm::vec3 emission, float absorption)
+			: MieScattering(mieScattering), PhaseValue(phaseValue), Emission(emission), Absorption(absorption)
+		{
+		}
+
+		glm::vec3 MieScattering = { 1.0f, 1.0f, 1.0f };
+		float PhaseValue = 0.0f;
+		glm::vec3 Emission = { 0.0f, 0.0f, 0.0f };
+		float Absorption = 1.0f;
 	};
 }

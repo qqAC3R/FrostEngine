@@ -30,7 +30,7 @@ namespace Frost
 	{
 	public:
 		EditorLayer()
-			: Layer("Example"), m_EditorCamera(85.0f, 1600.0f / 900.0f, 0.1f, 1000.0f)
+			: Layer("Example"), m_EditorCamera(85.0f, 1600.0f / 900.0f, 0.1f, 1000.0)
 		{
 		}
 
@@ -162,6 +162,8 @@ namespace Frost
 				ImGui::EndMenuBar();
 			}
 
+		
+
 
 			Renderer::Submit([&]()
 			{
@@ -189,7 +191,7 @@ namespace Frost
 
 					Renderer::Resize(viewportPanelSize.x, viewportPanelSize.y);
 					m_EditorCamera.SetViewportSize(viewportPanelSize.x, viewportPanelSize.y);
-					m_EditorCamera.SetProjectionMatrix(glm::perspective(70.0f, viewportPanelSize.x / viewportPanelSize.y, 0.1f, 10000.0f));
+					m_EditorCamera.SetProjectionMatrix(glm::perspective(70.0f, viewportPanelSize.x / viewportPanelSize.y, 0.1f, 500.0f));
 				}
 
 

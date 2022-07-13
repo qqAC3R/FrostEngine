@@ -31,5 +31,6 @@ namespace Frost
 		glm::vec2 m_ViewportSize = glm::vec2(0.0f);
 		bool m_Visibility = true;
 		bool m_IsResized = false;
+		bool m_IsResized_Internal = false;
 	};
 }

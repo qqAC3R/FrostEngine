@@ -651,7 +651,7 @@ namespace Frost
 	Ref<UniformBuffer> VulkanMaterial::GetUniformBuffer(const std::string& name)
 	{
 		FROST_ASSERT(bool(m_MaterialData.find(name) != m_MaterialData.end()), "Couldn't find the member");
-		return m_MaterialData[name].Pointer.AsRef<UniformBuffer>();
+		return m_MaterialData[name].Pointer.AsRef<UniformBufferData>()->UniformBuffer;
 	}
 
 	Ref<Texture2D> VulkanMaterial::GetTexture2D(const std::string& name)

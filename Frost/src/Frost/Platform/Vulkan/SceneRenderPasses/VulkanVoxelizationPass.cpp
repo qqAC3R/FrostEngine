@@ -9,6 +9,7 @@
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanVertexBuffer.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanUniformBuffer.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanShadowPass.h"
 
@@ -344,9 +345,9 @@ namespace Frost
 		);
 		projectionMatrix_Z[1][1] *= -1.0f;
 
-		glm::mat4 viewX = glm::lookAt(glm::vec3(size + camPosX, 0, 0), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-		glm::mat4 viewY = glm::lookAt(glm::vec3(0, size + camPosY, 0), glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
-		glm::mat4 viewZ = glm::lookAt(glm::vec3(0, 0, size + camPosZ), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+		glm::mat4 viewX = glm::lookAt(glm::vec3(size + camPosX, 0, 0), glm::vec3(camPosX, 0, 0), glm::vec3(0, 1, 0));
+		glm::mat4 viewY = glm::lookAt(glm::vec3(0, size + camPosY, 0), glm::vec3(0, camPosY, 0), glm::vec3(0, 0, -1));
+		glm::mat4 viewZ = glm::lookAt(glm::vec3(0, 0, size + camPosZ), glm::vec3(0, 0, camPosZ), glm::vec3(0, 1, 0));
 
 		VoxelProj.X = projectionMatrix_X * viewX;
 		VoxelProj.Y = projectionMatrix_Y * viewY;
@@ -541,18 +542,33 @@ namespace Frost
 		m_Data->VoxelizationRenderPass->Unbind();
 	}
 
+	//struct PushConstant_VoxelFilter
+	//{
+	//	glm::mat4 LightViewProjMatrix;
+	//	glm::mat4 CameraViewMatrix;
+
+	//	glm::vec4 CameraPosition_SampleMipLevel;
+	//	//int SampleMipLevel;
+	//	//glm::vec3 CameraPosition;
+
+	//	glm::vec4 CascadeDepthSplit;
+
+
+	//	float ProjectionExtents;
+	//	int CascadeSampleIndex;
+	//	float VoxelScale;
+	//	int Padding0 = 0;
+	//	//int Padding1 = 0;
+	//};
+
 	struct PushConstant_VoxelFilter
 	{
-		glm::mat4 LightViewProjMatrix;
+		glm::mat4 CameraViewMatrix;
 
 		glm::vec4 CameraPosition_SampleMipLevel;
-		//int SampleMipLevel;
-		//glm::vec3 CameraPosition;
 
 		float ProjectionExtents;
-		int CascadeSampleIndex;
-		//int Padding0 = 0;
-		//int Padding1 = 0;
+		float VoxelScale;
 	};
 	static PushConstant_VoxelFilter s_VoxelFilterPushConstant;
 
@@ -566,25 +582,45 @@ namespace Frost
 		Ref<VulkanMaterial> vulkanDescriptor = m_Data->VoxelFilterDescriptor[currentFrameIndex].As<VulkanMaterial>();
 		Ref<VulkanComputePipeline> vulkanPipeline = m_Data->VoxelFilterPipeline.As<VulkanComputePipeline>();
 
+
 		s_VoxelFilterPushConstant.ProjectionExtents = m_Data->m_VoxelAABB / 2.0f;
+		s_VoxelFilterPushConstant.VoxelScale = m_Data->m_VoxelSize;
+
 		s_VoxelFilterPushConstant.CameraPosition_SampleMipLevel = glm::vec4(m_Data->VoxelCameraPosition, 1.0f);
-		s_VoxelFilterPushConstant.CascadeSampleIndex = 1;
-		s_VoxelFilterPushConstant.LightViewProjMatrix = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->CascadeViewProjMatrix[1];
+		s_VoxelFilterPushConstant.CameraViewMatrix = renderQueue.CameraViewMatrix;
 
 
+		// Making a barrier to be sure that the voxelization pass has been finished
 		Ref<VulkanTexture3D> vulkanVoxelTexture = m_Data->VoxelizationTexture[currentFrameIndex].As<VulkanTexture3D>();
 		vulkanVoxelTexture->TransitionLayout(cmdBuf, vulkanVoxelTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
+		// Making a barrier to be sure that the shadow pass has been finished
 		Ref<VulkanImage2D> shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
 		shadowDepthTexture->TransitionLayout(cmdBuf, shadowDepthTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
+		// Shadow Cascades data neede for the shader
+		auto shadowPassInternalData = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>();
+
+		glm::vec4 cascadeDepthSplit = {
+			shadowPassInternalData->CascadeDepthSplit[0],
+			shadowPassInternalData->CascadeDepthSplit[1],
+			shadowPassInternalData->CascadeDepthSplit[2],
+			shadowPassInternalData->CascadeDepthSplit[3]
+		};
+
+		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix0", shadowPassInternalData->CascadeViewProjMatrix[0]);
+		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix1", shadowPassInternalData->CascadeViewProjMatrix[1]);
+		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix2", shadowPassInternalData->CascadeViewProjMatrix[2]);
+		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix3", shadowPassInternalData->CascadeViewProjMatrix[3]);
+		vulkanDescriptor->Set("DirectionaLightData.CascadeDepthSplit", cascadeDepthSplit);
+		
+		Ref<VulkanUniformBuffer> vulkanUniformBuffer = vulkanDescriptor->GetUniformBuffer("DirectionaLightData").As<VulkanUniformBuffer>();
 
 		uint32_t mipWidth = vulkanVoxelTexture->GetWidth();
 		uint32_t mipHeight = vulkanVoxelTexture->GetHeight();
 		uint32_t mipDepth = vulkanVoxelTexture->GetDepth();
 
-		//for (uint32_t mip = 0; mip < vulkanVoxelTexture->GetMipChainLevels(); mip++)
-		for (uint32_t mip = 0; mip < 6; mip++)
+		for (uint32_t mip = 0; mip < vulkanVoxelTexture->GetMipChainLevels() - 2; mip++)
 		{
 
 			VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
@@ -645,6 +681,21 @@ namespace Frost
 				writeDescriptorSet.dstArrayElement = 0;
 				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 				writeDescriptorSet.pImageInfo = &imageInfo;
+				writeDescriptorSet.descriptorCount = 1;
+				writeDescriptorSet.dstSet = descriptorSet;
+
+				vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+			}
+
+			// Shadow Cascades Uniform Buffer
+			{
+				VkDescriptorBufferInfo* bufferInfo = &vulkanUniformBuffer->GetVulkanDescriptorInfo();
+
+				VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				writeDescriptorSet.dstBinding = 3;
+				writeDescriptorSet.dstArrayElement = 0;
+				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+				writeDescriptorSet.pBufferInfo = bufferInfo;
 				writeDescriptorSet.descriptorCount = 1;
 				writeDescriptorSet.dstSet = descriptorSet;
 

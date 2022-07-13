@@ -16,8 +16,6 @@ layout(push_constant) uniform PushConstant {
 	float Mode;
 } u_PushConstant;
 
-float weight[5] = float[] (0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
-
 vec3 DownSampleBox13(sampler2D tex, float lod, vec2 uv, vec2 texelSize)
 {
     // Center
@@ -76,6 +74,8 @@ vec3 DownSampleBox13(sampler2D tex, float lod, vec2 uv, vec2 texelSize)
 
     return result;
 }
+
+float weight[5] = float[] (0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
 
 void main()
 {

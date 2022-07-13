@@ -274,7 +274,6 @@ void main()
 
 	s_IndirectDiffuse = mix(s_IndirectDiffuse, vec3(1.0f), fadeVoxelFactor);
 	s_IndirectSpecular = mix(s_IndirectSpecular, vec3(1.0f), fadeVoxelFactor);
-
 	
 	imageStore(u_IndirectDiffuseTexture, globalInvocation, vec4(s_IndirectDiffuse, 1.0));
 	imageStore(u_IndirectSpecularTexture, globalInvocation, vec4(s_IndirectSpecular, 1.0));

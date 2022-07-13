@@ -78,6 +78,7 @@ namespace Frost
 		static void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform);
 		static void Submit(const PointLightComponent& pointLight, const glm::vec3& position);
 		static void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
+		static void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
 
 		template<typename FuncT>
 		static void Submit(FuncT&& func)
@@ -101,6 +102,7 @@ namespace Frost
 		static Ref<Texture2D> GetWhiteLUT();
 		static Ref<Texture2D> GetBRDFLut();
 		static Ref<Texture2D> GetNoiseLut();
+		static Ref<Texture2D> GetBlueNoiseLut();
 
 		static Ref<ShaderLibrary> GetShaderLibrary();
 		static Ref<SceneEnvironment> GetSceneEnvironment();

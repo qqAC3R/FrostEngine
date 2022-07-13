@@ -9,6 +9,7 @@ namespace Frost
 	{
 		m_Data.reserve(2048);
 		m_LightData.PointLights.reserve(1024);
+		m_FogVolumeData.reserve(1024);
 	}
 
 	RenderQueue::~RenderQueue()
@@ -36,11 +37,12 @@ namespace Frost
 
 	void RenderQueue::AddPointLight(const PointLightComponent& pointLight, const glm::vec3& position)
 	{
-		LightData::PointLight pointLightComponent{};
-		memcpy((void*)&pointLightComponent, (void*)&pointLight, sizeof(PointLightComponent));
+		m_LightData.PointLights.push_back({ pointLight, position });
+	}
 
-		pointLightComponent.Position = position;
-		m_LightData.PointLights.push_back(pointLightComponent);
+	void RenderQueue::AddFogVolume(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform)
+	{
+		m_FogVolumeData.push_back({ glm::inverse(transform), fogVolume });
 	}
 
 	void RenderQueue::SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction)
@@ -51,8 +53,10 @@ namespace Frost
 
 	void RenderQueue::Reset()
 	{
+		m_SubmeshCount = 0;
 		m_Data.clear();
 		m_LightData.PointLights.clear();
+		m_FogVolumeData.clear();
 		CameraViewMatrix = glm::mat4(1.0f);
 		CameraProjectionMatrix = glm::mat4(1.0f);
 	}
