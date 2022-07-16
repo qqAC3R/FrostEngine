@@ -89,7 +89,10 @@ namespace Frost
 		struct FogVolume
 		{
 			glm::mat4 InverseTransformMat; // Due to buffer padding reasons, the mat4 should be first
-			FogBoxVolumeComponent FogVolumeParams;
+			glm::vec3 MieScattering = { 1.0f, 1.0f, 1.0f };
+			float PhaseValue = 0.0f;
+			glm::vec3 Emission = { 0.0f, 0.0f, 0.0f };
+			float Absorption = 1.0f;
 		};
 		Vector<FogVolume> m_FogVolumeData;
 

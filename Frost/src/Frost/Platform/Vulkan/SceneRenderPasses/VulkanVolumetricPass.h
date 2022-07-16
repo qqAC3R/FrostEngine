@@ -23,17 +23,6 @@ namespace Frost
 
 		virtual const std::string& GetName() override { return m_Name; }
 	private:
-
-		// -------------- Volumetric Pass ----------------
-		void VolumetricsInitData(uint32_t width, uint32_t height);
-		void VolumetricsUpdate(const RenderQueue& renderQueue);
-		// -----------------------------------------------
-
-		// -------------- Gaussian Pass ----------------
-		void GaussianBlurInitData(uint32_t width, uint32_t height);
-		void GaussianBlurUpdate(const RenderQueue& renderQueue);
-		// -----------------------------------------------
-
 		// ----------- Froxel Volume Populate Pass ------------
 		void FroxelVolumetricInitData(uint32_t width, uint32_t height);
 		void FroxelVolumetricUpdate(const RenderQueue& renderQueue);
@@ -43,27 +32,38 @@ namespace Frost
 		void VolumetricComputeInitData(uint32_t width, uint32_t height);
 		void VolumetricComputeUpdate(const RenderQueue& renderQueue);
 		// ----------------------------------------------------
+
+		// ----------- Volumetric Blur Pass ------------
+		void VolumetricBlurInitData(uint32_t width, uint32_t height);
+		void VolumetricBlurUpdate(const RenderQueue& renderQueue);
+		// ----------------------------------------------------
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
 
 		struct InternalData
 		{
-			Ref<Shader> VolumetricsShader;
-			Ref<ComputePipeline> VolumetricsPipeline;
-			Vector<Ref<Material>> VolumetricsDescriptor;
-			Vector<Ref<Image2D>> VolumetricsTexture;
-
-			Ref<Shader> GaussianBlurShader;
-			Ref<ComputePipeline> GaussianBlurPipeline;
-			Vector<Ref<Material>> GaussianBlurDescriptor;
-			Vector<Ref<Image2D>> GaussianBlurTexture;
-
 			Ref<Shader> FroxelPopulateShader;
 			Ref<ComputePipeline> FroxelPopulatePipeline;
 			Vector<Ref<Material>> FroxelPopulateDescriptor;
 			Vector<Ref<Texture3D>> ScatExtinctionFroxelTexture;
 			Vector<Ref<Texture3D>> EmissionPhaseFroxelTexture;
 			Vector<Ref<BufferDevice>> FogVolumesDataBuffer;
+
+			Ref<Shader> VolumetricComputeShader;
+			Ref<ComputePipeline> VolumetricComputePipeline;
+			Vector<Ref<Material>> VolumetricComputeDescriptor;
+			Vector<Ref<Image2D>> VolumetricComputeTexture;
+
+
+			Ref<Shader> VolumetricBlurShader;
+			Ref<ComputePipeline> VolumetricBlurPipeline;
+			Vector<Ref<Material>> VolumetricBlurXDescriptor;
+			Vector<Ref<Material>> VolumetricBlurYDescriptor;
+			Vector<Ref<Material>> VolumetricBlurUpsampleDescriptor;
+			Vector<Ref<Image2D>> VolumetricBlurTexture_DirX;
+			Vector<Ref<Image2D>> VolumetricBlurTexture_DirY;
+			Vector<Ref<Image2D>> VolumetricBlurTexture_Upsample;
+
 
 			Ref<Shader> VolumetricComputeShader;
 			Ref<ComputePipeline> VolumetricComputePipeline;

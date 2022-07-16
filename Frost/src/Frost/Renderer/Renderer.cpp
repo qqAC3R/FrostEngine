@@ -74,10 +74,9 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowDepthPass.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowCompute.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VoxelConeTracing.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Volumetrics.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/FroxelVolumePopulate.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricCompute.glsl");
-
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricBlur.glsl");
 		
 		// Init the pools
 		s_RendererAPI->Init();

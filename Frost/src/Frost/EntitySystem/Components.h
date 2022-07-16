@@ -103,5 +103,6 @@ namespace Frost
 		float PhaseValue = 0.0f;
 		glm::vec3 Emission = { 0.0f, 0.0f, 0.0f };
 		float Absorption = 1.0f;
+		float Density = 1.0f;
 	};
 }

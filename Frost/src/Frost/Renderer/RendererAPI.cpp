@@ -42,7 +42,13 @@ namespace Frost
 
 	void RenderQueue::AddFogVolume(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform)
 	{
-		m_FogVolumeData.push_back({ glm::inverse(transform), fogVolume });
+		m_FogVolumeData.push_back({
+			glm::inverse(transform),
+			fogVolume.MieScattering * fogVolume.Density,
+			fogVolume.PhaseValue,
+			fogVolume.Emission * fogVolume.Density,
+			fogVolume.Absorption * fogVolume.Density,
+		});
 	}
 
 	void RenderQueue::SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction)

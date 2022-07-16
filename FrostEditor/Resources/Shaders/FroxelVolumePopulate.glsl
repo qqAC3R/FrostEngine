@@ -9,8 +9,8 @@
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout(binding = 0, rgba8) restrict writeonly uniform image3D u_ScatExtinctionFroxel;
-layout(binding = 1, rgba8) restrict writeonly uniform image3D u_EmissionPhaseFroxel;
+layout(binding = 0, rgba16f) restrict writeonly uniform image3D u_ScatExtinctionFroxel;
+layout(binding = 1, rgba16f) restrict writeonly uniform image3D u_EmissionPhaseFroxel;
 
 struct FogVolumeParams
 {

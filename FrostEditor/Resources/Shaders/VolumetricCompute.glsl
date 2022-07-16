@@ -185,7 +185,6 @@ vec4 ComputeVolumetrics()
 	
 	// Getting the normalized ray direction
 	vec3 rayDir = (endPos - u_PushConstant.CameraPosition) / rayLength;
-	//vec3 rayDir = (u_PushConstant.CameraPosition - endPos) / rayLength;
 
 	// Start position of the ray march
 	vec3 startPos = u_PushConstant.CameraPosition + rayDir * stepLength * noise.w;
@@ -219,18 +218,20 @@ vec4 ComputeVolumetrics()
 
 		ScatteringParams params = GetScatteringParamsAtPos(samplePos, distanceToFarPlane, uv, noise.rgb);
 
-		float phaseFunction = GetMiePhase(dot(rayDir, u_PushConstant.DirectionalLightDir), params.Phase);
+		float phaseFunction = GetMiePhase(dot(rayDir, -u_PushConstant.DirectionalLightDir), params.Phase);
 		vec3 mieScattering = params.Scattering;
+
 		vec3 extinction = vec3(params.Extinction);
 		vec3 voxelAlbedo = mieScattering / extinction;
 
 		
-		vec3 lScattering = voxelAlbedo * phaseFunction * shadowContribution;// * visibility
+		vec3 lScattering = max(voxelAlbedo * phaseFunction * shadowContribution, vec3(0.0f));// * visibility
 		vec3 sampleTransmittance = exp(-stepLength * extinction);
 		vec3 scatteringIntegral = (lScattering - lScattering * sampleTransmittance) / extinction;
 
 		luminance += max(scatteringIntegral * transmittance, 0.0f);
 		luminance += params.Emission * transmittance;
+
 		transmittance *= min(sampleTransmittance, 1.0f);
 
 		//if(visibility)
@@ -244,9 +245,10 @@ vec4 ComputeVolumetrics()
 	}
 
 	//luminance *= u_lightColourIntensity.xyz * u_lightColourIntensity.w;
-	luminance *= vec3(1.0f) * 5.0f;
+	//luminance *= vec3(1.0f) * 5.0f;
 
-	return vec4(luminance, dot(vec3(1.0 / 3.0), transmittance));
+	//return vec4(luminance, dot(vec3(1.0 / 3.0), transmittance));
+	return vec4(luminance, transmittance);
 }
 // -------------------------------------------------------
 

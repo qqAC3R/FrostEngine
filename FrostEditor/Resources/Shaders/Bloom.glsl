@@ -5,14 +5,6 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 layout(binding = 0, rgba16f) writeonly uniform image2D o_Image;
 
-/*
-order:
-1)prefilter
-2)downsample
-3)upsample first
-4)upsample
-*/
-
 layout(binding = 1) uniform sampler2D u_Texture;
 layout(binding = 2) uniform sampler2D u_BloomTexture; // Add all the bloom toghether
 
@@ -29,56 +21,6 @@ layout(push_constant) uniform PushConstant
 #define MODE_UPSAMPLE       3
 
 const float Epsilon = 1.0e-4;
-
-/*
-MODE = MODE_DOWNSAMPLE
-for(mip < texture_mips - 2)
-{
-    //ping
-    o_Image = image[1]
-    u_Texture = image[0]
-    u_BloomTexture = geomeptry_pass(pohui)
-
-    LOD = i - 1;
-    _Dispatch()
-    _Barrier(image[1])
-
-
-    //pong
-    o_Image = image[0]
-    u_Texture = image[1]
-    u_BloomTexture = geometry_pass(pohui)
-
-    LOD = i;
-    _Dispatch()
-    _Barrier(image[0])
-}
-
-
-// upsample_first
-MODE = MODE_UPSAMPLE_FIRST
-o_Image = image[2](mips - 2) // "mip-2" (11 - 2)
-u_Texture = image[0]
-u_BloomTexture = geomeptry_pass(pohui)
-
-_Dispatch()
-
-_Barrier(image[2])
-
-
-// upsample
-for(mip < mips - 3) // mips - 3 because we upsampled the first one above^^
-{
-    o_Image = image[2](mip)
-    u_Texture = image[0]  (both work: 1 or 2)
-    u_BloomTexture = image[2](all mips, but uses the previous mip, to add the values)
-
-    _Dispatch()
-    _Barrier(image[2], mip)
-}
-
-
-*/
 
 vec3 DownSampleBox13(sampler2D tex, float lod, vec2 uv, vec2 texelSize)
 {
@@ -190,8 +132,12 @@ vec3 UpsampleTent9(sampler2D tex, float lod, vec2 uv, vec2 texelSize, float radi
 void main()
 {
 	vec2 imgSize = vec2(imageSize(o_Image));
-
 	ivec2 loc = ivec2(gl_GlobalInvocationID.xy);
+
+    if (any(greaterThanEqual(loc, imgSize)))
+	  return;
+	
+
 	vec2 texCoords = vec2(float(loc.x) / imgSize.x, float(loc.y) / imgSize.y);
 	//vec2 texCoords = vec2(loc) / vec2(imgSize);
 	texCoords += (1.0f / imgSize) * 0.5f;

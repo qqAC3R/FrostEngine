@@ -51,8 +51,13 @@ vec3 AO_MultiBounce(float ao, vec3 albedo)
 void main()
 {
 	ivec2 loc = ivec2(gl_GlobalInvocationID.xy);
+	vec2 imgSize = vec2(imageSize(o_Texture_Final));
 	vec2 uv = (vec2(loc) + 0.5f.xx) / vec2(imageSize(o_Texture_Final).xy);
 	
+	if (any(greaterThanEqual(loc, imgSize)))
+	  return;
+
+
 	if(u_PushConstant.Stage == TONE_MAP_FRAME)
 	{
 		vec3 color = texelFetch(u_ColorFrameTexture, loc, 0).rgb;

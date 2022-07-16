@@ -283,6 +283,7 @@ namespace Frost
 			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
 			if (ImGui::BeginTable("DirectionalLightProperties", 2, flags))
 			{
+
 				{
 					ImGui::PushID(0);
 
@@ -295,8 +296,21 @@ namespace Frost
 					ImGui::PopID();
 				}
 
+
 				{
 					ImGui::PushID(1);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Density");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Density, 0.01f, 0.005f, 10.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(2);
 
 					ImGui::TableNextColumn();
 					ImGui::Text("Emission");
@@ -309,7 +323,7 @@ namespace Frost
 
 
 				{
-					ImGui::PushID(2);
+					ImGui::PushID(3);
 
 					ImGui::TableNextColumn();
 					ImGui::Text("Phase");
@@ -321,13 +335,13 @@ namespace Frost
 				}
 
 				{
-					ImGui::PushID(3);
+					ImGui::PushID(4);
 
 					ImGui::TableNextColumn();
 					ImGui::Text("Absorption");
 
 					ImGui::TableNextColumn();
-					UserInterface::DragFloat("", component.Absorption, 0.01f, 0.0f, 10.0f);
+					UserInterface::DragFloat("", component.Absorption, 0.01f, 0.0f, 100.0f);
 
 					ImGui::PopID();
 				}
