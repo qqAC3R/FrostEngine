@@ -102,7 +102,8 @@ namespace Frost
 		static Ref<Texture2D> GetWhiteLUT();
 		static Ref<Texture2D> GetBRDFLut();
 		static Ref<Texture2D> GetNoiseLut();
-		static Ref<Texture2D> GetBlueNoiseLut();
+		static Ref<Texture2D> GetSpatialBlueNoiseLut();
+		static Ref<Texture2D> GetTemporalNoiseLut();
 
 		static Ref<ShaderLibrary> GetShaderLibrary();
 		static Ref<SceneEnvironment> GetSceneEnvironment();

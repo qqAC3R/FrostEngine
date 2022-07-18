@@ -13,7 +13,8 @@ namespace Frost
 		Ref<Texture2D> m_WhiteTexture;
 		Ref<Texture2D> m_BRDFLut;
 		Ref<Texture2D> m_NoiseLut;
-		Ref<Texture2D> m_BlueNoiseLut;
+		Ref<Texture2D> m_SpatialBlueNoiseLut;
+		Ref<Texture2D> m_TemporalBlueNoiseLut;
 		Ref<SceneEnvironment> m_Environment;
 		//Ref<RendererDebugger> m_RendererDebugger;
 	};
@@ -77,6 +78,10 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/FroxelVolumePopulate.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricCompute.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricBlur.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricInjectLight.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricGatherLight.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricTAA.glsl");
+
 		
 		// Init the pools
 		s_RendererAPI->Init();
@@ -94,7 +99,8 @@ namespace Frost
 		s_Data->m_BRDFLut = Texture2D::Create("Resources/LUT/BRDF_LUT.tga", textureSpec);
 
 		// Blue noise
-		s_Data->m_BlueNoiseLut = Texture2D::Create("Resources/LUT/BlueNoise.png", textureSpec);
+		s_Data->m_SpatialBlueNoiseLut = Texture2D::Create("Resources/LUT/BlueNoise.png", textureSpec);
+		s_Data->m_TemporalBlueNoiseLut = Texture2D::Create("Resources/LUT/TemporalNoise.png", textureSpec);
 
 		// Simple 4x4 noise
 		textureSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
@@ -189,9 +195,14 @@ namespace Frost
 		return s_Data->m_NoiseLut;
 	}
 
-	Ref<Texture2D> Renderer::GetBlueNoiseLut()
+	Ref<Texture2D> Renderer::GetSpatialBlueNoiseLut()
 	{
-		return s_Data->m_BlueNoiseLut;
+		return s_Data->m_SpatialBlueNoiseLut;
+	}
+
+	Ref<Texture2D> Renderer::GetTemporalNoiseLut()
+	{
+		return s_Data->m_TemporalBlueNoiseLut;
 	}
 
 	void Renderer::ExecuteCommandBuffer()

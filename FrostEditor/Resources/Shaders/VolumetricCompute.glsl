@@ -11,23 +11,10 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 #define PI 3.141592654
 #define EPSILON 1e-6
 
-layout(binding = 0) uniform sampler3D u_ScatExtinctionFroxel;
-layout(binding = 1) uniform sampler3D u_EmissionPhaseFroxel;
-layout(binding = 2) uniform sampler2D u_DepthTexture;
-layout(binding = 3) uniform sampler2D u_BlueNoiseLUT;
-layout(binding = 4) uniform sampler2D u_ShadowDepthTexture;
-layout(binding = 5) uniform writeonly image2D u_VolumetricTex;
-
-layout(binding = 6) uniform DirectionaLightData
-{
-	mat4 LightViewProjMatrix0;
-	mat4 LightViewProjMatrix1;
-	mat4 LightViewProjMatrix2;
-	mat4 LightViewProjMatrix3;
-
-	float CascadeDepthSplit[4];
-} u_DirLightData;
-
+layout(binding = 0) uniform sampler3D u_FinalGatherFroxel;
+layout(binding = 1) uniform sampler2D u_DepthTexture;
+layout(binding = 2) uniform sampler2D u_SpatialBlueNoiseLUT;
+layout(binding = 3) uniform writeonly image2D u_VolumetricTex;
 
 layout(push_constant) uniform PushConstant
 {
@@ -48,82 +35,16 @@ struct ScatteringParams
 	float Extinction;
 };
 
-// ---------------------- CASCADED SHADOW MAPS ------------------------
-vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
-{
-	switch(cascadeIndex)
-	{
-	case 1:
-		return coord * vec2(0.5f);
-	case 2:
-		return vec2(coord.x * 0.5f + 0.5f, coord.y * 0.5f);
-	case 3:
-		return vec2(coord.x * 0.5f, coord.y * 0.5f + 0.5f);
-	case 4:
-		return coord * vec2(0.5f) + vec2(0.5f);
-	}
-}
-
-uint GetCascadeIndex(float viewPosZ)
-{
-#define SHADOW_MAP_CASCADE_COUNT 4
-
-	uint cascadeIndex = 1;
-	for(uint i = 0; i < SHADOW_MAP_CASCADE_COUNT - 1; ++i) 
-	{
-		if(viewPosZ < u_DirLightData.CascadeDepthSplit[i])
-		{	
-			cascadeIndex = i + 1;
-		}
-	}
-	return cascadeIndex;
-}
-
-mat4 GetCascadeMatrix(uint cascadeIndex)
-{
-	switch(cascadeIndex)
-	{
-		case 1: return u_DirLightData.LightViewProjMatrix0;
-		case 2: return u_DirLightData.LightViewProjMatrix1;
-		case 3: return u_DirLightData.LightViewProjMatrix2;
-		case 4: return u_DirLightData.LightViewProjMatrix3;
-	}
-}
-
-float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex)
-{
-	vec2 coords = ComputeShadowCoord(shadowCoords.xy, cascadeIndex);
-	float dist = texture(u_ShadowDepthTexture, coords).r;
-	return dist;
-}
-
-bool HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
-{
-	float bias = 0.005;
-
-	if (shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
-	{
-		float dist = SampleShadowMap(shadowCoord.xy * 0.5 + 0.5, cascadeIndex);
-
-		if (shadowCoord.w > 0 && dist < shadowCoord.z - bias)
-		{
-			return false;
-		}
-	}
-	return true;
-}
 // ------------------------ LUTS --------------------------
 vec4 FastTricubicLookup(sampler3D tex, vec3 coord);
 
 vec4 SampleBlueNoise(ivec2 coords)
 {
-	return texture(u_BlueNoiseLUT, (vec2(coords) + 0.5.xx) / vec2(textureSize(u_BlueNoiseLUT, 0).xy));
+	return texture(u_SpatialBlueNoiseLUT, (vec2(coords) + 0.5.xx) / vec2(textureSize(u_SpatialBlueNoiseLUT, 0).xy));
 }
 // ------------------- VOLUMETRICS -----------------------
-ScatteringParams GetScatteringParamsAtPos(vec3 position, float maxT, vec2 uv, vec3 noise)
+vec4 GetValueFromFroxel(vec3 position, float maxT, vec2 uv, vec3 noise)
 {
-	ScatteringParams outParams;
-
 	float z = length(position - u_PushConstant.CameraPosition);
 	z /= maxT;
 	z = pow(z, 1.0 / 2.0);
@@ -131,18 +52,11 @@ ScatteringParams GetScatteringParamsAtPos(vec3 position, float maxT, vec2 uv, ve
 	vec3 volumeUVW = vec3(uv, z);
 
 	// Offset the coords with some noise
-	volumeUVW += (2.0 * noise - vec3(1.0)) / textureSize(u_ScatExtinctionFroxel, 0).xyz;
+	volumeUVW += (2.0 * noise - vec3(1.0)) / textureSize(u_FinalGatherFroxel, 0).xyz;
 
-	// Get the values
-	vec4 mieScattering_extinction = FastTricubicLookup(u_ScatExtinctionFroxel, volumeUVW);
-	vec4 emissionPhase = FastTricubicLookup(u_EmissionPhaseFroxel, volumeUVW);
-
-	outParams.Scattering = mieScattering_extinction.rgb;
-	outParams.Extinction = mieScattering_extinction.a;
-	outParams.Emission = emissionPhase.rgb;
-	outParams.Phase = emissionPhase.a;
-
-	return outParams;
+	// Get the value
+	vec4 result = FastTricubicLookup(u_FinalGatherFroxel, volumeUVW);
+	return result;
 }
 
 // Decodes the worldspace position of the fragment from depth.
@@ -168,90 +82,6 @@ float GetMiePhase(float cosTheta, float g)
 	return scale * num / denom;
 }
 
-vec4 ComputeVolumetrics()
-{
-	const uint numSteps = 48;
-	ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
-
-	// The end point of the raymarch
-	//vec3 endPos = texelFetch(u_PositionTexture, coords, 0).rgb;
-	vec4 noise = SampleBlueNoise(coords);
-
-	vec3 endPos = DecodePosition(coords);
-
-	// Computing the ray length and step length from the end point to the camera
-	float rayLength = length(endPos - u_PushConstant.CameraPosition) - EPSILON;
-	float stepLength = rayLength / max(float(numSteps) - 1.0, 1.0); 
-	
-	// Getting the normalized ray direction
-	vec3 rayDir = (endPos - u_PushConstant.CameraPosition) / rayLength;
-
-	// Start position of the ray march
-	vec3 startPos = u_PushConstant.CameraPosition + rayDir * stepLength * noise.w;
-
-	float startEndLength = length(endPos - startPos) - EPSILON;
-	stepLength = startEndLength / max(float(numSteps) - 1.0, 1.0);
-
-	vec2 uv = (vec2(coords) + vec2(0.5f)) / vec2(imageSize(u_VolumetricTex).xy);
-	vec4 worldSpaceMax = u_PushConstant.InvViewProjMatrix * vec4(2.0 * uv - vec2(1.0), 1.0f, 1.0f);
-	worldSpaceMax /= worldSpaceMax.w;
-
-	float distanceToFarPlane = length(worldSpaceMax.xyz - u_PushConstant.CameraPosition);
-
-	vec3 luminance = vec3(0.0f);
-	vec3 transmittance = vec3(1.0f);
-	float currentSteps = 0.0f;
-	for(uint i = 0; i < numSteps; i++)
-	{
-		vec3 samplePos = startPos + currentSteps * rayDir;
-
-		uint cascadeIndex = GetCascadeIndex(samplePos.z);
-		mat4 cascadeMat = GetCascadeMatrix(cascadeIndex);
-		vec4 shadowCoord = cascadeMat * vec4(samplePos, 1.0f);
-		bool visibility = HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
-
-		float shadowContribution = 1.0f;
-		if(!visibility)
-		{
-			shadowContribution = 0.1f;
-		}
-
-		ScatteringParams params = GetScatteringParamsAtPos(samplePos, distanceToFarPlane, uv, noise.rgb);
-
-		float phaseFunction = GetMiePhase(dot(rayDir, -u_PushConstant.DirectionalLightDir), params.Phase);
-		vec3 mieScattering = params.Scattering;
-
-		vec3 extinction = vec3(params.Extinction);
-		vec3 voxelAlbedo = mieScattering / extinction;
-
-		
-		vec3 lScattering = max(voxelAlbedo * phaseFunction * shadowContribution, vec3(0.0f));// * visibility
-		vec3 sampleTransmittance = exp(-stepLength * extinction);
-		vec3 scatteringIntegral = (lScattering - lScattering * sampleTransmittance) / extinction;
-
-		luminance += max(scatteringIntegral * transmittance, 0.0f);
-		luminance += params.Emission * transmittance;
-
-		transmittance *= min(sampleTransmittance, 1.0f);
-
-		//if(visibility)
-		//{
-		//	transmittance *= min(sampleTransmittance, 1.0f);
-		//}
-
-
-
-		currentSteps += stepLength;
-	}
-
-	//luminance *= u_lightColourIntensity.xyz * u_lightColourIntensity.w;
-	//luminance *= vec3(1.0f) * 5.0f;
-
-	//return vec4(luminance, dot(vec3(1.0 / 3.0), transmittance));
-	return vec4(luminance, transmittance);
-}
-// -------------------------------------------------------
-
 void main()
 {
 	ivec2 invoke = ivec2(gl_GlobalInvocationID.xy);
@@ -261,7 +91,19 @@ void main()
 	if (any(greaterThanEqual(invoke, imageSize(u_VolumetricTex).xy)))
 		return;
 
-	vec4 result = ComputeVolumetrics();
+	ivec2 coords = invoke;
+
+	vec4 noise = SampleBlueNoise(coords);
+	vec3 worlSpacePos = DecodePosition(coords);
+
+	vec2 uv = (vec2(coords) + vec2(0.5f)) / vec2(imageSize(u_VolumetricTex).xy);
+	vec4 worldSpaceMax = u_PushConstant.InvViewProjMatrix * vec4(2.0 * uv - vec2(1.0), 1.0f, 1.0f);
+	worldSpaceMax /= worldSpaceMax.w;
+
+	float distanceToFarPlane = length(worldSpaceMax.xyz - u_PushConstant.CameraPosition);
+
+
+	vec4 result = GetValueFromFroxel(worlSpacePos, distanceToFarPlane, uv, noise.rgb);
 
 	imageStore(u_VolumetricTex, invoke, result);
 }

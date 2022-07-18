@@ -24,9 +24,27 @@ namespace Frost
 		virtual const std::string& GetName() override { return m_Name; }
 	private:
 		// ----------- Froxel Volume Populate Pass ------------
-		void FroxelVolumetricInitData(uint32_t width, uint32_t height);
-		void FroxelVolumetricUpdate(const RenderQueue& renderQueue);
+		void FroxelPopulateInitData(uint32_t width, uint32_t height);
+		void FroxelPopulateUpdate(const RenderQueue& renderQueue);
 		// ----------------------------------------------------
+
+		// ----------- Froxel Light Injection Pass ------------
+		void FroxelLightInjectInitData(uint32_t width, uint32_t height);
+		void FroxelLightInjectUpdate(const RenderQueue& renderQueue);
+		// ----------------------------------------------------
+
+		// ----------- Froxel Temporal Anti Aliasing ----------
+		void FroxelTAAInitData(uint32_t width, uint32_t height);
+		void FroxelTAAUpdate(const RenderQueue& renderQueue);
+		// ----------------------------------------------------
+
+		// ------------ Froxel Final Gather Pass --------------
+		void FroxelFinalComputeInitData(uint32_t width, uint32_t height);
+		void FroxelFinalComputeUpdate(const RenderQueue& renderQueue);
+		// ----------------------------------------------------
+
+
+
 
 		// ----------- Volumetric Compute Pass ------------
 		void VolumetricComputeInitData(uint32_t width, uint32_t height);
@@ -46,8 +64,27 @@ namespace Frost
 			Ref<ComputePipeline> FroxelPopulatePipeline;
 			Vector<Ref<Material>> FroxelPopulateDescriptor;
 			Vector<Ref<Texture3D>> ScatExtinctionFroxelTexture;
-			Vector<Ref<Texture3D>> EmissionPhaseFroxelTexture;
+			Vector<Ref<Texture3D>> EmissionPhaseFroxelTexture; // Also used as the final light gather texture later
 			Vector<Ref<BufferDevice>> FogVolumesDataBuffer;
+
+			Ref<Shader> FroxelLightInjectShader;
+			Ref<ComputePipeline> FroxelLightInjectPipeline;
+			Vector<Ref<Material>> FroxelLightInjectDescriptor;
+
+			Ref<Shader> FroxelFinalComputeShader;
+			Ref<ComputePipeline> FroxelFinalComputePipeline;
+			Vector<Ref<Material>> FroxelFinalComputeDescriptor;
+			
+			Ref<Shader> FroxelTAAShader;
+			Ref<ComputePipeline> FroxelTAAPipeline;
+			Vector<Ref<Material>> FroxelTAADescriptor;
+			Vector<Ref<Texture3D>> FroxelResolveTAATexture;
+
+
+
+
+
+
 
 			Ref<Shader> VolumetricComputeShader;
 			Ref<ComputePipeline> VolumetricComputePipeline;
@@ -59,16 +96,11 @@ namespace Frost
 			Ref<ComputePipeline> VolumetricBlurPipeline;
 			Vector<Ref<Material>> VolumetricBlurXDescriptor;
 			Vector<Ref<Material>> VolumetricBlurYDescriptor;
-			Vector<Ref<Material>> VolumetricBlurUpsampleDescriptor;
+			//Vector<Ref<Material>> VolumetricBlurUpsampleDescriptor;
 			Vector<Ref<Image2D>> VolumetricBlurTexture_DirX;
 			Vector<Ref<Image2D>> VolumetricBlurTexture_DirY;
-			Vector<Ref<Image2D>> VolumetricBlurTexture_Upsample;
+			//Vector<Ref<Image2D>> VolumetricBlurTexture_Upsample;
 
-
-			Ref<Shader> VolumetricComputeShader;
-			Ref<ComputePipeline> VolumetricComputePipeline;
-			Vector<Ref<Material>> VolumetricComputeDescriptor;
-			Vector<Ref<Image2D>> VolumetricComputeTexture;
 
 
 		};

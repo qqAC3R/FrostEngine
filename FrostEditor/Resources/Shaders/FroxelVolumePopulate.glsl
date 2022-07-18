@@ -11,6 +11,7 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(binding = 0, rgba16f) restrict writeonly uniform image3D u_ScatExtinctionFroxel;
 layout(binding = 1, rgba16f) restrict writeonly uniform image3D u_EmissionPhaseFroxel;
+layout(binding = 3) uniform sampler2D u_TemporalBlueNoiseLUT;
 
 struct FogVolumeParams
 {
@@ -19,7 +20,7 @@ struct FogVolumeParams
 	vec4 EmissionAbsorption; // Emission (x, y, z) and absorption (w).
 };
 
-layout(binding = 3) readonly buffer FogVolumeData
+layout(binding = 4) readonly buffer FogVolumeData
 {
 	FogVolumeParams Volumes[];
 } u_FogVolumeData;
@@ -30,6 +31,7 @@ layout(push_constant) uniform PushConstant
 	vec3 CameraPosition;
 
 	float FogVolumesCount;
+	float Time;
 } u_PushConstant;
 
 bool PointInOBB(vec3 point, FogVolumeParams volume)
@@ -43,6 +45,14 @@ bool PointInOBB(vec3 point, FogVolumeParams volume)
 	return xAxis && yAxis && zAxis;
 }
 
+// Sample a dithering function.
+vec4 SampleNoise(ivec2 coords)
+{
+	vec4 temporal = fract((vec4(u_PushConstant.Time) + vec4(0.0, 1.0, 2.0, 3.0)) * 0.61803399);
+	vec2 uv = (vec2(coords) + 0.5.xx) / vec2(textureSize(u_TemporalBlueNoiseLUT, 0).xy);
+	return fract(texture(u_TemporalBlueNoiseLUT, uv) + temporal);
+}
+
 void main()
 {
 	ivec3 invoke = ivec3(gl_GlobalInvocationID.xyz);
@@ -51,9 +61,12 @@ void main()
 	if (any(greaterThanEqual(invoke, numFroxels)))
 		return;
 
+	// Sample temporal blue noise
+	vec3 noise = (2.0 * SampleNoise(invoke.xy).rgb - vec3(1.0)) / vec3(numFroxels);
+
 	// Center UV of the current texel
 	vec2 centerUV;
-	centerUV = (vec2(invoke.xy) + vec2(0.5f)) / vec2(numFroxels.xy);
+	centerUV = (vec2(invoke.xy) + vec2(0.5f)) / vec2(numFroxels.xy) + noise.xy;
 
 
 	// Computing the center of the current texel (in world space)
@@ -69,7 +82,7 @@ void main()
 	// Computing the world space position of the texel's center
 	direction = worldSpaceMax.xyz - u_PushConstant.CameraPosition;
 
-	w = (float(invoke.z) + 0.5f) / float(numFroxels.z);
+	w = (float(invoke.z) + 0.5f) / float(numFroxels.z) + noise.z;
 	worldSpacePosCenter = u_PushConstant.CameraPosition + direction * w * w;
 
 
