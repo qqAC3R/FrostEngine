@@ -27,6 +27,8 @@ layout(binding = 3) uniform DirectionaLightData
 
 	float CascadeDepthSplit[4];
 
+	float DirectionalLightIntensity;
+
 } u_DirLightData;
 
 const ivec3 anisoOffsets[] = ivec3[8]
@@ -107,7 +109,7 @@ float SampleGather_ShadowMap(vec2 shadowCoords, uint cascadeIndex)
 
 float HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 {
-	float shadow = 1.0;
+	float shadow = u_DirLightData.DirectionalLightIntensity;
 	float bias = 0.01;
 
 	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )

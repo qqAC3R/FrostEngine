@@ -271,6 +271,47 @@ namespace Frost
 
 					ImGui::PopID();
 				}
+
+				ImGui::Separator();
+
+				{
+					ImGui::PushID(3);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Volume Density");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.VolumeDensity, 0.01f, 0.0f, 1.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(4);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Volume Absorption");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Absorption, 0.01f, 0.0f, 100.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(5);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Phase Function");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Phase, 0.01f, -1.0f, 1.0f);
+
+					ImGui::PopID();
+				}
+
+
+
 				ImGui::EndTable();
 			}
 			ImGui::PopStyleVar();

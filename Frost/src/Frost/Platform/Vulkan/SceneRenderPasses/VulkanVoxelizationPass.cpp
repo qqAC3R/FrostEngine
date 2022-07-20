@@ -613,6 +613,7 @@ namespace Frost
 		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix2", shadowPassInternalData->CascadeViewProjMatrix[2]);
 		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix3", shadowPassInternalData->CascadeViewProjMatrix[3]);
 		vulkanDescriptor->Set("DirectionaLightData.CascadeDepthSplit", cascadeDepthSplit);
+		vulkanDescriptor->Set("DirectionaLightData.DirectionalLightIntensity", renderQueue.m_LightData.DirectionalLight.Intensity);
 		
 		Ref<VulkanUniformBuffer> vulkanUniformBuffer = vulkanDescriptor->GetUniformBuffer("DirectionaLightData").As<VulkanUniformBuffer>();
 

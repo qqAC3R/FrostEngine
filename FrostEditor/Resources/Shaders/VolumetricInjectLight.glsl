@@ -1,5 +1,6 @@
 #type compute
 #version 460
+#extension GL_EXT_scalar_block_layout : enable
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -20,8 +21,31 @@ layout(binding = 5) uniform DirectionaLightData
 	mat4 LightViewProjMatrix3;
 
 	float CascadeDepthSplit[4];
+	
+	vec3 MieScattering;
+	float Density;
+	float Absorption;
+	float Phase;
+	float Intensity;
 } u_DirLightData;
 
+
+struct PointLight
+{
+    vec3 Radiance;
+	float Intensity;
+    float Radius;
+    float Falloff;
+    vec3 Position;
+};
+
+layout(binding = 6, scalar) readonly buffer LightData {
+	PointLight PointLights[];
+} u_LightData;
+
+layout(binding = 7, scalar) readonly buffer VisibleLightData {
+	int Indices[];
+} u_VisibleLightData;
 
 layout(push_constant) uniform PushConstant
 {
@@ -31,8 +55,24 @@ layout(push_constant) uniform PushConstant
 	float Time;
 
 	vec3 DirectionalLightDir;
+
+	float LightCullingWorkgroupX;
+
+	vec2 ViewportSize;
+	float PointLightCount;
 } u_PushConstant;
 
+
+// --------------------- Tiled Light Culling --------------------------
+int GetLightBufferIndex(int i, vec2 uv)
+{
+	vec2 coord = vec2(u_PushConstant.ViewportSize * uv);
+    ivec2 tileID = ivec2(coord) / ivec2(16, 16); //Current Fragment position / Tile count
+    uint index = tileID.y * uint(u_PushConstant.LightCullingWorkgroupX) + tileID.x;
+
+    uint offset = index * 1024;
+    return u_VisibleLightData.Indices[offset + i];
+}
 
 // ---------------------- CASCADED SHADOW MAPS ------------------------
 vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
@@ -110,6 +150,15 @@ float GetMiePhase(float cosTheta, float g)
 	return scale * num / denom;
 }
 
+vec3 GetPointLightContribution(PointLight pointLight, vec3 worldPos)
+{
+	float Ld          = length(pointLight.Position - worldPos); //  Light distance
+	float attenuation = clamp(1.0 - (Ld * Ld) / (pointLight.Radius * pointLight.Radius), 0.0, 1.0);
+	attenuation      *= mix(attenuation, 1.0, pointLight.Falloff);
+
+	return pointLight.Intensity * pointLight.Radiance * attenuation;
+}
+
 // Sample a dithering function.
 vec4 SampleNoise(ivec2 coords)
 {
@@ -140,23 +189,63 @@ void main()
 	vec4 scattExtinction = texelFetch(u_ScatExtinctionFroxel, invoke, 0);
 	vec4 emissionPhase = texelFetch(u_EmissionPhaseFroxel, invoke, 0);
 
-	// Compute the light integral
-	float phaseFunction = GetMiePhase(
-		dot(normalize(direction), u_PushConstant.DirectionalLightDir),
-		emissionPhase.w
-	);
 
-	vec3 mieScattering = scattExtinction.xyz;
-	vec3 extinction = vec3(scattExtinction.w);
-	vec3 voxelAlbedo = mieScattering / extinction;
-
-	// TODO: Add point light contribution
+	// Computing Cascaded Shadow Map Contribution
 	uint cascadeIndex = GetCascadeIndex(worldSpacePosition.z);
 	mat4 cascadeMat = GetCascadeMatrix(cascadeIndex);
 	vec4 shadowCoord = cascadeMat * vec4(worldSpacePosition, 1.0f);
 	float visibility = SampleShadowTexture(shadowCoord, cascadeIndex);
 
-	vec3 light = max(voxelAlbedo * phaseFunction * visibility * 5.0f, vec3(0.0f)) + emissionPhase.rgb;
+	
+	vec3 pointLightContribution = vec3(1.0);
+	if(scattExtinction.w > 0.0f)
+	{
+		for(int i = 0; i < u_PushConstant.PointLightCount; i++)
+		{
+			int lightIndex = GetLightBufferIndex(int(i), uv);
+			if (lightIndex == -1)
+				break;
 
-	imageStore(u_ScatExtinctionFroxel_Output, invoke, vec4(light, scattExtinction.w));
+			PointLight pointLight = u_LightData.PointLights[lightIndex];
+
+			if(length(pointLight.Position - worldSpacePosition) <= pointLight.Radius)
+			{
+				pointLightContribution += GetPointLightContribution(pointLight, worldSpacePosition);
+			}
+		}
+	}
+
+	// Compute the light integral for the fog volumes
+	float phaseFunction = GetMiePhase(
+		dot(normalize(direction), u_PushConstant.DirectionalLightDir),
+		emissionPhase.w
+	);
+	vec3 mieScattering = scattExtinction.xyz;
+	vec3 extinction = vec3(scattExtinction.w);
+	vec3 voxelAlbedo = mieScattering / extinction;
+	vec3 fogVolumesContribution = max(voxelAlbedo * phaseFunction * visibility * pointLightContribution * u_DirLightData.Intensity, vec3(0.0)) + emissionPhase.rgb;
+
+
+
+	// Compute the light integral for the directional light
+	vec3 dirLightContribution = vec3(0.0f);
+	vec3 dirLightExtinction = vec3(0.0f);
+	if(u_DirLightData.Density > 0.0f)
+	{
+		vec3 dirLightMieScattering = u_DirLightData.MieScattering * pow(u_DirLightData.Density, 3);
+		dirLightExtinction = vec3(dot(dirLightMieScattering, vec3(1.0 / 3.0)) + (u_DirLightData.Absorption * u_DirLightData.Density));
+
+		vec3 dirLightVoxelAlbedo = dirLightMieScattering / dirLightExtinction;
+		
+		float dirLightphaseFunction = GetMiePhase(dot(normalize(direction), u_PushConstant.DirectionalLightDir), u_DirLightData.Phase);
+		
+		vec3 dirLightFinalContribution = dirLightVoxelAlbedo * dirLightphaseFunction;
+
+		dirLightContribution = max(dirLightVoxelAlbedo * (visibility - 0.1f), vec3(0.0f));
+	}
+
+
+	vec3 finalResult = (fogVolumesContribution + dirLightContribution);
+
+	imageStore(u_ScatExtinctionFroxel_Output, invoke, vec4(finalResult, scattExtinction.w + dirLightExtinction.x));
 }

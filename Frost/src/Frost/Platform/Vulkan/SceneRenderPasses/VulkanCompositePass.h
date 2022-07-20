@@ -53,6 +53,7 @@ namespace Frost
 			// Light data
 			Vector<HeapBlock> PointLightBufferData;
 			Vector<Ref<BufferDevice>> PointLightIndices;
+			Vector<Ref<BufferDevice>> PointLightIndicesVolumetric;
 
 			// Light culling
 			Ref<Shader> LightCullingShader;

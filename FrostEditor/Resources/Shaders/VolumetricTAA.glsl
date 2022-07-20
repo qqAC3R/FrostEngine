@@ -102,7 +102,7 @@ void main()
 	// Compute the final result
 	vec4 finalResult;
 	if(InFrustum(previousPosNDC))
-		finalResult = mix(lastFrameResult, currentResult, 0.075);
+		finalResult = mix(lastFrameResult, currentResult, 0.05);
 	else
 		finalResult = currentResult;
 		

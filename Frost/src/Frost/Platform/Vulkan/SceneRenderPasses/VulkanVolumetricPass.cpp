@@ -8,6 +8,7 @@
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanShadowPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanCompositePass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanPostFXPass.h"
 
@@ -117,8 +118,11 @@ namespace Frost
 
 			auto descriptor = m_Data->FroxelLightInjectDescriptor[i].As<VulkanMaterial>();
 
-			auto shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetColorAttachment(0, i);
-			auto temporalBlueNoiseLUT = Renderer::GetTemporalNoiseLut();
+			Ref<Image2D> shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetColorAttachment(0, i);
+			Ref<Texture2D> temporalBlueNoiseLUT = Renderer::GetTemporalNoiseLut();
+
+			Ref<BufferDevice> pointLightBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->PointLightBufferData[i].DeviceBuffer;
+			Ref<BufferDevice> pointLightIndicesBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->PointLightIndicesVolumetric[i];
 
 			descriptor->Set("u_TemporalBlueNoiseLUT", temporalBlueNoiseLUT);
 			descriptor->Set("u_ShadowDepthTexture", shadowDepthTexture);
@@ -126,6 +130,8 @@ namespace Frost
 			descriptor->Set("u_EmissionPhaseFroxel", m_Data->EmissionPhaseFroxelTexture[i]);
 			descriptor->Set("u_ScatExtinctionFroxel_Output", m_Data->ScatExtinctionFroxelTexture[i]); // The same volume texture, but outputting on the texel that we are reading,
 																									  // so no need to sync
+			descriptor->Set("LightData", pointLightBuffer);
+			descriptor->Set("VisibleLightData", pointLightIndicesBuffer);
 
 			descriptor->UpdateVulkanDescriptorIfNeeded();
 		}
@@ -223,9 +229,9 @@ namespace Frost
 			ImageSpecification imageSpec{};
 			imageSpec.Width = width;
 			imageSpec.Height = height;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
-			imageSpec.Format = ImageFormat::RGBA8;
+			imageSpec.Format = ImageFormat::RGBA16F;
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.UseMipChain = false;
 
@@ -272,9 +278,9 @@ namespace Frost
 			ImageSpecification imageSpec{};
 			imageSpec.Width = width;
 			imageSpec.Height = height;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
-			imageSpec.Format = ImageFormat::RGBA8;
+			imageSpec.Format = ImageFormat::RGBA16F;
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.UseMipChain = false;
 
@@ -424,6 +430,9 @@ namespace Frost
 		glm::vec3 CameraPosition;
 		float Time = 0.0f;
 		glm::vec3 DirectionalLightDir;
+		float LightCullingWorkgroupX;
+		glm::vec2 ViewportSize;
+		float PointLightCount;
 	};
 	static VolumetricLightInjectPushConstant s_VolumetricLightInjectPushConstant;
 
@@ -453,6 +462,12 @@ namespace Frost
 		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix3", shadowPassInternalData->CascadeViewProjMatrix[3]);
 		vulkanDescriptor->Set("DirectionaLightData.CascadeDepthSplit", cascadeDepthSplit);
 
+		vulkanDescriptor->Set("DirectionaLightData.MieScattering", renderQueue.m_LightData.DirectionalLight.Color);
+		vulkanDescriptor->Set("DirectionaLightData.Density", renderQueue.m_LightData.DirectionalLight.VolumeDensity);
+		vulkanDescriptor->Set("DirectionaLightData.Absorption", renderQueue.m_LightData.DirectionalLight.Absorption);
+		vulkanDescriptor->Set("DirectionaLightData.Phase", renderQueue.m_LightData.DirectionalLight.Phase);
+		vulkanDescriptor->Set("DirectionaLightData.Intensity", renderQueue.m_LightData.DirectionalLight.Intensity);
+
 		// Binding the descriptor
 		vulkanDescriptor->Bind(cmdBuf, m_Data->FroxelLightInjectPipeline);
 
@@ -461,6 +476,10 @@ namespace Frost
 		s_VolumetricLightInjectPushConstant.CameraPosition = s_FroxelPopulatePushConstant.CameraPosition;
 		s_VolumetricLightInjectPushConstant.DirectionalLightDir = renderQueue.m_LightData.DirectionalLight.Direction;
 		s_VolumetricLightInjectPushConstant.Time = s_FroxelPopulatePushConstant.Time;
+		s_VolumetricLightInjectPushConstant.PointLightCount = (uint32_t)renderQueue.m_LightData.PointLights.size();
+		s_VolumetricLightInjectPushConstant.ViewportSize = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
+		s_VolumetricLightInjectPushConstant.LightCullingWorkgroupX = std::ceil(renderQueue.ViewPortWidth / 16.0f);
+
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VolumetricLightInjectPushConstant);
 
 		// Dispatch
@@ -640,8 +659,6 @@ namespace Frost
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VolumetricPushConstant);
 
 		// Dispatch
-		groupX = std::ceil((width) / 16.0f);
-		groupY = std::ceil((height) / 16.0f);
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 		// Image barrier for the volumetric direction X blur texture

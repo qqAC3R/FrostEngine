@@ -55,7 +55,6 @@ layout(location = 1) in vec2 v_TexCoord;
 layout(binding = 0) uniform sampler2D u_PositionTexture;
 layout(binding = 1) uniform sampler2D u_AlbedoTexture;
 layout(binding = 2) uniform sampler2D u_NormalTexture;
-//layout(binding = 3) uniform sampler2D u_CompositeTexture;
 layout(binding = 3, scalar) readonly buffer u_LightData { // Using scalar, it will fix our byte padding issues?
 	PointLight u_PointLights[];
 } LightData;

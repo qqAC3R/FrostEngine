@@ -89,6 +89,10 @@ namespace Frost
 		glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
 		float Intensity = 5.0f;
 		float Size = 2.0f;
+
+		float VolumeDensity = 0.0f;
+		float Absorption = 1.0f;
+		float Phase = 0.0f;
 	};
 
 	struct FogBoxVolumeComponent

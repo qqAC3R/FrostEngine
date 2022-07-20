@@ -22,18 +22,9 @@ layout(binding = 1) writeonly buffer u_VisibleLightsBuffer {
 	int Indices[];
 } LightIndices;
 
-
-/*
-layout(binding = 2, scalar) readonly buffer u_u_PushConstant { // Using scalar, it will fix our byte padding issues?
-    vec2 ScreenSize;
-    int PointLightCount;
-    int Padding;
-
-    mat4 ViewMatrix;
-    mat4 ProjectionMatrix;
-    mat4 ViewProjectionMatrix;
-} u_PushConstant;
-*/
+layout(binding = 2) writeonly buffer u_VisibleLightsVolumetricBuffer {
+	int Indices[];
+} LightIndicesVolumetrics;
 
 layout(push_constant) uniform PushConstant
 {
@@ -56,8 +47,13 @@ shared uint maxDepthInt;
 shared uint visibleLightCount;
 shared vec4 frustumPlanes[6];
 
+// Used for volumetric light culling (it shouldn't have a depth limit)
+shared vec4 frustumPlanesNoDepth[6];
+shared uint visibleLightCountNoDepth;
+
 // Shared thread local storage(TLS) for visible indices, will be written out to the global buffer(u_VisibleLightsBuffer) at the end.
-shared int visibleLightIndices[1024];
+shared int visibleLightIndices[2048];
+//shared int visibleLightIndicesNoDepth[1024];
 
 
 void main()
@@ -76,6 +72,7 @@ void main()
         minDepthInt = 0xFFFFFFFF;
         maxDepthInt = 0;
         visibleLightCount = 0;
+        visibleLightCountNoDepth = 0;
     }
     barrier();
 
@@ -99,7 +96,8 @@ void main()
         // Convert the min and max across the entire tile back to float
         float minDepth = uintBitsToFloat(minDepthInt);
         float maxDepth = uintBitsToFloat(maxDepthInt);
-
+        
+        
         // Steps based on tile sale
         vec2 negativeStep = (2.0 * vec2(tileID)) / vec2(tileNumber);
         vec2 positiveStep = (2.0 * vec2(tileID + ivec2(1, 1))) / vec2(tileNumber);
@@ -114,11 +112,24 @@ void main()
         frustumPlanes[5] = vec4( 0.0,  0.0,  1.0,  maxDepth); // Far
 
 
+        // Creating the frustum planes for the volumetrics (it has depth limit of 0.0f to 1.0f)
+        minDepth = u_PushConstant.ProjectionMatrix[3][2] / (0.0f + u_PushConstant.ProjectionMatrix[2][2]);
+        maxDepth = u_PushConstant.ProjectionMatrix[3][2] / (1.0f + u_PushConstant.ProjectionMatrix[2][2]);
+
+        frustumPlanesNoDepth[0] = frustumPlanes[0];
+        frustumPlanesNoDepth[1] = frustumPlanes[1];
+        frustumPlanesNoDepth[2] = frustumPlanes[2];
+        frustumPlanesNoDepth[3] = frustumPlanes[3];
+        frustumPlanesNoDepth[4] = vec4( 0.0,  0.0, -1.0, -minDepth); // Near
+        frustumPlanesNoDepth[5] = vec4( 0.0,  0.0,  1.0,  maxDepth); // Far
+
         // Transform the first four planes to the camera's perspective
         for (uint i = 0; i < 4; i++)
         {
             frustumPlanes[i] *= u_PushConstant.ViewProjectionMatrix;
             frustumPlanes[i] /= length(frustumPlanes[i].xyz);
+
+            frustumPlanesNoDepth[i] = frustumPlanes[i];
         }
 
         // Transform the depth planes
@@ -126,6 +137,11 @@ void main()
         frustumPlanes[4] /= length(frustumPlanes[4].xyz);
         frustumPlanes[5] *= u_PushConstant.ViewMatrix;
         frustumPlanes[5] /= length(frustumPlanes[5].xyz);
+
+        frustumPlanesNoDepth[4] *= u_PushConstant.ViewMatrix;
+        frustumPlanesNoDepth[4] /= length(frustumPlanesNoDepth[4].xyz);
+        frustumPlanesNoDepth[5] *= u_PushConstant.ViewMatrix;
+        frustumPlanesNoDepth[5] /= length(frustumPlanesNoDepth[5].xyz);
     }
     barrier();
 
@@ -144,7 +160,7 @@ void main()
 
         vec4 position = vec4(LightData.u_PointLights[lightIndex].Position, 1.0f);
         float radius = LightData.u_PointLights[lightIndex].Radius;
-        //radius += radius * 0.3;
+
 
         // Check if light radius is in frustums
         float distance = 0.0;
@@ -156,13 +172,31 @@ void main()
                 break;
         }
 
-
         if (distance > 0.0)
         {
             // Add index to the shared array of visible indices
             uint offset = atomicAdd(visibleLightCount, 1);
             visibleLightIndices[offset] = int(lightIndex); // Add to Thread Local Storage(TLS)
         }
+
+
+
+        float distanceNoDepth = 0.0;
+        for (uint j = 0; j < 6; j++)
+        {
+            distanceNoDepth = dot(position, frustumPlanesNoDepth[j]) + radius;
+
+            if (distanceNoDepth <= 0.0) // No intersection
+                break;
+        }
+
+        if (distanceNoDepth > 0.0)
+        {
+            // Add index to the shared array of visible indices
+            uint offset = atomicAdd(visibleLightCountNoDepth, 1);
+            visibleLightIndices[offset + 1024] = int(lightIndex); // Add to Thread Local Storage(TLS)
+        }
+
     }
     barrier();
 
@@ -176,12 +210,27 @@ void main()
         {
             LightIndices.Indices[offset + i] = visibleLightIndices[i];
         }
+
+        for (uint i = 0; i < visibleLightCountNoDepth; i++)
+        {
+            LightIndicesVolumetrics.Indices[offset + i] = visibleLightIndices[i + 1024];
+        }
+
+
+
         
         if (visibleLightCount != 1024)
         {
             // Unless we have totally filled the entire array, mark it's end with -1
             // Final shader step will use this to determine where to stop (without having to pass the light count)
             LightIndices.Indices[offset + visibleLightCount] = -1;
+        }
+
+        if (visibleLightCountNoDepth != 1024)
+        {
+            // Unless we have totally filled the entire array, mark it's end with -1
+            // Final shader step will use this to determine where to stop (without having to pass the light count)
+            LightIndicesVolumetrics.Indices[offset + visibleLightCountNoDepth] = -1;
         }
     }
 }

@@ -155,6 +155,7 @@ namespace Frost
 		// Descriptor
 		m_Data->PointLightIndices.resize(framesInFlight);
 		m_Data->LightCullingDescriptor.resize(framesInFlight);
+		m_Data->PointLightIndicesVolumetric.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			if(!m_Data->LightCullingDescriptor[i])
@@ -167,6 +168,7 @@ namespace Frost
 			uint32_t workGroupsY = std::ceil(height / 16.0f);
 			uint64_t lightIndicesBufferSize = workGroupsX * workGroupsY * 1024 * sizeof(int32_t); // 16x16 (tiles) * 1024 (lights per tile)
 			m_Data->PointLightIndices[i] = BufferDevice::Create(lightIndicesBufferSize, { BufferUsage::Storage });
+			m_Data->PointLightIndicesVolumetric[i] = BufferDevice::Create(lightIndicesBufferSize, { BufferUsage::Storage });
 
 			// Depth buffer neccesary for the `i` frmae
 			const Ref<Image2D>& depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(i);
@@ -174,6 +176,7 @@ namespace Frost
 			// Setting up the data into the descriptor
 			descriptor->Set("u_LightData", m_Data->PointLightBufferData[i].DeviceBuffer);
 			descriptor->Set("u_VisibleLightsBuffer", m_Data->PointLightIndices[i]);
+			descriptor->Set("u_VisibleLightsVolumetricBuffer", m_Data->PointLightIndicesVolumetric[i]);
 			descriptor->Set("u_DepthBuffer", depthBuffer);
 			descriptor->UpdateVulkanDescriptorIfNeeded();
 		}
