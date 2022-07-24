@@ -105,7 +105,7 @@ void main()
 
 	vec4 result = GetValueFromFroxel(worlSpacePos, distanceToFarPlane, uv, noise.rgb);
 
-	imageStore(u_VolumetricTex, invoke, result);
+	imageStore(u_VolumetricTex, invoke, vec4(result.rgb, result.a));
 }
 
 // The code below follows this license.

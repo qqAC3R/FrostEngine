@@ -30,7 +30,7 @@ namespace Frost
 	{
 	public:
 		EditorLayer()
-			: Layer("Example"), m_EditorCamera(85.0f, 1600.0f / 900.0f, 0.1f, 1000.0)
+			: Layer("Example"), m_EditorCamera(70.0f, 1600.0f / 900.0f, 0.1f, 1000.0)
 		{
 		}
 

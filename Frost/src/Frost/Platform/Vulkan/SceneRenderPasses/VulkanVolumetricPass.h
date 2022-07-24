@@ -44,8 +44,6 @@ namespace Frost
 		// ----------------------------------------------------
 
 
-
-
 		// ----------- Volumetric Compute Pass ------------
 		void VolumetricComputeInitData(uint32_t width, uint32_t height);
 		void VolumetricComputeUpdate(const RenderQueue& renderQueue);
@@ -55,6 +53,15 @@ namespace Frost
 		void VolumetricBlurInitData(uint32_t width, uint32_t height);
 		void VolumetricBlurUpdate(const RenderQueue& renderQueue);
 		// ----------------------------------------------------
+
+
+		// ----------- Cloud Noise Compute ------------
+		void CloudNoiseCompute(uint32_t width, uint32_t height);
+		
+		void CloudComputeInitData(uint32_t width, uint32_t height);
+		void CloudComputeUpdate(const RenderQueue& renderQueue);
+		// ----------------------------------------------------
+
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
 
@@ -82,10 +89,6 @@ namespace Frost
 
 
 
-
-
-
-
 			Ref<Shader> VolumetricComputeShader;
 			Ref<ComputePipeline> VolumetricComputePipeline;
 			Vector<Ref<Material>> VolumetricComputeDescriptor;
@@ -96,22 +99,33 @@ namespace Frost
 			Ref<ComputePipeline> VolumetricBlurPipeline;
 			Vector<Ref<Material>> VolumetricBlurXDescriptor;
 			Vector<Ref<Material>> VolumetricBlurYDescriptor;
-			//Vector<Ref<Material>> VolumetricBlurUpsampleDescriptor;
 			Vector<Ref<Image2D>> VolumetricBlurTexture_DirX;
 			Vector<Ref<Image2D>> VolumetricBlurTexture_DirY;
-			//Vector<Ref<Image2D>> VolumetricBlurTexture_Upsample;
 
 
+			Ref<Shader> WoorleyNoiseShader;
+			Ref<ComputePipeline> WoorleyNoisePipeline;
+			Ref<Material> WoorleyNoiseDescriptor;
+			Ref<Texture3D> ErroderNoiseTexture;
 
+			Ref<Shader> PerlinNoiseShader;
+			Ref<ComputePipeline> PerlinNoisePipeline;
+			Ref<Material> PerlinNoiseDescriptor;
+			Ref<Texture3D> CloudNoiseTexture; // Woorley + Perlin
+
+
+			Ref<Shader> CloudComputeShader;
+			Ref<ComputePipeline> CloudComputePipeline;
+			Vector<Ref<Material>> CloudComputeDescriptor;
+			Vector<Ref<Image2D>> CloudComputeTexture;
+			Vector<Ref<BufferDevice>> CloudVolumesDataBuffer;
+
+
+			int32_t m_UseTAA = 1;
+			int32_t m_UseVolumetrics = 1;
 		};
 
-		struct FogVolumeParams
-		{
-			glm::mat4 InvTransformMatrix; // Inverse model-space transform matrix.
-			glm::vec4 MieScatteringPhase; // Mie scattering (x, y, z) and phase value (w).
-			glm::vec4 EmissionAbsorption; // Emission (x, y, z) and absorption (w).
-		};
-
+		
 		InternalData* m_Data;
 		std::string m_Name;
 

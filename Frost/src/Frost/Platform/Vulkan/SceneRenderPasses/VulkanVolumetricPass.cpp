@@ -38,11 +38,19 @@ namespace Frost
 		m_Data->VolumetricComputeShader = Renderer::GetShaderLibrary()->Get("VolumetricCompute");
 		m_Data->VolumetricBlurShader = Renderer::GetShaderLibrary()->Get("VolumetricBlur");
 
+		m_Data->WoorleyNoiseShader = Renderer::GetShaderLibrary()->Get("CloudWoorleyNoise");
+		m_Data->PerlinNoiseShader = Renderer::GetShaderLibrary()->Get("CloudPerlinNoise");
+		m_Data->CloudComputeShader = Renderer::GetShaderLibrary()->Get("CloudComputeVolumetric");
+
+		CloudNoiseCompute(1600, 900);
+		CloudComputeInitData(1600, 900);
+
 		FroxelPopulateInitData(1600, 900);
 		FroxelLightInjectInitData(1600, 900);
 		FroxelTAAInitData(1600, 900);
 		FroxelFinalComputeInitData(1600, 900);
 		VolumetricComputeInitData(1600, 900);
+
 		VolumetricBlurInitData(1600, 900);
 	}
 
@@ -51,7 +59,7 @@ namespace Frost
 	void VulkanVolumetricPass::FroxelPopulateInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-		uint32_t froxel_ZSlices = 128;
+		uint32_t froxel_ZSlices = Renderer::GetRendererConfig().VoluemtricFroxelSlicesZ;
 
 		// Pipeline creation
 		ComputePipeline::CreateInfo createInfoCP{};
@@ -79,7 +87,7 @@ namespace Frost
 			m_Data->EmissionPhaseFroxelTexture[i] = Texture3D::Create(imageSpec);
 
 			if(!m_Data->FogVolumesDataBuffer[i])
-				m_Data->FogVolumesDataBuffer[i] = BufferDevice::Create(1024 * sizeof(FogVolumeParams), { BufferUsage::Storage });
+				m_Data->FogVolumesDataBuffer[i] = BufferDevice::Create(1024 * sizeof(RenderQueue::FogVolume), { BufferUsage::Storage });
 		}
 
 		m_Data->FroxelPopulateDescriptor.resize(framesInFlight);
@@ -140,7 +148,7 @@ namespace Frost
 	void VulkanVolumetricPass::FroxelTAAInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-		uint32_t froxel_ZSlices = 128;
+		uint32_t froxel_ZSlices = Renderer::GetRendererConfig().VoluemtricFroxelSlicesZ;
 
 		// Pipeline creation
 		ComputePipeline::CreateInfo createInfoCP{};
@@ -227,8 +235,8 @@ namespace Frost
 		{
 			// Compute the volumetrics at half the res because it is very expensive
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width;
-			imageSpec.Height = height;
+			imageSpec.Width = width / 2.0f;
+			imageSpec.Height = height / 2.0f;
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			imageSpec.Format = ImageFormat::RGBA16F;
@@ -253,6 +261,7 @@ namespace Frost
 			descriptor->Set("u_SpatialBlueNoiseLUT", spatialBlueNoiseLUT);
 			descriptor->Set("u_FinalGatherFroxel", m_Data->EmissionPhaseFroxelTexture[i]);
 			descriptor->Set("u_VolumetricTex", m_Data->VolumetricComputeTexture[i]);
+			//descriptor->Set("u_CloudComputeTex", m_Data->CloudComputeTexture[i]);
 
 			descriptor->UpdateVulkanDescriptorIfNeeded();
 		}
@@ -276,8 +285,8 @@ namespace Frost
 		{
 			// Compute the volumetrics at half the res because it is very expensive
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width;
-			imageSpec.Height = height;
+			imageSpec.Width = width / 2.0f;
+			imageSpec.Height = height / 2.0f;
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			imageSpec.Format = ImageFormat::RGBA16F;
@@ -331,6 +340,135 @@ namespace Frost
 		}
 	}
 
+	void VulkanVolumetricPass::CloudNoiseCompute(uint32_t width, uint32_t height)
+	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+
+		{
+			ComputePipeline::CreateInfo createInfoCP{};
+			createInfoCP.Shader = m_Data->PerlinNoiseShader;
+			m_Data->PerlinNoisePipeline = ComputePipeline::Create(createInfoCP);
+
+			ImageSpecification imageSpec{};
+			imageSpec.Width = 128;
+			imageSpec.Height = 128;
+			imageSpec.Depth = 128;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+			imageSpec.Sampler.SamplerWrap = ImageWrap::Repeat;
+			imageSpec.Format = ImageFormat::RGBA8;
+			imageSpec.Usage = ImageUsage::Storage;
+			imageSpec.UseMipChain = false;
+			m_Data->CloudNoiseTexture = Texture3D::Create(imageSpec);
+
+			m_Data->PerlinNoiseDescriptor = Material::Create(m_Data->PerlinNoiseShader, "CloudNoiseMaterial");
+			m_Data->PerlinNoiseDescriptor->Set("u_CloudNoiseTex", m_Data->CloudNoiseTexture);
+		}
+		{
+			ComputePipeline::CreateInfo createInfoCP{};
+			createInfoCP.Shader = m_Data->WoorleyNoiseShader;
+			m_Data->WoorleyNoisePipeline = ComputePipeline::Create(createInfoCP);
+
+			ImageSpecification imageSpec{};
+			imageSpec.Width = 32;
+			imageSpec.Height = 32;
+			imageSpec.Depth = 32;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+			imageSpec.Sampler.SamplerWrap = ImageWrap::Repeat;
+			imageSpec.Format = ImageFormat::RGBA8;
+			imageSpec.Usage = ImageUsage::Storage;
+			imageSpec.UseMipChain = false;
+			m_Data->ErroderNoiseTexture = Texture3D::Create(imageSpec);
+
+			m_Data->WoorleyNoiseDescriptor = Material::Create(m_Data->WoorleyNoiseShader, "ErroderNoiseMaterial");
+			m_Data->WoorleyNoiseDescriptor->Set("u_ErroderNoiseTex", m_Data->ErroderNoiseTexture);
+		}
+
+
+
+		// Recording a temporary commandbuffer
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
+
+
+		// Main noise texture
+		Ref<VulkanComputePipeline> cloudNoisePipeline = m_Data->PerlinNoisePipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> cloudNoiseDescriptor = m_Data->PerlinNoiseDescriptor.As<VulkanComputePipeline>();
+		Ref<VulkanTexture3D> cloudNoiseTexture = m_Data->CloudNoiseTexture.As<VulkanTexture3D>();
+
+		cloudNoiseDescriptor->Bind(cmdBuf, m_Data->PerlinNoisePipeline);
+		cloudNoisePipeline->Dispatch(cmdBuf, 128 / 4, 128 / 4, 128 / 4);
+
+		cloudNoiseTexture->TransitionLayout(cmdBuf, cloudNoiseTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+		cloudNoiseTexture->GenerateMipMaps(cmdBuf, cloudNoiseTexture->GetVulkanImageLayout());
+
+		// Erroder
+		Ref<VulkanComputePipeline> erroderNoisePipeline = m_Data->WoorleyNoisePipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> erroderNoiseDescriptor = m_Data->WoorleyNoiseDescriptor.As<VulkanComputePipeline>();
+		Ref<VulkanTexture3D> erroderNoiseTexture = m_Data->ErroderNoiseTexture.As<VulkanTexture3D>();
+
+		erroderNoiseDescriptor->Bind(cmdBuf, m_Data->WoorleyNoisePipeline);
+		erroderNoisePipeline->Dispatch(cmdBuf, 32 / 4, 32 / 4, 32 / 4);
+
+		erroderNoiseTexture->TransitionLayout(cmdBuf, erroderNoiseTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+		erroderNoiseTexture->GenerateMipMaps(cmdBuf, erroderNoiseTexture->GetVulkanImageLayout());
+
+		// Ending the temporary commandbuffer
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
+	}
+
+	void VulkanVolumetricPass::CloudComputeInitData(uint32_t width, uint32_t height)
+	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+
+		// Pipeline creation
+		ComputePipeline::CreateInfo createInfoCP{};
+		createInfoCP.Shader = m_Data->CloudComputeShader;
+		if (!m_Data->CloudComputePipeline)
+			m_Data->CloudComputePipeline = ComputePipeline::Create(createInfoCP);
+
+
+		m_Data->CloudComputeTexture.resize(framesInFlight);
+		m_Data->CloudVolumesDataBuffer.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			ImageSpecification imageSpec{};
+			imageSpec.Width = width / 2.0f;
+			imageSpec.Height = height / 2.0f;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+			imageSpec.Format = ImageFormat::RGBA8;
+			imageSpec.Usage = ImageUsage::Storage;
+			imageSpec.UseMipChain = false;
+
+			m_Data->CloudComputeTexture[i] = Image2D::Create(imageSpec);
+
+			if (!m_Data->CloudVolumesDataBuffer[i])
+				m_Data->CloudVolumesDataBuffer[i] = BufferDevice::Create(1024 * sizeof(RenderQueue::CloudVolume), { BufferUsage::Storage });
+		}
+
+
+
+		m_Data->CloudComputeDescriptor.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			if (!m_Data->CloudComputeDescriptor[i])
+				m_Data->CloudComputeDescriptor[i] = Material::Create(m_Data->CloudComputeShader, "CloudComputeMaterial");
+
+			auto descriptor = m_Data->CloudComputeDescriptor[i].As<VulkanMaterial>();
+
+			Ref<Image2D> depthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(i);
+			Ref<Texture2D> blueNoise = Renderer::GetSpatialBlueNoiseLut();
+
+			descriptor->Set("u_DepthBuffer", depthTexture);
+			descriptor->Set("u_CloudTexture", m_Data->CloudComputeTexture[i]);
+			descriptor->Set("u_CloudNoiseTex", m_Data->CloudNoiseTexture);
+			descriptor->Set("u_ErroderTex", m_Data->ErroderNoiseTexture);
+			descriptor->Set("u_SpatialBlueNoiseLUT", blueNoise);
+			descriptor->Set("CloudVolumeData", m_Data->CloudVolumesDataBuffer[i]);
+			descriptor->UpdateVulkanDescriptorIfNeeded();
+		}
+	}
+
 	void VulkanVolumetricPass::InitLate()
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
@@ -362,12 +500,22 @@ namespace Frost
 
 	void VulkanVolumetricPass::OnUpdate(const RenderQueue& renderQueue)
 	{
-		FroxelPopulateUpdate(renderQueue);
-		FroxelLightInjectUpdate(renderQueue);
-		FroxelTAAUpdate(renderQueue);
-		FroxelFinalComputeUpdate(renderQueue);
-		VolumetricComputeUpdate(renderQueue);
-		VolumetricBlurUpdate(renderQueue);
+		if (m_Data->m_UseVolumetrics)
+		{
+			CloudComputeUpdate(renderQueue);
+
+			FroxelPopulateUpdate(renderQueue);
+			FroxelLightInjectUpdate(renderQueue);
+
+			if (m_Data->m_UseTAA)
+			{
+				FroxelTAAUpdate(renderQueue);
+			}
+
+			FroxelFinalComputeUpdate(renderQueue);
+			VolumetricComputeUpdate(renderQueue);
+			VolumetricBlurUpdate(renderQueue);
+		}
 	}
 
 	struct FroxelPopulatePushConstant
@@ -416,7 +564,7 @@ namespace Frost
 
 		uint32_t groupX = std::ceil(width / 8.0f);
 		uint32_t groupY = std::ceil(height / 8.0f);
-		uint32_t froxel_ZSlices = 128;
+		uint32_t froxel_ZSlices = Renderer::GetRendererConfig().VoluemtricFroxelSlicesZ;
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, froxel_ZSlices);
 
 		// Volume texture barrier
@@ -488,7 +636,7 @@ namespace Frost
 
 		uint32_t groupX = std::ceil(width / 8.0f);
 		uint32_t groupY = std::ceil(height / 8.0f);
-		uint32_t froxel_ZSlices = 128;
+		uint32_t froxel_ZSlices = Renderer::GetRendererConfig().VoluemtricFroxelSlicesZ;
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, froxel_ZSlices);
 
 		// Volume texture barrier
@@ -604,8 +752,8 @@ namespace Frost
 		// Dispatch
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
-		uint32_t groupX = std::ceil((width) / 32.0f);
-		uint32_t groupY = std::ceil((height) / 32.0f);
+		uint32_t groupX = std::ceil((width  / 2.0f) / 32.0f);
+		uint32_t groupY = std::ceil((height / 2.0f) / 32.0f);
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
@@ -642,8 +790,8 @@ namespace Frost
 		// Dispatch
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
-		uint32_t groupX = std::ceil((width) / 16.0f);
-		uint32_t groupY = std::ceil((height) / 16.0f);
+		uint32_t groupX = std::ceil((width  / 2.0f) / 16.0f);
+		uint32_t groupY = std::ceil((height / 2.0f) / 16.0f);
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 
@@ -684,12 +832,66 @@ namespace Frost
 		*/
 	}
 
+	struct CloudComputePushConstant
+	{
+		glm::mat4 InvViewProjMatrix;
+		glm::vec3 CameraPosition;
+
+		float NearPlane;
+
+		glm::vec3 DirectionaLightDir;
+
+		float FarPlane;
+		float CloudsCount = 0;
+	};
+	static CloudComputePushConstant s_CloudComputePushConstant;
+
+	void VulkanVolumetricPass::CloudComputeUpdate(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		m_Data->CloudVolumesDataBuffer[currentFrameIndex]->SetData(sizeof(RenderQueue::CloudVolume) * renderQueue.m_CloudVolumeData.size(), (void*)renderQueue.m_CloudVolumeData.data());
+
+		auto vulkanPipeline = m_Data->CloudComputePipeline.As<VulkanComputePipeline>();
+		auto vulkanDescriptor = m_Data->CloudComputeDescriptor[currentFrameIndex].As<VulkanMaterial>();
+
+		// Push constant information
+		s_CloudComputePushConstant.InvViewProjMatrix = s_FroxelPopulatePushConstant.InvViewProjMatrix;
+		s_CloudComputePushConstant.CameraPosition = renderQueue.CameraPosition;
+		s_CloudComputePushConstant.NearPlane = renderQueue.m_Camera.GetNearClip();
+		s_CloudComputePushConstant.FarPlane = renderQueue.m_Camera.GetFarClip();
+		s_CloudComputePushConstant.CloudsCount = renderQueue.m_CloudVolumeData.size();
+		s_CloudComputePushConstant.DirectionaLightDir = renderQueue.m_LightData.DirectionalLight.Direction;
+
+
+		// Binding the descriptor and compute pipeline
+		vulkanDescriptor->Bind(cmdBuf, m_Data->CloudComputePipeline);
+		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_CloudComputePushConstant);
+
+		// Dispatch
+		float width = renderQueue.ViewPortWidth;
+		float height = renderQueue.ViewPortHeight;
+		uint32_t groupX = std::ceil((width  / 2.0f) / 16.0f);
+		uint32_t groupY = std::ceil((height / 2.0f) / 16.0f);
+		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+	}
+
 	void VulkanVolumetricPass::OnRenderDebug()
 	{
+		if (ImGui::CollapsingHeader("Unified Volumetrics"))
+		{
+			ImGui::SliderInt("Enable", &m_Data->m_UseVolumetrics, 0, 1);
+			ImGui::SliderInt("TAA", &m_Data->m_UseTAA, 0, 1);
+		}
 	}
 
 	void VulkanVolumetricPass::OnResize(uint32_t width, uint32_t height)
 	{
+		CloudComputeInitData(width, height);
+
 		FroxelPopulateInitData(width, height);
 		FroxelLightInjectInitData(width, height);
 		FroxelTAAInitData(width, height);

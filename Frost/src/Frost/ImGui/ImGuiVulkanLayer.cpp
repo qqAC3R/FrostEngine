@@ -2,6 +2,7 @@
 #include "ImGuiVulkanLayer.h"
 
 #include "Frost/Core/Application.h"
+//#include "Frost/Utils/HeapTracker.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 
 #include <imgui.h>
@@ -150,6 +151,10 @@ namespace Frost
 			float free = memoryStats.FreeMemory / 1000000.0f;
 			ImGui::Text("Used Memory: %.2f MB", used);
 			ImGui::Text("Free Memory: %.2f MB", free);
+
+			//ImGui::Separator();
+			//
+			//ImGui::Text(HeapTracker::GetResultAsString().c_str());
 		}
 		ImGui::End();
 	}

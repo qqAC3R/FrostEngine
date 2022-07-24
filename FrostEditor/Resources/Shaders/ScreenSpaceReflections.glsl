@@ -17,6 +17,9 @@
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
+// Unroll all loops for performance - this is important
+#pragma optionNV(unroll all)
+
 layout(binding = 0) uniform sampler2D u_ColorFrameTex;
 
 layout(binding = 1) uniform sampler2D u_ViewPosTex;
@@ -43,13 +46,12 @@ layout(binding = 7) uniform UniformBuffer {
 // Global variables
 vec2 s_UV;
 
-
 // Constants
 const float relfectionSpecularFalloffExponent = 6.0f;
 
 
 // Defines
-#define HIZ_CROSS_EPSILON		(vec2(0.5f) / u_UniformBuffer.ScreenSize.xy)
+#define HIZ_CROSS_EPSILON		(vec2(0.5f) / vec2(textureSize(u_HiZBuffer, 0).xy))
 
 #define INVALID_HIT_POINT		vec3(-1.0)
 #define HIZ_VIEWDIR_EPSILON		0.00001
@@ -130,7 +132,7 @@ void LinearRayTraceBinarySearch(inout vec3 rayPos, vec3 rayDir)
 			break;
 		
 		/* Check if we found our final hit point */
-		float depth = textureLod(u_HiZBuffer, rayPos.xy, 0.0f).r;
+		float depth = textureLod(u_HiZBuffer, rayPos.xy, 0.0f).g;
 		float depthDelta = depth - rayPos.z;
 		
 		if (abs(depthDelta) < BS_DELTA_EPSILON)
@@ -180,7 +182,7 @@ bool LinearRayTrace(inout vec3 rayPos, vec3 rayDir)
 			numScreenEdgeHits = 0;
 		
 		/* Check if the ray hit any geometry (delta < 0) */
-		float depth = textureLod(u_HiZBuffer, rayPos.xy, 0.0f).r;
+		float depth = textureLod(u_HiZBuffer, rayPos.xy, 0.0f).g;
 		float depthDelta = depth - rayPos.z;
 		
 		if (depthDelta < 0.0)
@@ -253,10 +255,10 @@ vec3 IntersectCellBoundary(vec3 rayOrigin, vec3 rayDir, vec2 cellIndex, vec2 cel
 	return IntersectDepthPlane(rayOrigin, rayDir, t);
 }
 
-float GetDepthPlanes(vec2 pos, float level)
+vec2 GetDepthPlanes(vec2 pos, float level)
 {
 	/* Texture lookup with <linear-clamp> sampler */
-	return textureLod(u_HiZBuffer, pos, level).r;
+	return textureLod(u_HiZBuffer, pos, level).yx;
 }
 
 bool CrossedCellBoundary(vec2 cellIndexA, vec2 cellIndexB)
@@ -271,8 +273,9 @@ bool CrossedCellBoundary(vec2 cellIndexA, vec2 cellIndexB)
 */
 vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 {
-	const vec2 hiZSize = u_UniformBuffer.ScreenSize.xy;
-	const float maxMipLevel = floor(log2(max(hiZSize.x, hiZSize.y))) - 1;
+	const vec2 hiZSize = vec2(textureSize(u_HiZBuffer, 0).xy);
+	//const float maxMipLevel = floor(log2(max(hiZSize.x, hiZSize.y))) - 1;
+	const float maxMipLevel = 5;
 
 	
 	/* Check if ray points towards the camera */
@@ -284,15 +287,15 @@ vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 		}
 		return INVALID_HIT_POINT;
 	}
-
-
-	vec3 rayOrigin_begin = rayOrigin;
-	vec3 rayDir_begin = rayDir;
 	
-	if(LinearRayTrace(rayOrigin_begin, rayDir_begin))
-	{
-		return vec3(rayOrigin_begin.xy, 0.0f);
-	}
+	
+	//vec3 rayOrigin_begin = rayOrigin;
+	//vec3 rayDir_begin = rayDir;
+	//
+	//if(LinearRayTrace(rayOrigin_begin, rayDir_begin))
+	//{
+	//	return vec3(rayOrigin_begin.xy, 0.0f);
+	//}
 
 	
 	/*
@@ -313,7 +316,7 @@ vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 	rayOrigin = IntersectDepthPlane(rayOrigin, rayDir, -rayOrigin.z); // rayOrigin + rayDir * (-rayOrigin.z)
 	
 	/* Cross to next cell so that we don't get a self-intersection immediately */
-	float level = 2.0f;
+	float level = 1.0f;
 	
 	vec2 firstCellCount = GetCellCount(hiZSize, level);
 	vec2 rayCell = GetCell(rayPos.xy, firstCellCount);
@@ -324,7 +327,7 @@ vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 	/* Main tracing iteration loop */
 	uint i = 0;
 	
-#define HIZ_STOP_LEVEL      2.0f
+#define HIZ_STOP_LEVEL      1.0f
 #define HIZ_MAX_ITERATIONS  32
 
 	for (; level >= HIZ_STOP_LEVEL && i < HIZ_MAX_ITERATIONS; i++)
@@ -339,36 +342,46 @@ vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 		vec2 oldCellIndex = GetCell(rayPos.xy, cellCount);
 		
 		/* Get minimum depth plane in which the current ray resides */
-		float zMin = GetDepthPlanes(rayPos.xy, level);
-		
-		
+		vec2 zMinMax = GetDepthPlanes(rayPos.xy, level);
+
+
+#if 1
 		/* Intersect only if ray depth is between minimum and maximum depth planes */
-		vec3 tmpRay = IntersectDepthPlane(rayOrigin, rayDir, max(rayPos.z, zMin)); // MIN
+		vec3 tmpRay = IntersectDepthPlane(rayOrigin, rayDir, max(rayPos.z, zMinMax.r)); // MIN
+		//vec3 tmpRay = IntersectDepthPlane(rayOrigin, rayDir, clamp(rayPos.z, zMinMax.r, zMinMax.g)); // MIN
 		
 		/* Get new cell number */
 		vec2 newCellIndex = GetCell(tmpRay.xy, cellCount);
 		
 		/* If the new cell number is different from the old cell number, we know we crossed a cell */
-		if (CrossedCellBoundary(oldCellIndex, newCellIndex))
+		if (CrossedCellBoundary(oldCellIndex, newCellIndex))// || tmpRay.z > zMinMax.g + 0.001)
 		{
 			/*
 			Intersect the boundary of that cell instead,
 			and go up a level for taking a larger step next iteration
 			*/
 			tmpRay = IntersectCellBoundary(rayOrigin, rayDir, oldCellIndex, cellCount, crossStep, crossOffset);
-			level = min(maxMipLevel, level + 2.0);
+			level = min(maxMipLevel, level + 1.0);
 		}
-		
+		else
+		{
+			/* Go down a level in the Hi-Z */
+			level -= 1.0;
+		}
+
 		rayPos = tmpRay;
+#endif
+
 		
 		
 		
-		/* Go down a level in the Hi-Z */
-		level -= 1.0;
 	}
 
 	return vec3(rayPos.xy, 0.0f);
 }
+
+
+
 
 // -----------------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------------
@@ -443,6 +456,7 @@ vec4 ConeSampleWeightRoughness(vec2 samplePos, float mipLevel, float roughness)
 vec4 ConeTrace(vec2 startPos, vec2 endPos, float roughness)
 {
 	float lod = 0.0f;
+	vec2 screenSize = vec2(imageSize(o_FrameTex).xy);
 
 	float specularPower = RoughnessToSpecularPower(roughness);
 
@@ -483,7 +497,7 @@ vec4 ConeTrace(vec2 startPos, vec2 endPos, float roughness)
 		Convert the in-radius into screen space and then check what power N
 		we have to raise 2 to reach it. That power N becomes our mip level to sample from.
 		*/
-		float mipLevel = log2(incircleSize * max(u_UniformBuffer.ScreenSize.x, u_UniformBuffer.ScreenSize.y));
+		float mipLevel = log2(incircleSize * max(screenSize.x, screenSize.y));
 		lod = mipLevel;
 
 		/* Sample the color buffer (using visibility buffer) */
@@ -524,25 +538,31 @@ vec3 FresnelShlick(in float cosTheta, in vec3 F0)
 
 void main()
 {
-	s_UV = vec2(gl_GlobalInvocationID.xy) / u_UniformBuffer.ScreenSize.xy;
+	//s_UV = vec2(gl_GlobalInvocationID.xy) / u_UniformBuffer.ScreenSize.xy;
 	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 imageOutputSize = imageSize(o_FrameTex).xy;
+	vec2 s_UV = (vec2(gl_GlobalInvocationID.xy) + vec2(0.5f)) / vec2(imageOutputSize);
 
-	if(gl_GlobalInvocationID.x > u_UniformBuffer.ScreenSize.x || gl_GlobalInvocationID.y > u_UniformBuffer.ScreenSize.y) return;
+	if (any(greaterThanEqual(pixelCoord, imageOutputSize)))
+        return;
+	
+
+	//if(gl_GlobalInvocationID.x > u_UniformBuffer.ScreenSize.x || gl_GlobalInvocationID.y > u_UniformBuffer.ScreenSize.y) return;
 
 	// Sample information from the gbuffer
-	vec3 viewPos = texelFetch(u_ViewPosTex, pixelCoord, 0).xyz;
-	vec3 currentColor = texelFetch(u_ColorFrameTex, pixelCoord, 0).rgb;
-	float metallic = texelFetch(u_NormalTex, pixelCoord, 0).z;
-	float roughness = texelFetch(u_NormalTex, pixelCoord, 0).w;
+	vec3 viewPos = texture(u_ViewPosTex, s_UV).xyz;
+	vec3 currentColor = texture(u_ColorFrameTex, s_UV).rgb;
+	float metallic = texture(u_NormalTex, s_UV).z;
+	float roughness = texture(u_NormalTex, s_UV).w;
 	float roughnessFactor = roughness / 2.0f;
 
 	if(viewPos.x == 0.0f && viewPos.y == 0.0f && viewPos.z == 0.0f) {
 		imageStore(o_FrameTex, pixelCoord, vec4(currentColor, 1.0f));
-		return; 
+		return;
 	}
 
 	// Decode normals and calculate normals in view space (from model space)
-	vec2 decodedNormal = texelFetch(u_NormalTex, pixelCoord, 0).xy;
+	vec2 decodedNormal = texture(u_NormalTex, s_UV).xy;
     vec3 normal = DecodeNormal(decodedNormal);
 	vec3 viewNormal = transpose(inverse(mat3(u_UniformBuffer.ViewMatrix))) * normal;
 
@@ -552,22 +572,18 @@ void main()
 	vec3 fresnel = FresnelShlick(max(dot(normalize(viewPos), normalize(viewNormal)), 0.0f), F0);
 
 	// SSR
-	float depth = 0.0f;
-	vec3 hitPos = viewPos.xyz;
-
-
-	vec3 worldPos = vec3(vec4(viewPos, 1.0f) * u_UniformBuffer.InvViewMatrix);
 	vec3 reflectionDir = normalize(reflect(normalize(viewPos), normalize(viewNormal)));
 	
 	
 	const float nearPlane = 0.1f;
-	vec3 currentCoords = vec3(s_UV, textureLod(u_HiZBuffer, s_UV, 0.0f).r);
+	vec3 currentCoords = vec3(s_UV, textureLod(u_HiZBuffer, s_UV, 0.0f).g);
 
 	
 	vec3 hitCoords;
 	vec3 reflectionColor;
 	if(u_UniformBuffer.UseConeTracing == 0)
 	{
+		vec3 worldPos = vec3(u_UniformBuffer.InvViewMatrix * vec4(viewPos, 1.0f));
 		vec3 jitter = mix(vec3(0.0f), vec3(HashFunc(worldPos)), roughnessFactor);
 
 		vec3 reflectVector = normalize(reflectionDir + jitter) * max(1.0f, -viewPos.z);

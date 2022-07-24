@@ -135,7 +135,7 @@ void main()
 	ivec2 loc = ivec2(gl_GlobalInvocationID.xy);
 
     if (any(greaterThanEqual(loc, imgSize)))
-	  return;
+        return;
 	
 
 	vec2 texCoords = vec2(float(loc.x) / imgSize.x, float(loc.y) / imgSize.y);

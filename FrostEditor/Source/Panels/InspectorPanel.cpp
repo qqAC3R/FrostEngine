@@ -130,6 +130,15 @@ namespace Frost
 					FROST_CORE_WARN("This entity already has the Box Fog Volume Component!");
 			}
 
+			// Box Fog Volume component
+			if (ImGui::MenuItem("Cloud Volume"))
+			{
+				if (!selectedEntity.HasComponent<CloudVolumeComponent>())
+					selectedEntity.AddComponent<CloudVolumeComponent>();
+				else
+					FROST_CORE_WARN("This entity already has the Cloud Volume Component!");
+			}
+
 			ImGui::EndPopup();
 		}
 
@@ -322,7 +331,7 @@ namespace Frost
 		{
 			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
 			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
-			if (ImGui::BeginTable("DirectionalLightProperties", 2, flags))
+			if (ImGui::BeginTable("BoxFogVolumeProperties", 2, flags))
 			{
 
 				{
@@ -383,6 +392,104 @@ namespace Frost
 
 					ImGui::TableNextColumn();
 					UserInterface::DragFloat("", component.Absorption, 0.01f, 0.0f, 100.0f);
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+			ImGui::PopStyleVar();
+		});
+
+
+
+		DrawComponent<CloudVolumeComponent>("Cloud Volume", entity, [](auto& component)
+		{
+			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+			if (ImGui::BeginTable("CloudVolumeProperties", 2, flags))
+			{
+				{
+					ImGui::PushID(0);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Cloud Scale");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.CloudScale, 0.01f, 0.005f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+
+				{
+					ImGui::PushID(1);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Density");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Precipation, 0.01f, 0.005f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(2);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Density Offset");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.DensityOffset, 0.1f, 0.0f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(3);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Scattering");
+
+					ImGui::TableNextColumn();
+					UserInterface::DrawVec3ColorEdit("", component.Scattering);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(4);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Phase Function");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.PhaseFunction, 0.1f, 0.0f, 1.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(5);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Cloud Absorption");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.CloudAbsorption, 0.1f, 0.0f, 10.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(6);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Sun Absorption");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.SunAbsorption, 0.1f, 0.0f, 10.0f);
 
 					ImGui::PopID();
 				}

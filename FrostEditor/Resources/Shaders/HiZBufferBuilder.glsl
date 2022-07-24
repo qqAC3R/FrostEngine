@@ -4,16 +4,17 @@
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) uniform sampler2D i_Depth;
-layout(set = 0, binding = 1, r32f) uniform writeonly image2D o_Depth;
+layout(set = 0, binding = 1, rg32f) uniform writeonly image2D o_Depth;
 
 layout(push_constant) uniform PushConstant
 {
 	vec2 u_ImageSize;
+	float MipLevel;
 } u_PushConstant;
 
 void main()
 {
-	uvec2 pos = gl_GlobalInvocationID.xy;
+	ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
 
 #if 0
 	// Method 1:
@@ -33,13 +34,25 @@ void main()
 #if 1
 	// Method 3:
 	// Texture offset approach
+
+	//if(u_PushConstant.MipLevel == 0.0f)
+	//{
+	//	float depth = texelFetch(i_Depth, pos, 0).r;
+	//	imageStore(o_Depth, ivec2(pos), vec4(depth, depth, 0.0f, 0.0f));
+	//	return;
+	//}
+
 	float depth1 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2(-1,  0)).x; // left
 	float depth2 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 1,  0)).x; // right
 	float depth3 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 0,  1)).x; // up
 	float depth4 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 0, -1)).x; // down
 	
-	float depth = max(max(depth1, depth2), max(depth3, depth4));
+	float depthMin = min(min(depth1, depth2), min(depth3, depth4));
+	float depthMax = max(max(depth1, depth2), max(depth3, depth4));
+
+	
+
 #endif
 
-	imageStore(o_Depth, ivec2(pos), vec4(depth));
+	imageStore(o_Depth, ivec2(pos), vec4(depthMax, depthMin, 0.0f, 0.0f));
 }

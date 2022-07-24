@@ -9,8 +9,9 @@ layout(binding = 2) uniform sampler2D u_SSRTexture;
 layout(binding = 3) uniform sampler2D u_AOTexture;
 layout(binding = 4) uniform sampler2D u_AerialImage;
 layout(binding = 5) uniform sampler2D u_VolumetricTexture;
-layout(binding = 6, rgba8) uniform writeonly image2D o_Texture_ForSSR;
-layout(binding = 7, rgba8) uniform writeonly image2D o_Texture_Final;
+layout(binding = 6) uniform sampler2D u_CloudComputeTex;
+layout(binding = 7, rgba8) uniform writeonly image2D o_Texture_ForSSR;
+layout(binding = 8, rgba8) uniform writeonly image2D o_Texture_Final;
 
 #define TONE_MAP_FRAME          0
 #define TONE_MAP_FRAME_WITH_SSR 1
@@ -75,7 +76,8 @@ void main()
 		// Contribution from the screen space reflections
 		if(u_PushConstant.UseSSR == 1)
 		{
-			vec3 reflectionContribution = texelFetch(u_SSRTexture, loc, 0).rgb;
+			//vec3 reflectionContribution = texelFetch(u_SSRTexture, loc, 0).rgb;
+			vec3 reflectionContribution = texture(u_SSRTexture, uv).rgb;
 			//color = mix(color, reflectionContribution.xyz, 0.4f);
 			color += reflectionContribution.xyz;
 		}
@@ -85,7 +87,8 @@ void main()
 		// Contribution from ambient occlusion
 		if(u_PushConstant.UseAO == 1)
 		{
-			float ao = texelFetch(u_AOTexture, loc, 0).r;
+			//float ao = texelFetch(u_AOTexture, loc, 0).r;
+			float ao = texture(u_AOTexture, uv).r;
 			vec3 ao_contribution = AO_MultiBounce(ao, color);
 			color = color * ao_contribution;
 			color = color;
@@ -98,6 +101,11 @@ void main()
 			vec3 bloomFactor = texelFetch(u_BloomTexture, loc, 0).rgb;
 			color += bloomFactor;
 		}
+
+		vec4 cloudContribution = texture(u_CloudComputeTex, uv);
+		color *= cloudContribution.a;
+		color += cloudContribution.rgb;
+
 
 		vec4 volumetricContribution = texture(u_VolumetricTexture, uv);
 		color *= volumetricContribution.a;

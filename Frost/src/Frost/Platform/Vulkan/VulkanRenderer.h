@@ -25,6 +25,7 @@ namespace Frost
 		virtual void Submit(const PointLightComponent& pointLight, const glm::vec3& position) override;
 		virtual void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction) override;
 		virtual void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform) override;
+		virtual void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale) override;
 
 		virtual void Resize(uint32_t width, uint32_t height) override;
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const override;

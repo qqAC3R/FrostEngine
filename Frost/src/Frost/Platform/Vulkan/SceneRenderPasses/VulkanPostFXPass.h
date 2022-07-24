@@ -2,6 +2,8 @@
 
 #include "Frost/Renderer/SceneRenderPass.h"
 
+typedef struct VkSampler_T* VkSampler;
+
 namespace Frost
 {
 	class VulkanPostFXPass : public SceneRenderPass
@@ -98,6 +100,7 @@ namespace Frost
 			Ref<ComputePipeline> HZBPipeline;
 			Vector<Vector<Ref<Material>>> HZBDescriptor;
 			Vector<Ref<Image2D>> DepthPyramid;
+			Vector<VkSampler> HZBLinearSampler; // For SSR
 
 			// Visibility buffer
 			Ref<Shader> VisibilityShader;

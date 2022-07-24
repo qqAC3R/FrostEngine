@@ -109,4 +109,23 @@ namespace Frost
 		float Absorption = 1.0f;
 		float Density = 1.0f;
 	};
+
+	struct CloudVolumeComponent
+	{
+		CloudVolumeComponent() = default;
+		CloudVolumeComponent(float cloudScale)
+			: CloudScale(cloudScale)
+		{
+		}
+
+		float CloudScale = 1.0f;
+		float Precipation = 1.0f;
+		
+		glm::vec3 Scattering = { 1.0f, 1.0f, 1.0f };
+		float PhaseFunction = 0.75f;
+
+		float DensityOffset = 10.0f;
+		float CloudAbsorption = 0.75f;
+		float SunAbsorption = 1.25f;
+	};
 }

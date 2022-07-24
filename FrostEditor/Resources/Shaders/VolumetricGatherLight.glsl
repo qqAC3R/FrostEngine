@@ -7,6 +7,8 @@ layout(binding = 0) uniform sampler3D u_LightExtinctionFroxel;
 
 layout(binding = 1, rgba16f) restrict writeonly uniform image3D u_FinalLightFroxel;
 
+// Unroll all loops for performance - this is important
+#pragma optionNV(unroll all)
 
 layout(push_constant) uniform PushConstant
 {

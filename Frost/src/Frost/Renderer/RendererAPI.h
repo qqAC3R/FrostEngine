@@ -39,6 +39,7 @@ namespace Frost
 		virtual void Submit(const PointLightComponent& pointLight, const glm::vec3& position) = 0;
 		virtual void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction) = 0;
 		virtual void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform) = 0;
+		virtual void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale) = 0;
 
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const = 0;
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
@@ -57,6 +58,7 @@ namespace Frost
 
 		void Add(Ref<Mesh> mesh, const glm::mat4& transform);
 		void AddFogVolume(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
+		void AddCloudVolume(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale);
 		void AddPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
 		void SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
 
@@ -95,6 +97,25 @@ namespace Frost
 			float Absorption = 1.0f;
 		};
 		Vector<FogVolume> m_FogVolumeData;
+
+		// Cloud Volume Data
+		struct CloudVolume
+		{
+			glm::vec3 Position;
+			float CloudScale;
+
+			glm::vec3 Scale;
+			float Density;
+
+			glm::vec3 Scattering;
+			float PhaseFunction;
+
+			float DensityOffset;
+			float CloudAbsorption;
+			float SunAbsorption;
+			float Padding0;
+		};
+		Vector<CloudVolume> m_CloudVolumeData;
 
 
 		uint32_t m_SubmeshCount = 0;

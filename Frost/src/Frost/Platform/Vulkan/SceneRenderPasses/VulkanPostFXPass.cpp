@@ -189,7 +189,7 @@ namespace Frost
 	void VulkanPostFXPass::SSRInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 		{
 			ComputePipeline::CreateInfo computePipelineCreateInfo{};
@@ -203,11 +203,11 @@ namespace Frost
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
+			imageSpec.Width = uint32_t(width * 0.75f);
+			imageSpec.Height = uint32_t(height * 0.75f);
 			imageSpec.Format = ImageFormat::RGBA8;
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
-			imageSpec.Width = width;
-			imageSpec.Height = height;
 			m_Data->SSRTexture[i] = Image2D::Create(imageSpec);
 		}
 
@@ -219,21 +219,43 @@ namespace Frost
 			if(!m_Data->SSRDescriptor[i])
 				m_Data->SSRDescriptor[i] = Material::Create(m_Data->SSRShader, "Post-ProceesingFX");
 
-			auto& vulkanMaterial = m_Data->SSRDescriptor[i].As<VulkanMaterial>();
+			auto vulkanMaterial = m_Data->SSRDescriptor[i].As<VulkanMaterial>();
+			auto vulkanDepthPyramid = m_Data->DepthPyramid[i].As<VulkanImage2D>();
+			VkDescriptorSet descriptorSet = vulkanMaterial->GetVulkanDescriptorSet(0);
 
 			auto viewPosTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(3, i);
 			auto normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
-			//auto finalImage = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, i);
 
 			// Textures
 			vulkanMaterial->Set("u_ColorFrameTex", m_Data->ColorCorrectionTexture[i]);
 			vulkanMaterial->Set("u_ViewPosTex", viewPosTexture);
-			vulkanMaterial->Set("u_HiZBuffer", m_Data->DepthPyramid[i]);
+			//vulkanMaterial->Set("u_HiZBuffer", m_Data->DepthPyramid[i]);
 			vulkanMaterial->Set("u_NormalTex", normalTexture);
 			vulkanMaterial->Set("o_FrameTex", m_Data->SSRTexture[i]);
 			vulkanMaterial->Set("u_PrefilteredColorBuffer", m_Data->BlurredColorBuffer[i]);
 
+
+			// HZB with custum linear sampler (exclusive for SSR)
+			VkDescriptorImageInfo imageDescriptorInfo{};
+			imageDescriptorInfo.imageView = vulkanDepthPyramid->GetVulkanImageView();
+			imageDescriptorInfo.imageLayout = vulkanDepthPyramid->GetVulkanImageLayout();
+			imageDescriptorInfo.sampler = m_Data->HZBLinearSampler[i];
+
+			VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+			writeDescriptorSet.dstBinding = 2; // layout(binding = 2) uniform sampler2D u_HiZBuffer;
+			writeDescriptorSet.dstArrayElement = 0;
+			writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
+			writeDescriptorSet.descriptorCount = 1;
+			writeDescriptorSet.dstSet = descriptorSet;
+
+			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, 0);
+
+
 			// Uniform buffer data
+			//vulkanMaterial->Set("UniformBuffer.ScreenSize", glm::vec4(width + (width % 2), height + (height % 2), 0.0f, 0.0f));
+			width = int32_t(width * 0.75f) + (int32_t(width * 0.75f) % 2);
+			height = int32_t(height * 0.75f) + (int32_t(height * 0.75f) % 2);
 			vulkanMaterial->Set("UniformBuffer.ScreenSize", glm::vec4(width, height, 0.0f, 0.0f));
 
 			vulkanMaterial->UpdateVulkanDescriptorIfNeeded();
@@ -244,6 +266,7 @@ namespace Frost
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
 		uint32_t mipLevels = m_Data->ScreenMipLevel;
 
 		{
@@ -256,6 +279,7 @@ namespace Frost
 
 		// Calculating the previous frame index
 		m_Data->DepthPyramid.resize(framesInFlight);
+		m_Data->HZBLinearSampler.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 
@@ -266,11 +290,40 @@ namespace Frost
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 
-			imageSpec.Format = ImageFormat::R32;
+			imageSpec.Format = ImageFormat::RG32F;
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.UseMipChain = true;
 
 			m_Data->DepthPyramid[i] = Image2D::Create(imageSpec);
+
+
+			if (m_Data->HZBLinearSampler[i])
+			{
+				vkDestroySampler(device, m_Data->HZBLinearSampler[i], nullptr);
+			}
+
+			// Create the linear sampler used by the SSR (Hi-Z tracing)
+			VkPhysicalDeviceProperties properties;
+			vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+			VkSamplerCreateInfo linearSamplerCreateInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+			linearSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+			linearSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+			linearSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			linearSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			linearSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			linearSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			linearSamplerCreateInfo.anisotropyEnable = VK_TRUE;
+			linearSamplerCreateInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+			linearSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+			linearSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+			linearSamplerCreateInfo.compareEnable = VK_FALSE;
+			linearSamplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+			linearSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			linearSamplerCreateInfo.mipLodBias = 0.0f;
+			linearSamplerCreateInfo.minLod = 0.0f;
+			linearSamplerCreateInfo.maxLod = static_cast<float>(mipLevels);
+			vkCreateSampler(device, &linearSamplerCreateInfo, nullptr, &m_Data->HZBLinearSampler[i]);
 		}
 
 		m_Data->HZBDescriptor.resize(framesInFlight);
@@ -726,11 +779,13 @@ namespace Frost
 			Ref<Image2D> colorBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, i); // From the pbr shader
 			//Ref<Image2D> volumetricTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->VolumetricBlurTexture_Upsample[i];
 			Ref<Image2D> volumetricTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->VolumetricBlurTexture_DirY[i];
+			Ref<Image2D> cloudsTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->CloudComputeTexture[i];
 
 			vulkanColorCorrectionDescriptor->Set("u_ColorFrameTexture", colorBuffer);
 			vulkanColorCorrectionDescriptor->Set("u_BloomTexture", m_Data->Bloom_UpsampledTexture[i]);
 			vulkanColorCorrectionDescriptor->Set("u_AerialImage", m_Data->ApplyAerialImage[i]);
 			vulkanColorCorrectionDescriptor->Set("u_VolumetricTexture", volumetricTexture);
+			vulkanColorCorrectionDescriptor->Set("u_CloudComputeTex", cloudsTexture);
 			//vulkanColorCorrectionDescriptor->Set("u_SSRTexture", m_Data->SSRTexture[i]);
 			vulkanColorCorrectionDescriptor->Set("o_Texture_ForSSR", m_Data->ColorCorrectionTexture[i]);
 			vulkanColorCorrectionDescriptor->Set("o_Texture_Final", m_Data->FinalTexture[i]);
@@ -857,8 +912,8 @@ namespace Frost
 
 		ssrMaterial->Bind(cmdBuf, m_Data->SSRPipeline);
 
-		uint32_t groupX = std::ceil(renderQueue.ViewPortWidth  / 32.0f);
-		uint32_t groupY = std::ceil(renderQueue.ViewPortHeight / 32.0f);
+		uint32_t groupX = std::ceil((renderQueue.ViewPortWidth  * 0.75f) / 32.0f);
+		uint32_t groupY = std::ceil((renderQueue.ViewPortHeight * 0.75f) / 32.0f);
 		ssrPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
@@ -877,6 +932,7 @@ namespace Frost
 		geometryDepthAttachment->TransitionLayout(cmdBuf, srcDepthImageLayout, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
 		glm::vec2 currentHZB_Dimensions = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
+		glm::vec3 pushConstant{};
 
 		auto vulkanHZB_Pipeline = m_Data->HZBPipeline.As<VulkanComputePipeline>();
 
@@ -891,7 +947,8 @@ namespace Frost
 
 			vulkanHZB_Descriptor->Bind(cmdBuf, m_Data->HZBPipeline);
 
-			vulkanHZB_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &currentHZB_Dimensions);
+			pushConstant = { currentHZB_Dimensions.x, currentHZB_Dimensions.y, float(mipLevel) };
+			vulkanHZB_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant);
 
 			uint32_t groupX = std::ceil(currentHZB_Dimensions.x / 32.0f);
 			uint32_t groupY = std::ceil(currentHZB_Dimensions.y / 32.0f);
@@ -1572,6 +1629,11 @@ namespace Frost
 
 	void VulkanPostFXPass::ShutDown()
 	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		for (uint32_t i = 0; i < framesInFlight; i++)
+			vkDestroySampler(device, m_Data->HZBLinearSampler[i], nullptr);
+
 		delete m_Data;
 	}
 }

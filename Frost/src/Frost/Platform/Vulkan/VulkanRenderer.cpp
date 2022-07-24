@@ -263,6 +263,15 @@ namespace Frost
 		});
 	}
 
+	void VulkanRenderer::Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, cloudVolume, position, scale, currentFrameIndex]()
+		{
+			s_RenderQueue[currentFrameIndex].AddCloudVolume(cloudVolume, position, scale);
+		});
+	}
+
 	void VulkanRenderer::Resize(uint32_t width, uint32_t height)
 	{
 		Renderer::Submit([width, height]()

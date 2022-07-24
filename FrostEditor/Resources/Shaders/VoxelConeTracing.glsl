@@ -26,6 +26,8 @@ layout(push_constant) uniform PushConstant
 	int ConeTraceMaxSteps;
 } u_PushConstant;
 
+// Unroll all loops for performance - this is important
+#pragma optionNV(unroll all)
 
 // =======================================================
 // Constants

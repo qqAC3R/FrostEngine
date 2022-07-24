@@ -57,6 +57,16 @@ namespace Frost
 				Renderer::Submit(fogVolumeComponent, transformComponent.GetTransform());
 			}
 		}
+
+		{
+			// Cloud Volumes
+			auto group = m_Registry.group<CloudVolumeComponent>(entt::get<TransformComponent>);
+			for (auto& entity : group)
+			{
+				auto [cloudVolumeComponent, transformComponent] = group.get<CloudVolumeComponent, TransformComponent>(entity);
+				Renderer::Submit(cloudVolumeComponent, transformComponent.Translation, transformComponent.Scale);
+			}
+		}
 	}
 
 	Entity Scene::CreateEntity(const std::string name)

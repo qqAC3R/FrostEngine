@@ -22,6 +22,7 @@ namespace Frost
 	RendererAPI* Renderer::s_RendererAPI = nullptr;
 	static RenderCommandQueue* s_CommandQueue = nullptr;
 	static RendererData* s_Data = nullptr;
+	static RendererConfig s_RendererConfig = {};
 
 	void Renderer::Init()
 	{
@@ -81,6 +82,9 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricInjectLight.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricGatherLight.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VolumetricTAA.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudPerlinNoise.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudWoorleyNoise.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudComputeVolumetric.glsl");
 
 		
 		// Init the pools
@@ -156,6 +160,11 @@ namespace Frost
 		s_RendererAPI->Submit(fogVolume, transform);
 	}
 
+	void Renderer::Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale)
+	{
+		s_RendererAPI->Submit(cloudVolume, position, scale);
+	}
+
 	void Renderer::LoadEnvironmentMap(const std::string& filepath)
 	{
 		// TODO: Add some function for the SceneRenderpasses to update the env texture with the new ones
@@ -178,6 +187,11 @@ namespace Frost
 	Ref<SceneEnvironment> Renderer::GetSceneEnvironment()
 	{
 		return s_Data->m_Environment;
+	}
+
+	const RendererConfig& Renderer::GetRendererConfig()
+	{
+		return s_RendererConfig;
 	}
 
 	Ref<Texture2D> Renderer::GetWhiteLUT()

@@ -44,6 +44,8 @@ namespace Frost
 		// Voxelization Pass
 		uint32_t VoxelTextureResolution = 256;
 
+		// Volumetric Pass
+		uint32_t VoluemtricFroxelSlicesZ = 64;
 	};
 
 	// Memory Usage:
@@ -79,6 +81,7 @@ namespace Frost
 		static void Submit(const PointLightComponent& pointLight, const glm::vec3& position);
 		static void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
 		static void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
+		static void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale);
 
 		template<typename FuncT>
 		static void Submit(FuncT&& func)
@@ -107,7 +110,7 @@ namespace Frost
 
 		static Ref<ShaderLibrary> GetShaderLibrary();
 		static Ref<SceneEnvironment> GetSceneEnvironment();
-		static RendererConfig GetRendererConfig() { return RendererConfig(); }
+		static const RendererConfig& GetRendererConfig();
 		static RendererAPI::API GetAPI() { return s_RendererAPI->s_API; }
 
 		static void ExecuteCommandBuffer();

@@ -10,6 +10,7 @@ namespace Frost
 		m_Data.reserve(2048);
 		m_LightData.PointLights.reserve(1024);
 		m_FogVolumeData.reserve(1024);
+		m_CloudVolumeData.reserve(1024);
 	}
 
 	RenderQueue::~RenderQueue()
@@ -51,6 +52,22 @@ namespace Frost
 		});
 	}
 
+	void RenderQueue::AddCloudVolume(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale)
+	{
+		m_CloudVolumeData.push_back({
+			position,
+			cloudVolume.CloudScale,
+			scale,
+			cloudVolume.Precipation,
+			cloudVolume.Scattering,
+			cloudVolume.PhaseFunction,
+			cloudVolume.DensityOffset,
+			cloudVolume.CloudAbsorption,
+			cloudVolume.SunAbsorption,
+			0.0f
+		});
+	}
+
 	void RenderQueue::SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction)
 	{
 		m_LightData.DirectionalLight = directionalLight;
@@ -63,6 +80,7 @@ namespace Frost
 		m_Data.clear();
 		m_LightData.PointLights.clear();
 		m_FogVolumeData.clear();
+		m_CloudVolumeData.clear();
 		CameraViewMatrix = glm::mat4(1.0f);
 		CameraProjectionMatrix = glm::mat4(1.0f);
 	}
