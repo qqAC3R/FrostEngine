@@ -49,7 +49,7 @@ namespace Frost
 
 		CalculateMipLevels       (1600, 900);
 		BloomInitData            (1600, 900);
-		ApplyAerialInitData      (1600, 900);
+		//ApplyAerialInitData      (1600, 900);
 		ColorCorrectionInitData  (1600, 900);
 		HZBInitData              (1600, 900);
 		SSRFilterInitData        (1600, 900);
@@ -203,8 +203,8 @@ namespace Frost
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = uint32_t(width * 0.75f);
-			imageSpec.Height = uint32_t(height * 0.75f);
+			imageSpec.Width = uint32_t(width);
+			imageSpec.Height = uint32_t(height);
 			imageSpec.Format = ImageFormat::RGBA8;
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
@@ -564,9 +564,9 @@ namespace Frost
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width;
-			imageSpec.Height = height;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Width = width ;
+			imageSpec.Height = height ;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 
 			imageSpec.Format = ImageFormat::R32;
@@ -621,7 +621,7 @@ namespace Frost
 			ImageSpecification imageSpec{};
 			imageSpec.Width = width;
 			imageSpec.Height = height;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 
 			imageSpec.Format = ImageFormat::R32;
@@ -779,11 +779,10 @@ namespace Frost
 			Ref<Image2D> colorBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, i); // From the pbr shader
 			//Ref<Image2D> volumetricTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->VolumetricBlurTexture_Upsample[i];
 			Ref<Image2D> volumetricTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->VolumetricBlurTexture_DirY[i];
-			Ref<Image2D> cloudsTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->CloudComputeTexture[i];
+			Ref<Image2D> cloudsTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->CloudComputeBlurTexture_DirY[i];
 
 			vulkanColorCorrectionDescriptor->Set("u_ColorFrameTexture", colorBuffer);
 			vulkanColorCorrectionDescriptor->Set("u_BloomTexture", m_Data->Bloom_UpsampledTexture[i]);
-			vulkanColorCorrectionDescriptor->Set("u_AerialImage", m_Data->ApplyAerialImage[i]);
 			vulkanColorCorrectionDescriptor->Set("u_VolumetricTexture", volumetricTexture);
 			vulkanColorCorrectionDescriptor->Set("u_CloudComputeTex", cloudsTexture);
 			//vulkanColorCorrectionDescriptor->Set("u_SSRTexture", m_Data->SSRTexture[i]);
@@ -803,32 +802,41 @@ namespace Frost
 		auto finalImage = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex).As<VulkanImage2D>();
 		finalImage->TransitionLayout(cmdBuf, finalImage->GetVulkanImageLayout());
 
+		VulkanRenderer::BeginTimeStampPass("Bloom Pass");
 		if (m_CompositeSetings.UseBloom)
 		{
 			BloomUpdate(renderQueue);
 		}
+		VulkanRenderer::EndTimeStampPass("Bloom Pass");
 
 		ColorCorrectionUpdate(renderQueue, TARGET_BLOOM);
 		
+		VulkanRenderer::BeginTimeStampPass("HZB Builder");
 		HZBUpdate(renderQueue);
+		VulkanRenderer::EndTimeStampPass("HZB Builder");
 		
+
+		VulkanRenderer::BeginTimeStampPass("SSCTR Pass");
 		if (m_CompositeSetings.UseSSR)
 		{
 			SSRFilterUpdate(renderQueue);
 			SSRUpdate(renderQueue);
 		}
+		VulkanRenderer::EndTimeStampPass("SSCTR Pass");
 		
+
+		VulkanRenderer::BeginTimeStampPass("AO Pass");
 		if (m_CompositeSetings.UseAO)
 		{
 			AmbientOcclusionUpdate(renderQueue);
 			SpatialDenoiserUpdate(renderQueue);
 		}
-		
-#if 0
-		ApplyAerialUpdate(renderQueue);
-#endif
+		VulkanRenderer::EndTimeStampPass("AO Pass");
+	
 
+		VulkanRenderer::BeginTimeStampPass("Composite Pass");
 		ColorCorrectionUpdate(renderQueue, TARGET_COMPOSITE);
+		VulkanRenderer::EndTimeStampPass("Composite Pass");
 	}
 
 	void VulkanPostFXPass::SSRFilterUpdate(const RenderQueue& renderQueue)
@@ -900,7 +908,7 @@ namespace Frost
 
 
 		ssrMaterial->Set("UniformBuffer.ProjectionMatrix", projectionMatrix);
-		ssrMaterial->Set("UniformBuffer.InvProjectionMatrix", glm::inverse(projectionMatrix));
+		ssrMaterial->Set("UniformBuffer.InvProjectionMatrix", invProjectionMatrix);
 
 		ssrMaterial->Set("UniformBuffer.ViewMatrix", renderQueue.CameraViewMatrix);
 		ssrMaterial->Set("UniformBuffer.InvViewMatrix", invViewMatrix);
@@ -912,8 +920,8 @@ namespace Frost
 
 		ssrMaterial->Bind(cmdBuf, m_Data->SSRPipeline);
 
-		uint32_t groupX = std::ceil((renderQueue.ViewPortWidth  * 0.75f) / 32.0f);
-		uint32_t groupY = std::ceil((renderQueue.ViewPortHeight * 0.75f) / 32.0f);
+		uint32_t groupX = std::ceil((renderQueue.ViewPortWidth) / 32.0f);
+		uint32_t groupY = std::ceil((renderQueue.ViewPortHeight) / 32.0f);
 		ssrPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
@@ -1068,8 +1076,8 @@ namespace Frost
 
 		vulkan_AO_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_AO_pushConstant);
 
-		uint32_t groupX = static_cast<uint32_t>(std::ceil(width / 32.0f));
-		uint32_t groupY = static_cast<uint32_t>(std::ceil(height / 32.0f));
+		uint32_t groupX = static_cast<uint32_t>(std::ceil((width / 1.0f) / 32.0f));
+		uint32_t groupY = static_cast<uint32_t>(std::ceil((height / 1.0f ) / 32.0f));
 		vulkan_AO_Pipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 
@@ -1104,10 +1112,9 @@ namespace Frost
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
 		
-		uint32_t groupX = std::ceil(width / 32.0f);
-		uint32_t groupY = std::ceil(height / 32.0f);
+		uint32_t groupX = std::ceil((width ) / 32.0f);
+		uint32_t groupY = std::ceil((height) / 32.0f);
 		vulkan_denoiser_Pipeline->Dispatch(cmdBuf, groupX, groupY, 1);
-
 
 
 		Ref<VulkanImage2D> vulkanDenoisedAOTexture = m_Data->DenoiserImage[currentFrameIndex].As<VulkanImage2D>();
@@ -1568,7 +1575,7 @@ namespace Frost
 	{
 		CalculateMipLevels       (width, height);
 		BloomInitData            (width, height);
-		ApplyAerialInitData      (width, height);
+		//ApplyAerialInitData      (width, height);
 		ColorCorrectionInitData  (width, height);
 		SSRFilterInitData        (width, height);
 		HZBInitData              (width, height);

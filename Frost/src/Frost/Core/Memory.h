@@ -260,7 +260,7 @@ namespace Frost
 			return ref;
 		}
 
-		bool IsValid() const { return m_Instance ? RefUtils::IsLive(m_Instance) : false; }
+		bool IsValid() const { return m_Instance != nullptr ? RefUtils::IsLive(m_Instance) : false; }
 		operator bool() const { return IsValid(); }
 	private:
 		uint32_t* m_RefCount = nullptr;

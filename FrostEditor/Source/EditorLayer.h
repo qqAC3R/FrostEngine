@@ -30,7 +30,7 @@ namespace Frost
 	{
 	public:
 		EditorLayer()
-			: Layer("Example"), m_EditorCamera(70.0f, 1600.0f / 900.0f, 0.1f, 1000.0)
+			: Layer("Example"), m_EditorCamera(70.0f, 1600.0f / 900.0f, 0.1f, 2000.0f)
 		{
 		}
 
@@ -76,7 +76,7 @@ namespace Frost
 				//meshComponent.Mesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
 
 				auto& transformComponent = sponzaEntity.GetComponent<TransformComponent>();
-				transformComponent.Scale = { 4.0f, 4.0f, 4.0f };
+				transformComponent.Scale = { 2.5f, 2.5f, 2.5f };
 			}
 
 			{
@@ -191,7 +191,7 @@ namespace Frost
 
 					Renderer::Resize(viewportPanelSize.x, viewportPanelSize.y);
 					m_EditorCamera.SetViewportSize(viewportPanelSize.x, viewportPanelSize.y);
-					m_EditorCamera.SetProjectionMatrix(glm::perspective(70.0f, viewportPanelSize.x / viewportPanelSize.y, 0.1f, 500.0f));
+					m_EditorCamera.SetProjectionMatrix(glm::perspective(70.0f, viewportPanelSize.x / viewportPanelSize.y, 0.1f, 2000.0f));
 				}
 
 

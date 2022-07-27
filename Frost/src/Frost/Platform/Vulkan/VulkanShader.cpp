@@ -6,7 +6,7 @@
 
 #include <filesystem>
 #include <shaderc/shaderc.hpp>
-#include <yaml-cpp/yaml.h>
+//#include <yaml-cpp/yaml.h>
 
 #include "Frost/Utils/Timer.h"
 
@@ -347,12 +347,12 @@ namespace Frost
 		}
 
 
+#if 0
 		{
 			// Getting the hash code from the old shader
 			std::filesystem::path cacheDir = Utils::GetShaderHashCacheDirectory();
 			std::filesystem::path cachedPath = cacheDir / (m_Name + ".cache");
 
-#if 0
 			std::ifstream instream(cachedPath, std::ios::in | std::ios::binary);
 			if (instream.is_open())
 			{
@@ -392,7 +392,6 @@ namespace Frost
 				}
 
 			}
-#endif
 			//else
 			{
 				YAML::Emitter out;
@@ -417,6 +416,7 @@ namespace Frost
 
 
 		}
+#endif
 
 		return false;
 	}

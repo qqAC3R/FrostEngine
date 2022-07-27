@@ -60,7 +60,8 @@ void main()
 	float totalao = 0.0;
 
 	vec2 baseSize = vec2(textureSize(i_Texture, 0));
-	vec2 uv = (loc / baseSize);
+	vec2 uv = ((vec2(loc) + 0.5.xx) / vec2(imageSize(o_Texture)));
+	vec2 texelSize = 1.0 / baseSize;
 
 	//vec4 ao = smartDeNoise(i_Texture, uv, 7, 1.29f, 0.195f);
 
@@ -71,25 +72,25 @@ void main()
 	//totalao += Sample2x2(i_Texture, loc + ivec2(0, 2));
 	//totalao += Sample2x2(i_Texture, loc + ivec2(2, 2));
 
-	totalao += texelFetch(i_Texture, loc + ivec2(0, 0), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(1, 0), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(0, 1), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(1, 1), 0).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 0.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 0.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 1.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 1.0)).r;
 	
-	totalao += texelFetch(i_Texture, loc + ivec2(3, 0), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(2, 0), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(2, 1), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(3, 1), 0).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 0.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 0.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 1.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 1.0)).r;
 	
-	totalao += texelFetch(i_Texture, loc + ivec2(0, 2), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(1, 2), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(0, 3), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(1, 3), 0).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 2.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 2.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 3.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 3.0)).r;
 	
-	totalao += texelFetch(i_Texture, loc + ivec2(2, 2), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(3, 2), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(2, 3), 0).r;
-	totalao += texelFetch(i_Texture, loc + ivec2(3, 3), 0).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 2.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 2.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 3.0)).r;
+	totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 3.0)).r;
 
 	imageStore(o_Texture, ivec2(gl_GlobalInvocationID.xy), vec4(totalao / 16.0f, vec3(1.0f)));
 }

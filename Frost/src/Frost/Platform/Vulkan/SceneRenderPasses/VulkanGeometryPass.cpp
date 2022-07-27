@@ -223,11 +223,23 @@ namespace Frost
 		}
 	}
 
+	static Vector<IndirectMeshData> s_Geometry_MeshIndirectData;
+
 	void VulkanGeometryPass::OnUpdate(const RenderQueue& renderQueue)
 	{
 		// If we have 0 meshes, we shouldnt render this pass
 		if (renderQueue.GetQueueSize() == 0) return;
 
+
+		VulkanRenderer::BeginTimeStampPass("Geometry Pass");
+		GeometryPrepareIndirectData(renderQueue);
+		GeometryUpdate(renderQueue, s_Geometry_MeshIndirectData);
+		VulkanRenderer::EndTimeStampPass("Geometry Pass");
+	}
+
+
+	void VulkanGeometryPass::GeometryPrepareIndirectData(const RenderQueue& renderQueue)
+	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
@@ -237,15 +249,13 @@ namespace Frost
 		projectionMatrix[1][1] *= -1; // GLM uses opengl style of rendering, where the y coordonate is inverted
 		glm::mat4 viewProjectionMatrix = projectionMatrix * renderQueue.CameraViewMatrix;
 
-
-
 		/*
 			Each mesh might have a set of submeshes which are sent to render individualy.
 			We dont need them when we render them indirectly (because the gpu renders all the submeshes automatically - `multidraw`),
 			instead we just need to know the `start index` of every mesh in the `VkDrawIndexedIndirectCommand` buffer.
 		*/
-		Vector<IndirectMeshData> meshIndirectData;
-		
+		s_Geometry_MeshIndirectData.clear();
+
 		// `Indirect draw commands` offset
 		uint64_t indirectCmdsOffset = 0;
 
@@ -284,7 +294,7 @@ namespace Frost
 
 
 				// TODO: Fix frustum culling
-#if 1
+#if 0
 				//if (!submesh.BoundingBox.IsOnFrustum(renderQueue.m_Camera.GetFrustum(), modelMatrix))
 				//	continue;
 #endif
@@ -312,7 +322,7 @@ namespace Frost
 
 
 				// Adding up the offset
-				meshDataOffset     += sizeof(MeshData_OC);
+				meshDataOffset += sizeof(MeshData_OC);
 				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
 				submittedSubmeshes += 1;
 				//vboInstancedDataOffset += sizeof(SubmeshInstanced);
@@ -351,21 +361,21 @@ namespace Frost
 			}
 
 			// If we are submitting the first mesh, we don't need any offset
-			if (meshIndirectData.size() == 0)
+			if (s_Geometry_MeshIndirectData.size() == 0)
 			{
-				meshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0));
+				s_Geometry_MeshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0));
 			}
 			else
 			{
-				uint32_t previousMeshOffset = meshIndirectData[i - 1].SubmeshOffset;
-				uint32_t previousMeshCount = meshIndirectData[i - 1].SubmeshCount;
+				uint32_t previousMeshOffset = s_Geometry_MeshIndirectData[i - 1].SubmeshOffset;
+				uint32_t previousMeshCount = s_Geometry_MeshIndirectData[i - 1].SubmeshCount;
 				uint32_t currentMeshOffset = previousMeshOffset + previousMeshCount;
 
-				uint32_t previousMaterialOffset = meshIndirectData[i - 1].MaterialOffset;
-				uint32_t previousMaterialCount = meshIndirectData[i - 1].MaterialCount;
+				uint32_t previousMaterialOffset = s_Geometry_MeshIndirectData[i - 1].MaterialOffset;
+				uint32_t previousMaterialCount = s_Geometry_MeshIndirectData[i - 1].MaterialCount;
 				uint32_t currentMaterialOffset = previousMaterialOffset + previousMaterialCount;
 
-				meshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
+				s_Geometry_MeshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
 
 			}
 		}
@@ -388,11 +398,6 @@ namespace Frost
 
 
 		//OcclusionCullUpdate(renderQueue, indirectCmdsOffset);
-
-		GeometryUpdate(renderQueue, meshIndirectData);
-
-
-
 
 	}
 

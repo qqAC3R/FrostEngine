@@ -1,7 +1,7 @@
 //#type compute
 #version 460
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler2D u_DepthBuffer;
 layout(binding = 1) uniform sampler3D u_CloudNoiseTex;
@@ -23,7 +23,7 @@ struct CloudVolumeParams
     float DensityOffset;
     float CloudAbsorption;
     float SunAbsorption;
-    float Padding0;
+    float DetailOffset;
 };
 
 layout(binding = 5) readonly buffer CloudVolumeData
@@ -48,7 +48,7 @@ layout(push_constant) uniform PushConstant
 #define saturate(x) clamp(x, 0.0, 1.0)
 #define PI 3.141592654
 
-float numStepsLight = 8.0; // uniform
+float numStepsLight = 6.0; // uniform
 float lightAbsorptionTowardSun = 1.21; // uniform
 float lightAbsorptionThroughCloud = 0.75; // Uniform
 float darknessThreshold = 0.15; // Uniform
@@ -189,7 +189,7 @@ float SampleCloudDensity(vec3 rayPos, vec3 boxMin, vec3 boxMax, const CloudVolum
 
     // Calculate base shape density
     // As described here https://www.diva-portal.org/smash/get/diva2:1223894/FULLTEXT01.pdf
-    vec4 low_frequency_noise = FastTricubicLookup(u_CloudNoiseTex, cloudUWV);
+    vec4 low_frequency_noise = texture(u_CloudNoiseTex, cloudUWV);
     float lowFreqFBM = dot(low_frequency_noise.gba, vec3(0.625, 0.25, 0.125));
     vec3 shapeNoise = vec3(Remap(low_frequency_noise.r, (lowFreqFBM - 1.0), 1.0, 0.0 , 1.0));
     
@@ -199,11 +199,11 @@ float SampleCloudDensity(vec3 rayPos, vec3 boxMin, vec3 boxMax, const CloudVolum
 
     if (baseShapeDensity > 0) 
     {
-        vec3 detailUWV = rayPos * 0.001 * params.Scale;
-        detailUWV  += (2.0 * noise - 1.0.xxx) / vec3(textureSize(u_ErroderTex, 0).xyz);
+        vec3 detailUWV = rayPos * 0.001 * params.CloudScale;
+        detailUWV += (2.0 * noise - 1.0.xxx) / vec3(textureSize(u_ErroderTex, 0).xyz);
 
         // Sample detail noise
-        vec4 detailNoise = FastTricubicLookup(u_ErroderTex, detailUWV);
+        vec4 detailNoise = texture(u_ErroderTex, detailUWV);
     
         vec3 detailWeights = vec3(1.0, 0.5, 0.5);
         float detailNoiseWeight = 1.0;
@@ -212,9 +212,10 @@ float SampleCloudDensity(vec3 rayPos, vec3 boxMin, vec3 boxMax, const CloudVolum
         float detailFBM = dot(detailNoise.xyz, normalizedDetailWeights);
     
         // Subtract detail noise from base shape (weighted by inverse density so that edges get eroded more than centre)
+        float detailOffset = -params.DetailOffset; // Uniform
         float oneMinusShape = 1 - shapeFBM;
         float detailErodeWeight = oneMinusShape * oneMinusShape * oneMinusShape;
-        float cloudDensity = baseShapeDensity - (1.0 - detailFBM) * detailErodeWeight * detailNoiseWeight;
+        float cloudDensity = baseShapeDensity - (1.0 - detailFBM) * detailErodeWeight * detailNoiseWeight + (detailOffset * 0.1);
     
         float densityMultiplier = params.Density;
         return cloudDensity * densityMultiplier * 0.1;
@@ -262,7 +263,7 @@ float Phase(float cosTheta, float phaseValue)
         public float phaseFactor = .15f;
     */
     
-    vec4 phaseParams = { 0.83f, 0.3f, 0.8f, 0.15f };
+    vec4 phaseParams = { 0.83f, 0.3f, 1.0f, 0.15f };
     float blend = 0.5;
     float hgBlend = HG(cosTheta,phaseParams.x) * (1-blend) + HG(cosTheta,-phaseParams.y) * blend;
     return phaseParams.z + hgBlend * phaseValue;
@@ -272,7 +273,7 @@ void main()
 {
     ivec2 invoke = ivec2(gl_GlobalInvocationID.xy);
 
-    vec2 texCoords = (vec2(invoke) + vec2(0.5f)) / vec2(textureSize(u_DepthBuffer, 0).xy / 2.0);
+    vec2 texCoords = (vec2(invoke) + vec2(0.5f)) / vec2(imageSize(u_CloudTexture).xy);
     float depth = textureLod(u_DepthBuffer, texCoords, 0).r;
 
 
@@ -288,7 +289,7 @@ void main()
     vec4 noise = SampleBlueNoise(invoke);
 
 
-    const float numSteps = 12.0;
+    const float numSteps = 8.0;
     float transmittance = 1.0f;
     float lightEnergy = 0.0f;
     vec3 scatteringIntegral = vec3(0.0);
@@ -320,11 +321,6 @@ void main()
         // Phase function makes clouds brighter around sun
         float cosAngle = dot(rayDir, u_PushConstant.DirectionalLightDir);
         float phaseValue = Phase(cosAngle, cloudParams.PhaseFunction);
-
-	    //float phaseValue = GetMiePhase(
-		//    dot(normalize(rayDir), u_PushConstant.DirectionalLightDir),
-		//    cloudParams.PhaseFunction
-	    //);
 
         vec3 scatteringValue = cloudParams.Scattering;
 

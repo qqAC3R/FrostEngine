@@ -113,7 +113,7 @@ namespace Frost
 			float DensityOffset;
 			float CloudAbsorption;
 			float SunAbsorption;
-			float Padding0;
+			float DetailOffset;
 		};
 		Vector<CloudVolume> m_CloudVolumeData;
 

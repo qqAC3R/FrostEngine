@@ -32,26 +32,6 @@ layout(push_constant) uniform PushConstant
 // =======================================================
 // Constants
 const float PI = 3.141592;
-const int NUM_CONES = 6;
-const vec3 diffuseConeDirections[] =
-{
-    vec3(0.0f, 1.0f, 0.0f),
-    vec3(0.0f, 0.5f, 0.866025f),
-    vec3(0.823639f, 0.5f, 0.267617f),
-    vec3(0.509037f, 0.5f, -0.7006629f),
-    vec3(-0.50937f, 0.5f, -0.7006629f),
-    vec3(-0.823639f, 0.5f, 0.267617f)
-};
-
-const float diffuseConeWeights[] =
-{
-    PI / 4.0,
-    3.0 * PI / 20.0,
-    3.0 * PI / 20.0,
-    3.0 * PI / 20.0,
-    3.0 * PI / 20.0,
-    3.0 * PI / 20.0,
-};
 // =======================================================
 vec4 SampleVoxels(vec3 worldPosition, float lod)
 {
@@ -103,6 +83,7 @@ vec4 ConeTrace(vec3 worldPos, vec3 normal, vec3 direction, float tanHalfAngle, o
 		// Sample the voxel texture
 		vec4 voxelColor = SampleVoxels(conePosition, lodLevel);
 
+		// If the point is outside the voxel grid, discard it
 		if(voxelColor.a == -1.0f)
 		{
 			if(steps == 0)
@@ -114,7 +95,6 @@ vec4 ConeTrace(vec3 worldPos, vec3 normal, vec3 direction, float tanHalfAngle, o
 				break;
 			}
 		}
-
 
 		// Front-to-back compositing
         float a = (1.0 - alpha);
@@ -132,6 +112,28 @@ vec4 ConeTrace(vec3 worldPos, vec3 normal, vec3 direction, float tanHalfAngle, o
 
 	return vec4(color, alpha);
 }
+
+
+const int NUM_CONES = 6;
+const vec3 diffuseConeDirections[] =
+{
+    vec3(0.0f, 1.0f, 0.0f),
+    vec3(0.0f, 0.5f, 0.866025f),
+    vec3(0.823639f, 0.5f, 0.267617f),
+    vec3(0.509037f, 0.5f, -0.7006629f),
+    vec3(-0.50937f, 0.5f, -0.7006629f),
+    vec3(-0.823639f, 0.5f, 0.267617f)
+};
+
+const float diffuseConeWeights[] =
+{
+    PI / 4.0,
+    3.0 * PI / 20.0,
+    3.0 * PI / 20.0,
+    3.0 * PI / 20.0,
+    3.0 * PI / 20.0,
+    3.0 * PI / 20.0,
+};
 
 vec3 ComputeIndirectDiffuse(vec3 worldPos, vec3 normal, out float occlusion_out)
 {
@@ -248,16 +250,18 @@ vec3 DecodeNormal(vec2 e)
 void main()
 {
 	ivec2 globalInvocation = ivec2(gl_GlobalInvocationID.xy);
+	vec2 uv = (vec2(globalInvocation) + 0.5.xx) / vec2(imageSize(u_IndirectDiffuseTexture).xy);
+
 
 	// World Pos
-	vec3 worldPos = texelFetch(u_PositionTexture, globalInvocation, 0).rgb;
+	vec3 worldPos = texture(u_PositionTexture, uv).rgb;
 
 	// Decode normals
-	vec2 encodedNormal =   texelFetch(u_NormalTexture, globalInvocation, 0).rg;
+	vec2 encodedNormal =   texture(u_NormalTexture, uv).rg;
     vec3 normal =          DecodeNormal(encodedNormal);
 	
 	// PBR Values
-	float roughness = texelFetch(u_NormalTexture, globalInvocation, 0).a;
+	float roughness = texture(u_NormalTexture, uv).a;
 
 	
 	// Voxel Cone Tracing

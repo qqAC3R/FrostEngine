@@ -88,13 +88,15 @@ namespace Frost
 			FROST_CORE_WARN("Texture Shader ('{0}') has been set with a invalid texture", name);
 			return false;
 		}
-		else if (m_MaterialData[name].Pointer)
-		{
-			if (m_MaterialData[name].Pointer.AsRef<void*>().Raw() == texture)
-			{
-				return false;
-			}
-		}
+
+		// TODO: Fix weak refs, bool operator returns true even tho the internal pointer is nullptr
+		//else if (m_MaterialData[name].Pointer)
+		//{
+		//	//if (m_MaterialData[name].Pointer.AsRef<void*>().Raw() == texture)
+		//	//{
+		//	//	return false;
+		//	//}
+		//}
 		return true;
 	}
 

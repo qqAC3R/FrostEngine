@@ -46,6 +46,7 @@ namespace Frost
 	private:
 		// -------------------- Geometry Pass ------------------------
 		void GeometryDataInit(uint32_t width, uint32_t height);
+		void GeometryPrepareIndirectData(const RenderQueue& renderQueue);
 		void GeometryUpdate(const RenderQueue& renderQueue, const Vector<IndirectMeshData>& indirectMeshData);
 		// -----------------------------------------------------------
 

@@ -54,6 +54,7 @@ namespace Frost
 		Graphics, Compute
 	};
 
+	/*
 	class VulkanPhysicalDevice
 	{
 	public:
@@ -67,6 +68,7 @@ namespace Frost
 
 		friend class VulkanDevice;
 	};
+	*/
 
 	class VulkanDevice
 	{
@@ -75,7 +77,7 @@ namespace Frost
 		virtual ~VulkanDevice();
 
 		void Init(VkInstance& instance, VkDebugUtilsMessengerEXT& dbMessenger);
-		void Init(const Scope<VulkanPhysicalDevice>& physicalDevice);
+		//void Init(const Scope<VulkanPhysicalDevice>& physicalDevice);
 		void ShutDown();
 
 		VkDevice GetVulkanDevice() const { return m_LogicalDevice; }

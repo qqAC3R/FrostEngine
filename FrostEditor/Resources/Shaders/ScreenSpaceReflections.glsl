@@ -316,7 +316,7 @@ vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 	rayOrigin = IntersectDepthPlane(rayOrigin, rayDir, -rayOrigin.z); // rayOrigin + rayDir * (-rayOrigin.z)
 	
 	/* Cross to next cell so that we don't get a self-intersection immediately */
-	float level = 1.0f;
+	float level = 2.0f;
 	
 	vec2 firstCellCount = GetCellCount(hiZSize, level);
 	vec2 rayCell = GetCell(rayPos.xy, firstCellCount);
@@ -327,7 +327,7 @@ vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 	/* Main tracing iteration loop */
 	uint i = 0;
 	
-#define HIZ_STOP_LEVEL      1.0f
+#define HIZ_STOP_LEVEL      2.0f
 #define HIZ_MAX_ITERATIONS  32
 
 	for (; level >= HIZ_STOP_LEVEL && i < HIZ_MAX_ITERATIONS; i++)

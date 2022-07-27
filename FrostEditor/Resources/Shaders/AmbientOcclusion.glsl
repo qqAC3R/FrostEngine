@@ -292,9 +292,10 @@ float ComputeAO(vec3 vpos, vec3 vnorm, vec3 vdir, int aoMode)
 void main()
 {
 	ivec2 loc = ivec2(gl_GlobalInvocationID.xy);
-	vec2 s_UV = vec2(loc) / u_PushConstant.AO_Data.yz;
+	ivec2 imgSize = imageSize(o_AOTexture).xy;
+	vec2 s_UV = (vec2(loc) + 0.5.xx) / vec2(imgSize);
 	//vec4 vpos = GetViewPosition(loc, 0.0);
-	vec4 vpos = texelFetch(u_ViewPositionTex, loc, 0);
+	vec4 vpos = texture(u_ViewPositionTex, s_UV);
 	
 	//if (vpos.w == 1.0) {
 	//	imageStore(o_AOTexture, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(1.0f), 1.0f));
@@ -308,7 +309,7 @@ void main()
 	}
 		
 
-	vec3 world_norm = DecodeNormal(texelFetch(u_NormalsTex, loc, 0).rg);
+	vec3 world_norm = DecodeNormal(texture(u_NormalsTex, s_UV).rg);
 	vec3 vnorm = transpose(inverse(mat3(u_PushConstant.ViewMatrix))) * world_norm;
 	vec3 vdir = normalize(-vpos.xyz);
 

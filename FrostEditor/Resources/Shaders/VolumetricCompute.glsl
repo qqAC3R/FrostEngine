@@ -13,8 +13,9 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler3D u_FinalGatherFroxel;
 layout(binding = 1) uniform sampler2D u_DepthTexture;
-layout(binding = 2) uniform sampler2D u_SpatialBlueNoiseLUT;
-layout(binding = 3) uniform writeonly image2D u_VolumetricTex;
+layout(binding = 2) uniform sampler2D u_PositionTexture;
+layout(binding = 3) uniform sampler2D u_SpatialBlueNoiseLUT;
+layout(binding = 4) uniform writeonly image2D u_VolumetricTex;
 
 layout(push_constant) uniform PushConstant
 {
@@ -55,7 +56,8 @@ vec4 GetValueFromFroxel(vec3 position, float maxT, vec2 uv, vec3 noise)
 	volumeUVW += (2.0 * noise - vec3(1.0)) / textureSize(u_FinalGatherFroxel, 0).xyz;
 
 	// Get the value
-	vec4 result = FastTricubicLookup(u_FinalGatherFroxel, volumeUVW);
+	//vec4 result = FastTricubicLookup(u_FinalGatherFroxel, volumeUVW);
+	vec4 result = texture(u_FinalGatherFroxel, volumeUVW);
 	return result;
 }
 
@@ -65,6 +67,12 @@ vec3 DecodePosition(ivec2 coords)
 	vec2 texCoords = (vec2(coords) + vec2(0.5f)) / vec2(imageSize(u_VolumetricTex).xy);
 
 	float depth = textureLod(u_DepthTexture, texCoords, 1).r;
+
+	if(depth != 1.0)
+	{
+		return texture(u_PositionTexture, texCoords).rgb;
+	}
+
 	vec3 clipCoords = vec3(texCoords * 2.0 - 1.0, depth);
 	
 	vec4 temp = u_PushConstant.InvViewProjMatrix * vec4(clipCoords, 1.0);

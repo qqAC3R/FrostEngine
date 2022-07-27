@@ -5,7 +5,7 @@
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 #include "Frost/Renderer/Renderer.h"
 
-#include "VkBootstrap.h"
+//#include "VkBootstrap.h"
 
 #include <GLFW/glfw3.h>
 
@@ -323,7 +323,7 @@ namespace Frost
 	VkDebugUtilsMessengerEXT VulkanContext::m_DebugMessenger;
 
 	Scope<VulkanDevice> VulkanContext::m_Device;
-	Scope<VulkanPhysicalDevice> VulkanContext::m_PhysicalDevice;
+	//Scope<VulkanPhysicalDevice> VulkanContext::m_PhysicalDevice;
 
 
 	Scope<VulkanSwapChain> VulkanContext::m_SwapChain;

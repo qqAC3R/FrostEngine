@@ -117,7 +117,7 @@ void main()
     vec2 viewport = u_PushConstant.DepthPyramidRes.xy;
     vec2 screenPosMin = (ndcMin * 0.5f + 0.5f) * viewport;
     vec2 screenPosMax = (ndcMax * 0.5f + 0.5f) * viewport;
-    vec2 screenRect = (ndcMax - ndcMin) * 0.5f;
+    vec2 screenRect = (screenPosMax - screenPosMin);
     float screenSize = max(screenRect.x, screenRect.y) - 0.01;
 
     int mip = int(ceil(log2(screenSize)));
@@ -139,14 +139,14 @@ void main()
     float sceneZ = 0.0f;
     for(uint i = 0; i < 4; i++)
     {
-        sceneZ = max(sceneZ, textureLod(DepthPyramid, coords[i], mip).r);
+        sceneZ = min(sceneZ, textureLod(DepthPyramid, coords[i], mip).g);
     }
 
 
     // Now for the result, we check if the `zMin` (being the minimum z values of the current mesh),
     // has lower z value then the sampled depth pyramid (`sceneZ`). If so, then the object is in front, so it shouldn't be culled,
     // otherwise the object will be culled
-    if(!(zMin <= sceneZ))
+    if((zMin > sceneZ))
     {
         u_DrawCommands.cmds[idx].indexCount = 0;
         u_DrawCommands.cmds[idx].instanceCount = 1;

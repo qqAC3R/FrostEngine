@@ -52,7 +52,7 @@ namespace Frost
 		static uint32_t m_VulkanAPIVersion;
 
 		static Scope<VulkanDevice> m_Device;
-		static Scope<VulkanPhysicalDevice> m_PhysicalDevice;
+		//static Scope<VulkanPhysicalDevice> m_PhysicalDevice;
 		static Scope<VulkanSwapChain> m_SwapChain;
 
 		Vector<const char*> m_SupportedInstanceExtensions;

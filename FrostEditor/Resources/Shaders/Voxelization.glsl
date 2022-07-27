@@ -26,7 +26,6 @@ layout(buffer_reference, scalar) buffer Vertices { Vertex v[]; }; // Positions o
 layout(push_constant) uniform Constants
 {
 	mat4 ViewMatrix;
-	mat4 LightViewProjMatrix;
 	uint MaterialIndex;
 	uint64_t VertexBufferBDA;
 	int VoxelDimensions;
@@ -34,27 +33,21 @@ layout(push_constant) uniform Constants
 } u_PushConstant;
 
 
-layout(location = 0) out vData {
-    vec2 TexCoord;
-    vec4 PositionDepth;
-} v_Data;
-
-layout(location = 2) out flat int v_BufferIndex;
+layout(location = 0) out vec2 v_TexCoord;
+layout(location = 1) out flat int v_BufferIndex;
 
 void main()
 {
 	Vertices verticies = Vertices(u_PushConstant.VertexBufferBDA);
 	Vertex vertex = verticies.v[gl_VertexIndex];
 
-	v_Data.TexCoord = vertex.TexCoord;
-	//v_Data.PositionDepth = vec4(0.0f); // TODO: Add the light view matrix to get depth coords
+	v_TexCoord = vertex.TexCoord;
 
 	int meshIndex = int(u_PushConstant.MaterialIndex + vertex.MaterialIndex);
 	v_BufferIndex = int(meshIndex);
 
 	// Compute world position
 	vec4 worldPos = a_ModelSpaceMatrix * vec4(vertex.Position, 1.0f);
-	v_Data.PositionDepth = u_PushConstant.LightViewProjMatrix * worldPos; // TODO: Add the light view matrix to get depth coords
 	
 	gl_Position = worldPos;
 }
@@ -66,54 +59,13 @@ layout (triangles) in;
 layout (triangle_strip, max_vertices = 3) out;
 
 // Input from vertex shader, stored in an array
-layout(location = 0) in vData {
-    vec2 TexCoord;
-    vec4 PositionDepth;
-} v_Data[];
-
-layout(location = 2) in flat int v_BufferIndex[];
+layout(location = 0) in vec2 v_TexCoord[];
+layout(location = 1) in flat int v_BufferIndex[];
 
 layout(location = 0) out vec2 f_TexCoord;
 layout(location = 1) out flat int g_BufferIndex;
 layout(location = 2) out flat int f_Axis;
 layout(location = 3) out mat4 f_ProjectionMatrix;
-layout(location = 7) out vec4 f_PositionDepth;
-
-
-// Computation of an extended triangle in clip space based on 
-// "Conservative Rasterization", GPU Gems 2 Chapter 42 by Jon Hasselgren, Tomas Akenine-Möller and Lennart Ohlsson:
-// http://http.developer.nvidia.com/GPUGems2/gpugems2_chapter42.html
-void ComputeExtendedTriangle(vec2 halfPixelSize, vec3 triangleNormalClip, inout vec4 trianglePositionsClip[3], out vec4 triangleAABBClip)
-{
-	float trianglePlaneD = dot(trianglePositionsClip[0].xyz, triangleNormalClip); 
-    float nSign = sign(triangleNormalClip.z);
-        
-    // Compute plane equations
-    vec3 plane[3];
-    plane[0] = cross(trianglePositionsClip[0].xyw - trianglePositionsClip[2].xyw, trianglePositionsClip[2].xyw);
-    plane[1] = cross(trianglePositionsClip[1].xyw - trianglePositionsClip[0].xyw, trianglePositionsClip[0].xyw);
-    plane[2] = cross(trianglePositionsClip[2].xyw - trianglePositionsClip[1].xyw, trianglePositionsClip[1].xyw);
-    
-    // Move the planes by the appropriate semidiagonal
-    plane[0].z -= nSign * dot(halfPixelSize, abs(plane[0].xy));
-    plane[1].z -= nSign * dot(halfPixelSize, abs(plane[1].xy));
-    plane[2].z -= nSign * dot(halfPixelSize, abs(plane[2].xy));
-	
-	// Compute triangle AABB in clip space
-    triangleAABBClip.xy = min(trianglePositionsClip[0].xy, min(trianglePositionsClip[1].xy, trianglePositionsClip[2].xy));
-	triangleAABBClip.zw = max(trianglePositionsClip[0].xy, max(trianglePositionsClip[1].xy, trianglePositionsClip[2].xy));
-    
-    triangleAABBClip.xy -= halfPixelSize;
-    triangleAABBClip.zw += halfPixelSize;
-	
-	for (int i = 0; i < 3; ++i)
-    {
-        // Compute intersection of the planes
-        trianglePositionsClip[i].xyw = cross(plane[i], plane[(i + 1) % 3]);
-        trianglePositionsClip[i].xyw /= trianglePositionsClip[i].w;
-        trianglePositionsClip[i].z = -(trianglePositionsClip[i].x * triangleNormalClip.x + trianglePositionsClip[i].y * triangleNormalClip.y - trianglePlaneD) / triangleNormalClip.z;
-    }
-}
 
 layout(set = 0, binding = 0) uniform VoxelProjections
 {
@@ -146,23 +98,14 @@ void main()
 	     f_ProjectionMatrix = m_VoxelProjections.AxisZ;	
 	} 
 
-	vec4 pos[3];
-	for(int i = 0; i < 3; i++)
-	{
-		pos[i] = f_ProjectionMatrix * gl_in[i].gl_Position;
-	}
-
 	// For every vertex sent in vertices
     for(int i = 0; i < 3; i++)
 	{
-        f_TexCoord = v_Data[i].TexCoord;
-        //f_TexCoord = texCoords[i];
-        f_PositionDepth = v_Data[i].PositionDepth;
+        f_TexCoord = v_TexCoord[i];
 
 		g_BufferIndex = v_BufferIndex[i];
 
-		//vec4 position = f_ProjectionMatrix * gl_in[i].gl_Position;
-		vec4 position = pos[i];
+		vec4 position = f_ProjectionMatrix * gl_in[i].gl_Position;
         gl_Position = position;
 
         EmitVertex();
@@ -186,12 +129,10 @@ layout(location = 0) in vec2 f_TexCoord;
 layout(location = 1) in flat int g_BufferIndex;
 layout(location = 2) in flat int f_Axis;
 layout(location = 3) in mat4 f_ProjectionMatrix;
-layout(location = 7) in vec4 f_PositionDepth;
 
 // The same texture but with different formats (for atomic operations)
 layout(set = 0, binding = 1) writeonly uniform image3D u_VoxelTexture_NonAtomic;
 layout(set = 0, binding = 2, r32ui) uniform volatile coherent uimage3D u_VoxelTexture;
-layout(set = 0, binding = 4) uniform sampler2D u_ShadowDepthTexture;
 
 struct MaterialData
 {
@@ -217,7 +158,6 @@ layout(set = 0, binding = 3) readonly buffer u_MaterialUniform
 layout(push_constant) uniform Constants
 {
 	mat4 ViewMatrix;
-	mat4 LightViewProjMatrix;
 	uint MaterialIndex;
 	uint64_t VertexBufferBDA;
 	int VoxelDimensions;
@@ -279,81 +219,6 @@ void imageAtomicRGBA8Avg(ivec3 coords, vec4 value)
     }
 }
 
-
-
-// https://rauwendaal.net/2013/02/07/glslrunningaverage/ (for understanding the algorithm)
-void imageAtomicRGBA8Avg_2(ivec3 coords, vec4 value)
-{
-    uint nextUint = packUnorm4x8(vec4(value.xyz,1.0f/255.0f));
-    uint prevUint = 0;
-    uint currUint;
- 
-    vec4 currVec4;
- 
-    vec3 average;
-    uint count;
- 
-    //"Spin" while threads are trying to change the voxel
-    while((currUint = imageAtomicCompSwap(u_VoxelTexture, coords, prevUint, nextUint)) != prevUint)
-    {
-        prevUint = currUint;                    //store packed rgb average and count
-        currVec4 = unpackUnorm4x8(currUint);    //unpack stored rgb average and count
- 
-        average =      currVec4.rgb;        //extract rgb average
-        count   = uint(currVec4.a*255.0f);  //extract count
- 
-        //Compute the running average
-        average = (average*count + value.xyz) / (count+1);
- 
-		//average.a = 1.0f;
-
-        //Pack new average and incremented count back into a uint
-        nextUint = packUnorm4x8(vec4(average, (count+1)/255.0f));
-    }
-}
-
-
-
-vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
-{
-	switch(cascadeIndex)
-	{
-	case 1:
-		return coord * vec2(0.5f);
-	case 2:
-		return vec2(coord.x * 0.5f + 0.5f, coord.y * 0.5f);
-	case 3:
-		return vec2(coord.x * 0.5f, coord.y * 0.5f + 0.5f);
-	case 4:
-		return coord * vec2(0.5f) + vec2(0.5f);
-	}
-}
-
-float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex)
-{
-	vec2 coords = ComputeShadowCoord(shadowCoords.xy, cascadeIndex);
-	float dist = texture(u_ShadowDepthTexture, coords).r;
-	return dist;
-}
-
-float SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
-{
-	float shadow = 1.0;
-	float bias = 0.003;
-
-	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
-	{
-		float dist = SampleShadowMap(shadowCoord.xy * 0.5 + 0.5, cascadeIndex);
-
-		if (shadowCoord.w > 0 && dist < shadowCoord.z - bias)
-		{
-			shadow = 0.3f;
-		}
-	}
-	return shadow;
-}
-
-
 void main()
 {
 	// Material Index
@@ -402,13 +267,6 @@ void main()
 
 	// Flip the Z
 	texcoord.z = u_PushConstant.VoxelDimensions - texcoord.z - 1;
-
-
-	// Inject directional light
-	//vec4 shadowPos = f_PositionDepth / f_PositionDepth.w;
-	//float shadowFactor = SampleShadowTexture(shadowPos, 2);
-	//o_Albedo.xyz *= shadowFactor;
-
 
 	// Atomic operations to get an averaged value, described in OpenGL insights about voxelization
 	// Required to avoid flickering when voxelizing every frame

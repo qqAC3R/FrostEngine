@@ -4,6 +4,7 @@
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 
 #include "Frost/Platform/Vulkan/VulkanImage.h"
+#include "Frost/Platform/Vulkan/VulkanRenderer.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
@@ -428,12 +429,14 @@ namespace Frost
 
 
 		m_Data->CloudComputeTexture.resize(framesInFlight);
+		m_Data->CloudComputeBlurTexture_DirX.resize(framesInFlight);
+		m_Data->CloudComputeBlurTexture_DirY.resize(framesInFlight);
 		m_Data->CloudVolumesDataBuffer.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width / 2.0f;
-			imageSpec.Height = height / 2.0f;
+			imageSpec.Width = width / 1.5f;
+			imageSpec.Height = height / 1.5f;
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			imageSpec.Format = ImageFormat::RGBA8;
@@ -441,6 +444,8 @@ namespace Frost
 			imageSpec.UseMipChain = false;
 
 			m_Data->CloudComputeTexture[i] = Image2D::Create(imageSpec);
+			m_Data->CloudComputeBlurTexture_DirX[i] = Image2D::Create(imageSpec);
+			m_Data->CloudComputeBlurTexture_DirY[i] = Image2D::Create(imageSpec);
 
 			if (!m_Data->CloudVolumesDataBuffer[i])
 				m_Data->CloudVolumesDataBuffer[i] = BufferDevice::Create(1024 * sizeof(RenderQueue::CloudVolume), { BufferUsage::Storage });
@@ -467,6 +472,31 @@ namespace Frost
 			descriptor->Set("CloudVolumeData", m_Data->CloudVolumesDataBuffer[i]);
 			descriptor->UpdateVulkanDescriptorIfNeeded();
 		}
+
+
+		m_Data->CloudComputeBlurXDescriptor.resize(framesInFlight);
+		m_Data->CloudComputeBlurYDescriptor.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			if (!m_Data->CloudComputeBlurXDescriptor[i])
+				m_Data->CloudComputeBlurXDescriptor[i] = Material::Create(m_Data->VolumetricBlurShader, "CloudBlurXMaterial");
+
+			if (!m_Data->CloudComputeBlurYDescriptor[i])
+				m_Data->CloudComputeBlurYDescriptor[i] = Material::Create(m_Data->VolumetricBlurShader, "CloudBlurYMaterial");
+
+			auto descriptorCloudBlurX = m_Data->CloudComputeBlurXDescriptor[i].As<VulkanMaterial>();
+			auto descriptorCloudBlurY = m_Data->CloudComputeBlurYDescriptor[i].As<VulkanMaterial>();
+
+			descriptorCloudBlurX->Set("u_SrcTex", m_Data->CloudComputeTexture[i]);
+			descriptorCloudBlurX->Set("u_DstTex", m_Data->CloudComputeBlurTexture_DirX[i]);
+			descriptorCloudBlurX->UpdateVulkanDescriptorIfNeeded();
+
+
+			descriptorCloudBlurY->Set("u_SrcTex", m_Data->CloudComputeBlurTexture_DirX[i]);
+			descriptorCloudBlurY->Set("u_DstTex", m_Data->CloudComputeBlurTexture_DirY[i]);
+			descriptorCloudBlurY->UpdateVulkanDescriptorIfNeeded();
+		}
+
 	}
 
 	void VulkanVolumetricPass::InitLate()
@@ -478,14 +508,18 @@ namespace Frost
 			auto descriptorVolumetricCompute = m_Data->VolumetricComputeDescriptor[i].As<VulkanMaterial>();
 			auto descriptorVolumetricBlurX = m_Data->VolumetricBlurXDescriptor[i].As<VulkanMaterial>();
 			auto descriptorVolumetricBlurY = m_Data->VolumetricBlurYDescriptor[i].As<VulkanMaterial>();
+			auto descriptorCloudBlurX = m_Data->CloudComputeBlurXDescriptor[i].As<VulkanMaterial>();
+			auto descriptorCloudBlurY = m_Data->CloudComputeBlurYDescriptor[i].As<VulkanMaterial>();
 
 			int32_t lastFrame = i - 1;
 			if (i == 0) lastFrame = framesInFlight - 1;
 
 			Ref<Image2D> depthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanPostFXPass>()->DepthPyramid[lastFrame];
+			Ref<Image2D> worldPositionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, lastFrame);
 
 			// Set the volumetric compute descriptor
 			descriptorVolumetricCompute->Set("u_DepthTexture", depthTexture);
+			descriptorVolumetricCompute->Set("u_PositionTexture", worldPositionTexture);
 			descriptorVolumetricCompute->UpdateVulkanDescriptorIfNeeded();
 
 			// Set the volumetric blur descriptor
@@ -495,15 +529,26 @@ namespace Frost
 			descriptorVolumetricBlurY->Set("u_DepthBuffer", depthTexture);
 			descriptorVolumetricBlurY->UpdateVulkanDescriptorIfNeeded();
 
+			// Set the cloud blur descriptor
+			descriptorCloudBlurX->Set("u_DepthBuffer", depthTexture);
+			descriptorCloudBlurX->UpdateVulkanDescriptorIfNeeded();
+
+			descriptorCloudBlurY->Set("u_DepthBuffer", depthTexture);
+			descriptorCloudBlurY->UpdateVulkanDescriptorIfNeeded();
+
 		}
 	}
 
 	void VulkanVolumetricPass::OnUpdate(const RenderQueue& renderQueue)
 	{
+		VulkanRenderer::BeginTimeStampPass("Cloud Compute Pass");
+		CloudComputeUpdate(renderQueue);
+		VulkanRenderer::EndTimeStampPass("Cloud Compute Pass");
+
 		if (m_Data->m_UseVolumetrics)
 		{
-			CloudComputeUpdate(renderQueue);
 
+			VulkanRenderer::BeginTimeStampPass("Volumetric Pass");
 			FroxelPopulateUpdate(renderQueue);
 			FroxelLightInjectUpdate(renderQueue);
 
@@ -515,6 +560,7 @@ namespace Frost
 			FroxelFinalComputeUpdate(renderQueue);
 			VolumetricComputeUpdate(renderQueue);
 			VolumetricBlurUpdate(renderQueue);
+			VulkanRenderer::EndTimeStampPass("Volumetric Pass");
 		}
 	}
 
@@ -545,7 +591,8 @@ namespace Frost
 		
 		// Push constans
 		glm::mat4 cameraViewMatrix = renderQueue.m_Camera.GetViewMatrix();
-		glm::mat4 cameraProjMatrix = renderQueue.m_Camera.GetProjectionMatrix();
+		//glm::mat4 cameraProjMatrix = renderQueue.m_Camera.GetProjectionMatrix();
+		glm::mat4 cameraProjMatrix = m_Data->CustomProjectionMatrix;
 		cameraProjMatrix[1][1] *= -1.0f;
 
 		s_FroxelPopulatePushConstant.CameraPosition = renderQueue.CameraPosition;
@@ -761,7 +808,7 @@ namespace Frost
 	struct VolumetricBlurPushConstant {
 		glm::vec2 BlurDirection; // For the blur, we should do 2 blur passes, one vertical and one horizontal
 		uint32_t DepthMipSample;
-		uint32_t Mode;
+		float Sharpness;
 	};
 	static VolumetricBlurPushConstant s_VolumetricPushConstant;
 
@@ -781,7 +828,7 @@ namespace Frost
 		/// We firstly blur in the X direction
 		s_VolumetricPushConstant.BlurDirection = { 1.0f, 0.0f };
 		s_VolumetricPushConstant.DepthMipSample = 1;
-		s_VolumetricPushConstant.Mode = 0; // 0 - MODE_BLUR
+		s_VolumetricPushConstant.Sharpness = 3.0;
 
 		vulkanBlurXDescriptor->Bind(cmdBuf, m_Data->VolumetricBlurPipeline);
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VolumetricPushConstant);
@@ -812,24 +859,6 @@ namespace Frost
 		// Image barrier for the volumetric direction X blur texture
 		Ref<VulkanImage2D> volumetricBlurDirYTex = m_Data->VolumetricBlurTexture_DirY[currentFrameIndex].As<VulkanImage2D>();
 		volumetricBlurDirYTex->TransitionLayout(cmdBuf, volumetricBlurDirYTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-
-
-		/*
-		/// Upsample!
-		s_VolumetricPushConstant.Mode = 1; // 1 - MODE_UPSAMPLE
-
-		vulkanBlurUpsampleDescriptor->Bind(cmdBuf, m_Data->VolumetricBlurPipeline);
-		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VolumetricPushConstant);
-
-		// Dispatch
-		groupX = std::ceil(width / 16.0f);
-		groupY = std::ceil(height / 16.0f);
-		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
-
-		// Image barrier for the volumetric direction X blur texture
-		Ref<VulkanImage2D> volumetricBlurUpsample = m_Data->VolumetricBlurTexture_Upsample[currentFrameIndex].As<VulkanImage2D>();
-		volumetricBlurUpsample->TransitionLayout(cmdBuf, volumetricBlurUpsample->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-		*/
 	}
 
 	struct CloudComputePushConstant
@@ -874,9 +903,52 @@ namespace Frost
 		// Dispatch
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
-		uint32_t groupX = std::ceil((width  / 2.0f) / 16.0f);
-		uint32_t groupY = std::ceil((height / 2.0f) / 16.0f);
+		uint32_t groupX = std::ceil((width / 1.5f) / 16.0f);
+		uint32_t groupY = std::ceil((height / 1.5f) / 16.0f);
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+
+
+		/// Blur stage
+		auto vulkanBlurPipeline = m_Data->VolumetricBlurPipeline.As<VulkanComputePipeline>();
+		auto vulkanBlurXDescriptor = m_Data->CloudComputeBlurXDescriptor[currentFrameIndex].As<VulkanMaterial>();
+		auto vulkanBlurYDescriptor = m_Data->CloudComputeBlurYDescriptor[currentFrameIndex].As<VulkanMaterial>();
+
+
+		/// We firstly blur in the X direction
+		s_VolumetricPushConstant.BlurDirection = { 1.0f, 0.0f };
+		s_VolumetricPushConstant.DepthMipSample = 1;
+		s_VolumetricPushConstant.Sharpness = 10.0;
+
+		vulkanBlurXDescriptor->Bind(cmdBuf, m_Data->VolumetricBlurPipeline);
+		vulkanBlurPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VolumetricPushConstant);
+
+
+		// Dispatch
+		groupX = std::ceil((width / 1.5f) / 16.0f);
+		groupY = std::ceil((height / 1.5f) / 16.0f);
+		vulkanBlurPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+
+
+		// Image barrier for the volumetric direction X blur texture
+		Ref<VulkanImage2D> cloudBlurDirXTex = m_Data->CloudComputeBlurTexture_DirX[currentFrameIndex].As<VulkanImage2D>();
+		cloudBlurDirXTex->TransitionLayout(cmdBuf, cloudBlurDirXTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+
+		/// Then blur in the Y direction
+		s_VolumetricPushConstant.BlurDirection = { 0.0f, 1.0f };
+
+		vulkanBlurYDescriptor->Bind(cmdBuf, m_Data->VolumetricBlurPipeline);
+		vulkanBlurPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VolumetricPushConstant);
+
+		// Dispatch
+		groupX = std::ceil((width / 1.5f) / 16.0f);
+		groupY = std::ceil((height / 1.5f) / 16.0f);
+		vulkanBlurPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+
+		// Image barrier for the volumetric direction X blur texture
+		Ref<VulkanImage2D> cloudBlurDirYTex = m_Data->CloudComputeBlurTexture_DirY[currentFrameIndex].As<VulkanImage2D>();
+		cloudBlurDirYTex->TransitionLayout(cmdBuf, cloudBlurDirYTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
 	}
 
 	void VulkanVolumetricPass::OnRenderDebug()
@@ -890,6 +962,8 @@ namespace Frost
 
 	void VulkanVolumetricPass::OnResize(uint32_t width, uint32_t height)
 	{
+		m_Data->CustomProjectionMatrix = glm::perspective(70.0f, float(width) / float(height), 0.1f, 500.0f);
+
 		CloudComputeInitData(width, height);
 
 		FroxelPopulateInitData(width, height);

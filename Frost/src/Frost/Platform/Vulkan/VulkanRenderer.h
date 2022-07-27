@@ -31,6 +31,18 @@ namespace Frost
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const override;
 
 		static VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetAllocateInfo allocInfo);
+
+		static void BeginTimeStampPass(const std::string& passName);
+		static void EndTimeStampPass(const std::string& passName);
+
+	private:
+		static uint64_t BeginTimestampQuery();
+		static void EndTimestampQuery(uint64_t queryId);
+		static void GetTimestampResults(uint32_t currentFrameIndex);
+		static const Vector<float>& GetFrameExecutionTimings();
+
+	private:
+		friend class VulkanRendererDebugger; // To access the internal time stamps functions
 	};
 
 	namespace Utils

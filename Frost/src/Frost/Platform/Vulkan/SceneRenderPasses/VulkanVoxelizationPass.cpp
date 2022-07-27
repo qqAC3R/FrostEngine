@@ -55,6 +55,7 @@ namespace Frost
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 		m_VoxelizationPushConstant.VoxelDimensions = voxelVolumeDimensions;
+		m_Data->m_VoxelGrid = voxelVolumeDimensions;
 
 		// RenderPass
 		RenderPassSpecification renderPassSpecs =
@@ -122,12 +123,7 @@ namespace Frost
 			Ref<VulkanMaterial> descriptor = m_Data->VoxelizationDescriptor[i].As<VulkanMaterial>();
 			VkDescriptorSet descriptorSet = descriptor->GetVulkanDescriptorSet(0);
 
-			Ref<Image2D> shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetDepthAttachment(i);
-			//shadowDepthTexture->TransitionLayout(cmdBuf, shadowDepthTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-
 			descriptor->Set("u_VoxelTexture_NonAtomic", m_Data->VoxelizationTexture[i]);
-			descriptor->Set("u_ShadowDepthTexture", shadowDepthTexture);
-			//descriptor->Set("u_VoxelTexture_NonAtomic", m_Data->VoxelizationTexture[i], 1);
 			descriptor->Set("u_MaterialUniform", instanceSpec.DeviceBuffer);
 			descriptor->UpdateVulkanDescriptorIfNeeded();
 
@@ -206,11 +202,20 @@ namespace Frost
 		// If we have 0 meshes, we shouldnt render this pass
 		if (renderQueue.GetQueueSize() == 0) return;
 
+		VulkanRenderer::BeginTimeStampPass("Voxelization Pass");
 		if(m_EnableVoxelization)
 			VoxelizationUpdateRendering(renderQueue);
+		VulkanRenderer::EndTimeStampPass("Voxelization Pass");
 
+
+		VulkanRenderer::BeginTimeStampPass("Voxel Filter Pass");
 		VoxelFilterUpdate(renderQueue);
+		VulkanRenderer::EndTimeStampPass("Voxel Filter Pass");
+
+
+		VulkanRenderer::BeginTimeStampPass("Voxel Cone Tracing Pass");
 		VoxelConeTracingUpdate(renderQueue);
+		VulkanRenderer::EndTimeStampPass("Voxel Cone Tracing Pass");
 	}
 
 	void VulkanVoxelizationPass::VoxelConeTracingInit(uint32_t width, uint32_t height)
@@ -383,6 +388,8 @@ namespace Frost
 #endif
 	}
 
+	static Vector<IndirectMeshData> s_Voxelization_MeshIndirectData;
+
 	void VulkanVoxelizationPass::VoxelizationUpdateRendering(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
@@ -403,7 +410,7 @@ namespace Frost
 			We dont need them when we render them indirectly (because the gpu renders all the submeshes automatically - `multidraw`),
 			instead we just need to know the `start index` of every mesh in the `VkDrawIndexedIndirectCommand` buffer.
 		*/
-		Vector<IndirectMeshData> meshIndirectData;
+		s_Voxelization_MeshIndirectData.clear();
 
 		// `Indirect draw commands` offsets
 		uint64_t indirectCmdsOffset = 0;
@@ -441,21 +448,21 @@ namespace Frost
 			}
 
 			// If we are submitting the first mesh, we don't need any offset
-			if (meshIndirectData.size() == 0)
+			if (s_Voxelization_MeshIndirectData.size() == 0)
 			{
-				meshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0));
+				s_Voxelization_MeshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0));
 			}
 			else
 			{
-				uint32_t previousMeshOffset = meshIndirectData[i - 1].SubmeshOffset;
-				uint32_t previousMeshCount = meshIndirectData[i - 1].SubmeshCount;
+				uint32_t previousMeshOffset = s_Voxelization_MeshIndirectData[i - 1].SubmeshOffset;
+				uint32_t previousMeshCount = s_Voxelization_MeshIndirectData[i - 1].SubmeshCount;
 				uint32_t currentMeshOffset = previousMeshOffset + previousMeshCount;
 
-				uint32_t previousMaterialOffset = meshIndirectData[i - 1].MaterialOffset;
-				uint32_t previousMaterialCount = meshIndirectData[i - 1].MaterialCount;
+				uint32_t previousMaterialOffset = s_Voxelization_MeshIndirectData[i - 1].MaterialOffset;
+				uint32_t previousMaterialCount = s_Voxelization_MeshIndirectData[i - 1].MaterialCount;
 				uint32_t currentMaterialOffset = previousMaterialOffset + previousMaterialCount;
 
-				meshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
+				s_Voxelization_MeshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
 			}
 
 
@@ -507,9 +514,9 @@ namespace Frost
 
 
 		// Sending the indirect draw commands to the command buffer
-		for (uint32_t i = 0; i < meshIndirectData.size(); i++)
+		for (uint32_t i = 0; i < s_Voxelization_MeshIndirectData.size(); i++)
 		{
-			auto& meshData = meshIndirectData[i];
+			auto& meshData = s_Voxelization_MeshIndirectData[i];
 			uint32_t meshIndex = meshData.MeshIndex;
 
 			// Get the mesh
@@ -526,14 +533,13 @@ namespace Frost
 
 
 			// Set the transform matrix and model matrix of the submesh into a constant buffer
-			m_VoxelizationPushConstant.LightViewProj = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->CascadeViewProjMatrix[1];
 			m_VoxelizationPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
-			m_VoxelizationPushConstant.MaterialIndex = meshIndirectData[i].MaterialOffset;
+			m_VoxelizationPushConstant.MaterialIndex = s_Voxelization_MeshIndirectData[i].MaterialOffset;
 			m_VoxelizationPushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_VoxelizationPushConstant);
 
 			uint32_t submeshCount = meshData.SubmeshCount;
-			uint32_t offset = meshIndirectData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
+			uint32_t offset = s_Voxelization_MeshIndirectData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
 			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
 
 		}
@@ -756,8 +762,8 @@ namespace Frost
 		vulkanDescriptor->Bind(cmdBuf, m_Data->VoxelConeTracingPipeline);
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_VCTPushConstant);
 
-		uint32_t groupX = std::ceil(renderQueue.ViewPortWidth / 32.0f);
-		uint32_t groupY = std::ceil(renderQueue.ViewPortHeight / 32.0f);
+		uint32_t groupX = std::ceil((renderQueue.ViewPortWidth ) / 32.0f);
+		uint32_t groupY = std::ceil((renderQueue.ViewPortHeight) / 32.0f);
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 		Ref<VulkanImage2D> vulkanIndirectSpecularTexture = m_Data->VCT_IndirectSpecularTexture[currentFrameIndex].As<VulkanImage2D>();
@@ -771,12 +777,14 @@ namespace Frost
 
 	void VulkanVoxelizationPass::OnRenderDebug()
 	{
-		if (ImGui::CollapsingHeader("Voxelization Pass"))
+		if (ImGui::CollapsingHeader("Voxelization Pass (Experimental)"))
 		{
 			ImGui::SliderInt("Enable Voxelization", &m_EnableVoxelization, 0, 1);
 			ImGui::Separator();
 			ImGui::SliderInt("Atomic Operation (bool)", &m_VoxelizationPushConstant.AtomicOperation, 0, 1);
 			ImGui::DragFloat("Voxel Size", &m_Data->m_VoxelSize, 0.25f, 0.5f, 2.0f);
+			//ImGui::SliderInt("Cone Tracing Max Steps", &m_VCTPushConstant.ConeTraceMaxSteps, 0, 200);
+			//ImGui::DragFloat("Cone Tracing Max Distance", &m_VCTPushConstant.ConeTraceMaxDistance, 0.01f, 0, 1000);
 			ImGui::Separator();
 			ImGui::SliderInt("Indirect Diffuse", &m_VCTPushConstant.UseIndirectDiffuse, 0, 1);
 			ImGui::SliderInt("Indirect Specular", &m_VCTPushConstant.UseIndirectSpecular, 0, 1);

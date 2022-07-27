@@ -58,13 +58,13 @@ namespace Frost
 			position,
 			cloudVolume.CloudScale,
 			scale,
-			cloudVolume.Precipation,
+			cloudVolume.Density,
 			cloudVolume.Scattering,
 			cloudVolume.PhaseFunction,
 			cloudVolume.DensityOffset,
 			cloudVolume.CloudAbsorption,
 			cloudVolume.SunAbsorption,
-			0.0f
+			cloudVolume.DetailOffset
 		});
 	}
 

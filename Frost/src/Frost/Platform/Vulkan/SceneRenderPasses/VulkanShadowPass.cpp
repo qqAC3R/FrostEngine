@@ -4,6 +4,7 @@
 #include "Frost/Core/Application.h"
 
 #include "Frost/Platform/Vulkan/VulkanContext.h"
+#include "Frost/Platform/Vulkan/VulkanRenderer.h"
 #include "Frost/Platform/Vulkan/VulkanPipeline.h"
 #include "Frost/Platform/Vulkan/VulkanFramebuffer.h"
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
@@ -102,8 +103,8 @@ namespace Frost
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width;
-			imageSpec.Height = height;
+			imageSpec.Width = width / 1.5f;
+			imageSpec.Height = height / 1.5f;
 			imageSpec.Format = ImageFormat::RGBA8;
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
@@ -141,9 +142,17 @@ namespace Frost
 	void VulkanShadowPass::OnUpdate(const RenderQueue& renderQueue)
 	{
 		UpdateCascades(renderQueue);
+
+		VulkanRenderer::BeginTimeStampPass("Shadow Pass (Cascades)");
 		ShadowDepthUpdate(renderQueue);
+		VulkanRenderer::EndTimeStampPass("Shadow Pass (Cascades)");
+
+		VulkanRenderer::BeginTimeStampPass("Shadow Pass (Compute)");
 		ShadowComputeUpdate(renderQueue);
+		VulkanRenderer::EndTimeStampPass("Shadow Pass (Compute)");
 	}
+
+	static Vector<IndirectMeshData> s_ShadowDepth_MeshIndirectData; // Made a static variable, to not allocate new data everyframe
 
 	void VulkanShadowPass::ShadowDepthUpdate(const RenderQueue& renderQueue)
 	{
@@ -152,8 +161,6 @@ namespace Frost
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		Ref<VulkanRenderPass> vulkanRenderPass = m_Data->ShadowDepthRenderPass.As<VulkanRenderPass>();
 		Ref<VulkanPipeline> vulkanPipeline = m_Data->ShadowDepthPipeline.As<VulkanPipeline>();
-
-		uint32_t shadowTextureRes = Renderer::GetRendererConfig().ShadowTextureResolution;
 
 		
 		// Get the needed matricies from the camera
@@ -168,7 +175,7 @@ namespace Frost
 			We dont need them when we render them indirectly (because the gpu renders all the submeshes automatically - `multidraw`),
 			instead we just need to know the `start index` of every mesh in the `VkDrawIndexedIndirectCommand` buffer.
 		*/
-		Vector<IndirectMeshData> meshIndirectData;
+		s_ShadowDepth_MeshIndirectData.clear(); // Reset the vector from the previous frame
 
 		// `Indirect draw commands` offset
 		uint64_t indirectCmdsOffset = 0;
@@ -206,21 +213,21 @@ namespace Frost
 			}
 
 			// If we are submitting the first mesh, we don't need any offset
-			if (meshIndirectData.size() == 0)
+			if (s_ShadowDepth_MeshIndirectData.size() == 0)
 			{
-				meshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0));
+				s_ShadowDepth_MeshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0));
 			}
 			else
 			{
-				uint32_t previousMeshOffset = meshIndirectData[i - 1].SubmeshOffset;
-				uint32_t previousMeshCount = meshIndirectData[i - 1].SubmeshCount;
+				uint32_t previousMeshOffset = s_ShadowDepth_MeshIndirectData[i - 1].SubmeshOffset;
+				uint32_t previousMeshCount = s_ShadowDepth_MeshIndirectData[i - 1].SubmeshCount;
 				uint32_t currentMeshOffset = previousMeshOffset + previousMeshCount;
 
-				uint32_t previousMaterialOffset = meshIndirectData[i - 1].MaterialOffset;
-				uint32_t previousMaterialCount = meshIndirectData[i - 1].MaterialCount;
+				uint32_t previousMaterialOffset = s_ShadowDepth_MeshIndirectData[i - 1].MaterialOffset;
+				uint32_t previousMaterialCount = s_ShadowDepth_MeshIndirectData[i - 1].MaterialCount;
 				uint32_t currentMaterialOffset = previousMaterialOffset + previousMaterialCount;
 
-				meshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
+				s_ShadowDepth_MeshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
 			}
 
 
@@ -272,9 +279,9 @@ namespace Frost
 
 
 			// Sending the indirect draw commands to the command buffer
-			for (uint32_t j = 0; j < meshIndirectData.size(); j++)
+			for (uint32_t j = 0; j < s_ShadowDepth_MeshIndirectData.size(); j++)
 			{
-				auto& meshData = meshIndirectData[j];
+				auto& meshData = s_ShadowDepth_MeshIndirectData[j];
 				uint32_t meshIndex = meshData.MeshIndex;
 
 				// Get the mesh
@@ -298,7 +305,7 @@ namespace Frost
 				vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_PushConstant);
 
 				uint32_t submeshCount = meshData.SubmeshCount;
-				uint32_t offset = meshIndirectData[j].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
+				uint32_t offset = s_ShadowDepth_MeshIndirectData[j].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
 				vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
 			}
 
@@ -333,8 +340,8 @@ namespace Frost
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
 
-		uint32_t groupX = static_cast<uint32_t>(std::ceil(width / 32.0f));
-		uint32_t groupY = static_cast<uint32_t>(std::ceil(height / 32.0f));
+		uint32_t groupX = static_cast<uint32_t>(std::ceil((width  / 1.5f) / 32.0f));
+		uint32_t groupY = static_cast<uint32_t>(std::ceil((height / 1.5f) / 32.0f));
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 		
 		// Barrier

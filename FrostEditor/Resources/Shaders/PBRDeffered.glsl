@@ -121,6 +121,37 @@ int GetLightBufferIndex(int i)
     return VisibleLightData.Indices[offset + i];
 }
 // =======================================================
+vec4 UpsampleTent9(sampler2D tex, float lod, vec2 uv, float radius)
+{
+	vec2 texSize = vec2(textureSize(tex, int(lod)));
+    vec2 texelSize = 1.0f / texSize;
+
+    vec4 offset = texelSize.xyxy * vec4(1.0f, 1.0f, -1.0f, 0.0f) * radius;
+
+    // Center
+	vec4 center = textureLod(tex, uv, lod);
+    vec3 result = center.rgb * 4.0f;                          //  (0, 0)
+
+    result += textureLod(tex, uv - offset.xy, lod).rgb;       // -( 1,  1 ) // 1
+    result += textureLod(tex, uv - offset.wy, lod).rgb * 2.0; // -( 0,  1 ) // 2
+    result += textureLod(tex, uv - offset.zy, lod).rgb;       // -(-1,  1 ) // 3
+
+    result += textureLod(tex, uv + offset.zw, lod).rgb * 2.0; // +(-1,  0 ) // 4
+    result += textureLod(tex, uv + offset.xw, lod).rgb * 2.0; // +( 1,  0 ) // 5
+
+    result += textureLod(tex, uv + offset.zy, lod).rgb;       // +(-1,  1 ) // 6
+    result += textureLod(tex, uv + offset.wy, lod).rgb * 2.0; // +( 0,  1 ) // 7
+    result += textureLod(tex, uv + offset.xy, lod).rgb;       // +( 1,  1 ) // 8
+
+    // Sampling order (C = center)
+    //   6 7 8
+    //   4 C 5
+    //   3 2 1
+
+    return vec4(result * (1.0f / 16.0f), center.a);
+}
+
+// =======================================================
 
 //------------------------------------------------------------------------------
 // Filament PBR.
@@ -345,6 +376,7 @@ vec3 ComputeIBLContriubtion()
 	vec3 brdf = vec3(F0 * splitSums.x + splitSums.y);
 
 	vec3 specularRadiance = brdf * specularDecomp * (s_IndirectSpecular);
+	//vec3 specularRadiance = brdf * (s_IndirectSpecular);
 	//specularRadiance = mix(specularRadiance, brdf * s_IndirectSpecular, 0.4f);
 
 	return (irradiance + specularRadiance);
@@ -438,7 +470,8 @@ void main()
 	float IBLIntensity = 5.0f;
 	result += ComputeIBLContriubtion() * IBLIntensity;
 
-	result *= texture(u_ShadowTexture, v_TexCoord).rgb;
+	//result *= texture(u_ShadowTexture, v_TexCoord).rgb;
+	result *= UpsampleTent9(u_ShadowTexture, 0.0, v_TexCoord, 1.0).rgb;
 
 	// Calculating the result with the camera exposure
 	result *= u_UniformBuffer.CameraExposure;

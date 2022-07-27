@@ -212,8 +212,9 @@ namespace Frost
 			vulkanDepthImage->TransitionLayout(cmdBuf, vulkanDepthImage->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		}
 
-
+		VulkanRenderer::BeginTimeStampPass("Light Culling Pass");
 		TiledLightCullingUpdate(renderQueue);
+		VulkanRenderer::EndTimeStampPass("Light Culling Pass");
 
 		{
 			// From the GBuffer, blit the depth texture to render the environment cubemap
@@ -221,6 +222,10 @@ namespace Frost
 			auto vulkanDstDepthImage = m_Data->RenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
 			vulkanDstDepthImage->BlitImage(cmdBuf, vulkanSrcDepthImage);
 		}
+
+
+
+		VulkanRenderer::BeginTimeStampPass("Lightning Pass (PBR)");
 
 
 		// Setting up the light data
@@ -260,7 +265,6 @@ namespace Frost
 		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.PointLightCount", static_cast<float>(pointLightCount));
 
 		uint32_t width = static_cast<uint32_t>(renderQueue.ViewPortWidth);
-		//float workGroupsX = static_cast<float>(width + (width % 16)) / 16.0f;
 		float workGroupX = std::ceil(renderQueue.ViewPortWidth / 16.0f);
 		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.LightCullingWorkgroup", workGroupX);
 
@@ -273,6 +277,8 @@ namespace Frost
 		Renderer::GetSceneEnvironment()->RenderSkyBox(renderQueue);
 
 		m_Data->RenderPass->Unbind();
+
+		VulkanRenderer::EndTimeStampPass("Lightning Pass (PBR)");
 	}
 
 	void VulkanCompositePass::TiledLightCullingUpdate(const RenderQueue& renderQueue)

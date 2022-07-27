@@ -34,6 +34,8 @@ layout(binding = 4) uniform DirectionaLightData
 	int UsePCSS;
 } u_DirLightData;
 
+vec2 s_UV;
+
 vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
 {
 	switch(cascadeIndex)
@@ -67,10 +69,10 @@ mat4 GetCascadeMatrix(uint cascadeIndex)
 	}
 }
 
-uint GetCascadeIndex()
+uint GetCascadeIndex(vec2 uv)
 {
 	// Get cascade index for the current fragment's view position
-	float viewPosZ = texelFetch(u_ViewPositionTexture, ivec2(gl_GlobalInvocationID.xy), 0).z;
+	float viewPosZ = texture(u_ViewPositionTexture, uv).z;
 
 	uint cascadeIndex = 1;
 	for(uint i = 0; i < SHADOW_MAP_CASCADE_COUNT - 1; ++i) {
@@ -97,9 +99,9 @@ vec3 DecodeNormal(vec2 e)
 
 float GetShadowBias()
 {
-	const float MINIMUM_SHADOW_BIAS = 0.005;
+	const float MINIMUM_SHADOW_BIAS = 0.007;
 
-	vec3 normal = DecodeNormal(texelFetch(u_NormalMap, ivec2(gl_GlobalInvocationID.xy), 0).xy);
+	vec3 normal = DecodeNormal(texture(u_NormalMap, s_UV).xy);
 	float bias = max(
 		MINIMUM_SHADOW_BIAS * (1.0 - dot(normal, u_DirLightData.DirectionalLightDir)),
 		MINIMUM_SHADOW_BIAS
@@ -111,7 +113,8 @@ float GetShadowBias()
 float HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 {
 	float shadow = 1.0;
-	float bias = GetShadowBias();
+	//float bias = GetShadowBias();
+	float bias = 0.05;
 
 	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
 	{
@@ -208,8 +211,9 @@ float SearchRegionRadiusUV(float zWorld)
 float FindBlockerDistance_DirectionalLight(vec4 shadowCoords, uint cascadeIndex, float lightSize)
 {
 	float bias = GetShadowBias();
+	//float bias = 0.05;
 
-	int numBlockerSearchSamples = 48;
+	int numBlockerSearchSamples = 32;
 	int blockers = 0;
 	float avgBlockerDistance = 0;
 
@@ -234,6 +238,7 @@ float FindBlockerDistance_DirectionalLight(vec4 shadowCoords, uint cascadeIndex,
 float PCF_DirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius)
 {
 	float bias = GetShadowBias();
+	//float bias = 0.05;
 	int numPCFSamples = 32;
 
 	float sum = 0;
@@ -263,9 +268,15 @@ float PCSS_SampleShadowTexture(vec4 shadowCoords, uint cascadeIndex, float light
 void main()
 {
 	ivec2 globalInvocation = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 imgSize = imageSize(u_ShadowTextureOutput).xy;
+	vec2 uv = (vec2(globalInvocation) + 0.5.xx) / vec2(imgSize);
+	s_UV = uv;
 
-	uint cascadeIndex = GetCascadeIndex();
-	vec3 position = texelFetch(u_PositionTexture, globalInvocation, 0).rgb;
+	if (any(greaterThanEqual(globalInvocation, imgSize)))
+		return;
+
+	uint cascadeIndex = GetCascadeIndex(uv);
+	vec3 position = texture(u_PositionTexture, uv).rgb;
 
 	float lightSize = u_DirLightData.DirectionLightSize;
 
@@ -276,10 +287,10 @@ void main()
 	float shadowFactor = 0.0f;
 	if(u_DirLightData.FadeCascades == 1)
 	{
-		float viewPosZ = texelFetch(u_ViewPositionTexture, ivec2(gl_GlobalInvocationID.xy), 0).z;
+		float viewPosZ = texture(u_ViewPositionTexture, uv).z;
 		float cascadeTransitionFade = u_DirLightData.CascadesFadeFactor;
 
-		float c0 = smoothstep(u_PushConstant.CascadeDepthSplit[0] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[0] - cascadeTransitionFade * 0.5f, viewPosZ);
+		//float c0 = smoothstep(u_PushConstant.CascadeDepthSplit[0] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[0] - cascadeTransitionFade * 0.5f, viewPosZ);
 		float c1 = smoothstep(u_PushConstant.CascadeDepthSplit[1] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[1] - cascadeTransitionFade * 0.5f, viewPosZ);
 		float c2 = smoothstep(u_PushConstant.CascadeDepthSplit[2] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[2] - cascadeTransitionFade * 0.5f, viewPosZ);
 

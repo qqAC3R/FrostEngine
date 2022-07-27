@@ -96,11 +96,11 @@ namespace Frost
 
 
 			Ref<Shader> VolumetricBlurShader;
-			Ref<ComputePipeline> VolumetricBlurPipeline;
+			Ref<ComputePipeline> VolumetricBlurPipeline; // Used for clouds too
 			Vector<Ref<Material>> VolumetricBlurXDescriptor;
 			Vector<Ref<Material>> VolumetricBlurYDescriptor;
-			Vector<Ref<Image2D>> VolumetricBlurTexture_DirX;
-			Vector<Ref<Image2D>> VolumetricBlurTexture_DirY;
+			Vector<Ref<Image2D>> VolumetricBlurTexture_DirX; // Direction X blur
+			Vector<Ref<Image2D>> VolumetricBlurTexture_DirY; // Direction Y blur
 
 
 			Ref<Shader> WoorleyNoiseShader;
@@ -120,7 +120,12 @@ namespace Frost
 			Vector<Ref<Image2D>> CloudComputeTexture;
 			Vector<Ref<BufferDevice>> CloudVolumesDataBuffer;
 
+			Vector<Ref<Image2D>> CloudComputeBlurTexture_DirX; // Direction X blur
+			Vector<Ref<Image2D>> CloudComputeBlurTexture_DirY; // Direction Y blur
+			Vector<Ref<Material>> CloudComputeBlurXDescriptor;
+			Vector<Ref<Material>> CloudComputeBlurYDescriptor;
 
+			glm::mat4 CustomProjectionMatrix;
 			int32_t m_UseTAA = 1;
 			int32_t m_UseVolumetrics = 1;
 		};

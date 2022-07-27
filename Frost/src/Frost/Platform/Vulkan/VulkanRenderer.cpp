@@ -48,16 +48,30 @@ namespace Frost
 
 			Vector<VkDescriptorPool> DescriptorPools;
 		};
+
+		struct RenderDebugData
+		{
+			Vector<VkQueryPool> TimestampQueryPools;
+			uint32_t QueryCount = 0;
+			Vector<Vector<uint64_t>> TimestampQueryResults;
+			Vector<Vector<float>> ExecutionTimes;
+			uint64_t NextAvailableQueryID = 2;
+
+			float Device_TimestampPeriod;
+		};
 	}
 
 	static uint32_t s_ImageIndex = 0;
 	static RenderQueue s_RenderQueue[FRAMES_IN_FLIGHT];
 	static Vulkan::RenderData* s_Data;
+	static Vulkan::RenderDebugData* s_DebugData;
 
 	void VulkanRenderer::Init()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		VkPhysicalDevice physicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice();
 		s_Data = new Vulkan::RenderData();
+		s_DebugData = new Vulkan::RenderDebugData();
 
 		// Initilization
 		ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
@@ -105,6 +119,35 @@ namespace Frost
 			pool_info.pPoolSizes = pool_sizes;
 			FROST_VKCHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool));
 		}
+
+
+		const uint32_t maxUserQueries = 20;
+		s_DebugData->QueryCount = 2 + 2 * maxUserQueries;
+
+		s_DebugData->TimestampQueryPools.resize(Renderer::GetRendererConfig().FramesInFlight);
+		for(auto& queryPool : s_DebugData->TimestampQueryPools)
+		{
+			VkQueryPoolCreateInfo queryPoolInfo{ VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
+			queryPoolInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+			queryPoolInfo.queryCount = s_DebugData->QueryCount;
+			vkCreateQueryPool(device, &queryPoolInfo, nullptr, &queryPool);
+		}
+
+		s_DebugData->TimestampQueryResults.resize(Renderer::GetRendererConfig().FramesInFlight);
+		for (auto& timestampQueryResults : s_DebugData->TimestampQueryResults)
+		{
+			timestampQueryResults.resize(s_DebugData->QueryCount);
+		}
+
+		s_DebugData->ExecutionTimes.resize(Renderer::GetRendererConfig().FramesInFlight);
+		for (auto& executionTimes : s_DebugData->ExecutionTimes)
+		{
+			executionTimes.resize(s_DebugData->QueryCount / 2);
+		}
+
+		VkPhysicalDeviceProperties properties;
+		vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+		s_DebugData->Device_TimestampPeriod = properties.limits.timestampPeriod;
 	}
 
 	void VulkanRenderer::InitRenderPasses()
@@ -130,6 +173,7 @@ namespace Frost
 
 	void VulkanRenderer::BeginFrame()
 	{
+		
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		Renderer::Submit([&, currentFrameIndex]()
 		{
@@ -151,6 +195,10 @@ namespace Frost
 			/* Resetting the render queue that was used the previous `currentFrameIndex` frame,
 			   because there may be chances of an mesh being deleted while it is being rendered  */
 			s_RenderQueue[currentFrameIndex].Reset();
+
+			GetTimestampResults(currentFrameIndex);
+
+			s_DebugData->NextAvailableQueryID = 2;
 		});
 	}
 
@@ -171,6 +219,11 @@ namespace Frost
 			VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 			FROST_VKCHECK(vkBeginCommandBuffer(cmdBuf, &beginInfo));
 
+			// Timestamp query
+			vkCmdResetQueryPool(cmdBuf, s_DebugData->TimestampQueryPools[currentFrameIndex], 0, s_DebugData->QueryCount);
+			vkCmdWriteTimestamp(cmdBuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, s_DebugData->TimestampQueryPools[currentFrameIndex], 0);
+
+
 			/* Update the sky */
 			Renderer::GetSceneEnvironment()->UpdateAtmosphere(s_RenderQueue[currentFrameIndex]);
 
@@ -183,7 +236,10 @@ namespace Frost
 			Application::Get().GetImGuiLayer()->Render();
 			vkCmdEndRenderPass(cmdBuf);
 
+			// Stop the Timestamp query
+			vkCmdWriteTimestamp(cmdBuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, s_DebugData->TimestampQueryPools[currentFrameIndex], 1);
 
+			// End the render command buffer
 			FROST_VKCHECK(vkEndCommandBuffer(cmdBuf));
 			
 
@@ -200,7 +256,6 @@ namespace Frost
 
 			VkQueue graphicsQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().GraphicsFamily.Queue;
 			FROST_VKCHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fenceInFlight));
-
 
 			VulkanRenderer::Render();
 		});
@@ -295,10 +350,57 @@ namespace Frost
 			vkDestroyFence(device, s_Data->FencesInFlight[i], nullptr);
 			vkDestroyDescriptorPool(device, s_Data->DescriptorPools[i], nullptr);
 
+			// Debug Data
+			vkDestroyQueryPool(device, s_DebugData->TimestampQueryPools[i], nullptr);
+
 			// Clear all the submitted data (from every frame remaning)
 			s_RenderQueue[i].Reset();
 		}
 		VulkanMaterial::DeallocateDescriptorPool();
+	}
+
+	uint64_t VulkanRenderer::BeginTimestampQuery()
+	{
+		uint64_t queryIndex = s_DebugData->NextAvailableQueryID;
+		s_DebugData->NextAvailableQueryID += 2;
+
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		VkQueryPool queryPool = s_DebugData->TimestampQueryPools[currentFrameIndex];
+		vkCmdWriteTimestamp(cmdBuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, queryPool, queryIndex);
+		return queryIndex;
+	}
+
+	void VulkanRenderer::EndTimestampQuery(uint64_t queryId)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		VkQueryPool queryPool = s_DebugData->TimestampQueryPools[currentFrameIndex];
+		vkCmdWriteTimestamp(cmdBuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, queryPool, queryId + 1);
+	}
+
+	void VulkanRenderer::GetTimestampResults(uint32_t currentFrameIndex)
+	{
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		// Retrieve timestamp query results
+		vkGetQueryPoolResults(device, s_DebugData->TimestampQueryPools[currentFrameIndex], 0, s_DebugData->NextAvailableQueryID,
+			s_DebugData->NextAvailableQueryID * sizeof(uint64_t), s_DebugData->TimestampQueryResults[currentFrameIndex].data(), sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
+
+		for (uint32_t i = 0; i < s_DebugData->NextAvailableQueryID; i += 2)
+		{
+			uint64_t startTime = s_DebugData->TimestampQueryResults[currentFrameIndex][i];
+			uint64_t endTime = s_DebugData->TimestampQueryResults[currentFrameIndex][i + 1];
+			float nsTime = endTime > startTime ? (endTime - startTime) * s_DebugData->Device_TimestampPeriod : 0.0f;
+			s_DebugData->ExecutionTimes[currentFrameIndex][i / 2] = nsTime * 0.000001f; // Time in ms
+		}
+	}
+
+	const Vector<float>& VulkanRenderer::GetFrameExecutionTimings()
+	{
+		int32_t currentFrameIndex = int32_t(VulkanContext::GetSwapChain()->GetCurrentFrameIndex());
+		return s_DebugData->ExecutionTimes[currentFrameIndex];
 	}
 
 	void VulkanRenderer::Render()
@@ -310,6 +412,16 @@ namespace Frost
 	void VulkanRenderer::RenderDebugger()
 	{
 		s_Data->s_RendererDebugger->ImGuiRender();
+	}
+
+	void VulkanRenderer::BeginTimeStampPass(const std::string& passName)
+	{
+		s_Data->s_RendererDebugger->StartTimeStapForPass(passName);
+	}
+
+	void VulkanRenderer::EndTimeStampPass(const std::string& passName)
+	{
+		s_Data->s_RendererDebugger->EndTimeStapForPass(passName);
 	}
 
 	Ref<Image2D> VulkanRenderer::GetFinalImage(uint32_t id) const

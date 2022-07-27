@@ -35,8 +35,6 @@ namespace Frost
 		s_CommandQueue = new RenderCommandQueue();
 		s_Data = new RendererData();
 
-		RendererConfig rendererConfig{};
-
 		// Init the shaders
 		s_Data->m_ShaderLibrary = Ref<ShaderLibrary>::Create();
 

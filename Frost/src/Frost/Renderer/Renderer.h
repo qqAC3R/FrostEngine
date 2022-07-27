@@ -45,7 +45,7 @@ namespace Frost
 		uint32_t VoxelTextureResolution = 256;
 
 		// Volumetric Pass
-		uint32_t VoluemtricFroxelSlicesZ = 64;
+		uint32_t VoluemtricFroxelSlicesZ = 128;
 	};
 
 	// Memory Usage:
@@ -131,6 +131,9 @@ namespace Frost
 		
 		virtual void Init(SceneRenderPassPipeline* renderPassPipeline) = 0;
 		virtual void ImGuiRender() = 0;
+
+		virtual void StartTimeStapForPass(const std::string& passName) = 0;
+		virtual void EndTimeStapForPass(const std::string& passName) = 0;
 
 		static Ref<RendererDebugger> Create();
 	};

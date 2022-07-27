@@ -63,8 +63,8 @@ namespace Frost
 
 
 		// ---------------- Hillaire 2020 -------------------------
-		void ApplyAerialInitData(uint32_t width, uint32_t height);
-		void ApplyAerialUpdate(const RenderQueue& renderQueue);
+		void ApplyAerialInitData(uint32_t width, uint32_t height); // Deprecated
+		void ApplyAerialUpdate(const RenderQueue& renderQueue);	   // Deprecated
 		// --------------------------------------------------------
 
 

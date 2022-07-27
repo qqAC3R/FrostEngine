@@ -73,7 +73,7 @@ namespace Frost
 			Vector<HeapBlock> IndirectVoxelCmdBuffer;
 
 
-			int32_t m_VoxelGrid = 256;
+			int32_t m_VoxelGrid;
 			float m_VoxelSize = 1.0f;
 			glm::vec3 VoxelCameraPosition = { 0.0f, 0.0f, 0.0f };
 			float m_VoxelAABB = 0.0f;
@@ -89,7 +89,6 @@ namespace Frost
 		struct VoxelizationPushConstant
 		{
 			glm::mat4 ViewMatrix;
-			glm::mat4 LightViewProj;
 
 			uint32_t MaterialIndex;
 			uint64_t VertexBufferBDA;
@@ -105,14 +104,14 @@ namespace Frost
 			glm::vec3 CameraPosition;
 			float VoxelTextureSize;
 
-			int32_t UseIndirectDiffuse = 1;
-			int32_t UseIndirectSpecular = 1;
+			int32_t UseIndirectDiffuse = 0;
+			int32_t UseIndirectSpecular = 0;
 
-			float ConeTraceMaxDistance = 200.0f;
-			int32_t ConeTraceMaxSteps = 100;
+			float ConeTraceMaxDistance = 100.0f;
+			int32_t ConeTraceMaxSteps = 80;
 		} m_VCTPushConstant;
 
-		int32_t m_EnableVoxelization = 1;
+		int32_t m_EnableVoxelization = 0;
 
 		InternalData* m_Data;
 		std::string m_Name;

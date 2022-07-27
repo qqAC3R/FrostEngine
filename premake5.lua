@@ -30,8 +30,6 @@ IncludeDir["vma"] = "Frost/vendor/VulkanMemoryAllocator/include"
 IncludeDir["ImGui"] = "Frost/vendor/ImGui"
 IncludeDir["ImGuizmo"] = "Frost/vendor/ImGuizmo"
 IncludeDir["SPIRV_Cross"] = "Frost/vendor/VulkanSDK/SPIRV-Cross/include"
-IncludeDir["yaml_cpp"] = "Frost/vendor/yaml-cpp/include"
-IncludeDir["VkBootstrap"] = "Frost/vendor/VkBootstrap/src"
 IncludeDir["entt"] = "Frost/vendor/entt/include"
 
 LibraryDir = {}
@@ -56,8 +54,6 @@ group "Dependencies"
 	include "Frost/vendor/GLFW"
 	include "Frost/vendor/nvvk/shared_sources"
 	include "Frost/vendor/ImGui"
-	include "Frost/vendor/yaml-cpp"
-	include "Frost/vendor/VkBootstrap"
 group ""
 
 group "Core"
@@ -115,8 +111,6 @@ project "Frost"
 		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.SPIRV_Cross}",
-		"%{IncludeDir.yaml_cpp}",
-		"%{IncludeDir.VkBootstrap}",
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.nvvk}"
 	}
@@ -130,15 +124,11 @@ project "Frost"
 	{
 		"GLFW",
 		"ImGui",
-		"VkBootstrap",
 		"nvvk",
-		"yaml-cpp",
 
 		"assimp-vc142-mt.lib",
 		"vulkan-1.lib",
 	}
-
-	
 
 	libdirs
 	{
