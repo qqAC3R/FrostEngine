@@ -118,7 +118,7 @@ namespace Frost
 		{
 			m_Data->VoxelizationDescriptor[i] = Material::Create(m_Data->VoxelizationShader, "Voxelization_Material");
 
-			auto& instanceSpec = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->MaterialSpecs[i];
+			auto instanceSpec = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->MaterialSpecs[i];
 
 			Ref<VulkanMaterial> descriptor = m_Data->VoxelizationDescriptor[i].As<VulkanMaterial>();
 			VkDescriptorSet descriptorSet = descriptor->GetVulkanDescriptorSet(0);
@@ -202,16 +202,16 @@ namespace Frost
 		// If we have 0 meshes, we shouldnt render this pass
 		if (renderQueue.GetQueueSize() == 0) return;
 
-		VulkanRenderer::BeginTimeStampPass("Voxelization Pass");
-		if(m_EnableVoxelization)
+		if (m_EnableVoxelization)
+		{
+			VulkanRenderer::BeginTimeStampPass("Voxelization Pass");
 			VoxelizationUpdateRendering(renderQueue);
-		VulkanRenderer::EndTimeStampPass("Voxelization Pass");
+			VulkanRenderer::EndTimeStampPass("Voxelization Pass");
 
-
-		VulkanRenderer::BeginTimeStampPass("Voxel Filter Pass");
-		VoxelFilterUpdate(renderQueue);
-		VulkanRenderer::EndTimeStampPass("Voxel Filter Pass");
-
+			VulkanRenderer::BeginTimeStampPass("Voxel Filter Pass");
+			VoxelFilterUpdate(renderQueue);
+			VulkanRenderer::EndTimeStampPass("Voxel Filter Pass");
+		}
 
 		VulkanRenderer::BeginTimeStampPass("Voxel Cone Tracing Pass");
 		VoxelConeTracingUpdate(renderQueue);

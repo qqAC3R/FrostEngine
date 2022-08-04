@@ -41,6 +41,10 @@ namespace Frost
 			m_IsLoaded = false;
 			return;
 		}
+		else
+		{
+			m_IsLoaded = true;
+		}
 
 		m_Width = width;
 		m_Height = height;

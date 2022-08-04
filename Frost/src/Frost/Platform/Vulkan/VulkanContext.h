@@ -21,7 +21,7 @@ namespace Frost
 		virtual WindowDimension GetWindowDimension() override { return WindowDimension(); }
 
 		static const Scope<VulkanSwapChain>& GetSwapChain() { return m_SwapChain; }
-		static const Scope<VulkanDevice>& GetCurrentDevice() { return m_Device; }
+		static const Scope<VulkanDevice>& GetCurrentDevice() { return m_LogicalDevice; }
 		static VkPipelineBindPoint GetVulkanGraphicsType(GraphicsType type);
 		static VkInstance GetInstance() { return m_Instance; }
 
@@ -41,18 +41,25 @@ namespace Frost
 			vkSetDebugUtilsObjectNameEXT(device, &debugName);
 		}
 
+		static bool ValidationLayersEnabled() { return m_EnableValidationLayers; }
+
 	private:
-		void InitFunctionPointers();
+		void CreateInstance();
+		void CreateDebugMessenger();
+		void LoadVulkanFunctionPointers();
+
 
 	private:
 		GLFWwindow* m_Window;
 
 		static VkInstance m_Instance;
 		static VkDebugUtilsMessengerEXT m_DebugMessenger;
+		static bool m_EnableValidationLayers;
+
 		static uint32_t m_VulkanAPIVersion;
 
-		static Scope<VulkanDevice> m_Device;
-		//static Scope<VulkanPhysicalDevice> m_PhysicalDevice;
+		static Scope<VulkanDevice> m_LogicalDevice;
+		static Scope<VulkanPhysicalDevice> m_PhysicalDevice;
 		static Scope<VulkanSwapChain> m_SwapChain;
 
 		Vector<const char*> m_SupportedInstanceExtensions;

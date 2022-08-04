@@ -2,7 +2,7 @@
 
 #include "Frost/Platform/Vulkan/Vulkan.h"
 
-#include "nvvk/context_vk.hpp"
+//#include "nvvk/context_vk.hpp"
 
 namespace vkb
 {
@@ -40,8 +40,10 @@ namespace Frost
 	{
 		struct QueueFamily
 		{
-			uint32_t Index;
+			uint32_t Index = UINT32_MAX;
 			VkQueue Queue;
+
+			operator bool() const { return Index != UINT32_MAX; }
 		};
 
 		QueueFamily GraphicsFamily;
@@ -54,21 +56,20 @@ namespace Frost
 		Graphics, Compute
 	};
 
-	/*
+
 	class VulkanPhysicalDevice
 	{
 	public:
-		VulkanPhysicalDevice(vkb::Instance vkbInstance);
+		VulkanPhysicalDevice(VkInstance instance);
 		virtual ~VulkanPhysicalDevice();
 
+		VkPhysicalDevice GetVulkanPhysicalDevice() const { return m_PhysicalDevice; }
+	private:
+		void PickPhysicalDevice(VkInstance instance);
 	private:
 		VkPhysicalDevice m_PhysicalDevice;
-		//vkb::PhysicalDevice m_Handle;
-		std::vector<const char*> m_RequiredPhysicalDeviceExtensions;
-
-		friend class VulkanDevice;
 	};
-	*/
+
 
 	class VulkanDevice
 	{
@@ -76,25 +77,27 @@ namespace Frost
 		VulkanDevice();
 		virtual ~VulkanDevice();
 
-		void Init(VkInstance& instance, VkDebugUtilsMessengerEXT& dbMessenger);
+		//void Init(VkInstance& instance, VkDebugUtilsMessengerEXT& dbMessenger);
 		//void Init(const Scope<VulkanPhysicalDevice>& physicalDevice);
+		void Init(const Scope<VulkanPhysicalDevice>& physicalDevice);
 		void ShutDown();
 
 		VkDevice GetVulkanDevice() const { return m_LogicalDevice; }
 		VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
 
-		QueueFamilyIndices FindQueueFamilies(const VkPhysicalDevice& device);
-		const QueueFamilies& GetQueueFamilies() { return m_QueueFamilies; }
-
-		VkFormat FindDepthFormat();
+		//QueueFamilyIndices FindQueueFamilies(const VkPhysicalDevice& device);
+		const QueueFamilies& GetQueueFamilies() { return m_FamilyQueues; }
 
 		VkCommandBuffer AllocateCommandBuffer(RenderQueueType queueType = RenderQueueType::Graphics, bool beginRecording = false);
 		void FlushCommandBuffer(VkCommandBuffer commandBuffer, RenderQueueType queueType = RenderQueueType::Graphics);
 
 	private:
-		void CreateDevice(std::vector<const char*> enabledExtensions, void* pNextChain, bool useSwapChain, VkQueueFlags requestedQueueTypes);
-		bool ExtensionSupported(std::string extension) { return false; }
-		VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+		//void CreateDevice(std::vector<const char*> enabledExtensions, void* pNextChain, bool useSwapChain, VkQueueFlags requestedQueueTypes);
+		//bool ExtensionSupported(std::string extension) { return false; }
+		//VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+	private:
+		void CreateLogicalDevice(VkPhysicalDevice physicalDevice);
+
 	private:
 		VkPhysicalDevice m_PhysicalDevice;
 		VkDevice m_LogicalDevice;
@@ -102,13 +105,13 @@ namespace Frost
 		VkCommandPool m_CommandPool;
 		VkCommandPool m_ComputeCommandPool;
 
-		QueueFamilies m_QueueFamilies{};
+		QueueFamilies m_FamilyQueues;
 
-		vk::PhysicalDeviceAccelerationStructureFeaturesKHR accelFeature;
-		vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeature;
+		//vk::PhysicalDeviceAccelerationStructureFeaturesKHR accelFeature;
+		//vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeature;
 
 
-		nvvk::Context vkctx;
+		//nvvk::Context vkctx;
 
 		friend class VulkanRenderer;
 	};

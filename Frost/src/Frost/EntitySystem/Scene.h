@@ -18,14 +18,18 @@ namespace Frost
 
 		Entity CreateEntity(const std::string name = "New Entity");
 		Entity CreateEntityWithID(const UUID& id, const std::string name = "New Entity");
+		void ParentEntity(Entity& parent, Entity& entity);
+		
+		void UnparentEntity(Entity& child);
 		void DestroyEntity(Entity entity);
+
+		const glm::mat4& GetTransformMatFromEntityAndParent(Entity entity);
+		void ConvertEntityToParentTransform(Entity entity);
 
 		Entity FindEntityByUUID(UUID id);
 
 		entt::registry& GetRegistry() { return m_Registry; }
 		const entt::registry& GetRegistry() const { return m_Registry; }
-
-	private:
 
 	private:
 		entt::registry m_Registry;

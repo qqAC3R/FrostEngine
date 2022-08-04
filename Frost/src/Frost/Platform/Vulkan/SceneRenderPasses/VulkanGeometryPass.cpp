@@ -265,7 +265,7 @@ namespace Frost
 
 		// `Instance data` offset.
 		//  Allocating here the `InstanceData`, because if we allocate it for every submesh in the scene, it will be way more expensive
-		MaterialData instData{};
+		//MaterialData instData{};
 		uint32_t materialDataOffset = 0;
 
 		// Get all the indirect draw commands
@@ -338,24 +338,26 @@ namespace Frost
 				// Setting up the material data into a storage buffer
 				DataStorage& materialData = mesh->GetMaterialData(k);
 
-#if 1
+#if 0
 				// Textures
 				instData.AlbedoTextureID = materialData.Get<uint32_t>("AlbedoTexture");
 				instData.RoughessTextureID = materialData.Get<uint32_t>("RoughnessTexture");
 				instData.MetalnessTextureID = materialData.Get<uint32_t>("MetalnessTexture");
 				instData.NormalTextureID = materialData.Get<uint32_t>("NormalTexture");
-
+				
 				instData.UseNormalMap = materialData.Get<uint32_t>("UseNormalMap");
-
+				
 				// PBR values
 				instData.AlbedoColor = glm::vec4(materialData.Get<glm::vec3>("AlbedoColor"), 1.0f);
 				instData.Roughness = materialData.Get<float>("RoughnessFactor");
 				instData.Metalness = materialData.Get<float>("MetalnessFactor");
 				instData.Emission = materialData.Get<float>("EmissionFactor");
-#endif
 
 				// The data collected from the mesh, should be written into a cpu buffer, which will later be copied into a storage buffer
-				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write((void*)&instData, sizeof(MaterialData), materialDataOffset);
+				//m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write((void*)&instData, sizeof(MaterialData), materialDataOffset);
+#endif
+
+				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write((void*)materialData, sizeof(MaterialData), materialDataOffset);
 
 				materialDataOffset += sizeof(MaterialData);
 			}

@@ -177,6 +177,7 @@ namespace Frost
 
 				// Material editor rendering
 				m_MaterialEditor->SetActiveEntity(m_SceneHierarchyPanel->GetSelectedEntity());
+				m_MaterialEditor->SetActiveSubmesh(m_SceneHierarchyPanel->GetSelectedEntitySubmesh());
 				m_MaterialEditor->Render();
 
 				// Asset browser rendering
@@ -222,9 +223,9 @@ namespace Frost
 						);
 
 
-						// Entity
+						// Get the world position for the entity, then we will convert it in local position (if it is a child)
+						glm::mat4 transform = m_EditorScene->GetTransformMatFromEntityAndParent(selectedEntity);
 						TransformComponent& tc = selectedEntity.GetComponent<TransformComponent>();
-						glm::mat4 transform = tc.GetTransform();
 
 						// Snapping
 						bool snap = Input::IsKeyPressed(Key::LeftControl);
@@ -248,6 +249,15 @@ namespace Frost
 
 						if (ImGuizmo::IsUsing() && !Input::IsKeyPressed(Key::LeftAlt) && !Input::IsMouseButtonPressed(Mouse::Button1))
 						{
+							Entity parent = m_EditorScene->FindEntityByUUID(selectedEntity.GetParent());
+
+							// If the entity has a parent, then the transform should be converted from local space to world space
+							if (parent)
+							{
+								glm::mat4 parentTransform = m_EditorScene->GetTransformMatFromEntityAndParent(parent);
+								transform = glm::inverse(parentTransform) * transform;
+							}
+
 							glm::vec3 translation, rotation, scale;
 							Math::DecomposeTransform(transform, translation, rotation, scale);
 

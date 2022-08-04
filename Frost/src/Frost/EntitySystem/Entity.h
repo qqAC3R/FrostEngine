@@ -40,7 +40,39 @@ namespace Frost
 			return m_Scene->GetRegistry().any_of<T>(m_Handle);
 		}
 
+		bool IsAncesterOf(Entity entity)
+		{
+			const auto& children = GetComponent<ParentChildComponent>().ChildIDs;
+
+			if (children.empty())
+				return false;
+
+			// Check children's UUIDs
+			for (UUID child : children)
+			{
+				if (child == entity.GetUUID())
+					return true;
+			}
+			
+			// If not, check the children's of the children UUIDs (recursive)
+			for (UUID child : children)
+			{
+				if (m_Scene->FindEntityByUUID(child).IsAncesterOf(entity))
+					return true;
+			}
+
+			return false;
+		}
+
+		bool IsChildOf(Entity entity)
+		{
+			return entity.IsAncesterOf(*this);
+		}
+
 		UUID GetUUID() { return GetComponent<IDComponent>().ID; }
+		UUID GetParent() { return GetComponent<ParentChildComponent>().ParentID; }
+		const Vector<UUID>& GetChildren() { return GetComponent<ParentChildComponent>().ChildIDs; }
+
 		entt::entity Raw() { return m_Handle; }
 
 		operator bool() const { return m_Handle != entt::null; }

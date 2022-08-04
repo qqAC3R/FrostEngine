@@ -39,19 +39,16 @@ namespace Frost
 		{
 			//m_IsResized = true;
 
-			m_IsResized = false;
+			m_IsResized = true;
 			m_IsResized_Internal = true;
 
 			m_ViewportSize = *(glm::vec2*)&viewPortSizePanel;
 		}
 		else
 		{
-			//if (m_IsResized)
-			//	m_WasResized = true;
-			//else
-			//	m_WasResized = false;
 
-			//if (!Input::IsMouseButtonPressed(Mouse::Button1))
+			//m_IsResized = false;
+#if 1
 			if(m_IsResized_Internal && !Input::IsMouseButtonPressed(Mouse::Button0))
 			{
 				m_IsResized = true;
@@ -61,6 +58,7 @@ namespace Frost
 			{
 				m_IsResized = false;
 			}
+#endif
 
 		}
 	}

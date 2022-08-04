@@ -21,6 +21,16 @@ namespace Frost
 		UUID ID;
 	};
 
+	struct ParentChildComponent
+	{
+		ParentChildComponent() = default;
+		ParentChildComponent(const UUID& parentID)
+			: ParentID(parentID), ChildIDs({}) {}
+
+		UUID ParentID = 0;
+		Vector<UUID> ChildIDs;
+	};
+
 	struct TagComponent
 	{
 		TagComponent() = default;

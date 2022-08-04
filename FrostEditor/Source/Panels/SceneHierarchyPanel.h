@@ -27,12 +27,21 @@ namespace Frost
 		}
 
 		Entity& GetSelectedEntity() { return m_SelectedEntity; }
+		uint32_t GetSelectedEntitySubmesh() { return m_SelectedSubmesh; }
 
 	private:
 		void DrawEntityNode(Entity& entity);
+
+		void AddLateFunction(const std::function<void()>& func);
+		void ExecuteLateFunctions();
 	private:
 		Ref<Scene> m_SceneContext = nullptr;
 		Entity m_SelectedEntity = {};
+
+		Vector<std::function<void()>> m_LateDeletionFunctions;
+
+		// This is optional, and only works when the selected entity has a mesh component
+		uint32_t m_SelectedSubmesh = UINT32_MAX;
 
 		bool m_Visibility = true;
 	};

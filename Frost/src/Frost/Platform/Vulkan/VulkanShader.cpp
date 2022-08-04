@@ -142,7 +142,7 @@ namespace Frost
 		const bool optimize = false;
 		if (optimize)
 			options.SetOptimizationLevel(shaderc_optimization_level_performance);
-
+		
 		std::filesystem::path cacheDirectory = Utils::GetShaderCacheDirectory();
 
 		auto& shaderData = m_VulkanSPIRV;
@@ -154,9 +154,9 @@ namespace Frost
 			std::filesystem::path cachedPath = cacheDirectory / (shaderFilePath.filename().string() + Utils::ShaderStageCachedFileExtension(stage));
 
 			std::ifstream in(cachedPath, std::ios::in | std::ios::binary);
-
-			//if (in.is_open())
-			if (false) // TODO: Hash the shader source code
+			
+			if (in.is_open())
+			//if (false) // TODO: Hash the shader source code
 			{
 				bool isChanged = IsFiledChanged();
 

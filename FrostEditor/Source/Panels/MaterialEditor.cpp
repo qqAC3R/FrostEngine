@@ -33,6 +33,14 @@ namespace Frost
 
 			if (selectedEntityMesh.Mesh)
 			{
+				if (m_SelectedSubmesh != UINT32_MAX)
+				{
+					const Submesh& selectedSubmesh = selectedEntityMesh.Mesh->GetSubMeshes()[m_SelectedSubmesh];
+					m_SelectedMaterialIndex = selectedSubmesh.MaterialIndex;
+				}
+
+				/*
+				
 				uint32_t idCounter = 0;
 				for (uint32_t i = 0; i < selectedEntityMesh.Mesh->GetMaterialCount(); i++)
 				{
@@ -68,7 +76,7 @@ namespace Frost
 
 
 					ImGui::PopID();
-				}
+					*/
 			}
 		}
 		ImGui::End();

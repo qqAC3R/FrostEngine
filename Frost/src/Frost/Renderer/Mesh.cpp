@@ -235,19 +235,6 @@ namespace Frost
 				m_MaterialData[i].Set("RoughnessTexture", m_TextureAllocatorSlots[roughnessTextureIndex]);
 				m_MaterialData[i].Set("MetalnessTexture", m_TextureAllocatorSlots[metalnessTextureIndex]);
 
-				/*
-				// Sometimes there could be more materials then submeshes (for some odd reason)
-				if (i < m_Submeshes.size())
-				{
-					m_MaterialData[i].Add("ModelMatrix", m_Submeshes[i].Transform);
-				}
-				else
-				{
-					m_MaterialData[i].Add("ModelMatrix", glm::mat4(1.0f));
-				}
-				*/
-
-
 				auto aiMaterial = scene->mMaterials[i];
 				auto aiMaterialName = aiMaterial->GetName();
 
