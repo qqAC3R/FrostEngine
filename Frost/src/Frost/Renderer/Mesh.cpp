@@ -9,9 +9,13 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <assimp/Importer.hpp>
+#include <assimp/DefaultLogger.hpp>
+#include <assimp/LogStream.hpp>
 
 #include <cmath>
 #include <filesystem>
+
+#define MAX_BONES 200
 
 namespace Frost
 {
@@ -23,7 +27,7 @@ namespace Frost
 
 	namespace Utils
 	{
-		glm::mat4 AssimpMat4ToGlmMat4(const aiMatrix4x4& matrix)
+		static glm::mat4 AssimpMat4ToGlmMat4(const aiMatrix4x4& matrix)
 		{
 			glm::mat4 result;
 			result[0][0] = matrix.a1; result[1][0] = matrix.a2; result[2][0] = matrix.a3; result[3][0] = matrix.a4;
@@ -48,12 +52,12 @@ namespace Frost
 	Mesh::Mesh(const std::string& filepath, MaterialInstance material)
 		: m_Material(material), m_Filepath(filepath)
 	{
-		Assimp::Importer* m_Importer = new Assimp::Importer;
+		m_Importer = CreateScope<Assimp::Importer>();
 
 		const aiScene* scene = m_Importer->ReadFile(filepath, Utils::s_MeshImportFlags);
 		FROST_ASSERT(!(!scene || !scene->HasMeshes()), m_Importer->GetErrorString());
 
-		m_MeshShader = Renderer::GetShaderLibrary()->Get("GeometryPass");
+		m_Scene = scene;
 		m_IsLoaded = true;
 
 		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
@@ -68,6 +72,10 @@ namespace Frost
 
 		uint32_t vertexCount = 0;
 		uint32_t indexCount = 0;
+		m_IsAnimated = scene->mAnimations != nullptr;
+
+		//m_IsAnimated = false;
+
 
 		Vector<Index> submeshIndices;
 		uint32_t maxIndex = 0;
@@ -96,36 +104,58 @@ namespace Frost
 			aabb.Max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 			for (size_t i = 0; i < mesh->mNumVertices; i++)
 			{
-				Vertex vertex;
-				vertex.Position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
-				vertex.Normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
-				
-				vertex.MeshIndex = (float)mesh->mMaterialIndex;
-				//vertex.MeshIndex = (float)m_TextureAllocatorSlots[mesh->mMaterialIndex * 4];
-
-
-				aabb.Min.x = glm::min(vertex.Position.x, aabb.Min.x);
-				aabb.Min.y = glm::min(vertex.Position.y, aabb.Min.y);
-				aabb.Min.z = glm::min(vertex.Position.z, aabb.Min.z);
-				aabb.Max.x = glm::max(vertex.Position.x, aabb.Max.x);
-				aabb.Max.y = glm::max(vertex.Position.y, aabb.Max.y);
-				aabb.Max.z = glm::max(vertex.Position.z, aabb.Max.z);
-
-				// Setting up the bounding box into the submesh
-				submesh.BoundingBox = Math::BoundingBox(aabb.Min, aabb.Max);
-
-				if (mesh->HasTangentsAndBitangents())
+				if (m_IsAnimated)
 				{
-					vertex.Tangent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
-					vertex.Bitangent = { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z };
+					AnimatedVertex vertex;
+					vertex.Position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
+					vertex.Normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
+
+					vertex.MeshIndex = (float)mesh->mMaterialIndex;
+
+					if (mesh->HasTangentsAndBitangents())
+					{
+						vertex.Tangent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
+						vertex.Bitangent = { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z };
+					}
+
+					if (mesh->HasTextureCoords(0))
+						vertex.TexCoord = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+					else
+						vertex.TexCoord = { 0.0f, 0.0f };
+
+					m_AnimatedVertices.push_back(vertex);
 				}
-
-				if (mesh->HasTextureCoords(0))
-					vertex.TexCoord = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
 				else
-					vertex.TexCoord = { 0.0f, 0.0f };
+				{
+					Vertex vertex;
+					vertex.Position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
+					vertex.Normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
 
-				m_Vertices.push_back(vertex);
+					vertex.MeshIndex = (float)mesh->mMaterialIndex;
+
+					aabb.Min.x = glm::min(vertex.Position.x, aabb.Min.x);
+					aabb.Min.y = glm::min(vertex.Position.y, aabb.Min.y);
+					aabb.Min.z = glm::min(vertex.Position.z, aabb.Min.z);
+					aabb.Max.x = glm::max(vertex.Position.x, aabb.Max.x);
+					aabb.Max.y = glm::max(vertex.Position.y, aabb.Max.y);
+					aabb.Max.z = glm::max(vertex.Position.z, aabb.Max.z);
+
+					// Setting up the bounding box into the submesh
+					submesh.BoundingBox = Math::BoundingBox(aabb.Min, aabb.Max);
+
+					if (mesh->HasTangentsAndBitangents())
+					{
+						vertex.Tangent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
+						vertex.Bitangent = { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z };
+					}
+
+					if (mesh->HasTextureCoords(0))
+						vertex.TexCoord = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+					else
+						vertex.TexCoord = { 0.0f, 0.0f };
+
+					m_Vertices.push_back(vertex);
+				}
 			}
 
 			uint32_t subMeshLastIndex = 0;
@@ -137,9 +167,9 @@ namespace Frost
 				Index index = { mesh->mFaces[i].mIndices[0], mesh->mFaces[i].mIndices[1], mesh->mFaces[i].mIndices[2] };
 				m_Indices.push_back(index);
 
-				m_TriangleCache[m].emplace_back(
-					m_Vertices[index.V1 + submesh.BaseVertex], m_Vertices[index.V2 + submesh.BaseVertex], m_Vertices[index.V3 + submesh.BaseVertex]
-				);
+				//m_TriangleCache[m].emplace_back(
+				//	m_Vertices[index.V1 + submesh.BaseVertex], m_Vertices[index.V2 + submesh.BaseVertex], m_Vertices[index.V3 + submesh.BaseVertex]
+				//);
 
 				// ------------------------------
 				index = { maxIndex + mesh->mFaces[i].mIndices[0], maxIndex + mesh->mFaces[i].mIndices[1], maxIndex + mesh->mFaces[i].mIndices[2] };
@@ -160,13 +190,73 @@ namespace Frost
 		// Traverse over every mesh to get the transforms
 		TraverseNodes(scene->mRootNode);
 
+
+		// Bones
+		if (m_IsAnimated)
+		{
+			for (size_t m = 0; m < scene->mNumMeshes; m++)
+			{
+				aiMesh* mesh = scene->mMeshes[m];
+				Submesh& submesh = m_Submeshes[m];
+
+				for (size_t i = 0; i < mesh->mNumBones; i++)
+				{
+					aiBone* bone = mesh->mBones[i];
+					std::string boneName(bone->mName.data);
+					int boneIndex = 0;
+
+					if (m_BoneMapping.find(boneName) == m_BoneMapping.end())
+					{
+						// Allocate an index for a new bone
+						boneIndex = m_BoneCount;
+						m_BoneCount++;
+
+						BoneInfo boneInfo;
+						boneInfo.BoneOffset = Utils::AssimpMat4ToGlmMat4(bone->mOffsetMatrix);
+						m_BoneInfo.push_back(boneInfo);
+
+						m_BoneMapping[boneName] = boneIndex;
+					}
+					else
+					{
+						//FROST_CORE_INFO("Found existing bone in bone map");
+						boneIndex = m_BoneMapping[boneName];
+					}
+
+					for (size_t j = 0; j < bone->mNumWeights; j++)
+					{
+						int VertexID = submesh.BaseVertex + bone->mWeights[j].mVertexId;
+						float Weight = bone->mWeights[j].mWeight;
+						m_AnimatedVertices[VertexID].AddBoneData(boneIndex, Weight);
+					}
+				}
+			}
+
+			m_BoneTransforms.reserve(MAX_BONES);
+			m_BoneTransforms.resize(m_BoneCount);
+
+
+			m_Animations.resize(scene->mNumAnimations);
+			for (size_t m = 0; m < scene->mNumAnimations; m++)
+			{
+				const aiAnimation* animation = scene->mAnimations[m];
+				m_Animations[m] = Ref<Animation>::Create(animation, this);
+			}
+		}
+
+
+
 		{
 			// Timer
 			std::string timerText = m_Filepath + " buffers creation";
 			Timer timer(timerText.c_str());
 
 			// Vertex/Index buffer
-			m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
+			if(m_IsAnimated)
+				m_VertexBuffer = VertexBuffer::Create(m_AnimatedVertices.data(), m_AnimatedVertices.size() * sizeof(AnimatedVertex));
+			else
+				m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
+
 			m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)m_Indices.size() * sizeof(Index));
 
 			// Instanced vertex buffer
@@ -176,8 +266,17 @@ namespace Frost
 			m_VertexBufferInstanced_CPU.resize(framesInFlight);
 			for (uint32_t i = 0; i < framesInFlight; i++)
 			{
-				m_VertexBufferInstanced_CPU[i].Allocate(m_Submeshes.size() * sizeof(SubmeshInstanced) + 1);
 				m_VertexBufferInstanced[i] = BufferDevice::Create(m_Submeshes.size() * sizeof(SubmeshInstanced), {BufferUsage::Vertex});
+				m_VertexBufferInstanced_CPU[i].Allocate(m_Submeshes.size() * sizeof(SubmeshInstanced) + 1);
+			}
+
+			if (m_IsAnimated)
+			{
+				m_BoneTransformsUniformBuffer.resize(framesInFlight);
+				for (uint32_t i = 0; i < framesInFlight; i++)
+				{
+					m_BoneTransformsUniformBuffer[i] = UniformBuffer::Create(sizeof(glm::mat4) * MAX_BONES);
+				}
 			}
 
 
@@ -191,11 +290,11 @@ namespace Frost
 			m_AccelerationStructure = BottomLevelAccelerationStructure::Create(meshInfo);
 		}
 
-
+		// Materials
 		if (scene->HasMaterials())
 		{
 			m_Textures.reserve(scene->mNumMaterials);
-			m_Materials.resize(scene->mNumMaterials);
+			//m_Materials.resize(scene->mNumMaterials);
 			m_MaterialData.resize(scene->mNumMaterials);
 
 			for (uint32_t i = 0; i < scene->mNumMaterials; i++)
@@ -238,8 +337,8 @@ namespace Frost
 				auto aiMaterial = scene->mMaterials[i];
 				auto aiMaterialName = aiMaterial->GetName();
 
-				auto mi = Material::Create(m_MeshShader, aiMaterialName.data);
-				m_Materials[i] = mi;
+				//auto mi = Material::Create(m_MeshShader, aiMaterialName.data);
+				//m_Materials[i] = mi;
 				
 				uint32_t textureCount = aiMaterial->GetTextureCount(aiTextureType_DIFFUSE);
 
@@ -249,14 +348,14 @@ namespace Frost
 				{
 					glm::vec3 materialColor = { aiColor.r, aiColor.g, aiColor.b };
 
-					mi->Set("u_MaterialUniform.AlbedoColor", materialColor);
+					//mi->Set("u_MaterialUniform.AlbedoColor", materialColor);
 					m_MaterialData[i].Set("AlbedoColor", glm::vec4(materialColor, 1.0f));
 				}
 
 				// Geting the emission factor
 				if (aiMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, aiEmission) == AI_SUCCESS)
 				{
-					mi->Set("u_MaterialUniform.Emission", aiEmission.r);
+					////mi->Set("u_MaterialUniform.Emission", aiEmission.r);
 					m_MaterialData[i].Set("EmissionFactor", aiEmission.r);
 				}
 
@@ -274,8 +373,8 @@ namespace Frost
 				float roughness = 1.0f - glm::sqrt(shininess / 100.0f);
 				if (roughness == 1.0f) roughness = 0.99f;
 
-				mi->Set("u_MaterialUniform.Roughness", roughness);
-				mi->Set("u_MaterialUniform.Metalness", metalness);
+				////mi->Set("u_MaterialUniform.Roughness", roughness);
+				////mi->Set("u_MaterialUniform.Metalness", metalness);
 				m_MaterialData[i].Set("RoughnessFactor", roughness);
 				m_MaterialData[i].Set("MetalnessFactor", metalness);
 
@@ -301,8 +400,8 @@ namespace Frost
 
 						texture->GenerateMipMaps();
 						m_Textures[textureId] = texture;
-						mi->Set("u_AlbedoTexture", texture);
-						mi->Set("u_MaterialUniform.AlbedoColor", glm::vec3(1.0f));
+						//mi->Set("u_AlbedoTexture", texture);
+						//mi->Set("u_MaterialUniform.AlbedoColor", glm::vec3(1.0f));
 
 						VulkanBindlessAllocator::AddTextureCustomSlot(texture, textureId);
 					}
@@ -312,7 +411,7 @@ namespace Frost
 
 						uint32_t textureId = m_TextureAllocatorSlots[albedoTextureIndex];
 						m_Textures[textureId] = whiteTexture;
-						mi->Set("u_AlbedoTexture", whiteTexture);
+						//mi->Set("u_AlbedoTexture", whiteTexture);
 						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 				}
@@ -320,7 +419,7 @@ namespace Frost
 				{
 					uint32_t textureId = m_TextureAllocatorSlots[albedoTextureIndex];
 					m_Textures[textureId] = whiteTexture;
-					mi->Set("u_AlbedoTexture", whiteTexture);
+					//mi->Set("u_AlbedoTexture", whiteTexture);
 					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 				}
 
@@ -342,8 +441,8 @@ namespace Frost
 					{
 						uint32_t textureId = m_TextureAllocatorSlots[normalMapTextureIndex];
 						m_Textures[textureId] = texture;
-						mi->Set("u_NormalTexture", texture);
-						mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(1));
+						//mi->Set("u_NormalTexture", texture);
+						//mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(1));
 
 						m_MaterialData[i].Set("UseNormalMap", uint32_t(1));
 						VulkanBindlessAllocator::AddTextureCustomSlot(texture, textureId);
@@ -351,8 +450,8 @@ namespace Frost
 					else
 					{
 						FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
-						mi->Set("u_NormalTexture", whiteTexture);
-						mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
+						//mi->Set("u_NormalTexture", whiteTexture);
+						//mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
 
 						uint32_t textureId = m_TextureAllocatorSlots[normalMapTextureIndex];
 						m_Textures[textureId] = whiteTexture;
@@ -362,8 +461,8 @@ namespace Frost
 				}
 				else
 				{
-					mi->Set("u_NormalTexture", whiteTexture);
-					mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
+					////mi->Set("u_NormalTexture", whiteTexture);
+					////mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
 
 					uint32_t textureId = m_TextureAllocatorSlots[normalMapTextureIndex];
 					m_Textures[textureId] = whiteTexture;
@@ -390,7 +489,7 @@ namespace Frost
 					{
 						uint32_t textureId = m_TextureAllocatorSlots[roughnessTextureIndex];
 						m_Textures[textureId] = texture;
-						mi->Set("u_RoughnessTexture", texture);
+						////mi->Set("u_RoughnessTexture", texture);
 
 						VulkanBindlessAllocator::AddTextureCustomSlot(texture, textureId);
 					}
@@ -400,7 +499,7 @@ namespace Frost
 
 						uint32_t textureId = m_TextureAllocatorSlots[roughnessTextureIndex];
 						m_Textures[textureId] = whiteTexture;
-						mi->Set("u_RoughnessTexture", whiteTexture);
+						//mi->Set("u_RoughnessTexture", whiteTexture);
 
 						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
@@ -409,7 +508,7 @@ namespace Frost
 				{
 					uint32_t textureId = m_TextureAllocatorSlots[roughnessTextureIndex];
 					m_Textures[textureId] = whiteTexture;
-					mi->Set("u_RoughnessTexture", whiteTexture);
+					//mi->Set("u_RoughnessTexture", whiteTexture);
 
 					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 				}
@@ -444,7 +543,7 @@ namespace Frost
 
 								uint32_t textureId = m_TextureAllocatorSlots[metalnessTextureIndex];
 								m_Textures[textureId] = texture;
-								mi->Set("u_MetalnessTexture", texture);
+								//mi->Set("u_MetalnessTexture", texture);
 
 								VulkanBindlessAllocator::AddTextureCustomSlot(texture, textureId);
 							}
@@ -460,7 +559,7 @@ namespace Frost
 					{
 						uint32_t textureId = m_TextureAllocatorSlots[metalnessTextureIndex];
 						m_Textures[textureId] = whiteTexture;
-						mi->Set("u_MetalnessTexture", whiteTexture);
+						//mi->Set("u_MetalnessTexture", whiteTexture);
 						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 
@@ -469,16 +568,16 @@ namespace Frost
 		}
 		else
 		{
-			auto mi = Material::Create(m_MeshShader, "MeshShader-Default");
-			mi->Set("u_AlbedoTexture", whiteTexture);
-			mi->Set("u_NormalTexture", whiteTexture);
-			mi->Set("u_MetalnessTexture", whiteTexture);
+			//auto mi = Material::Create(m_MeshShader, "MeshShader-Default");
+			//mi->Set("u_AlbedoTexture", whiteTexture);
+			//mi->Set("u_NormalTexture", whiteTexture);
+			//mi->Set("u_MetalnessTexture", whiteTexture);
 
-			mi->Set("u_MaterialUniform.AlbedoColor", glm::vec3(0.8f));
-			mi->Set("u_MaterialUniform.Emission", 0.0f);
-			mi->Set("u_MaterialUniform.Roughness", 0.0f);
-			mi->Set("u_MaterialUniform.Metalness", 0.0f);
-			mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
+			//mi->Set("u_MaterialUniform.AlbedoColor", glm::vec3(0.8f));
+			//mi->Set("u_MaterialUniform.Emission", 0.0f);
+			//mi->Set("u_MaterialUniform.Roughness", 0.0f);
+			//mi->Set("u_MaterialUniform.Metalness", 0.0f);
+			//mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
 		}
 
 		return;
@@ -522,6 +621,33 @@ namespace Frost
 		auto vulkanVBOInstanced = m_VertexBufferInstanced[currentFrameIndex];
 		vulkanVBOInstanced->SetData(vboInstancedDataOffset, m_VertexBufferInstanced_CPU[currentFrameIndex].Data);
 
+		if (m_IsAnimated)
+		{
+			m_BoneTransformsUniformBuffer[currentFrameIndex]->SetData(m_BoneTransforms.data());
+		}
+
+	}
+
+	void Mesh::Update(float deltaTime)
+	{
+		if (m_IsAnimated)
+		{
+			if(m_ActiveAnimation)
+				m_ActiveAnimation->Update(deltaTime);
+			else
+			{
+				for (size_t i = 0; i < m_BoneCount; i++)
+					memset(m_BoneTransforms.data(), 1.0f, m_BoneCount * sizeof(glm::mat4));
+					//m_BoneTransforms[i] = glm::mat4(1.0f);
+			}
+
+
+			
+			
+
+			//BoneTransform(deltaTime);
+			//m_BoneTransformsUniformBuffer[currentFrameIndex]->SetData(m_BoneTransforms.data());
+		}
 	}
 
 	void Mesh::SetNewTexture(uint32_t textureId, Ref<Texture2D> texture)

@@ -168,10 +168,44 @@ namespace Frost
 				}
 			}
 
+			// Draw the mesh's filepath
 			std::string path = UserInterface::DrawFilePath("File Path", meshFilepath, "fbx");
 			if (!path.empty())
 			{
 				component.Mesh = Mesh::Load(path);
+			}
+
+			// Draw Animations
+			if (component.Mesh.Raw() != nullptr)
+			{
+				if (component.Mesh->IsAnimated())
+				{
+					ImGui::Separator();
+					ImGui::Text("Animations");
+
+					const Vector<Ref<Animation>>& animations = component.Mesh->GetAnimations();
+
+					std::string activeAnimationName = "";
+					if (component.ActiveAnimation)
+					{
+						activeAnimationName = component.ActiveAnimation->GetName();
+					}
+
+					if (ImGui::BeginCombo("##animator", activeAnimationName.c_str()))
+					{
+						for (auto& animation : animations)
+						{
+							bool isSelected = (animation.Raw() == component.ActiveAnimation.Raw());
+
+							if (ImGui::Selectable(animation->GetName().c_str(), isSelected))
+								component.ActiveAnimation = animation;
+
+							if (isSelected)
+								ImGui::SetItemDefaultFocus();
+						}
+						ImGui::EndCombo();
+					}
+				}
 			}
 		});
 

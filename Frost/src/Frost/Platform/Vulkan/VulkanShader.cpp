@@ -155,8 +155,8 @@ namespace Frost
 
 			std::ifstream in(cachedPath, std::ios::in | std::ios::binary);
 			
-			if (in.is_open())
-			//if (false) // TODO: Hash the shader source code
+			//if (in.is_open())
+			if (false) // TODO: Hash the shader source code
 			{
 				bool isChanged = IsFiledChanged();
 

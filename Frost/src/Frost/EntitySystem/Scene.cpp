@@ -74,7 +74,7 @@ namespace Frost
 		ConvertEntityToParentTransform(entity);
 	}
 
-	void Scene::Update()
+	void Scene::Update(Timestep ts)
 	{
 		{
 			// Meshes
@@ -87,6 +87,10 @@ namespace Frost
 					glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
 
 					Renderer::Submit(mesh.Mesh, transform);
+
+					if(mesh.ActiveAnimation)
+						mesh.Mesh->SetActiveAnimation(mesh.ActiveAnimation);
+					mesh.Mesh->Update(ts);
 				}
 			}
 		}

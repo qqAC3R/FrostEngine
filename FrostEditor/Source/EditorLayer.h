@@ -92,12 +92,12 @@ namespace Frost
 
 		}
 
-		virtual void OnUpdate(Frost::Timestep ts)
+		virtual void OnUpdate(Timestep ts)
 		{
 			m_EditorCamera.OnUpdate(ts);
 
 			Renderer::BeginScene(m_EditorCamera);
-			m_EditorScene->Update();
+			m_EditorScene->Update(ts);
 			Renderer::EndScene();
 		}
 

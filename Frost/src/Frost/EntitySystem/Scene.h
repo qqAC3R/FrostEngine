@@ -14,7 +14,7 @@ namespace Frost
 		Scene() = default;
 		virtual ~Scene();
 
-		void Update();
+		void Update(Timestep ts);
 
 		Entity CreateEntity(const std::string name = "New Entity");
 		Entity CreateEntityWithID(const UUID& id, const std::string name = "New Entity");

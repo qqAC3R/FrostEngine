@@ -39,7 +39,7 @@ namespace Frost
 		{
 			//m_IsResized = true;
 
-			m_IsResized = true;
+			//m_IsResized = true;
 			m_IsResized_Internal = true;
 
 			m_ViewportSize = *(glm::vec2*)&viewPortSizePanel;

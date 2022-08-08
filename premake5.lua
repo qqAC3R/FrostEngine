@@ -23,12 +23,11 @@ IncludeDir["GLFW"] = "Frost/vendor/GLFW/include"
 IncludeDir["glm"] = "Frost/vendor/glm"
 IncludeDir["stb_image"] = "Frost/vendor/stb_image"
 IncludeDir["spdlog"] = "Frost/vendor/spdlog/include"
-IncludeDir["assimp"] = "Frost/vendor/assimp/assimp/include"
+IncludeDir["assimp"] = "Frost/vendor/assimp/include"
 IncludeDir["assimpLib"] = "Frost/vendor/assimp/lib"
 IncludeDir["vma"] = "Frost/vendor/VulkanMemoryAllocator/include"
 IncludeDir["ImGui"] = "Frost/vendor/ImGui"
 IncludeDir["ImGuizmo"] = "Frost/vendor/ImGuizmo"
---IncludeDir["SPIRV_Cross"] = "Frost/vendor/VulkanSDK/SPIRV-Cross/include"
 IncludeDir["SPIRV_Cross"] = "Frost/vendor/SPIRV-Cross/include"
 
 IncludeDir["shaderc"] = "Frost/vendor/shaderc/Include"
@@ -44,21 +43,9 @@ Library = {}
 Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
 Library["shaderc"] = "Frost/vendor/shaderc/Lib/shaderc_shared.lib"
 
---Library["SPIRV_Cross"] = "Frost/vendor/SPIRV-Cross/include"
-
---LibraryDir["VulkanSDK_Debug"] = "%{wks.location}/Frost/vendor/VulkanSDK/Lib"
---Library["ShaderC_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/shaderc_sharedd.lib"
---Library["SPIRV_Cross_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/spirv-cross-cored.lib"
---Library["SPIRV_Cross_GLSL_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/spirv-cross-glsld.lib"
---Library["SPIRV_Tools_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/SPIRV-Toolsd.lib"
-
---Library["ShaderC_Release"] = "%{LibraryDir.VulkanSDK}/shaderc_shared.lib"
---Library["SPIRV_Cross_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-core.lib"
---Library["SPIRV_Cross_GLSL_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-glsl.lib"
 
 group "Dependencies"
 	include "Frost/vendor/GLFW"
-	--include "Frost/vendor/nvvk/shared_sources"
 	include "Frost/vendor/SPIRV-Cross"
 	include "Frost/vendor/ImGui"
 group ""
@@ -88,9 +75,6 @@ project "Frost"
 
 		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.h",
 		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.cpp",
-		
-		--"%{prj.name}vendor/nvvk/shared_sources/nvvk/**.hpp",
-		--"%{prj.name}vendor/nvvk/shared_sources/nvvk/**.cpp",
 	}
 
 	--filter "files:vendor/ImGuizmo/**.cpp"
@@ -117,10 +101,8 @@ project "Frost"
 		"%{IncludeDir.vma}",
 		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.ImGuizmo}",
-		--"%{IncludeDir.SPIRV_Cross}",
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.SPIRV_Cross}"
-		--"%{IncludeDir.nvvk}"
 	}
 
 	flags
@@ -133,9 +115,7 @@ project "Frost"
 		"GLFW",
 		"ImGui",
 		"SPIR-V_Cross",
-		--"nvvk",
 
-		"assimp-vc142-mt.lib",
 		"shaderc_shared.lib",
 		"vulkan-1.lib"
 	}
@@ -147,12 +127,16 @@ project "Frost"
 		"%{IncludeDir.shadercLib}"
 	}
 
+	libdirs
+	{
+		"%{IncludeDir.assimpLib}/Release"
+	}
 	links
 	{
-		--"%{Library.ShaderC_Debug}",
-		--"%{Library.SPIRV_Cross_Debug}",
-		--"%{Library.SPIRV_Cross_GLSL_Debug}"
+		"assimp-vc143-mt.lib"
 	}
+
+
 
 	filter "system:windows"
 		systemversion "latest"
@@ -161,11 +145,28 @@ project "Frost"
 		defines "FROST_DEBUG"
 		runtime "Debug"
 		symbols "on"
+--		libdirs
+--		{
+--			"%{IncludeDir.assimpLib}/Debug"
+--		}
+--		links
+--		{
+--			"assimp-vc143-mtd.lib"
+--		}
 
 	filter "configurations:Release"
 		defines "FROST_RELEASE"
 		runtime "Release"
 		optimize "on"
+--		libdirs
+--		{
+--			"%{IncludeDir.assimpLib}/Release"
+--		}
+--		links
+--		{
+--			"assimp-vc143-mt.lib"
+--		}
+
 
 	filter "configurations:Dist"
 		defines "FROST_DIST"

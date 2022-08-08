@@ -70,7 +70,8 @@ namespace Frost
 		{
 		}
 
-		Ref<Mesh> Mesh;
+		Ref<Mesh> Mesh = nullptr;
+		Ref<Animation> ActiveAnimation = nullptr;
 	};
 
 	struct PointLightComponent

@@ -120,9 +120,10 @@ namespace Frost
 		struct PushConstant
 		{
 			glm::mat4 ViewMatrix;
-			uint32_t MaterialIndex;
 			uint64_t VertexBufferBDA;
-			uint32_t Padding_ = 0;
+			uint64_t BoneInformationBDA;
+			uint32_t MaterialIndex;
+			uint32_t IsAnimated = 0;
 		};
 
 		InternalData* m_Data;

@@ -136,7 +136,7 @@ namespace Frost
 		bool entityHasSubmeshes = false;
 		if (entity.HasComponent<MeshComponent>())
 		{
-			const MeshComponent& entityMeshComponent = entity.GetComponent<MeshComponent>().Mesh;
+			const MeshComponent& entityMeshComponent = entity.GetComponent<MeshComponent>();
 
 			if (entityMeshComponent.Mesh)
 			{
@@ -215,7 +215,7 @@ namespace Frost
 
 			if (entity.HasComponent<MeshComponent>())
 			{
-				const MeshComponent& entityMeshComponent = entity.GetComponent<MeshComponent>().Mesh;
+				const MeshComponent& entityMeshComponent = entity.GetComponent<MeshComponent>();
 
 				if (entityMeshComponent.Mesh)
 				{

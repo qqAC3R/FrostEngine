@@ -28,7 +28,7 @@ namespace Frost
 			deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && // Must be a dedicated GPU
 			deviceFeatures.geometryShader == VK_TRUE && // Must have geometry shader for voxelization
 			deviceFeatures.multiDrawIndirect == VK_TRUE && // Must have multi draw indirect
-			deviceFeatures.samplerAnisotropy == VK_TRUE    // Must have sampler anisotropu
+			deviceFeatures.samplerAnisotropy == VK_TRUE    // Must have sampler anisotropy
 		);
 	}
 
@@ -114,163 +114,6 @@ namespace Frost
 	{
 	}
 
-	void VulkanDevice::ShutDown()
-	{
-		vkDeviceWaitIdle(m_LogicalDevice);
-
-		vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
-		vkDestroyCommandPool(m_LogicalDevice, m_ComputeCommandPool, nullptr);
-		vkDestroyDevice(m_LogicalDevice, nullptr);
-		//vkctx.deinit();
-	}
-
-
-
-	VkCommandBuffer VulkanDevice::AllocateCommandBuffer(RenderQueueType queueType, bool beginRecording)
-	{
-		VkCommandBuffer cmdBuf;
-
-		VkCommandBufferAllocateInfo allocInfo = {};
-		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.commandPool = queueType == RenderQueueType::Graphics ? m_CommandPool : m_ComputeCommandPool;
-		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		allocInfo.commandBufferCount = 1;
-
-		FROST_VKCHECK(vkAllocateCommandBuffers(m_LogicalDevice, &allocInfo, &cmdBuf));
-
-		if (beginRecording)
-		{
-			VkCommandBufferBeginInfo beginInfo{};
-			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-			FROST_VKCHECK(vkBeginCommandBuffer(cmdBuf, &beginInfo));
-		}
-
-		return cmdBuf;
-	}
-
-	void VulkanDevice::FlushCommandBuffer(VkCommandBuffer commandBuffer, RenderQueueType queueType)
-	{
-		VkQueue graphicsQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().GraphicsFamily.Queue;
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-		vkEndCommandBuffer(commandBuffer);
-
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.pCommandBuffers = &commandBuffer;
-		submitInfo.commandBufferCount = 1;
-
-		// Create fence to ensure that the command buffer has finished executing
-		VkFence fence;
-		VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-		fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-		FROST_VKCHECK(vkCreateFence(m_LogicalDevice, &fenceCreateInfo, nullptr, &fence));
-		FROST_VKCHECK(vkWaitForFences(m_LogicalDevice, 1, &fence, VK_TRUE, UINT64_MAX));
-		vkResetFences(device, 1, &fence);
-
-		// Submit to the queue
-		FROST_VKCHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fence));
-		// Wait for the fence to signal that command buffer has finished executing
-		FROST_VKCHECK(vkWaitForFences(m_LogicalDevice, 1, &fence, VK_TRUE, UINT64_MAX));
-
-		vkDestroyFence(m_LogicalDevice, fence, nullptr);
-
-		VkCommandPool commandPool = queueType == RenderQueueType::Graphics ? m_CommandPool : m_ComputeCommandPool;
-		vkFreeCommandBuffers(m_LogicalDevice, commandPool, 1, &commandBuffer);
-	}
-
-
-
-	/*
-	void VulkanDevice::Init(VkInstance& instance, VkDebugUtilsMessengerEXT& dbMessenger)
-	{
-		
-
-		nvvk::ContextCreateInfo contextInfo;
-		contextInfo.setVersion(1, 2);
-		//contextInfo.addInstanceLayer("VK_LAYER_LUNARG_monitor", true);
-		contextInfo.addInstanceExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, true);
-		contextInfo.addInstanceExtension(VK_EXT_DEBUG_REPORT_EXTENSION_NAME, true);
-		contextInfo.addInstanceExtension(VK_KHR_SURFACE_EXTENSION_NAME);
-		contextInfo.addInstanceExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-		contextInfo.addInstanceExtension(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-
-		contextInfo.addDeviceExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-		contextInfo.addDeviceExtension(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
-		contextInfo.addDeviceExtension(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
-		contextInfo.addDeviceExtension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-		contextInfo.addDeviceExtension(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-
-		contextInfo.addDeviceExtension(VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME);
-		contextInfo.addDeviceExtension(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
-
-		//#RayTracing_Extensions
-		contextInfo.addDeviceExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, false, &accelFeature);
-		contextInfo.addDeviceExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, false, &rtPipelineFeature);
-		contextInfo.addDeviceExtension(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
-		contextInfo.addDeviceExtension(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
-		contextInfo.addDeviceExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-		contextInfo.addDeviceExtension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-		contextInfo.addDeviceExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
-
-
-
-
-		vkctx.initInstance(contextInfo, "Frost Engine", DebugCallback);
-
-		auto compatibleDevices = vkctx.getCompatibleDevices(contextInfo);
-		assert(!compatibleDevices.empty());
-
-		vkctx.initDevice(compatibleDevices[0], contextInfo);
-
-
-
-		VkPhysicalDeviceProperties deviceProperties;
-		vkGetPhysicalDeviceProperties(vkctx.getPhysicalDevice(), &deviceProperties);
-
-		FROST_CORE_INFO("Renderer:");
-		FROST_CORE_INFO("  Vulkan Version: {0}.{1}", contextInfo.apiMajor, contextInfo.apiMinor);
-		FROST_CORE_INFO("  Device: {0}", deviceProperties.deviceName);
-
-
-
-		m_PhysicalDevice = vkctx.getPhysicalDevice();
-		m_LogicalDevice = vkctx.getDevice();
-
-		instance = vkctx.getInstance();
-		dbMessenger = vkctx.getDbMessenger();
-
-
-		vk::DynamicLoader dl;
-		PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-		VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
-		VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
-		VULKAN_HPP_DEFAULT_DISPATCHER.init(m_LogicalDevice);
-
-		// Getting the queues
-		QueueFamilyIndices indices = FindQueueFamilies(m_PhysicalDevice);
-		m_QueueFamilies.GraphicsFamily.Index = indices.graphicsFamily.value();
-		m_QueueFamilies.ComputeFamily.Index = indices.computeFamily.value();
-		vkGetDeviceQueue(m_LogicalDevice, indices.graphicsFamily.value(), 0, &m_QueueFamilies.GraphicsFamily.Queue);
-		vkGetDeviceQueue(m_LogicalDevice, indices.computeFamily.value(), 0, &m_QueueFamilies.ComputeFamily.Queue);
-
-		{
-			// Creating the graphics comamnd pool
-			VkCommandPoolCreateInfo cmdPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-			cmdPoolInfo.queueFamilyIndex = m_QueueFamilies.GraphicsFamily.Index;
-			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-			FROST_VKCHECK(vkCreateCommandPool(m_LogicalDevice, &cmdPoolInfo, nullptr, &m_CommandPool));
-		}
-		{
-			// Creating the compute comamnd pool
-			VkCommandPoolCreateInfo cmdPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-			cmdPoolInfo.queueFamilyIndex = m_QueueFamilies.ComputeFamily.Index;
-			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-			FROST_VKCHECK(vkCreateCommandPool(m_LogicalDevice, &cmdPoolInfo, nullptr, &m_ComputeCommandPool));
-		}
-	}
-	*/
 
 	void VulkanDevice::Init(const Scope<VulkanPhysicalDevice>& physicalDevice)
 	{
@@ -390,7 +233,7 @@ namespace Frost
 		VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
 		accelerationStructFeatures.accelerationStructure = true;
 
-		
+
 		// Creating the chain
 		features12.pNext = &features;
 		features.pNext = &rayTracingFeatures;
@@ -420,4 +263,67 @@ namespace Frost
 		vkGetDeviceQueue(m_LogicalDevice, m_FamilyQueues.TransferFamily.Index, 0, &m_FamilyQueues.TransferFamily.Queue);
 	}
 
+
+	void VulkanDevice::ShutDown()
+	{
+		vkDeviceWaitIdle(m_LogicalDevice);
+
+		vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
+		vkDestroyCommandPool(m_LogicalDevice, m_ComputeCommandPool, nullptr);
+		vkDestroyDevice(m_LogicalDevice, nullptr);
+	}
+
+	VkCommandBuffer VulkanDevice::AllocateCommandBuffer(RenderQueueType queueType, bool beginRecording)
+	{
+		VkCommandBuffer cmdBuf;
+
+		VkCommandBufferAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.commandPool = queueType == RenderQueueType::Graphics ? m_CommandPool : m_ComputeCommandPool;
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandBufferCount = 1;
+
+		FROST_VKCHECK(vkAllocateCommandBuffers(m_LogicalDevice, &allocInfo, &cmdBuf));
+
+		if (beginRecording)
+		{
+			VkCommandBufferBeginInfo beginInfo{};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			FROST_VKCHECK(vkBeginCommandBuffer(cmdBuf, &beginInfo));
+		}
+
+		return cmdBuf;
+	}
+
+	void VulkanDevice::FlushCommandBuffer(VkCommandBuffer commandBuffer, RenderQueueType queueType)
+	{
+		VkQueue graphicsQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().GraphicsFamily.Queue;
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		vkEndCommandBuffer(commandBuffer);
+
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.pCommandBuffers = &commandBuffer;
+		submitInfo.commandBufferCount = 1;
+
+		// Create fence to ensure that the command buffer has finished executing
+		VkFence fence;
+		VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+		fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		FROST_VKCHECK(vkCreateFence(m_LogicalDevice, &fenceCreateInfo, nullptr, &fence));
+		FROST_VKCHECK(vkWaitForFences(m_LogicalDevice, 1, &fence, VK_TRUE, UINT64_MAX));
+		vkResetFences(device, 1, &fence);
+
+		// Submit to the queue
+		FROST_VKCHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fence));
+		// Wait for the fence to signal that command buffer has finished executing
+		FROST_VKCHECK(vkWaitForFences(m_LogicalDevice, 1, &fence, VK_TRUE, UINT64_MAX));
+
+		vkDestroyFence(m_LogicalDevice, fence, nullptr);
+
+		VkCommandPool commandPool = queueType == RenderQueueType::Graphics ? m_CommandPool : m_ComputeCommandPool;
+		vkFreeCommandBuffers(m_LogicalDevice, commandPool, 1, &commandBuffer);
+	}
 }

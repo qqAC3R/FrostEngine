@@ -12,17 +12,32 @@ layout(location = 4) in mat4 a_WorldSpaceMatrix;
 
 struct Vertex
 {
-	 vec3  Position;
-	 vec2  TexCoord;
-	 vec3  Normal;
-	 vec3  Tangent;
-	 vec3  Bitangent;
-	 float MaterialIndex;
+	vec3  Position;
+	vec2  TexCoord;
+	vec3  Normal;
+	vec3  Tangent;
+	vec3  Bitangent;
+	float MaterialIndex;
+};
+
+struct AnimatedVertex
+{
+	vec3  Position;
+	vec2  TexCoord;
+	vec3  Normal;
+	vec3  Tangent;
+	vec3  Bitangent;
+	
+	float MaterialIndex;
+
+	ivec4 IDs;
+	vec4  Weights;
 };
 
 // Using buffer references instead of typical attributes
-layout(buffer_reference, scalar) buffer Vertices { Vertex v[]; }; // Positions of an object
-
+layout(buffer_reference, scalar) buffer Vertices { Vertex v[]; }; // Vertex information of an submesh
+layout(buffer_reference, scalar) buffer AnimatedVertices { AnimatedVertex v[]; }; // Animated vertex information of an submesh
+layout(buffer_reference, scalar) buffer MeshBoneInformation { mat4 BoneTransforms[]; }; // Animated vertex information of an submesh
 
 layout(location = 0) out vec3 v_FragmentPos;
 layout(location = 1) out vec2 v_TexCoord;
@@ -35,37 +50,72 @@ layout(location = 6) out flat int v_TextureIndex;
 layout(push_constant) uniform Constants
 {
 	mat4 ViewMatrix;
-	uint MaterialIndex;
 	uint64_t VertexBufferBDA;
-	uint Padding;
+	uint64_t BoneInformationBDA;
+	uint MaterialIndex;
+	uint IsAnimated;
 } u_PushConstant;
 
 void main()
 {
-	Vertices verticies = Vertices(u_PushConstant.VertexBufferBDA);
-	Vertex vertex = verticies.v[gl_VertexIndex];
+	vec3 position, normal, tangent;
+	vec2 texCoord;
+	float materialIndex;
 
-	int meshIndex = int(u_PushConstant.MaterialIndex + vertex.MaterialIndex);
+	// If the mesh is animated, then compute the bone transform matrix
+	mat4 boneTransform = mat4(1.0);
 
+	if(u_PushConstant.IsAnimated == 1)
+	{
+		AnimatedVertices animatedVerticies = AnimatedVertices(u_PushConstant.VertexBufferBDA);
+		MeshBoneInformation boneInfo = MeshBoneInformation(u_PushConstant.BoneInformationBDA);
+		AnimatedVertex vertex = animatedVerticies.v[gl_VertexIndex];
+
+		position = vertex.Position;
+		normal = vertex.Normal;
+		tangent = vertex.Tangent;
+		texCoord = vertex.TexCoord;
+		materialIndex = vertex.MaterialIndex;
+
+		boneTransform  = boneInfo.BoneTransforms[vertex.IDs[0]] * vertex.Weights[0];
+		boneTransform += boneInfo.BoneTransforms[vertex.IDs[1]] * vertex.Weights[1];
+		boneTransform += boneInfo.BoneTransforms[vertex.IDs[2]] * vertex.Weights[2];
+		boneTransform += boneInfo.BoneTransforms[vertex.IDs[3]] * vertex.Weights[3];
+	}
+	else
+	{
+		Vertices verticies = Vertices(u_PushConstant.VertexBufferBDA);
+		Vertex vertex = verticies.v[gl_VertexIndex];
+
+		position = vertex.Position;
+		normal = vertex.Normal;
+		tangent = vertex.Tangent;
+		texCoord = vertex.TexCoord;
+		materialIndex = vertex.MaterialIndex;
+	}
+	
 	// Calculating the normals with the model matrix
+	mat3 normalMatrix = mat3(boneTransform * a_ModelSpaceMatrix);
+	v_Normal = normalMatrix * normalize(normal);
+	v_Tangent = normalMatrix * normalize(tangent);
 	//mat3 normalMatrix = transpose(inverse(mat3(a_ModelSpaceMatrix)));
-	mat3 normalMatrix = (mat3(a_ModelSpaceMatrix));
-	v_Normal = normalMatrix * normalize(vertex.Normal);
-	v_Tangent = normalMatrix * normalize(vertex.Tangent);
+
 
 	// Texture Coords
-	v_TexCoord = vertex.TexCoord;
+	v_TexCoord = texCoord;
+
 
 	// World position
-	v_FragmentPos = vec3(a_ModelSpaceMatrix * vec4(vertex.Position, 1.0f));
-	v_ViewPosition = vec3(u_PushConstant.ViewMatrix * a_ModelSpaceMatrix * vec4(vertex.Position, 1.0f));
+	v_FragmentPos = vec3(a_ModelSpaceMatrix * boneTransform * vec4(position, 1.0f));
+	v_ViewPosition = vec3(u_PushConstant.ViewMatrix * a_ModelSpaceMatrix * boneTransform * vec4(position, 1.0f));
 
-	//v_BufferIndex = int(u_PushConstant.MaterialIndex + a_MaterialIndex);
+	// Material indices
+	int meshIndex = int(u_PushConstant.MaterialIndex + materialIndex);
 	v_BufferIndex = int(meshIndex);
-	v_TextureIndex = int(vertex.MaterialIndex);
+	v_TextureIndex = int(materialIndex);
 
 	// Compute world position
-	vec4 worldPos = a_WorldSpaceMatrix * vec4(vertex.Position, 1.0f);
+	vec4 worldPos = a_WorldSpaceMatrix * boneTransform * vec4(position, 1.0f);
 	gl_Position = worldPos;
 }
 

@@ -14,6 +14,7 @@
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanVertexBuffer.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanUniformBuffer.h"
 
 #include "Frost/Platform/Vulkan/VulkanPipelineCompute.h"
 
@@ -468,12 +469,18 @@ namespace Frost
 			pushConstant.MaterialIndex = indirectMeshData[i].MaterialOffset;
 			pushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 			pushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
+			pushConstant.IsAnimated = static_cast<uint32_t>(mesh->IsAnimated());
+
+			if(mesh->IsAnimated())
+				pushConstant.BoneInformationBDA = mesh->GetBoneUniformBuffer(currentFrameIndex).As<VulkanUniformBuffer>()->GetVulkanBufferAddress();
+			else
+				pushConstant.BoneInformationBDA = 0;
+
 			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
 
 			uint32_t submeshCount = meshData.SubmeshCount;
 			uint32_t offset = indirectMeshData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
 			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
-
 		}
 		// End the renderpass
 		m_Data->GeometryRenderPass->Unbind();
