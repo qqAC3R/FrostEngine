@@ -76,79 +76,12 @@ namespace Frost
 
 	void Scene::Update(Timestep ts)
 	{
-		{
-			// Meshes
-			auto group = m_Registry.group<MeshComponent>(entt::get<TransformComponent>);
-			for (auto& entity : group)
-			{
-				auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-				if (mesh.Mesh)
-				{
-					glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
-
-					Renderer::Submit(mesh.Mesh, transform);
-
-					if(mesh.ActiveAnimation)
-						mesh.Mesh->SetActiveAnimation(mesh.ActiveAnimation);
-					mesh.Mesh->Update(ts);
-				}
-			}
-		}
-
-		{
-			// Point lights
-			auto group = m_Registry.group<PointLightComponent>(entt::get<TransformComponent>);
-			for (auto& entity : group)
-			{
-				auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
-				
-				glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
-				glm::vec3 translation, temp;
-				Math::DecomposeTransform(transform, translation, temp, temp);
-
-				Renderer::Submit(pointLight, translation);
-			}
-
-		}
-
-		{
-			// Directional light
-			auto group = m_Registry.group<DirectionalLightComponent>(entt::get<TransformComponent>);
-			for (auto& entity : group)
-			{
-				auto [directionalLight, transformComponent] = group.get<DirectionalLightComponent, TransformComponent>(entity);
-
-				Renderer::Submit(directionalLight, transformComponent.GetTransform()[2]);
-			}
-		}
-
-		{
-			// Box Fog Volumes
-			auto group = m_Registry.group<FogBoxVolumeComponent>(entt::get<TransformComponent>);
-			for (auto& entity : group)
-			{
-				auto [fogVolumeComponent, transformComponent] = group.get<FogBoxVolumeComponent, TransformComponent>(entity);
-
-				glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
-
-				Renderer::Submit(fogVolumeComponent, transform);
-			}
-		}
-
-		{
-			// Cloud Volumes
-			auto group = m_Registry.group<CloudVolumeComponent>(entt::get<TransformComponent>);
-			for (auto& entity : group)
-			{
-				auto [cloudVolumeComponent, transformComponent] = group.get<CloudVolumeComponent, TransformComponent>(entity);
-
-				glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
-				glm::vec3 translation, rotation, scale;
-				Math::DecomposeTransform(transform, translation, rotation, scale);
-
-				Renderer::Submit(cloudVolumeComponent, translation, scale);
-			}
-		}
+		UpdateMeshComponents(ts);
+		UpdateAnimationControllers(ts);
+		UpdatePointLightComponent(ts);
+		UpdateDirectionalLight(ts);
+		UpdateBoxFogVolumes(ts);
+		UpdateCloudVolumes(ts);
 	}
 
 	const glm::mat4& Scene::GetTransformMatFromEntityAndParent(Entity entity)
@@ -187,6 +120,103 @@ namespace Frost
 				return Entity(entity, this);
 		}
 		return Entity{};
+	}
+
+	void Scene::UpdateMeshComponents(Timestep ts)
+	{
+		// Meshes
+		auto group = m_Registry.group<MeshComponent>(entt::get<TransformComponent>);
+		for (auto& entity : group)
+		{
+			auto [mesh, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
+			if (mesh.Mesh)
+			{
+				glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+
+				Renderer::Submit(mesh.Mesh, transform);
+
+				//if(mesh.ActiveAnimation)
+				//	mesh.Mesh->SetActiveAnimation(mesh.ActiveAnimation);
+				//mesh.Mesh->Update(ts);
+			}
+		}
+	}
+
+	void Scene::UpdateAnimationControllers(Timestep ts)
+	{
+		// Animation Controllers
+		auto group = m_Registry.group<AnimationComponent>(entt::get<MeshComponent>);
+		for (auto& entity : group)
+		{
+			auto [animationController, mesh] = group.get<AnimationComponent, MeshComponent>(entity);
+			if (mesh.Mesh)
+			{
+				animationController.Controller->OnUpdate(ts);
+				mesh.Mesh->UpdateBoneTransformMatrices(animationController.Controller->GetModelSpaceMatrices());
+
+				//if(mesh.ActiveAnimation)
+				//	mesh.Mesh->SetActiveAnimation(mesh.ActiveAnimation);
+				//mesh.Mesh->Update(ts);
+			}
+		}
+	}
+
+	void Scene::UpdatePointLightComponent(Timestep ts)
+	{
+		// Point lights
+		auto group = m_Registry.group<PointLightComponent>(entt::get<TransformComponent>);
+		for (auto& entity : group)
+		{
+			auto [pointLight, transformComponent] = group.get<PointLightComponent, TransformComponent>(entity);
+
+			glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+			glm::vec3 translation, temp;
+			Math::DecomposeTransform(transform, translation, temp, temp);
+
+			Renderer::Submit(pointLight, translation);
+		}
+	}
+
+	void Scene::UpdateDirectionalLight(Timestep ts)
+	{
+		// Directional light
+		auto group = m_Registry.group<DirectionalLightComponent>(entt::get<TransformComponent>);
+		for (auto& entity : group)
+		{
+			auto [directionalLight, transformComponent] = group.get<DirectionalLightComponent, TransformComponent>(entity);
+
+			Renderer::Submit(directionalLight, transformComponent.GetTransform()[2]);
+		}
+	}
+
+	void Scene::UpdateBoxFogVolumes(Timestep ts)
+	{
+		// Box Fog Volumes
+		auto group = m_Registry.group<FogBoxVolumeComponent>(entt::get<TransformComponent>);
+		for (auto& entity : group)
+		{
+			auto [fogVolumeComponent, transformComponent] = group.get<FogBoxVolumeComponent, TransformComponent>(entity);
+
+			glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+
+			Renderer::Submit(fogVolumeComponent, transform);
+		}
+	}
+
+	void Scene::UpdateCloudVolumes(Timestep ts)
+	{
+		// Cloud Volumes
+		auto group = m_Registry.group<CloudVolumeComponent>(entt::get<TransformComponent>);
+		for (auto& entity : group)
+		{
+			auto [cloudVolumeComponent, transformComponent] = group.get<CloudVolumeComponent, TransformComponent>(entity);
+
+			glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+			glm::vec3 translation, rotation, scale;
+			Math::DecomposeTransform(transform, translation, rotation, scale);
+
+			Renderer::Submit(cloudVolumeComponent, translation, scale);
+		}
 	}
 
 	void Scene::DestroyEntity(Entity entity)

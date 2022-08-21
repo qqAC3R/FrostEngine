@@ -121,7 +121,7 @@ namespace Frost
 
 		s_Data->m_Environment->InitCallbackFunctions();
 		//s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/pink_sunrise_4k.hdr");
-		s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/dikhololo_night_4k.hdr");
+		//s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/dikhololo_night_4k.hdr");
 		//s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/envmap.JPG");
 		//s_Data->m_Environment->SetType(SceneEnvironment::Type::Hillaire);
 		//s_Data->m_Environment->SetType(SceneEnvironment::Type::HDRMap);

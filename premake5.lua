@@ -28,7 +28,9 @@ IncludeDir["assimpLib"] = "Frost/vendor/assimp/lib"
 IncludeDir["vma"] = "Frost/vendor/VulkanMemoryAllocator/include"
 IncludeDir["ImGui"] = "Frost/vendor/ImGui"
 IncludeDir["ImGuizmo"] = "Frost/vendor/ImGuizmo"
+IncludeDir["OZZ_Animation"] = "Frost/vendor/ozz-animation/include"
 IncludeDir["SPIRV_Cross"] = "Frost/vendor/SPIRV-Cross/include"
+IncludeDir["FontAwesome"] = "Frost/vendor/FontAwesome"
 
 IncludeDir["shaderc"] = "Frost/vendor/shaderc/Include"
 IncludeDir["shadercLib"] = "Frost/vendor/shaderc/Lib"
@@ -47,6 +49,7 @@ Library["shaderc"] = "Frost/vendor/shaderc/Lib/shaderc_shared.lib"
 group "Dependencies"
 	include "Frost/vendor/GLFW"
 	include "Frost/vendor/SPIRV-Cross"
+	include "Frost/vendor/ozz-animation"
 	include "Frost/vendor/ImGui"
 group ""
 
@@ -102,7 +105,9 @@ project "Frost"
 		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.entt}",
-		"%{IncludeDir.SPIRV_Cross}"
+		"%{IncludeDir.SPIRV_Cross}",
+		"%{IncludeDir.OZZ_Animation}",
+		"%{IncludeDir.FontAwesome}"
 	}
 
 	flags
@@ -115,6 +120,7 @@ project "Frost"
 		"GLFW",
 		"ImGui",
 		"SPIR-V_Cross",
+		"OZZ-Animation",
 
 		"shaderc_shared.lib",
 		"vulkan-1.lib"
@@ -204,12 +210,13 @@ project "FrostEditor"
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.vma}",
-		"%{IncludeDir.nvvk}",
+		"%{IncludeDir.OZZ_Animation}",
 		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.spdlog}",
 		"%{IncludeDir.assimp}",
 		"%{IncludeDir.entt}",
+		"%{IncludeDir.FontAwesome}",
 		
 		"Frost/vendor",
 		"Frost/src/Frost",

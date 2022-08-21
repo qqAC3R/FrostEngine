@@ -303,7 +303,7 @@ namespace Frost
 	void VulkanTopLevelAccelertionStructure::UpdateAccelerationStructure(Vector<std::pair<Ref<Mesh>, glm::mat4>>& meshes)
 	{
 		uint32_t blasIndex = 0;
-		VkDeviceAddress deviceAddressTemp;
+		VkDeviceAddress deviceAddressTemp{};
 
 		Vector<VkAccelerationStructureInstanceKHR> accelerationStructureInstances;
 		for (auto& mesh : meshes)

@@ -71,7 +71,20 @@ namespace Frost
 		}
 
 		Ref<Mesh> Mesh = nullptr;
-		Ref<Animation> ActiveAnimation = nullptr;
+	};
+
+	struct AnimationComponent
+	{
+		AnimationComponent(const MeshComponent* mesh)
+			: Controller(CreateRef<AnimationController>()), MeshComponentPtr(mesh)
+		{}
+
+		AnimationComponent(Ref<AnimationController> animationController, const MeshComponent* mesh)
+			: Controller(animationController), MeshComponentPtr(mesh)
+		{}
+
+		const MeshComponent* MeshComponentPtr;
+		Ref<AnimationController> Controller;
 	};
 
 	struct PointLightComponent

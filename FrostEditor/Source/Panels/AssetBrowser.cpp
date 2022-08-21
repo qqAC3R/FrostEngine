@@ -15,8 +15,8 @@ namespace Frost
 
 	void AssetBrowser::Render()
 	{
-		ImGui::Begin("Asset Browser");
-		ImGui::End();
+		//ImGui::Begin("Asset Browser");
+		//ImGui::End();
 	}
 
 	void AssetBrowser::Shutdown()

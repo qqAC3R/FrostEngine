@@ -31,6 +31,11 @@ namespace Frost
 		m_UniformBuffer->SetData(data);
 	}
 
+	void VulkanUniformBuffer::SetData(void* data, uint32_t size)
+	{
+		m_UniformBuffer->SetData(size, data);
+	}
+
 	void VulkanUniformBuffer::Destroy()
 	{
 		m_UniformBuffer->Destroy();

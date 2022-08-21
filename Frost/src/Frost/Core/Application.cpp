@@ -8,7 +8,6 @@
 #include "Frost/Core/Input.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
 #include "Frost/Utils/Timer.h"
-#include "Frost/Utils/HeapTracker.h"
 
 #include <GLFW/glfw3.h>
 
@@ -31,7 +30,6 @@ namespace Frost
 		PushOverlay(m_ImGuiLayer);
 
 		Renderer::Init();
-		HeapTracker::Init();
 	}
 
 	Application::~Application()
@@ -58,7 +56,6 @@ namespace Frost
 			if (!m_Minimized)
 			{
 				Renderer::BeginFrame();
-				HeapTracker::BeginCapturing();
 
 				// Update
 				for (Layer* layer : m_LayerStack)
@@ -73,7 +70,6 @@ namespace Frost
 					layer->OnImGuiRender();
 				}
 
-				HeapTracker::EndCapturing();
 				Renderer::EndFrame();
 
 				// Execute the RenderCommandBuffers (pointer functions)

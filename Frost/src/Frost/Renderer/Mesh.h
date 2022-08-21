@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Frost/Renderer/Buffers/VertexBuffer.h"
-#include "Frost/Renderer/Buffers/IndexBuffer.h"
-#include "Frost/Renderer/Animation.h"
-#include "Frost/Renderer/Material.h"
 #include "Frost/Renderer/Texture.h"
+#include "Frost/Renderer/Material.h"
+#include "Frost/Renderer/Animation.h"
+#include "Frost/Renderer/Buffers/IndexBuffer.h"
+#include "Frost/Renderer/Buffers/VertexBuffer.h"
 
 #include "Frost/Math/BoundingBox.h"
 #include <glm/glm.hpp>
@@ -21,6 +21,10 @@ namespace Assimp
 
 namespace Frost
 {
+	//class Animation;
+	//class MeshSkeleton;
+	//class AnimationController;
+
 	struct Vertex
 	{
 		glm::vec3 Position;
@@ -56,7 +60,7 @@ namespace Frost
 				}
 			}
 
-			//FROST_CORE_WARN("Vertex has more than four bones/weights affecting it, extra data will be discarded (BoneID={0}, Weight={1})", BoneID, Weight);
+			FROST_CORE_WARN("Vertex has more than four bones/weights affecting it, extra data will be discarded (BoneID={0}, Weight={1})", BoneID, Weight);
 		}
 	};
 
@@ -65,10 +69,21 @@ namespace Frost
 		uint32_t V1, V2, V3;
 	};
 
+	//struct BoneInfo
+	//{
+	//	glm::mat4 BoneOffset;
+	//	glm::mat4 FinalBoneTransform;
+	//};
+
 	struct BoneInfo
 	{
-		glm::mat4 BoneOffset;
-		glm::mat4 FinalBoneTransform;
+		//ozz::math::Float4x4 InverseBindPose;
+		glm::mat4 InverseBindPose;
+		uint32_t JointIndex;
+
+		BoneInfo(glm::mat4 inverseBindPose, uint32_t jointIndex) : InverseBindPose(inverseBindPose), JointIndex(jointIndex) {}
+		
+		//BoneInfo(ozz::math::Float4x4 inverseBindPose, uint32_t jointIndex) : InverseBindPose(inverseBindPose), JointIndex(jointIndex) {}
 	};
 
 	// Used by RT for now, tho I'll need to change it
@@ -130,12 +145,13 @@ namespace Frost
 
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
 
-		void SetActiveAnimation(Ref<Animation> animation) { if (animation) { m_ActiveAnimation = animation; } }
+		//void SetActiveAnimation(Ref<Animation> animation) { if (animation) { m_ActiveAnimation = animation; } }
 		const Vector<Ref<Animation>>& GetAnimations() const { return m_Animations; }
 
 		Buffer& GetVertexBufferInstanced_CPU(uint32_t index) { return m_VertexBufferInstanced_CPU[index]; }
 		void UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex);
-		void Update(float deltaTime);
+		//void Update(float deltaTime);
+		void UpdateBoneTransformMatrices(const ozz::vector<ozz::math::Float4x4>& modelSpaceMatrices);
 
 		uint32_t GetMaterialCount() { return (uint32_t)m_MaterialData.size(); }
 		DataStorage& GetMaterialData(uint32_t materialIndex) { return m_MaterialData[materialIndex]; }
@@ -151,6 +167,7 @@ namespace Frost
 
 		bool IsLoaded() const { return m_IsLoaded; }
 		bool IsAnimated() const { return m_IsAnimated; }
+		//bool IsAnyAnimationPlaying() const { return m_IsAnyAnimationPlaying; }
 		const std::string& GetFilepath() const { return m_Filepath; }
 
 		void SetNewTexture(uint32_t textureId, Ref<Texture2D> texture);
@@ -165,6 +182,7 @@ namespace Frost
 		std::string m_Filepath;
 		bool m_IsLoaded;
 		bool m_IsAnimated;
+		//bool m_IsAnyAnimationPlaying = false;
 		
 		// Assimp import helpers
 		Scope<Assimp::Importer> m_Importer;
@@ -172,7 +190,7 @@ namespace Frost
 
 		// Mesh data
 		Vector<Vertex> m_Vertices;
-		Vector<AnimatedVertex> m_AnimatedVertices;
+		Vector<AnimatedVertex> m_SkinnedVertices;
 		Vector<Index> m_Indices;
 		Vector<Submesh> m_Submeshes;
 
@@ -183,13 +201,15 @@ namespace Frost
 
 		Vector<Ref<UniformBuffer>> m_BoneTransformsUniformBuffer;
 		Vector<glm::mat4> m_BoneTransforms;
+		//Ref<Animation> m_ActiveAnimation = nullptr;
+
+
+		//ozz::unique_ptr<ozz::animation::Skeleton> m_Skeleton;
+		Ref<MeshSkeleton> m_Skeleton;
 		Vector<Ref<Animation>> m_Animations;
-		Ref<Animation> m_ActiveAnimation = nullptr;
+		//Ref<AnimationController> m_AnimationController;
 
-		//float m_CurrentTime = 0.0f;
-		//uint32_t m_TicksPerSecond;
-		//float m_Duration;
-
+		
 		// Vertex and Index GPU buffers 
 		Ref<VertexBuffer> m_VertexBuffer;
 		Ref<IndexBuffer> m_IndexBuffer;

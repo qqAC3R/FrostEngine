@@ -65,7 +65,10 @@ void main()
 	// If the mesh is animated, then compute the bone transform matrix
 	mat4 boneTransform = mat4(1.0);
 
-	if(u_PushConstant.IsAnimated == 1)
+	//uint isAnimated = ((u_PushConstant.IsAnimated << 31) >> 31);
+	//uint isAnimationEnabled = (u_PushConstant.IsAnimated >> 1);
+
+	if(u_PushConstant.IsAnimated  == 1)
 	{
 		AnimatedVertices animatedVerticies = AnimatedVertices(u_PushConstant.VertexBufferBDA);
 		MeshBoneInformation boneInfo = MeshBoneInformation(u_PushConstant.BoneInformationBDA);
@@ -77,10 +80,13 @@ void main()
 		texCoord = vertex.TexCoord;
 		materialIndex = vertex.MaterialIndex;
 
-		boneTransform  = boneInfo.BoneTransforms[vertex.IDs[0]] * vertex.Weights[0];
-		boneTransform += boneInfo.BoneTransforms[vertex.IDs[1]] * vertex.Weights[1];
-		boneTransform += boneInfo.BoneTransforms[vertex.IDs[2]] * vertex.Weights[2];
-		boneTransform += boneInfo.BoneTransforms[vertex.IDs[3]] * vertex.Weights[3];
+		if(boneInfo.BoneTransforms[vertex.IDs[0]] [0][0] != 3.402823466e+38f)
+		{
+			boneTransform  = boneInfo.BoneTransforms[vertex.IDs[0]] * vertex.Weights[0];
+			boneTransform += boneInfo.BoneTransforms[vertex.IDs[1]] * vertex.Weights[1];
+			boneTransform += boneInfo.BoneTransforms[vertex.IDs[2]] * vertex.Weights[2];
+			boneTransform += boneInfo.BoneTransforms[vertex.IDs[3]] * vertex.Weights[3];
+		}
 	}
 	else
 	{

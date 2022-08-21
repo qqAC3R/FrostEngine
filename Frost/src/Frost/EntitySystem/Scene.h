@@ -32,6 +32,14 @@ namespace Frost
 		const entt::registry& GetRegistry() const { return m_Registry; }
 
 	private:
+		void UpdateMeshComponents(Timestep ts);
+		void UpdateAnimationControllers(Timestep ts);
+		void UpdatePointLightComponent(Timestep ts);
+		void UpdateDirectionalLight(Timestep ts);
+		void UpdateBoxFogVolumes(Timestep ts);
+		void UpdateCloudVolumes(Timestep ts);
+
+	private:
 		entt::registry m_Registry;
 	};
 }

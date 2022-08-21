@@ -3,6 +3,8 @@
 
 #include "Frost/Utils/Timer.h"
 #include "Frost/Renderer/Renderer.h"
+#include "Frost/Renderer/Animation.h"
+#include "Frost/Renderer/OZZAssimpImporter.h"
 
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 
@@ -12,10 +14,16 @@
 #include <assimp/DefaultLogger.hpp>
 #include <assimp/LogStream.hpp>
 
-#include <cmath>
+#include <ozz/animation/offline/raw_skeleton.h>
+#include <ozz/animation/offline/skeleton_builder.h>
+#include <ozz/base/maths/simd_math.h>
+
+#include <glm/gtc/type_ptr.hpp>
+
+//#include <cmath>
 #include <filesystem>
 
-#define MAX_BONES 200
+#define MAX_BONES 400
 
 namespace Frost
 {
@@ -45,6 +53,7 @@ namespace Frost
 			aiProcess_GenUVCoords |             // Convert UVs if required 
 			aiProcess_OptimizeMeshes |          // Batch draws where possible
 			aiProcess_JoinIdenticalVertices |
+			aiProcess_LimitBoneWeights |        // If more than N (=4) bone weights, discard least influencing bones and renormalise sum to 1
 			aiProcess_ValidateDataStructure;    // Validation
 
 	}
@@ -59,6 +68,15 @@ namespace Frost
 
 		m_Scene = scene;
 		m_IsLoaded = true;
+		m_IsAnimated = scene->mAnimations != nullptr;
+
+		if (m_IsAnimated)
+		{
+			m_Skeleton = CreateRef<MeshSkeleton>(scene);
+			//m_AnimationController = CreateRef<AnimationController>();
+		}
+
+
 
 		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
 		// Allocate texture slots before storing the vertex data, because we are using bindless
@@ -72,10 +90,6 @@ namespace Frost
 
 		uint32_t vertexCount = 0;
 		uint32_t indexCount = 0;
-		m_IsAnimated = scene->mAnimations != nullptr;
-
-		//m_IsAnimated = false;
-
 
 		Vector<Index> submeshIndices;
 		uint32_t maxIndex = 0;
@@ -123,7 +137,7 @@ namespace Frost
 					else
 						vertex.TexCoord = { 0.0f, 0.0f };
 
-					m_AnimatedVertices.push_back(vertex);
+					m_SkinnedVertices.push_back(vertex);
 				}
 				else
 				{
@@ -194,6 +208,8 @@ namespace Frost
 		// Bones
 		if (m_IsAnimated)
 		{
+			const ozz::animation::Skeleton& skeleton = m_Skeleton->GetInternalSkeleton();
+
 			for (size_t m = 0; m < scene->mNumMeshes; m++)
 			{
 				aiMesh* mesh = scene->mMeshes[m];
@@ -203,38 +219,52 @@ namespace Frost
 				{
 					aiBone* bone = mesh->mBones[i];
 					std::string boneName(bone->mName.data);
-					int boneIndex = 0;
 
-					if (m_BoneMapping.find(boneName) == m_BoneMapping.end())
+					// Find bone in skeleton
+					uint32_t jointIndex = ~0;
+					for (size_t j = 0; j < skeleton.joint_names().size(); j++)
+					{
+						if (boneName == skeleton.joint_names()[j])
+						{
+							jointIndex = static_cast<int>(j);
+							break;
+						}
+					}
+
+					if (jointIndex == ~0)
+					{
+						FROST_CORE_ERROR("Could not find mesh bone '{}' in skeleton!", boneName);
+					}
+
+					uint32_t boneIndex = ~0;
+					for (size_t j = 0; j < m_BoneInfo.size(); ++j)
+					{
+						if (m_BoneInfo[j].JointIndex == jointIndex)
+						{
+							boneIndex = static_cast<uint32_t>(j);
+							break;
+						}
+					}
+					if (boneIndex == ~0)
 					{
 						// Allocate an index for a new bone
-						boneIndex = m_BoneCount;
-						m_BoneCount++;
-
-						BoneInfo boneInfo;
-						boneInfo.BoneOffset = Utils::AssimpMat4ToGlmMat4(bone->mOffsetMatrix);
-						m_BoneInfo.push_back(boneInfo);
-
-						m_BoneMapping[boneName] = boneIndex;
-					}
-					else
-					{
-						//FROST_CORE_INFO("Found existing bone in bone map");
-						boneIndex = m_BoneMapping[boneName];
+						boneIndex = static_cast<uint32_t>(m_BoneInfo.size());
+						m_BoneInfo.emplace_back(Utils::AssimpMat4ToGlmMat4(bone->mOffsetMatrix), jointIndex); //	Note: bone->mOffsetMatrix already has skeletonTranform built into it
+						//m_BoneInfo.emplace_back(Float4x4FromAIMatrix4x4(bone->mOffsetMatrix), jointIndex); //	Note: bone->mOffsetMatrix already has skeletonTranform built into it
 					}
 
 					for (size_t j = 0; j < bone->mNumWeights; j++)
 					{
 						int VertexID = submesh.BaseVertex + bone->mWeights[j].mVertexId;
 						float Weight = bone->mWeights[j].mWeight;
-						m_AnimatedVertices[VertexID].AddBoneData(boneIndex, Weight);
+						m_SkinnedVertices[VertexID].AddBoneData(boneIndex, Weight);
 					}
+
 				}
+
 			}
 
-			m_BoneTransforms.reserve(MAX_BONES);
-			m_BoneTransforms.resize(m_BoneCount);
-
+			m_BoneTransforms.resize(m_BoneInfo.size());
 
 			m_Animations.resize(scene->mNumAnimations);
 			for (size_t m = 0; m < scene->mNumAnimations; m++)
@@ -242,7 +272,12 @@ namespace Frost
 				const aiAnimation* animation = scene->mAnimations[m];
 				m_Animations[m] = Ref<Animation>::Create(animation, this);
 			}
+
+			for (size_t i = 0; i < m_BoneInfo.size(); ++i)
+				m_BoneTransforms[i] = glm::mat4(FLT_MAX);
+
 		}
+
 
 
 
@@ -253,7 +288,7 @@ namespace Frost
 
 			// Vertex/Index buffer
 			if(m_IsAnimated)
-				m_VertexBuffer = VertexBuffer::Create(m_AnimatedVertices.data(), m_AnimatedVertices.size() * sizeof(AnimatedVertex));
+				m_VertexBuffer = VertexBuffer::Create(m_SkinnedVertices.data(), m_SkinnedVertices.size() * sizeof(AnimatedVertex));
 			else
 				m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
 
@@ -275,7 +310,7 @@ namespace Frost
 				m_BoneTransformsUniformBuffer.resize(framesInFlight);
 				for (uint32_t i = 0; i < framesInFlight; i++)
 				{
-					m_BoneTransformsUniformBuffer[i] = UniformBuffer::Create(sizeof(glm::mat4) * MAX_BONES);
+					m_BoneTransformsUniformBuffer[i] = UniformBuffer::Create(sizeof(glm::mat4) * m_BoneTransforms.size());
 				}
 			}
 
@@ -628,18 +663,46 @@ namespace Frost
 
 	}
 
-	void Mesh::Update(float deltaTime)
+	static glm::mat4 Mat4FromFloat4x4(const ozz::math::Float4x4& float4x4)
+	{
+		glm::mat4 result;
+		ozz::math::StorePtr(float4x4.cols[0], glm::value_ptr(result[0]));
+		ozz::math::StorePtr(float4x4.cols[1], glm::value_ptr(result[1]));
+		ozz::math::StorePtr(float4x4.cols[2], glm::value_ptr(result[2]));
+		ozz::math::StorePtr(float4x4.cols[3], glm::value_ptr(result[3]));
+		return result;
+	}
+
+	void Mesh::UpdateBoneTransformMatrices(const ozz::vector<ozz::math::Float4x4>& modelSpaceMatrices)
 	{
 		if (m_IsAnimated)
 		{
+
+			//m_AnimationController->OnUpdate(deltaTime);
+			if (modelSpaceMatrices.empty() || modelSpaceMatrices.size() < m_BoneInfo.size())
+			{
+				for (size_t i = 0; i < m_BoneInfo.size(); ++i)
+					m_BoneTransforms[i] = glm::mat4(FLT_MAX);
+			}
+			else
+			{
+				for (size_t i = 0; i < m_BoneInfo.size(); ++i)
+				{
+					uint32_t jointIndex = m_BoneInfo[i].JointIndex;
+					m_BoneTransforms[i] = Mat4FromFloat4x4(modelSpaceMatrices[jointIndex]) * m_BoneInfo[i].InverseBindPose;
+				}
+			}
+
+#if 0
 			if(m_ActiveAnimation)
 				m_ActiveAnimation->Update(deltaTime);
 			else
 			{
-				for (size_t i = 0; i < m_BoneCount; i++)
-					memset(m_BoneTransforms.data(), 1.0f, m_BoneCount * sizeof(glm::mat4));
+				memset(m_BoneTransforms.data(), 0.0f, m_BoneCount * sizeof(glm::mat4));
+				//for (size_t i = 0; i < m_BoneCount; i++)
 					//m_BoneTransforms[i] = glm::mat4(1.0f);
 			}
+#endif
 
 
 			

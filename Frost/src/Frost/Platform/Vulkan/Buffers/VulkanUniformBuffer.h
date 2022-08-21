@@ -14,6 +14,7 @@ namespace Frost
 		virtual ~VulkanUniformBuffer();
 
 		virtual void SetData(void* data) override;
+		virtual void SetData(void* data, uint32_t size) override;
 
 		VkBuffer GetVulkanBuffer() const { return m_Buffer; }
 		VkDeviceAddress GetVulkanBufferAddress() const { return m_BufferAddress; }

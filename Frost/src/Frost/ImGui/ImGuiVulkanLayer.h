@@ -32,6 +32,8 @@ namespace Frost
 		static void* GetTextureIDFromVulkanTexture(Ref<Image2D> texture);
 		static void* GetTextureIDFromVulkanTexture_MipLevel(Ref<Image2D> texture, uint32_t mipLevel);
 
+		static void ResetStyleSettings();
+
 		virtual void* GetImGuiTextureID(Ref<Image2D> texture, uint32_t mip = UINT32_MAX) override;
 		virtual void RenderTexture(Ref<Image2D> texture, uint32_t width, uint32_t height, uint32_t mip = UINT32_MAX) override;
 
