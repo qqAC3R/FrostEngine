@@ -31,6 +31,7 @@ IncludeDir["ImGuizmo"] = "Frost/vendor/ImGuizmo"
 IncludeDir["OZZ_Animation"] = "Frost/vendor/ozz-animation/include"
 IncludeDir["SPIRV_Cross"] = "Frost/vendor/SPIRV-Cross/include"
 IncludeDir["FontAwesome"] = "Frost/vendor/FontAwesome"
+IncludeDir["json"] = "Frost/vendor/json/include"
 
 IncludeDir["shaderc"] = "Frost/vendor/shaderc/Include"
 IncludeDir["shadercLib"] = "Frost/vendor/shaderc/Lib"
@@ -107,6 +108,7 @@ project "Frost"
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.SPIRV_Cross}",
 		"%{IncludeDir.OZZ_Animation}",
+		"%{IncludeDir.json}",
 		"%{IncludeDir.FontAwesome}"
 	}
 
@@ -217,6 +219,7 @@ project "FrostEditor"
 		"%{IncludeDir.assimp}",
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.FontAwesome}",
+		"%{IncludeDir.json}",
 		
 		"Frost/vendor",
 		"Frost/src/Frost",

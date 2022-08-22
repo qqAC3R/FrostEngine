@@ -183,9 +183,11 @@ namespace Frost
 		};
 
 		const std::vector<const char*> extensions = {
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME, // Swapchain
+			VK_KHR_SURFACE_EXTENSION_NAME, // Swapchain
 			VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
 			VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+			VK_KHR_RELAXED_BLOCK_LAYOUT_EXTENSION_NAME, // It removes the errors for the scalar blocks
+			VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME, // It removes the errors for the scalar blocks
 
 			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // Bindless
 			VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME, // Scalar block
@@ -214,6 +216,7 @@ namespace Frost
 		features12.hostQueryReset = true;
 		features12.runtimeDescriptorArray = true;
 		features12.samplerFilterMinmax = true;
+		features12.scalarBlockLayout = true;
 		features12.descriptorBindingUpdateUnusedWhilePending = true;
 		features12.descriptorBindingPartiallyBound = true;
 		features12.shaderSampledImageArrayNonUniformIndexing = true;

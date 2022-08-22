@@ -71,8 +71,8 @@ namespace Frost
 	void ShaderLibrary::Load(const std::string& filepath)
 	{
 		std::string shaderName = GetShaderNameFromFilepath(filepath);
-		std::string text = "Shader '" + shaderName + "' was compiled in ";
-		Timer shaderCompileTimer(text.c_str());
+		//std::string text = "Shader '" + shaderName + "' was compiled in ";
+		//Timer shaderCompileTimer(text.c_str());
 
 		auto shader = Shader::Create(filepath);
 		Add(shader);

@@ -135,8 +135,7 @@ void main()
 		color += cloudContribution.rgb;
 
 
-		//vec4 volumetricContribution = texture(u_VolumetricTexture, uv);
-		vec4 volumetricContribution = UpsampleTent9(u_VolumetricTexture, 0.0, uv, 1.0);
+		vec4 volumetricContribution = texture(u_VolumetricTexture, uv);
 		color *= volumetricContribution.a;
 		color += volumetricContribution.rgb;
 

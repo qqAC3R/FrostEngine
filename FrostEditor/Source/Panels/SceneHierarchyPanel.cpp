@@ -5,6 +5,8 @@
 #include "Frost/Renderer/Renderer.h"
 #include <imgui.h>
 
+#include "IconsFontAwesome.hpp"
+
 #define HIERARCHY_ENTITY_DND "HiEnT!"
 #define NO_SUBMESH_SELECTED UINT32_MAX
 
@@ -23,11 +25,18 @@ namespace Frost
 			return;
 		}
 
+		//ImVec4* colors = ImGui::GetStyle().Colors;
+		//colors[ImGuiCol_WindowBg] = ImVec4(0.09f, 0.12f, 0.14f, 1.00f);
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.09f, 0.12f, 0.15f, 1.0f));
+		//0.12f, 0.14f, 0.17f, 1.00f
 		ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+		
+
 		if (ImGui::Begin("Scene Hierarchy", &m_Visibility))
 		{
 
+			ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.0f);
 			if (ImGui::BeginPopup("Add Entity") || (ImGui::BeginPopupContextWindow(nullptr, 1, false)))
 			{
 				if (ImGui::MenuItem("Empty Entity"))
@@ -52,6 +61,7 @@ namespace Frost
 				}
 				ImGui::EndPopup();
 			}
+			ImGui::PopStyleVar();
 
 			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
 			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
@@ -83,6 +93,7 @@ namespace Frost
 			}
 			ImGui::PopStyleVar();
 
+			//ImGui::PopStyleColor();
 		}
 
 
@@ -92,11 +103,15 @@ namespace Frost
 			m_SelectedSubmesh = NO_SUBMESH_SELECTED;
 		}
 
+
 		ExecuteLateFunctions();
 
-
-		ImGui::PopStyleColor(2);
 		ImGui::End();
+		ImGui::PopStyleColor(3);
+		//ImGui::PopStyleColor(2);
+
+
+		//colors[ImGuiCol_WindowBg] = ImVec4(0.12f, 0.14f, 0.17f, 1.00f);// RESET
 	}
 
 	void SceneHierarchyPanel::OnEvent(Event& e)
@@ -115,10 +130,12 @@ namespace Frost
 
 	void SceneHierarchyPanel::DrawEntityNode(Entity& entity)
 	{
-		auto& tag = entity.GetComponent<TagComponent>().Tag;
+		std::string& tag = entity.GetComponent<TagComponent>().Tag;
+		//tag = tag;
 
 		ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entity) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_OpenOnArrow;
 		flags |= ImGuiTreeNodeFlags_SpanFullWidth;
+		flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
 
 		bool isEntitySelected = false;
 		if (m_SelectedEntity == entity)

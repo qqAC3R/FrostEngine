@@ -236,8 +236,8 @@ namespace Frost
 		{
 			// Compute the volumetrics at half the res because it is very expensive
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width / 2.0f;
-			imageSpec.Height = height / 2.0f;
+			imageSpec.Width = width;
+			imageSpec.Height = height;
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			imageSpec.Format = ImageFormat::RGBA16F;
@@ -286,8 +286,8 @@ namespace Frost
 		{
 			// Compute the volumetrics at half the res because it is very expensive
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width / 2.0f;
-			imageSpec.Height = height / 2.0f;
+			imageSpec.Width = width;
+			imageSpec.Height = height;
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			imageSpec.Format = ImageFormat::RGBA16F;
@@ -799,8 +799,8 @@ namespace Frost
 		// Dispatch
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
-		uint32_t groupX = std::ceil((width  / 2.0f) / 32.0f);
-		uint32_t groupY = std::ceil((height / 2.0f) / 32.0f);
+		uint32_t groupX = std::ceil((width  / 1.0f) / 32.0f);
+		uint32_t groupY = std::ceil((height / 1.0f) / 32.0f);
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
@@ -837,8 +837,8 @@ namespace Frost
 		// Dispatch
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
-		uint32_t groupX = std::ceil((width  / 2.0f) / 16.0f);
-		uint32_t groupY = std::ceil((height / 2.0f) / 16.0f);
+		uint32_t groupX = std::ceil((width  / 1.0f) / 16.0f);
+		uint32_t groupY = std::ceil((height / 1.0f) / 16.0f);
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 

@@ -24,6 +24,8 @@ namespace Frost
 		ImGuiIO& io = ImGui::GetIO();
 		auto boldFont = io.Fonts->Fonts[0];
 
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0); // Rouding for the buttons 
+
 		ImGui::PushID(name.c_str());
 
 		ImGui::Columns(2);
@@ -84,6 +86,8 @@ namespace Frost
 		ImGui::Columns(1);
 
 		ImGui::PopID();
+
+		ImGui::PopStyleVar(); // Rouding for the buttons 
 	}
 
 	std::string UserInterface::DrawFilePath(const std::string& label, const std::string& textBox, const std::string& format, float columnWidth)
@@ -99,18 +103,16 @@ namespace Frost
 		ImGui::Text(label.c_str());
 		ImGui::NextColumn();
 
-
 		char buffer[256];
 		memset(buffer, 0, sizeof(buffer));
 		std::strncpy(buffer, textBox.c_str(), sizeof(buffer));
 		ImGui::SetNextItemWidth(-1.0f);
 		ImGui::InputText("##Tag", buffer, sizeof(buffer));
 
+		ImGui::NextColumn();
 
 		float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
 		ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
-		ImGui::NextColumn();
-
 		std::string path;
 		if (ImGui::Button("..", buttonSize))
 		{

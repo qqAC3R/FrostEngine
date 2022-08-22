@@ -10,7 +10,7 @@ namespace Frost
 	class InspectorPanel : public Panel
 	{
 	public:
-		InspectorPanel() = default;
+		InspectorPanel();
 		virtual ~InspectorPanel() = default;
 
 		virtual void Init(void* initArgs) override;
@@ -28,6 +28,7 @@ namespace Frost
 		void DrawComponents(Entity& entity);
 	private:
 		Ref<SceneHierarchyPanel> m_SceneHierarchy = nullptr;
+		std::string m_PanelNameImGui;
 
 		bool m_Visibility = true;
 	};

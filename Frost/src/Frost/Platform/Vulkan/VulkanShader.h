@@ -29,6 +29,7 @@ namespace Frost
 		void CreateShaderModules();
 		void CreateVulkanDescriptorSetLayout();
 		bool IsFiledChanged();
+		void CacheShaderSourceFile();
 	private:
 		std::unordered_map<VkShaderStageFlagBits, VkShaderModule> m_ShaderModules;
 		std::unordered_map<ShaderType, std::string> m_ShaderSources;
@@ -36,8 +37,10 @@ namespace Frost
 		std::unordered_map<uint32_t, VkDescriptorSetLayout> m_DescriptorSetLayouts;
 		HashMap<std::string, uint32_t> m_CustomMemberArraySizes;
 		
+		std::string m_ShaderSource;
 		std::string m_Filepath;
 		std::string m_Name;
+		uint64_t m_ShaderSourceHashCode;
 
 		ShaderReflectionData m_ReflectionData;
 

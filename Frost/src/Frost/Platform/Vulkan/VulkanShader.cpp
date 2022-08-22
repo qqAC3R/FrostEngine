@@ -6,7 +6,10 @@
 
 #include <filesystem>
 #include <shaderc/shaderc.hpp>
+#include <spirv-tools/optimizer.hpp>
 //#include <yaml-cpp/yaml.h>
+
+#include <json/json.hpp>
 
 #include "Frost/Utils/Timer.h"
 
@@ -41,6 +44,7 @@ namespace Frost
 		std::string source = Utils::ReadFile(filepath);
 		auto shaderSources = Utils::PreProccesShaders(source);
 		m_ShaderSources = shaderSources;
+		m_ShaderSource = source;
 
 		// Check if we use bindless in a shader
 		{
@@ -148,6 +152,10 @@ namespace Frost
 		auto& shaderData = m_VulkanSPIRV;
 		shaderData.clear();
 
+		bool isFileChanged = IsFiledChanged();
+		if(isFileChanged)
+			CacheShaderSourceFile();
+
 		for (auto&& [stage, source] : shaderSources)
 		{
 			std::filesystem::path shaderFilePath = m_Filepath;
@@ -156,9 +164,9 @@ namespace Frost
 			std::ifstream in(cachedPath, std::ios::in | std::ios::binary);
 			
 			//if (in.is_open())
-			if (false) // TODO: Hash the shader source code
+			if (!isFileChanged) // TODO: Hash the shader source code
 			{
-				bool isChanged = IsFiledChanged();
+				//bool isChanged = IsFiledChanged();
 
 				in.seekg(0, std::ios::end);
 				auto size = in.tellg();
@@ -170,8 +178,10 @@ namespace Frost
 			}
 			else
 			{
-				shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(source,
-													   Utils::ShaderStageToShaderC(stage), m_Filepath.c_str(), options);
+				//spv_validator_options validatorOptions{};
+				//spvValidatorOptionsSetRelaxBlockLayout(validatorOptions, false);
+
+				shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(source, Utils::ShaderStageToShaderC(stage), m_Filepath.c_str(), options);
 
 				if (module.GetCompilationStatus() != shaderc_compilation_status_success)
 				{
@@ -327,98 +337,87 @@ namespace Frost
 
 	bool VulkanShader::IsFiledChanged()
 	{
-		uint64_t hashCode = 0;
+		uint64_t oldHashCode = 0;
+		
 
 		{
 			// Hashing the new shader
-			std::ifstream instream(m_Filepath, std::ios::in | std::ios::binary);
-			std::string result;
+			//std::ifstream instream(m_Filepath, std::ios::in | std::ios::binary);
+			//std::string result;
+			//instream.seekg(0, std::ios::end);
+			//size_t size = instream.tellg();
+			//if (size != -1)
+			//{
+			//	result.resize(size);
+			//	instream.seekg(0, std::ios::beg);
+			//	instream.read(&result[0], size);
+			//}
+			m_ShaderSourceHashCode = std::hash<std::string>{}(m_ShaderSource);
+			FROST_CORE_INFO("{0} shader hash code: {1}", m_Name, m_ShaderSourceHashCode);
+		}
+
+		{
+			std::ifstream instream("Resources/Cache/Shaders/Vulkan/Hash/ShaderHashes.hash", std::ios::in | std::ios::binary);
+			std::string hashFileContent;
 			instream.seekg(0, std::ios::end);
 			size_t size = instream.tellg();
 			if (size != -1)
 			{
-				result.resize(size);
+				hashFileContent.resize(size);
 				instream.seekg(0, std::ios::beg);
-				instream.read(&result[0], size);
-			}
+				instream.read(&hashFileContent[0], size);
 
-			hashCode = std::hash<std::string>{}(result);
-			FROST_INFO("{0} shader hash code: {1}", m_Name, hashCode);
+				// Create A JSON, from the previous file for writing the new contents
+				nlohmann::json j = nlohmann::json::parse(hashFileContent);
+
+				if (j.contains(m_Name))
+					oldHashCode = j[m_Name];
+			}
+			else
+			{
+				return true;
+			}
+			instream.close();
 		}
 
+		if (oldHashCode == m_ShaderSourceHashCode)
+			return false;
 
-#if 0
+		return true;
+	}
+
+	void VulkanShader::CacheShaderSourceFile()
+	{
+		nlohmann::json j;
+
+		std::ifstream instream("Resources/Cache/Shaders/Vulkan/Hash/ShaderHashes.hash", std::ios::in | std::ios::binary);
+		std::string hashFileContent;
+		instream.seekg(0, std::ios::end);
+		size_t size = instream.tellg();
+		if (size != -1)
 		{
-			// Getting the hash code from the old shader
-			std::filesystem::path cacheDir = Utils::GetShaderHashCacheDirectory();
-			std::filesystem::path cachedPath = cacheDir / (m_Name + ".cache");
+			hashFileContent.resize(size);
+			instream.seekg(0, std::ios::beg);
+			instream.read(&hashFileContent[0], size);
 
-			std::ifstream instream(cachedPath, std::ios::in | std::ios::binary);
-			if (instream.is_open())
-			{
-				std::stringstream strStream;
-				strStream << instream.rdbuf();
-
-				YAML::Node data = YAML::Load(strStream.str());
-				{
-					auto shaderName = data["ShaderHash"];
-					for (auto& shader : shaderName)
-					{
-						uint64_t shaderFileCode = shader["Filepath"].as<uint64_t>();
-					}
-					//auto shaderName2 = shaderName["Filepath"];
-					//uint64_t shaderFileCode = shaderName2["HashCode"].as<uint64_t>();
-
-					//
-					//std::string shaderFilepath = shaderName["Filepath"].as<std::string>();
-					//auto shaderHashCode = shaderName["HashCode"];
-					//uint32_t shaderCode = shaderHashCode["Code"].as<uint64_t>();
-
-					//if (shaderCode != hashCode)
-					//{
-					//	return true;
-					//}
-
-					//std::string shaderName = shader["Filepath"].as<std::string>();
-					//if (shaderName == m_Filepath)
-					{
-						//auto hashCodeYaml = shader["HashCode"];
-						//auto code = hashCodeYaml["Code"].as<uint32_t>();
-						//if (code != hashCode)
-						//{
-						//	return true;
-						//}
-					}
-				}
-
-			}
-			//else
-			{
-				YAML::Emitter out;
-
-				out << YAML::BeginMap;
-				out << YAML::Key << "ShaderName" << YAML::Value << m_Name;
-				out << YAML::Key << "ShaderHash" << YAML::Value << YAML::BeginSeq;
-
-				{
-					out << YAML::BeginMap;
-					out << YAML::Key << "Filepath" << YAML::Value << m_Filepath;
-					out << YAML::Key << "HashCode" << YAML::Value << hashCode;
-					out << YAML::EndMap;
-				}
-				out << YAML::EndSeq;
-				out << YAML::EndMap;
-
-
-				std::ofstream fout(cachedPath, std::ios::out);
-				fout << out.c_str();
-			}
-
-
+			// Create A JSON, from the previous file for writing the new contents
+			j = nlohmann::json::parse(hashFileContent);
 		}
-#endif
 
-		return false;
+		j[m_Name] = m_ShaderSourceHashCode;
+
+		std::string result = j.dump(4);
+
+		FILE* f = nullptr;
+		f = fopen("Resources/Cache/Shaders/Vulkan/Hash/ShaderHashes.hash", "w");
+		if (f)
+		{
+			fwrite(result.c_str(), sizeof(char), result.size(), f);
+			fclose(f);
+		}
+
+
+
 	}
 
 	void VulkanShader::Destroy()

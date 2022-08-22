@@ -99,7 +99,7 @@ vec3 DecodeNormal(vec2 e)
 
 float GetShadowBias()
 {
-	const float MINIMUM_SHADOW_BIAS = 0.007;
+	const float MINIMUM_SHADOW_BIAS = 0.005;
 
 	vec3 normal = DecodeNormal(texture(u_NormalMap, s_UV).xy);
 	float bias = max(

@@ -25,7 +25,7 @@ namespace Frost
 
 	void MaterialEditor::Render()
 	{
-		ImGui::Begin("Material Editor");
+		//ImGui::Begin("Material Editor");
 
 		if (m_SelectedEntity && m_SelectedEntity.HasComponent<MeshComponent>())
 		{
@@ -79,10 +79,10 @@ namespace Frost
 					*/
 			}
 		}
-		ImGui::End();
+		//ImGui::End();
 
 
-		ImGui::Begin("Material");
+		ImGui::Begin("Material Editor");
 		if (m_SelectedEntity && m_SelectedEntity.HasComponent<MeshComponent>())
 		{
 			MeshComponent& selectedEntityMesh = m_SelectedEntity.GetComponent<MeshComponent>();
