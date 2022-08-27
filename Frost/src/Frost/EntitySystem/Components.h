@@ -104,12 +104,7 @@ namespace Frost
 	struct DirectionalLightComponent
 	{
 		DirectionalLightComponent() = default;
-		DirectionalLightComponent(glm::vec3 direction)
-			: Direction(direction)
-		{
-		}
 
-		glm::vec3 Direction = { 45.0f, 0.0f, 0.0f };
 		glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
 		float Intensity = 5.0f;
 		float Size = 2.0f;

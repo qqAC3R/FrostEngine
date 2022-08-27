@@ -60,7 +60,7 @@ namespace Frost
 			glm::vec2 MaxResCascade[SHADOW_MAP_CASCADE_COUNT];
 		};
 
-		float CascadeSplitLambda = 0.80f;
+		float CascadeSplitLambda = 0.90f;
 		float CameraFarClip = 2000.0f;
 		float CameraNearClip = 0.1f;
 		float CascadeFarPlaneOffset = 0.0f, CascadeNearPlaneOffset = 0.0f;
@@ -73,7 +73,9 @@ namespace Frost
 		{
 			glm::mat4 ViewProjectionMatrix;
 			uint64_t VertexBufferBDA;
+			uint64_t BoneInformationBDA;
 			uint32_t CascadeIndex;
+			uint32_t IsAnimated = 0;
 		};
 		PushConstantData m_PushConstant;
 

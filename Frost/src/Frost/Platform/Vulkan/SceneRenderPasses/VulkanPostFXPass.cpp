@@ -287,7 +287,7 @@ namespace Frost
 			imageSpec.Width = width;
 			imageSpec.Height = height;
 			//imageSpec.Sampler.ReductionMode_Optional = ReductionMode::Min;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 
 			imageSpec.Format = ImageFormat::RG32F;

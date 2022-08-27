@@ -9,7 +9,7 @@
 #include <spirv-tools/optimizer.hpp>
 //#include <yaml-cpp/yaml.h>
 
-#include <json/json.hpp>
+#include <json/nlohmann/json.hpp>
 
 #include "Frost/Utils/Timer.h"
 
@@ -178,9 +178,6 @@ namespace Frost
 			}
 			else
 			{
-				//spv_validator_options validatorOptions{};
-				//spvValidatorOptionsSetRelaxBlockLayout(validatorOptions, false);
-
 				shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(source, Utils::ShaderStageToShaderC(stage), m_Filepath.c_str(), options);
 
 				if (module.GetCompilationStatus() != shaderc_compilation_status_success)

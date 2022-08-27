@@ -17,6 +17,7 @@
 #include "Frost/EntitySystem/Scene.h"
 #include "Frost/EntitySystem/Entity.h"
 #include "Frost/EntitySystem/Components.h"
+#include "Frost/EntitySystem/SceneSerializer.h"
 /* ------------------------------------------------------ */
 
 

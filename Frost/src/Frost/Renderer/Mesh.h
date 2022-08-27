@@ -128,8 +128,12 @@ namespace Frost
 
 	class Mesh
 	{
+	private:
+		// The constructor is private for several reasons, firstly beacuse here we pass some custom settings for the mesh to be built,
+		// and that should be done only internally. The user shouldn't access any of that, instead there is the `Load` function which just needs the filepath
+		struct MeshBuildSettings;
+		Mesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings = {});
 	public:
-		Mesh(const std::string& filepath, MaterialInstance material);
 		virtual ~Mesh();
 
 		Ref<VertexBuffer> GetVertexBuffer() const { return m_VertexBuffer; }
@@ -144,8 +148,6 @@ namespace Frost
 		const Vector<Index>& GetIndices() const { return m_Indices; }
 
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
-
-		//void SetActiveAnimation(Ref<Animation> animation) { if (animation) { m_ActiveAnimation = animation; } }
 		const Vector<Ref<Animation>>& GetAnimations() const { return m_Animations; }
 
 		Buffer& GetVertexBufferInstanced_CPU(uint32_t index) { return m_VertexBufferInstanced_CPU[index]; }
@@ -160,29 +162,26 @@ namespace Frost
 
 		MaterialInstance& GetMaterial() { return m_Material; } // TODO: Remove this
 		const MaterialInstance& GetMaterial() const { return m_Material; } // TODO: Remove this
-		//Vector<Ref<Material>> GetVulkanMaterial() { return m_Materials; } // TODO: Remove this (now using bindless)
 
 		Ref<BottomLevelAccelerationStructure> GetAccelerationStructure() const { return m_AccelerationStructure; }
 		Ref<IndexBuffer> GetSubmeshIndexBuffer() const { return m_SubmeshIndexBuffers; }
 
 		bool IsLoaded() const { return m_IsLoaded; }
 		bool IsAnimated() const { return m_IsAnimated; }
-		//bool IsAnyAnimationPlaying() const { return m_IsAnyAnimationPlaying; }
 		const std::string& GetFilepath() const { return m_Filepath; }
 
 		void SetNewTexture(uint32_t textureId, Ref<Texture2D> texture);
 
 		static Ref<Mesh> Load(const std::string& filepath, MaterialInstance material = {});
-
 	private:
 		void TraverseNodes(aiNode* node, const glm::mat4& parentTransform = glm::mat4(1.0f), uint32_t level = 0);
-		//void ReadNodeHierarchy(float AnimationTime, const aiNode* pNode, const glm::mat4& parentTransform);
-		//void BoneTransform(float time);
+
+		static Ref<Mesh> LoadCustomMesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings = {});
 	private:
+
 		std::string m_Filepath;
 		bool m_IsLoaded;
 		bool m_IsAnimated;
-		//bool m_IsAnyAnimationPlaying = false;
 		
 		// Assimp import helpers
 		Scope<Assimp::Importer> m_Importer;
@@ -194,22 +193,15 @@ namespace Frost
 		Vector<Index> m_Indices;
 		Vector<Submesh> m_Submeshes;
 
-		// Bone information
+		// Bone/Animation information
 		uint32_t m_BoneCount = 0;
 		Vector<BoneInfo> m_BoneInfo;
-		HashMap<std::string, uint32_t> m_BoneMapping;
-
-		Vector<Ref<UniformBuffer>> m_BoneTransformsUniformBuffer;
-		Vector<glm::mat4> m_BoneTransforms;
-		//Ref<Animation> m_ActiveAnimation = nullptr;
-
-
-		//ozz::unique_ptr<ozz::animation::Skeleton> m_Skeleton;
 		Ref<MeshSkeleton> m_Skeleton;
 		Vector<Ref<Animation>> m_Animations;
-		//Ref<AnimationController> m_AnimationController;
-
+		Vector<Ref<UniformBuffer>> m_BoneTransformsUniformBuffer;
+		Vector<glm::mat4> m_BoneTransforms;
 		
+
 		// Vertex and Index GPU buffers 
 		Ref<VertexBuffer> m_VertexBuffer;
 		Ref<IndexBuffer> m_IndexBuffer;
@@ -223,17 +215,33 @@ namespace Frost
 		HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots; // Bindless
 		Vector<DataStorage> m_MaterialData; // Bindless data
 
+		struct TextureMaterialFilepaths;
+		Vector<TextureMaterialFilepaths> m_TexturesFilepaths;
+
 
 		// Acceleration structure + custom index buffer (Ray Tracing)
 		Ref<BottomLevelAccelerationStructure> m_AccelerationStructure;
 		Ref<IndexBuffer> m_SubmeshIndexBuffers; // Same index buffer, but all grouped into a single mesh
 
+		struct TextureMaterialFilepaths
+		{
+			std::string AlbedoFilepath = "";
+			std::string NormalMapFilepath = "";
+			std::string RoughnessMapFilepath = "";
+			std::string MetalnessMapFilepath = "";
+		};
 
-
+		struct MeshBuildSettings
+		{
+			bool LoadMaterials = true; // Mostly for serialization
+			bool CreateBottomLevelStructure = true; // For ray tracing
+		};
 
 		MaterialInstance m_Material; // TODO: Remove
 
 
 		friend class Animation;
+		friend class SceneSerializer;
+		friend class Ref<Mesh>;
 	};
 }

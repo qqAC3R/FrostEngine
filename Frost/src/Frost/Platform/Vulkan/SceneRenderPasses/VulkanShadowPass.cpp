@@ -13,6 +13,7 @@
 #include "Frost/Platform/Vulkan/VulkanImage.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanVertexBuffer.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
+#include "Frost/Platform/Vulkan/Buffers/VulkanUniformBuffer.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanGeometryPass.h"
 
 #include <imgui.h>
@@ -103,11 +104,11 @@ namespace Frost
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width / 1.5f;
-			imageSpec.Height = height / 1.5f;
+			imageSpec.Width = width / 1.0f;
+			imageSpec.Height = height / 1.0f;
 			imageSpec.Format = ImageFormat::RGBA8;
 			imageSpec.Usage = ImageUsage::Storage;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			m_Data->ShadowComputeTexture[i] = Image2D::Create(imageSpec);
 		}
@@ -301,7 +302,13 @@ namespace Frost
 				m_PushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 				m_PushConstant.CascadeIndex = 0;
 				m_PushConstant.ViewProjectionMatrix = m_Data->CascadeViewProjMatrix[i];
-				//m_PushConstant.ViewProjectionMatrix = viewProjectionMatrix;
+				m_PushConstant.IsAnimated = static_cast<uint32_t>(mesh->IsAnimated());
+
+				if (mesh->IsAnimated())
+					m_PushConstant.BoneInformationBDA = mesh->GetBoneUniformBuffer(currentFrameIndex).As<VulkanUniformBuffer>()->GetVulkanBufferAddress();
+				else
+					m_PushConstant.BoneInformationBDA = 0;
+				
 				vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_PushConstant);
 
 				uint32_t submeshCount = meshData.SubmeshCount;
@@ -326,8 +333,8 @@ namespace Frost
 		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix1", m_Data->CascadeViewProjMatrix[1]);
 		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix2", m_Data->CascadeViewProjMatrix[2]);
 		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix3", m_Data->CascadeViewProjMatrix[3]);
-		vulkanDescriptor->Set("DirectionaLightData.DirectionalLightDir", renderQueue.m_LightData.DirectionalLight.Direction);
-		vulkanDescriptor->Set("DirectionaLightData.DirectionLightSize", renderQueue.m_LightData.DirectionalLight.Size);
+		vulkanDescriptor->Set("DirectionaLightData.DirectionalLightDir", renderQueue.m_LightData.DirLight.Direction);
+		vulkanDescriptor->Set("DirectionaLightData.DirectionLightSize", renderQueue.m_LightData.DirLight.Specification.Size);
 		vulkanDescriptor->Set("DirectionaLightData.FadeCascades", FadeCascades);
 		vulkanDescriptor->Set("DirectionaLightData.CascadesFadeFactor", CascadesFadeFactor);
 		vulkanDescriptor->Set("DirectionaLightData.CascadeDebug", m_ShowCascadesDebug);
@@ -340,8 +347,8 @@ namespace Frost
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
 
-		uint32_t groupX = static_cast<uint32_t>(std::ceil((width  / 1.5f) / 32.0f));
-		uint32_t groupY = static_cast<uint32_t>(std::ceil((height / 1.5f) / 32.0f));
+		uint32_t groupX = static_cast<uint32_t>(std::ceil((width  / 1.0f) / 32.0f));
+		uint32_t groupY = static_cast<uint32_t>(std::ceil((height / 1.0f) / 32.0f));
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 		
 		// Barrier
@@ -378,7 +385,7 @@ namespace Frost
 			cascadeSplits[i] = (d - nearClip) / clipRange;
 		}
 
-		cascadeSplits[3] = 0.3f;
+		//cascadeSplits[3] = 0.3f;
 
 
 		// Calculate orthographic projection matrix for each cascade
@@ -431,7 +438,7 @@ namespace Frost
 			glm::vec3 maxExtents = glm::vec3(radius);
 			glm::vec3 minExtents = -maxExtents;
 
-			glm::vec3 lightDir = glm::normalize(-renderQueue.m_LightData.DirectionalLight.Direction);
+			glm::vec3 lightDir = glm::normalize(-renderQueue.m_LightData.DirLight.Direction);
 			glm::mat4 lightViewMatrix = glm::lookAt(frustumCenter - lightDir * -minExtents.z, frustumCenter, glm::vec3(0.0f, 0.0f, 1.0f));
 
 			glm::mat4 lightOrthoMatrix = glm::ortho(

@@ -208,12 +208,24 @@ float SearchRegionRadiusUV(float zWorld)
 	return lightRadiusUV * (zWorld - light_zNear) / zWorld;
 }
 
+int GetSamplesRequiredForCascadeIndex(uint cascadeIndex)
+{
+	switch(cascadeIndex)
+	{
+		case 1: return 24;
+		case 2: return 16;
+		case 3: return 10;
+		case 4: return 8;
+	}
+	return 0;
+}
+
 float FindBlockerDistance_DirectionalLight(vec4 shadowCoords, uint cascadeIndex, float lightSize)
 {
 	float bias = GetShadowBias();
 	//float bias = 0.05;
 
-	int numBlockerSearchSamples = 32;
+	int numBlockerSearchSamples = GetSamplesRequiredForCascadeIndex(cascadeIndex);
 	int blockers = 0;
 	float avgBlockerDistance = 0;
 
@@ -239,7 +251,7 @@ float PCF_DirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius)
 {
 	float bias = GetShadowBias();
 	//float bias = 0.05;
-	int numPCFSamples = 32;
+	int numPCFSamples = GetSamplesRequiredForCascadeIndex(cascadeIndex);
 
 	float sum = 0;
 	for (int i = 0; i < numPCFSamples; i++)

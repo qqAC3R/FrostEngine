@@ -41,5 +41,7 @@ namespace Frost
 
 	private:
 		entt::registry m_Registry;
+
+		friend class SceneSerializer;
 	};
 }

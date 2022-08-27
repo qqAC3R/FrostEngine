@@ -183,7 +183,7 @@ namespace Frost
 		};
 
 		const std::vector<const char*> extensions = {
-			VK_KHR_SURFACE_EXTENSION_NAME, // Swapchain
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME, // Swapchain
 			VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
 			VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
 			VK_KHR_RELAXED_BLOCK_LAYOUT_EXTENSION_NAME, // It removes the errors for the scalar blocks

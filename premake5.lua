@@ -109,6 +109,7 @@ project "Frost"
 		"%{IncludeDir.SPIRV_Cross}",
 		"%{IncludeDir.OZZ_Animation}",
 		"%{IncludeDir.json}",
+		"%{IncludeDir.json}/json",
 		"%{IncludeDir.FontAwesome}"
 	}
 
@@ -220,6 +221,7 @@ project "FrostEditor"
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.FontAwesome}",
 		"%{IncludeDir.json}",
+		"%{IncludeDir.json}/json",
 		
 		"Frost/vendor",
 		"Frost/src/Frost",

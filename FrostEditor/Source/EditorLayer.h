@@ -24,6 +24,8 @@
 
 #include "UserInterface/UIWidgets.h"
 
+#include "IconsFontAwesome.hpp"
+
 namespace Frost
 {
 	class EditorLayer : public Layer
@@ -82,11 +84,10 @@ namespace Frost
 			{
 				auto& directionalLight = m_EditorScene->CreateEntity("Directional Light");
 				auto& meshComponent = directionalLight.AddComponent<DirectionalLightComponent>();
-				meshComponent.Direction = { -75.0f, 0.0f, 0.0f };
 			}
 
-			m_UseHillaire = false;
-			
+
+			Renderer::GetSceneEnvironment()->SetType(SceneEnvironment::Type::Hillaire);
 			//float& cameraExposure = m_EditorCamera.GetExposure();
 			//cameraExposure = 6.0f;
 
@@ -293,6 +294,30 @@ namespace Frost
 			ImGui::End();
 		}
 
+		void NewScene()
+		{
+			m_EditorScene = Ref<Scene>::Create();
+			m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
+		}
+
+		void SaveSceneAs()
+		{
+			std::string filepath = FileDialogs::SaveFile("");
+
+			SceneSerializer sceneSerializer(m_EditorScene);
+			sceneSerializer.Serialize(filepath);
+		}
+
+		void OpenScene()
+		{
+			NewScene();
+
+			std::string filepath = FileDialogs::OpenFile("");
+
+			SceneSerializer sceneSerializer(m_EditorScene);
+			sceneSerializer.Deserialize(filepath);
+		}
+
 		virtual void OnEvent(Event& event)
 		{
 			EventDispatcher dispatcher(event);
@@ -308,6 +333,8 @@ namespace Frost
 			if (event.GetRepeatCount() > 0)
 				return false;
 
+			bool leftControl = Input::IsKeyPressed(Key::LeftControl);
+
 			switch (event.GetKeyCode())
 			{
 				// ImGuizmo modes
@@ -315,6 +342,22 @@ namespace Frost
 			case Key::W:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::TRANSLATE; break;
 			case Key::E:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::ROTATE; break;
 			case Key::R:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::SCALE; break;
+
+			case Key::S: 
+				{
+					if (!leftControl) break;
+					SaveSceneAs();
+					break;
+				}
+
+			case Key::O: 
+				{
+					if (!leftControl) break;
+					OpenScene();
+					break;
+				}
+
+
 			}
 
 			return false;
@@ -336,9 +379,11 @@ namespace Frost
 		int m_GuizmoMode = -1;
 
 		bool m_UseRT = false;
-		bool m_UseHillaire = false;
+		bool m_UseHillaire = true;
 
 		Ref<Scene> m_EditorScene;
+		//Ref<SceneSerializer> m_SceneSerializer;
+
 		Ref<SceneHierarchyPanel> m_SceneHierarchyPanel;
 		Ref<InspectorPanel> m_InspectorPanel;
 		Ref<ViewportPanel> m_ViewportPanel;

@@ -470,8 +470,7 @@ void main()
 	float IBLIntensity = 5.0f;
 	result += ComputeIBLContriubtion() * IBLIntensity;
 
-	//result *= texture(u_ShadowTexture, v_TexCoord).rgb;
-	result *= UpsampleTent9(u_ShadowTexture, 0.0, v_TexCoord, 1.0).rgb;
+	result *= texture(u_ShadowTexture, v_TexCoord).rgb;
 
 	// Calculating the result with the camera exposure
 	result *= u_UniformBuffer.CameraExposure;

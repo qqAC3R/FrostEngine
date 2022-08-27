@@ -82,8 +82,14 @@ namespace Frost
 				glm::vec3 Position;
 			};
 
+			struct DirectionalLight
+			{
+				DirectionalLightComponent Specification;
+				glm::vec3 Direction;
+			};
+
 			Vector<PointLight> PointLights;
-			DirectionalLightComponent DirectionalLight;
+			DirectionalLight DirLight;
 		};
 		LightData m_LightData;
 		

@@ -56,7 +56,6 @@ vec4 GetValueFromFroxel(vec3 position, float maxT, vec2 uv, vec3 noise)
 	volumeUVW += (2.0 * noise - vec3(1.0)) / textureSize(u_FinalGatherFroxel, 0).xyz;
 
 	// Get the value
-	//vec4 result = FastTricubicLookup(u_FinalGatherFroxel, volumeUVW);
 	vec4 result = texture(u_FinalGatherFroxel, volumeUVW);
 	return result;
 }

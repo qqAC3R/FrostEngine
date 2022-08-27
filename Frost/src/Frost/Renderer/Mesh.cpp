@@ -33,6 +33,11 @@ namespace Frost
 		return CreateRef<Mesh>(filepath, material);
 	}
 
+	Ref<Mesh> Mesh::LoadCustomMesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings /*= {}*/)
+	{
+		return CreateRef<Mesh>(filepath, material, meshBuildSettings);
+	}
+
 	namespace Utils
 	{
 		static glm::mat4 AssimpMat4ToGlmMat4(const aiMatrix4x4& matrix)
@@ -58,7 +63,7 @@ namespace Frost
 
 	}
 
-	Mesh::Mesh(const std::string& filepath, MaterialInstance material)
+	Mesh::Mesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings)
 		: m_Material(material), m_Filepath(filepath)
 	{
 		m_Importer = CreateScope<Assimp::Importer>();
@@ -282,10 +287,6 @@ namespace Frost
 
 
 		{
-			// Timer
-			std::string timerText = m_Filepath + " buffers creation";
-			Timer timer(timerText.c_str());
-
 			// Vertex/Index buffer
 			if(m_IsAnimated)
 				m_VertexBuffer = VertexBuffer::Create(m_SkinnedVertices.data(), m_SkinnedVertices.size() * sizeof(AnimatedVertex));
@@ -305,6 +306,7 @@ namespace Frost
 				m_VertexBufferInstanced_CPU[i].Allocate(m_Submeshes.size() * sizeof(SubmeshInstanced) + 1);
 			}
 
+
 			if (m_IsAnimated)
 			{
 				m_BoneTransformsUniformBuffer.resize(framesInFlight);
@@ -314,27 +316,30 @@ namespace Frost
 				}
 			}
 
+			if (meshBuildSettings.CreateBottomLevelStructure)
+			{
+				// Acceleration structure creation
+				MeshASInfo meshInfo{};
+				meshInfo.MeshVertexBuffer = m_VertexBuffer;
+				meshInfo.MeshIndexBuffer = m_IndexBuffer;
+				meshInfo.SubmeshIndexBuffer = m_SubmeshIndexBuffers;
+				meshInfo.SubMeshes = m_Submeshes;
 
-			// Acceleration structure creation
-			MeshASInfo meshInfo{};
-			meshInfo.MeshVertexBuffer = m_VertexBuffer;
-			meshInfo.MeshIndexBuffer = m_IndexBuffer;
-			meshInfo.SubmeshIndexBuffer = m_SubmeshIndexBuffers;
-			meshInfo.SubMeshes = m_Submeshes;
-
-			m_AccelerationStructure = BottomLevelAccelerationStructure::Create(meshInfo);
+				m_AccelerationStructure = BottomLevelAccelerationStructure::Create(meshInfo);
+			}
 		}
 
 		// Materials
-		if (scene->HasMaterials())
+		if (scene->HasMaterials() && meshBuildSettings.LoadMaterials)
 		{
 			m_Textures.reserve(scene->mNumMaterials);
+			m_TexturesFilepaths.resize(scene->mNumMaterials);
 			//m_Materials.resize(scene->mNumMaterials);
 			m_MaterialData.resize(scene->mNumMaterials);
 
 			for (uint32_t i = 0; i < scene->mNumMaterials; i++)
 			{
-				// Albedo -         vec3        (12 bytes)
+				// Albedo -         vec4        (16 bytes)
 				// Roughness -      float       (4 bytes)
 				// Metalness -      float       (4 bytes)
 				// Emission -       float       (4 bytes)
@@ -408,8 +413,6 @@ namespace Frost
 				float roughness = 1.0f - glm::sqrt(shininess / 100.0f);
 				if (roughness == 1.0f) roughness = 0.99f;
 
-				////mi->Set("u_MaterialUniform.Roughness", roughness);
-				////mi->Set("u_MaterialUniform.Metalness", metalness);
 				m_MaterialData[i].Set("RoughnessFactor", roughness);
 				m_MaterialData[i].Set("MetalnessFactor", metalness);
 
@@ -431,13 +434,12 @@ namespace Frost
 					auto texture = Texture2D::Create(texturePath, textureSpec);
 					if (texture->Loaded())
 					{
-						uint32_t textureId = m_TextureAllocatorSlots[albedoTextureIndex];
-
 						texture->GenerateMipMaps();
-						m_Textures[textureId] = texture;
-						//mi->Set("u_AlbedoTexture", texture);
-						//mi->Set("u_MaterialUniform.AlbedoColor", glm::vec3(1.0f));
 
+						uint32_t textureId = m_TextureAllocatorSlots[albedoTextureIndex];
+						m_Textures[textureId] = texture;
+						m_TexturesFilepaths[i].AlbedoFilepath = texturePath;
+						
 						VulkanBindlessAllocator::AddTextureCustomSlot(texture, textureId);
 					}
 					else
@@ -446,7 +448,7 @@ namespace Frost
 
 						uint32_t textureId = m_TextureAllocatorSlots[albedoTextureIndex];
 						m_Textures[textureId] = whiteTexture;
-						//mi->Set("u_AlbedoTexture", whiteTexture);
+
 						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 				}
@@ -454,7 +456,7 @@ namespace Frost
 				{
 					uint32_t textureId = m_TextureAllocatorSlots[albedoTextureIndex];
 					m_Textures[textureId] = whiteTexture;
-					//mi->Set("u_AlbedoTexture", whiteTexture);
+					
 					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 				}
 
@@ -476,34 +478,29 @@ namespace Frost
 					{
 						uint32_t textureId = m_TextureAllocatorSlots[normalMapTextureIndex];
 						m_Textures[textureId] = texture;
-						//mi->Set("u_NormalTexture", texture);
-						//mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(1));
+						m_TexturesFilepaths[i].NormalMapFilepath = texturePath;
 
 						m_MaterialData[i].Set("UseNormalMap", uint32_t(1));
 						VulkanBindlessAllocator::AddTextureCustomSlot(texture, textureId);
 					}
 					else
 					{
-						FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
-						//mi->Set("u_NormalTexture", whiteTexture);
-						//mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
-
+						FROST_CORE_ERROR("Couldn't load albedo texture: {0}", texturePath);
+						
 						uint32_t textureId = m_TextureAllocatorSlots[normalMapTextureIndex];
 						m_Textures[textureId] = whiteTexture;
+
 						m_MaterialData[i].Set("UseNormalMap", uint32_t(0));
 						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 				}
 				else
 				{
-					////mi->Set("u_NormalTexture", whiteTexture);
-					////mi->Set("u_MaterialUniform.UseNormalMap", uint32_t(0));
-
 					uint32_t textureId = m_TextureAllocatorSlots[normalMapTextureIndex];
 					m_Textures[textureId] = whiteTexture;
+
 					m_MaterialData[i].Set("UseNormalMap", uint32_t(0));
 					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-
 				}
 
 
@@ -524,18 +521,17 @@ namespace Frost
 					{
 						uint32_t textureId = m_TextureAllocatorSlots[roughnessTextureIndex];
 						m_Textures[textureId] = texture;
-						////mi->Set("u_RoughnessTexture", texture);
+						m_TexturesFilepaths[i].RoughnessMapFilepath = texturePath;
 
 						VulkanBindlessAllocator::AddTextureCustomSlot(texture, textureId);
 					}
 					else
 					{
-						FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
+						FROST_CORE_ERROR("Couldn't load normal texture: {0}", texturePath);
 
 						uint32_t textureId = m_TextureAllocatorSlots[roughnessTextureIndex];
 						m_Textures[textureId] = whiteTexture;
-						//mi->Set("u_RoughnessTexture", whiteTexture);
-
+						
 						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 				}
@@ -543,8 +539,7 @@ namespace Frost
 				{
 					uint32_t textureId = m_TextureAllocatorSlots[roughnessTextureIndex];
 					m_Textures[textureId] = whiteTexture;
-					//mi->Set("u_RoughnessTexture", whiteTexture);
-
+					
 					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 				}
 
@@ -578,7 +573,7 @@ namespace Frost
 
 								uint32_t textureId = m_TextureAllocatorSlots[metalnessTextureIndex];
 								m_Textures[textureId] = texture;
-								//mi->Set("u_MetalnessTexture", texture);
+								m_TexturesFilepaths[i].MetalnessMapFilepath = texturePath;
 
 								VulkanBindlessAllocator::AddTextureCustomSlot(texture, textureId);
 							}
@@ -594,7 +589,7 @@ namespace Frost
 					{
 						uint32_t textureId = m_TextureAllocatorSlots[metalnessTextureIndex];
 						m_Textures[textureId] = whiteTexture;
-						//mi->Set("u_MetalnessTexture", whiteTexture);
+						
 						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 
@@ -692,22 +687,6 @@ namespace Frost
 					m_BoneTransforms[i] = Mat4FromFloat4x4(modelSpaceMatrices[jointIndex]) * m_BoneInfo[i].InverseBindPose;
 				}
 			}
-
-#if 0
-			if(m_ActiveAnimation)
-				m_ActiveAnimation->Update(deltaTime);
-			else
-			{
-				memset(m_BoneTransforms.data(), 0.0f, m_BoneCount * sizeof(glm::mat4));
-				//for (size_t i = 0; i < m_BoneCount; i++)
-					//m_BoneTransforms[i] = glm::mat4(1.0f);
-			}
-#endif
-
-
-			
-			
-
 			//BoneTransform(deltaTime);
 			//m_BoneTransformsUniformBuffer[currentFrameIndex]->SetData(m_BoneTransforms.data());
 		}

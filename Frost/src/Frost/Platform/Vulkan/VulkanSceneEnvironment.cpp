@@ -526,12 +526,12 @@ namespace Frost
 	{
 		AtmosphereParams& atmosphereParams = m_AtmosphereParams;
 
-		glm::vec3 sunDir = glm::radians(-renderQueue.m_LightData.DirectionalLight.Direction);
+		glm::vec3 sunDir = glm::radians(-renderQueue.m_LightData.DirLight.Direction);
 
-		glm::vec4 sunDir_Intensity = { sunDir.x, sunDir.y, sunDir.z, renderQueue.m_LightData.DirectionalLight.Intensity };
+		glm::vec4 sunDir_Intensity = { sunDir.x, sunDir.y, sunDir.z, renderQueue.m_LightData.DirLight.Specification.Intensity };
 		//float viewPosY = (6.360f + 0.0002f) + glm::clamp(renderQueue.CameraPosition.y / 100000.0f, 0.0f, 0.099f);
 
-		float sunSize = renderQueue.m_LightData.DirectionalLight.Size;
+		float sunSize = renderQueue.m_LightData.DirLight.Specification.Size;
 		atmosphereParams.ViewPos_SunSize.w = sunSize;
 
 		// If nothing changed since the last frame, don't compute it again since its useless

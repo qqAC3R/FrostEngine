@@ -154,7 +154,7 @@ namespace Frost
 
 		struct AmbientOcclussionSettings
 		{
-			int32_t AOMode = 0; // 0 = HBAO || 1 = GTAO
+			int32_t AOMode = 1; // 0 = HBAO || 1 = GTAO
 		} m_AOSettings;
 
 		struct SSRSettings

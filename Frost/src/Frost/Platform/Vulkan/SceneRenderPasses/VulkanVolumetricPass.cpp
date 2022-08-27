@@ -548,19 +548,29 @@ namespace Frost
 		if (m_Data->m_UseVolumetrics)
 		{
 
-			VulkanRenderer::BeginTimeStampPass("Volumetric Pass");
+			VulkanRenderer::BeginTimeStampPass("Volumetric Pass (Froxel Populate)");
 			FroxelPopulateUpdate(renderQueue);
-			FroxelLightInjectUpdate(renderQueue);
+			VulkanRenderer::EndTimeStampPass("Volumetric Pass (Froxel Populate)");
 
+			VulkanRenderer::BeginTimeStampPass("Volumetric Pass (Light Inject)");
+			FroxelLightInjectUpdate(renderQueue);
+			VulkanRenderer::EndTimeStampPass("Volumetric Pass (Light Inject)");
+
+			VulkanRenderer::BeginTimeStampPass("Volumetric Pass (TAA)");
 			if (m_Data->m_UseTAA)
 			{
 				FroxelTAAUpdate(renderQueue);
 			}
+			VulkanRenderer::EndTimeStampPass("Volumetric Pass (TAA)");
 
+			VulkanRenderer::BeginTimeStampPass("Volumetric Pass (Gather)");
 			FroxelFinalComputeUpdate(renderQueue);
+			VulkanRenderer::EndTimeStampPass("Volumetric Pass (Gather)");
+
+			VulkanRenderer::BeginTimeStampPass("Volumetric Pass (Compute)");
 			VolumetricComputeUpdate(renderQueue);
+			VulkanRenderer::EndTimeStampPass("Volumetric Pass (Compute)");
 			VolumetricBlurUpdate(renderQueue);
-			VulkanRenderer::EndTimeStampPass("Volumetric Pass");
 		}
 	}
 
@@ -657,11 +667,11 @@ namespace Frost
 		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix3", shadowPassInternalData->CascadeViewProjMatrix[3]);
 		vulkanDescriptor->Set("DirectionaLightData.CascadeDepthSplit", cascadeDepthSplit);
 
-		vulkanDescriptor->Set("DirectionaLightData.MieScattering", renderQueue.m_LightData.DirectionalLight.Color);
-		vulkanDescriptor->Set("DirectionaLightData.Density", renderQueue.m_LightData.DirectionalLight.VolumeDensity);
-		vulkanDescriptor->Set("DirectionaLightData.Absorption", renderQueue.m_LightData.DirectionalLight.Absorption);
-		vulkanDescriptor->Set("DirectionaLightData.Phase", renderQueue.m_LightData.DirectionalLight.Phase);
-		vulkanDescriptor->Set("DirectionaLightData.Intensity", renderQueue.m_LightData.DirectionalLight.Intensity);
+		vulkanDescriptor->Set("DirectionaLightData.MieScattering", renderQueue.m_LightData.DirLight.Specification.Color);
+		vulkanDescriptor->Set("DirectionaLightData.Density", renderQueue.m_LightData.DirLight.Specification.VolumeDensity);
+		vulkanDescriptor->Set("DirectionaLightData.Absorption", renderQueue.m_LightData.DirLight.Specification.Absorption);
+		vulkanDescriptor->Set("DirectionaLightData.Phase", renderQueue.m_LightData.DirLight.Specification.Phase);
+		vulkanDescriptor->Set("DirectionaLightData.Intensity", renderQueue.m_LightData.DirLight.Specification.Intensity);
 
 		// Binding the descriptor
 		vulkanDescriptor->Bind(cmdBuf, m_Data->FroxelLightInjectPipeline);
@@ -669,7 +679,7 @@ namespace Frost
 		// Updating push constant
 		s_VolumetricLightInjectPushConstant.InvViewProjMatrix = s_FroxelPopulatePushConstant.InvViewProjMatrix;
 		s_VolumetricLightInjectPushConstant.CameraPosition = s_FroxelPopulatePushConstant.CameraPosition;
-		s_VolumetricLightInjectPushConstant.DirectionalLightDir = renderQueue.m_LightData.DirectionalLight.Direction;
+		s_VolumetricLightInjectPushConstant.DirectionalLightDir = renderQueue.m_LightData.DirLight.Direction;
 		s_VolumetricLightInjectPushConstant.Time = s_FroxelPopulatePushConstant.Time;
 		s_VolumetricLightInjectPushConstant.PointLightCount = (uint32_t)renderQueue.m_LightData.PointLights.size();
 		s_VolumetricLightInjectPushConstant.ViewportSize = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
@@ -790,7 +800,7 @@ namespace Frost
 		// Push constant information
 		s_VolumetricComputePushConstant.CameraPosition = renderQueue.CameraPosition;
 		s_VolumetricComputePushConstant.InvViewProjMatrix = s_FroxelPopulatePushConstant.InvViewProjMatrix;
-		s_VolumetricComputePushConstant.DirectionalLightDir = renderQueue.m_LightData.DirectionalLight.Direction;
+		s_VolumetricComputePushConstant.DirectionalLightDir = renderQueue.m_LightData.DirLight.Direction;
 
 		// Binding the descriptor and compute pipeline
 		vulkanDescriptor->Bind(cmdBuf, m_Data->VolumetricComputePipeline);
@@ -893,7 +903,7 @@ namespace Frost
 		s_CloudComputePushConstant.NearPlane = renderQueue.m_Camera.GetNearClip();
 		s_CloudComputePushConstant.FarPlane = renderQueue.m_Camera.GetFarClip();
 		s_CloudComputePushConstant.CloudsCount = renderQueue.m_CloudVolumeData.size();
-		s_CloudComputePushConstant.DirectionaLightDir = renderQueue.m_LightData.DirectionalLight.Direction;
+		s_CloudComputePushConstant.DirectionaLightDir = renderQueue.m_LightData.DirLight.Direction;
 
 
 		// Binding the descriptor and compute pipeline

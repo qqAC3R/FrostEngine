@@ -70,8 +70,8 @@ namespace Frost
 
 	void RenderQueue::SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction)
 	{
-		m_LightData.DirectionalLight = directionalLight;
-		m_LightData.DirectionalLight.Direction = direction;
+		m_LightData.DirLight.Specification = directionalLight;
+		m_LightData.DirLight.Direction = direction;
 	}
 
 	void RenderQueue::Reset()

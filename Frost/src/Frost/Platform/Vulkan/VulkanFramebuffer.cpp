@@ -107,6 +107,7 @@ namespace Frost
 			spec.Height = m_Specification.Height;
 			spec.Format = Utils::GetImageFormat(attachment.TextureFormat);
 			spec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			spec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			spec.UseMipChain = false;
 
 			if (attachment.TextureFormat == FramebufferTextureFormat::Depth || attachment.TextureFormat == FramebufferTextureFormat::DepthStencil)
