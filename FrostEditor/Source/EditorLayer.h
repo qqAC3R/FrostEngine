@@ -155,6 +155,13 @@ namespace Frost
 			{
 				if (ImGui::BeginMenu("File"))
 				{
+					if (ImGui::MenuItem("Open"))
+						OpenScene();
+					if (ImGui::MenuItem("Save As"))
+						SaveSceneAs();
+
+					ImGui::Separator();
+					
 					if (ImGui::MenuItem("Exit"))
 						Application::Get().Close();
 
@@ -304,18 +311,23 @@ namespace Frost
 		{
 			std::string filepath = FileDialogs::SaveFile("");
 
-			SceneSerializer sceneSerializer(m_EditorScene);
-			sceneSerializer.Serialize(filepath);
+			if (!filepath.empty())
+			{
+				SceneSerializer sceneSerializer(m_EditorScene);
+				sceneSerializer.Serialize(filepath);
+			}
 		}
 
 		void OpenScene()
 		{
-			NewScene();
-
 			std::string filepath = FileDialogs::OpenFile("");
 
-			SceneSerializer sceneSerializer(m_EditorScene);
-			sceneSerializer.Deserialize(filepath);
+			if (!filepath.empty())
+			{
+				NewScene();
+				SceneSerializer sceneSerializer(m_EditorScene);
+				sceneSerializer.Deserialize(filepath);
+			}
 		}
 
 		virtual void OnEvent(Event& event)

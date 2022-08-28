@@ -40,7 +40,6 @@ namespace Frost
 	void SceneSerializer::SerializeEntity(nlohmann::ordered_json& out, Entity entity)
 	{
 		uint64_t uuid = entity.GetComponent<IDComponent>().ID.Get();
-		//std::string uuidStr = std::to_string(uuid);
 		nlohmann::ordered_json entityOut = nlohmann::ordered_json();
 
 		entityOut["UUID"] = uuid;
@@ -84,8 +83,6 @@ namespace Frost
 			nlohmann::json materials = nlohmann::json();
 			std::string meshFilepath = "";
 
-			//out["MeshComponent"]["Materials"] = nlohmann::json();
-
 			if (mesh)
 			{
 				meshFilepath = mesh->GetFilepath();
@@ -119,6 +116,33 @@ namespace Frost
 			entityOut["MeshComponent"]["Filepath"] = meshFilepath;
 		}
 
+		if (entity.HasComponent<AnimationComponent>())
+		{
+			int32_t animationIndex = -1;
+
+			AnimationComponent& animationController = entity.GetComponent<AnimationComponent>();
+
+			// Check whether the entity has a mesh component or not. If it does then search for the animation index
+			if (entity.HasComponent<MeshComponent>())
+			{
+				MeshComponent& meshComponent = entity.GetComponent<MeshComponent>();
+				Ref<Mesh> mesh = meshComponent.Mesh;
+
+				if (mesh)
+				{
+					for (uint32_t i = 0; i < mesh->m_Animations.size(); i++)
+					{
+						if (mesh->m_Animations[i].Raw() == animationController.Controller->GetActiveAnimation().Raw())
+						{
+							animationIndex = i;
+							break;
+						}
+					}
+				}
+			}
+			entityOut["AnimationComponent"]["AnimationIndex"] = animationIndex;
+		}
+
 		if (entity.HasComponent<DirectionalLightComponent>())
 		{
 			DirectionalLightComponent& dirLightComponent = entity.GetComponent<DirectionalLightComponent>();
@@ -132,8 +156,46 @@ namespace Frost
 			entityOut["DirectionalLightComponent"]["Phase"] = dirLightComponent.Phase;
 		}
 
-		out.push_back(entityOut);
+		if (entity.HasComponent<PointLightComponent>())
+		{
+			PointLightComponent& pointLightComponent = entity.GetComponent<PointLightComponent>();
 
+			entityOut["PointLightComponent"]["Color"] = { pointLightComponent.Color.x, pointLightComponent.Color.y, pointLightComponent.Color.z };
+			entityOut["PointLightComponent"]["Intensity"] = pointLightComponent.Intensity;
+			entityOut["PointLightComponent"]["Radius"] = pointLightComponent.Radius;
+			entityOut["PointLightComponent"]["Falloff"] = pointLightComponent.Falloff;
+		}
+
+		if (entity.HasComponent<FogBoxVolumeComponent>())
+		{
+			FogBoxVolumeComponent& fogBoxVolumeComponent = entity.GetComponent<FogBoxVolumeComponent>();
+
+			entityOut["FogBoxVolumeComponent"]["MieScattering"] = { fogBoxVolumeComponent.MieScattering.x, fogBoxVolumeComponent.MieScattering.y, fogBoxVolumeComponent.MieScattering.z };
+			entityOut["FogBoxVolumeComponent"]["PhaseValue"] = fogBoxVolumeComponent.PhaseValue;
+			entityOut["FogBoxVolumeComponent"]["Emission"] = { fogBoxVolumeComponent.Emission.x, fogBoxVolumeComponent.Emission.y, fogBoxVolumeComponent.Emission.z };
+			entityOut["FogBoxVolumeComponent"]["Absorption"] = fogBoxVolumeComponent.Absorption;
+			entityOut["FogBoxVolumeComponent"]["Density"] = fogBoxVolumeComponent.Density;
+		}
+
+		if (entity.HasComponent<CloudVolumeComponent>())
+		{
+			CloudVolumeComponent& cloudVolumeComponent = entity.GetComponent<CloudVolumeComponent>();
+
+			entityOut["CloudVolumeComponent"]["CloudScale"] = cloudVolumeComponent.CloudScale;
+			entityOut["CloudVolumeComponent"]["Density"] = cloudVolumeComponent.Density;
+
+			entityOut["CloudVolumeComponent"]["Scattering"] = { cloudVolumeComponent.Scattering.x, cloudVolumeComponent.Scattering.y, cloudVolumeComponent.Scattering.z };
+			entityOut["CloudVolumeComponent"]["PhaseFunction"] = cloudVolumeComponent.PhaseFunction;
+			
+			entityOut["CloudVolumeComponent"]["DensityOffset"] = cloudVolumeComponent.DensityOffset;
+			entityOut["CloudVolumeComponent"]["DetailOffset"] = cloudVolumeComponent.DetailOffset;
+			entityOut["CloudVolumeComponent"]["CloudAbsorption"] = cloudVolumeComponent.CloudAbsorption;
+			entityOut["CloudVolumeComponent"]["SunAbsorption"] = cloudVolumeComponent.SunAbsorption;
+		}
+
+		
+
+		out.push_back(entityOut);
 	}
 
 	bool SceneSerializer::Deserialize(const std::string& filepath)
@@ -388,11 +450,43 @@ namespace Frost
 
 						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
-
-
-
 				}
-				
+			}
+
+			// Animation Component
+			if (!entity["AnimationComponent"].is_null())
+			{
+				AnimationComponent& animationComponent = ent.AddComponent<AnimationComponent>(nullptr);
+				nlohmann::json cloudVolumeIn = entity["AnimationComponent"];
+
+				if (ent.HasComponent<MeshComponent>())
+				{
+					MeshComponent& meshComponent = ent.GetComponent<MeshComponent>();
+					Ref<Mesh> mesh = meshComponent.Mesh;
+
+					if (mesh)
+					{
+						animationComponent.MeshComponentPtr = &meshComponent;
+						animationComponent.Controller = nullptr;
+
+						if (entity["AnimationComponent"]["AnimationIndex"] != -1)
+						{
+							animationComponent.Controller = CreateRef<AnimationController>();
+							animationComponent.Controller->SetActiveAnimation(mesh->GetAnimations()[entity["AnimationComponent"]["AnimationIndex"]]);
+						}
+					}
+					else
+					{
+						animationComponent.MeshComponentPtr = nullptr;
+						animationComponent.Controller = nullptr;
+					}
+				}
+				else
+				{
+					animationComponent.MeshComponentPtr = nullptr;
+					animationComponent.Controller = nullptr;
+				}
+
 			}
 
 			// Directional Light Component
@@ -409,6 +503,48 @@ namespace Frost
 				dirLightComponent.Absorption = dirLightIn["Absorption"];
 				dirLightComponent.Phase = dirLightIn["Phase"];
 			}
+
+			// Point Light Component
+			if (!entity["PointLightComponent"].is_null())
+			{
+				PointLightComponent& pointLightComponent = ent.AddComponent<PointLightComponent>();
+				nlohmann::json pointLightIn = entity["PointLightComponent"];
+
+				pointLightComponent.Color = { pointLightIn["Color"][0], pointLightIn["Color"][1], pointLightIn["Color"][2] };
+				pointLightComponent.Intensity = pointLightIn["Intensity"];
+				pointLightComponent.Radius = pointLightIn["Radius"];
+				pointLightComponent.Falloff = pointLightIn["Falloff"];
+			}
+
+			// Fog Box Volume Component
+			if (!entity["FogBoxVolumeComponent"].is_null())
+			{
+				FogBoxVolumeComponent& fogBoxVolumeComponent = ent.AddComponent<FogBoxVolumeComponent>();
+				nlohmann::json fogBoxVolumeIn = entity["FogBoxVolumeComponent"];
+
+				fogBoxVolumeComponent.MieScattering = { fogBoxVolumeIn["MieScattering"][0], fogBoxVolumeIn["MieScattering"][1], fogBoxVolumeIn["MieScattering"][2] };
+				fogBoxVolumeComponent.PhaseValue = fogBoxVolumeIn["PhaseValue"];
+				fogBoxVolumeComponent.Emission = { fogBoxVolumeIn["Emission"][0], fogBoxVolumeIn["Emission"][1], fogBoxVolumeIn["Emission"][2] };
+				fogBoxVolumeComponent.Absorption = fogBoxVolumeIn["Absorption"];
+				fogBoxVolumeComponent.Density = fogBoxVolumeIn["Density"];
+			}
+
+			// Cloud Volume Component
+			if (!entity["CloudVolumeComponent"].is_null())
+			{
+				CloudVolumeComponent& cloudVolumeComponent = ent.AddComponent<CloudVolumeComponent>();
+				nlohmann::json cloudVolumeIn = entity["CloudVolumeComponent"];
+
+				cloudVolumeComponent.CloudScale = cloudVolumeIn["CloudScale"];
+				cloudVolumeComponent.Density = cloudVolumeIn["Density"];
+				cloudVolumeComponent.Scattering = { cloudVolumeIn["Scattering"][0], cloudVolumeIn["Scattering"][1], cloudVolumeIn["Scattering"][2] };
+				cloudVolumeComponent.PhaseFunction = cloudVolumeIn["PhaseFunction"];
+				cloudVolumeComponent.DensityOffset = cloudVolumeIn["DensityOffset"];
+				cloudVolumeComponent.DetailOffset = cloudVolumeIn["DetailOffset"];
+				cloudVolumeComponent.CloudAbsorption = cloudVolumeIn["CloudAbsorption"];
+				cloudVolumeComponent.SunAbsorption = cloudVolumeIn["SunAbsorption"];
+			}
+
 
 		}
 
