@@ -541,6 +541,12 @@ namespace Frost
 
 	void VulkanVolumetricPass::OnUpdate(const RenderQueue& renderQueue)
 	{
+		if (m_Data->CameraFOV != renderQueue.m_Camera->GetCameraFOV())
+		{
+			m_Data->CustomProjectionMatrix = glm::perspective(glm::radians(renderQueue.m_Camera->GetCameraFOV()), float(renderQueue.ViewPortWidth) / float(renderQueue.ViewPortHeight), 0.1f, 500.0f);
+		}
+		m_Data->CameraFOV = renderQueue.m_Camera->GetCameraFOV();
+
 		VulkanRenderer::BeginTimeStampPass("Cloud Compute Pass");
 		CloudComputeUpdate(renderQueue);
 		VulkanRenderer::EndTimeStampPass("Cloud Compute Pass");
@@ -600,8 +606,7 @@ namespace Frost
 		vulkanDescriptor->Bind(cmdBuf, m_Data->FroxelPopulatePipeline);
 		
 		// Push constans
-		glm::mat4 cameraViewMatrix = renderQueue.m_Camera.GetViewMatrix();
-		//glm::mat4 cameraProjMatrix = renderQueue.m_Camera.GetProjectionMatrix();
+		glm::mat4 cameraViewMatrix = renderQueue.m_Camera->GetViewMatrix();
 		glm::mat4 cameraProjMatrix = m_Data->CustomProjectionMatrix;
 		cameraProjMatrix[1][1] *= -1.0f;
 
@@ -898,10 +903,11 @@ namespace Frost
 		auto vulkanDescriptor = m_Data->CloudComputeDescriptor[currentFrameIndex].As<VulkanMaterial>();
 
 		// Push constant information
-		s_CloudComputePushConstant.InvViewProjMatrix = s_FroxelPopulatePushConstant.InvViewProjMatrix;
+		//s_CloudComputePushConstant.InvViewProjMatrix = s_FroxelPopulatePushConstant.InvViewProjMatrix;
+		s_CloudComputePushConstant.InvViewProjMatrix = glm::inverse(renderQueue.m_Camera->GetViewProjectionVK());
 		s_CloudComputePushConstant.CameraPosition = renderQueue.CameraPosition;
-		s_CloudComputePushConstant.NearPlane = renderQueue.m_Camera.GetNearClip();
-		s_CloudComputePushConstant.FarPlane = renderQueue.m_Camera.GetFarClip();
+		s_CloudComputePushConstant.NearPlane = renderQueue.m_Camera->GetNearClip();
+		s_CloudComputePushConstant.FarPlane = renderQueue.m_Camera->GetFarClip();
 		s_CloudComputePushConstant.CloudsCount = renderQueue.m_CloudVolumeData.size();
 		s_CloudComputePushConstant.DirectionaLightDir = renderQueue.m_LightData.DirLight.Direction;
 
@@ -913,8 +919,8 @@ namespace Frost
 		// Dispatch
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
-		uint32_t groupX = std::ceil((width / 1.5f) / 16.0f);
-		uint32_t groupY = std::ceil((height / 1.5f) / 16.0f);
+		uint32_t groupX = std::ceil((width / 1.5f) / 32.0f);
+		uint32_t groupY = std::ceil((height / 1.5f) / 32.0f);
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 
@@ -972,7 +978,7 @@ namespace Frost
 
 	void VulkanVolumetricPass::OnResize(uint32_t width, uint32_t height)
 	{
-		m_Data->CustomProjectionMatrix = glm::perspective(70.0f, float(width) / float(height), 0.1f, 500.0f);
+		m_Data->CustomProjectionMatrix = glm::perspective(glm::radians(m_Data->CameraFOV), float(width) / float(height), 0.1f, 500.0f);
 
 		CloudComputeInitData(width, height);
 

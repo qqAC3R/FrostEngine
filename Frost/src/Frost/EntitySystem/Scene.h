@@ -7,6 +7,7 @@
 namespace Frost
 {
 	class Entity;
+	struct CameraComponent;
 
 	class Scene
 	{
@@ -31,7 +32,9 @@ namespace Frost
 		entt::registry& GetRegistry() { return m_Registry; }
 		const entt::registry& GetRegistry() const { return m_Registry; }
 
+		CameraComponent* GetPrimaryCamera();
 	private:
+		void UpdateSkyLight(Timestep ts);
 		void UpdateMeshComponents(Timestep ts);
 		void UpdateAnimationControllers(Timestep ts);
 		void UpdatePointLightComponent(Timestep ts);

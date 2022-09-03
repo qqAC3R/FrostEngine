@@ -31,7 +31,8 @@ namespace Frost
 		virtual void BeginFrame() = 0;
 		virtual void EndFrame() = 0;
 
-		virtual void BeginScene(const EditorCamera& camera) = 0;
+		virtual void BeginScene(Ref<EditorCamera> camera) = 0;
+		virtual void BeginScene(Ref<RuntimeCamera> camera) = 0;
 		virtual void EndScene() = 0;
 
 		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform) = 0;
@@ -54,7 +55,8 @@ namespace Frost
 		RenderQueue();
 		~RenderQueue();
 
-		void SetCamera(const EditorCamera& camera);
+		void SetCamera(Ref<EditorCamera> camera);
+		void SetCamera(Ref<RuntimeCamera> camera);
 
 		void Add(Ref<Mesh> mesh, const glm::mat4& transform);
 		void AddFogVolume(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
@@ -126,7 +128,12 @@ namespace Frost
 
 		uint32_t m_SubmeshCount = 0;
 
-		EditorCamera m_Camera;
+		enum class CameraType
+		{
+			Editor, Runtime
+		};
+		
+		Ref<Camera> m_Camera;
 		glm::mat4 CameraViewMatrix;
 		glm::mat4 CameraProjectionMatrix;
 		glm::vec3 CameraPosition;

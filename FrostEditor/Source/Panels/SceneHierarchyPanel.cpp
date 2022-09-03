@@ -48,7 +48,23 @@ namespace Frost
 					m_SelectedEntity = m_SceneContext->CreateEntity("Mesh");
 					m_SelectedEntity.AddComponent<MeshComponent>();
 				}
+				if (ImGui::MenuItem("Fog Box Volume"))
+				{
+					m_SelectedEntity = m_SceneContext->CreateEntity("Fog Box");
+					m_SelectedEntity.AddComponent<FogBoxVolumeComponent>();
+				}
 				ImGui::Separator();
+				if (ImGui::MenuItem("Camera"))
+				{
+					m_SelectedEntity = m_SceneContext->CreateEntity("Camera");
+					m_SelectedEntity.AddComponent<CameraComponent>();
+				}
+				ImGui::Separator();
+				if (ImGui::MenuItem("Sky Light"))
+				{
+					m_SelectedEntity = m_SceneContext->CreateEntity("Sky Light");
+					m_SelectedEntity.AddComponent<SkyLightComponent>();
+				}
 				if (ImGui::MenuItem("Point Light"))
 				{
 					m_SelectedEntity = m_SceneContext->CreateEntity("Point Light");

@@ -17,14 +17,24 @@ namespace Frost
 	{
 	}
 
-	void RenderQueue::SetCamera(const EditorCamera& camera)
+	void RenderQueue::SetCamera(Ref<EditorCamera> camera)
 	{
-		m_Camera = camera;
-		CameraViewMatrix = camera.GetViewMatrix();
-		CameraProjectionMatrix = camera.GetProjectionMatrix();
-		CameraPosition = camera.GetPosition();
-		ViewPortWidth = (uint32_t)camera.m_ViewportWidth;
-		ViewPortHeight = (uint32_t)camera.m_ViewportHeight;
+		m_Camera = camera.As<Camera>();
+		CameraViewMatrix = camera->GetViewMatrix();
+		CameraProjectionMatrix = camera->GetProjectionMatrix();
+		CameraPosition = camera->GetPosition();
+		ViewPortWidth = (uint32_t)camera->m_ViewportWidth;
+		ViewPortHeight = (uint32_t)camera->m_ViewportHeight;
+	}
+
+	void RenderQueue::SetCamera(Ref<RuntimeCamera> camera)
+	{
+		m_Camera = camera.As<Camera>();
+		CameraViewMatrix = camera->GetViewMatrix();
+		CameraProjectionMatrix = camera->GetProjectionMatrix();
+		CameraPosition = camera->GetPosition();
+		ViewPortWidth = (uint32_t)camera->m_ViewportWidth;
+		ViewPortHeight = (uint32_t)camera->m_ViewportHeight;
 	}
 
 	void RenderQueue::Add(Ref<Mesh> mesh, const glm::mat4& transform)

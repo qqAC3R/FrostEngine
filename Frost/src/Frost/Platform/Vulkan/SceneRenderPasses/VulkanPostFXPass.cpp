@@ -998,8 +998,8 @@ namespace Frost
 			float FarPlane;
 		} visBufferPushConstant;
 
-		visBufferPushConstant.NearPlane = renderQueue.m_Camera.GetNearClip();
-		visBufferPushConstant.FarPlane = renderQueue.m_Camera.GetFarClip();
+		visBufferPushConstant.NearPlane = renderQueue.m_Camera->GetNearClip();
+		visBufferPushConstant.FarPlane = renderQueue.m_Camera->GetFarClip();
 
 		for (uint32_t mipLevel = 0; mipLevel < m_Data->ScreenMipLevel; mipLevel++)
 		{
@@ -1056,14 +1056,14 @@ namespace Frost
 		auto vulkan_AO_Pipeline = m_Data->AO_Pipeline.As<VulkanComputePipeline>();
 		auto vulkan_AO_Descriptor = m_Data->AO_Descriptor[currentFrameIndex].As<VulkanMaterial>();
 
-		glm::mat4 projMatrix = renderQueue.m_Camera.GetProjectionMatrix();
+		glm::mat4 projMatrix = renderQueue.m_Camera->GetProjectionMatrix();
 		projMatrix[1][1] *= -1;
 
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
-		float fov = glm::radians(renderQueue.m_Camera.GetCameraFOV());
-		float farplane = renderQueue.m_Camera.GetFarClip();
-		float nearplane = renderQueue.m_Camera.GetNearClip();
+		float fov = glm::radians(renderQueue.m_Camera->GetCameraFOV());
+		float farplane = renderQueue.m_Camera->GetFarClip();
+		float nearplane = renderQueue.m_Camera->GetNearClip();
 
 
 		float projectionScale = (height / (2.0f * tanf(fov * 0.5f)));
@@ -1148,7 +1148,7 @@ namespace Frost
 		vulkan_cc_Descriptor->Bind(cmdBuf, m_Data->ColorCorrectionPipeline);
 
 		m_CompositeSetings.Gamma = 2.2f;
-		m_CompositeSetings.Exposure = renderQueue.m_Camera.GetExposure();
+		m_CompositeSetings.Exposure = renderQueue.m_Camera->GetExposure();
 		m_CompositeSetings.Stage = static_cast<float>(target);
 		vulkan_cc_Pipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_CompositeSetings);
 
@@ -1174,9 +1174,9 @@ namespace Frost
 
 		vulkanApplyAerialDescriptor->Set("CameraBlock.ViewMatrix", renderQueue.CameraViewMatrix);
 		vulkanApplyAerialDescriptor->Set("CameraBlock.ProjMatrix", renderQueue.CameraProjectionMatrix);
-		vulkanApplyAerialDescriptor->Set("CameraBlock.InvViewProjMatrix", glm::inverse(renderQueue.m_Camera.GetViewProjection()));
+		vulkanApplyAerialDescriptor->Set("CameraBlock.InvViewProjMatrix", glm::inverse(renderQueue.m_Camera->GetViewProjection()));
 		vulkanApplyAerialDescriptor->Set("CameraBlock.CamPosition", glm::vec4(renderQueue.CameraPosition, 0.0f));
-		vulkanApplyAerialDescriptor->Set("CameraBlock.NearFarPlane", glm::vec4(renderQueue.m_Camera.GetNearClip(), renderQueue.m_Camera.GetFarClip(), 0.0f, 0.0f));
+		vulkanApplyAerialDescriptor->Set("CameraBlock.NearFarPlane", glm::vec4(renderQueue.m_Camera->GetNearClip(), renderQueue.m_Camera->GetFarClip(), 0.0f, 0.0f));
 
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;

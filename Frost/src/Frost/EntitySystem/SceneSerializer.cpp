@@ -20,7 +20,6 @@ namespace Frost
 		std::ofstream istream(filepath);
 		istream.clear();
 
-
 		nlohmann::ordered_json out;
 
 		m_Scene->m_Registry.each([&](auto entityID)
@@ -143,6 +142,14 @@ namespace Frost
 			entityOut["AnimationComponent"]["AnimationIndex"] = animationIndex;
 		}
 
+		if (entity.HasComponent<SkyLightComponent>())
+		{
+			SkyLightComponent& skyLightComponent = entity.GetComponent<SkyLightComponent>();
+
+			entityOut["SkyLightComponent"]["Filepath"] = skyLightComponent.Filepath;
+			entityOut["SkyLightComponent"]["IsActive"] = skyLightComponent.IsActive;
+		}
+
 		if (entity.HasComponent<DirectionalLightComponent>())
 		{
 			DirectionalLightComponent& dirLightComponent = entity.GetComponent<DirectionalLightComponent>();
@@ -191,6 +198,16 @@ namespace Frost
 			entityOut["CloudVolumeComponent"]["DetailOffset"] = cloudVolumeComponent.DetailOffset;
 			entityOut["CloudVolumeComponent"]["CloudAbsorption"] = cloudVolumeComponent.CloudAbsorption;
 			entityOut["CloudVolumeComponent"]["SunAbsorption"] = cloudVolumeComponent.SunAbsorption;
+		}
+
+		if (entity.HasComponent<CameraComponent>())
+		{
+			CameraComponent& cameraComponent = entity.GetComponent<CameraComponent>();
+
+			entityOut["CameraComponent"]["FOV"] = cameraComponent.Camera->GetCameraFOV();
+			entityOut["CameraComponent"]["NearClip"] = cameraComponent.Camera->GetNearClip();
+			entityOut["CameraComponent"]["FarClip"] = cameraComponent.Camera->GetFarClip();
+			entityOut["CameraComponent"]["Primary"] = cameraComponent.Primary;
 		}
 
 		
@@ -489,6 +506,24 @@ namespace Frost
 
 			}
 
+			// Sky Light Component
+			if (!entity["SkyLightComponent"].is_null())
+			{
+				SkyLightComponent& skyLightComponent = ent.AddComponent<SkyLightComponent>();
+				skyLightComponent.Filepath = entity["SkyLightComponent"]["Filepath"];
+				skyLightComponent.IsActive = entity["SkyLightComponent"]["IsActive"];
+
+				if (!skyLightComponent.Filepath.empty())
+				{
+					bool computeEnvMap = Renderer::GetSceneEnvironment()->ComputeEnvironmentMap(
+						skyLightComponent.Filepath, skyLightComponent.RadianceMap, skyLightComponent.PrefilteredMap, skyLightComponent.IrradianceMap
+					);
+					if (!computeEnvMap)
+						skyLightComponent.IsActive = false;
+				}
+			}
+
+
 			// Directional Light Component
 			if (!entity["DirectionalLightComponent"].is_null())
 			{
@@ -543,6 +578,18 @@ namespace Frost
 				cloudVolumeComponent.DetailOffset = cloudVolumeIn["DetailOffset"];
 				cloudVolumeComponent.CloudAbsorption = cloudVolumeIn["CloudAbsorption"];
 				cloudVolumeComponent.SunAbsorption = cloudVolumeIn["SunAbsorption"];
+			}
+
+			if (!entity["CameraComponent"].is_null())
+			{
+				CameraComponent& cameraComponent = ent.AddComponent<CameraComponent>();
+
+				cameraComponent.Camera->SetFOV(entity["CameraComponent"]["FOV"]);
+				cameraComponent.Camera->SetNearClip(entity["CameraComponent"]["NearClip"]);
+				cameraComponent.Camera->SetFarClip(entity["CameraComponent"]["FarClip"]);
+				cameraComponent.Camera->RecalculateProjectionMatrix();
+
+				cameraComponent.Primary = entity["CameraComponent"]["Primary"];
 			}
 
 

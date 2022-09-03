@@ -34,20 +34,27 @@ namespace Frost
 	public:
 		enum class Type
 		{
-			HDRMap = 0, Hillaire = 1
+			Null = -1, HDRMap = 0, Hillaire = 1
 		};
 
 		virtual ~SceneEnvironment() {}
+
+		virtual Ref<Texture2D> GetEnvironmentMap() = 0;
+		virtual Ref<TextureCubeMap> GetRadianceMap() = 0;
+		virtual Ref<TextureCubeMap> GetIrradianceMap() = 0;
+		virtual Ref<TextureCubeMap> GetPrefilteredMap() = 0;
 
 		virtual void InitCallbackFunctions() = 0;
 
 		virtual void RenderSkyBox(const RenderQueue& renderQueue) = 0;
 		virtual void UpdateAtmosphere(const RenderQueue& renderQueue) = 0;
 
-		virtual void LoadEnvMap(const std::string& filepath) = 0;
 		virtual void SetEnvironmentMapCallback(const std::function<void(const Ref<TextureCubeMap>& /*Prefiltered*/, const Ref<TextureCubeMap>& /*Irradiance*/)>& func) = 0;
 
-		virtual void SetType(SceneEnvironment::Type type) = 0;
+		virtual void SetDynamicSky() = 0;
+		virtual void SetHDREnvironmentMap(const Ref<TextureCubeMap>& radianceMap, const Ref<TextureCubeMap>& prefilteredMap, const Ref<TextureCubeMap>& irradianceMap) = 0;
+
+		virtual bool ComputeEnvironmentMap(const std::string& filepath, Ref<TextureCubeMap>& radianceMap, Ref<TextureCubeMap>& prefilteredMap, Ref<TextureCubeMap>& irradianceMap) = 0;
 
 		virtual glm::vec3 GetSunDirection() = 0;
 		virtual void SetSunDirection(glm::vec3 sunDir) = 0;

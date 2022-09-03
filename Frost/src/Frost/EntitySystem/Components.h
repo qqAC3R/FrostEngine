@@ -3,6 +3,7 @@
 // Frost libraries
 #include "Frost/Core/UUID.h"
 #include "Frost/Renderer/Mesh.h"
+#include "Frost/Renderer/RuntimeCamera.h"
 
 // Math
 #include <glm/glm.hpp>
@@ -87,6 +88,16 @@ namespace Frost
 		Ref<AnimationController> Controller;
 	};
 
+	struct CameraComponent
+	{
+		CameraComponent()
+			: Camera(Ref<RuntimeCamera>::Create(85.0f, 1.0f, 0.1f, 1000.0f)), Primary(true)
+		{}
+
+		Ref<RuntimeCamera> Camera;
+		bool Primary = true;
+	};
+
 	struct PointLightComponent
 	{
 		PointLightComponent() = default;
@@ -147,5 +158,19 @@ namespace Frost
 		float DetailOffset = 0.0f; // Detail noise offset
 		float CloudAbsorption = 0.75f;
 		float SunAbsorption = 1.25f;
+	};
+
+	struct SkyLightComponent
+	{
+		SkyLightComponent() = default;
+
+		bool IsValid() { return RadianceMap && IrradianceMap && PrefilteredMap; }
+
+		bool IsActive = false;
+		std::string Filepath;
+		//Ref<Texture2D> EnvironmentMap;
+		Ref<TextureCubeMap> RadianceMap;
+		Ref<TextureCubeMap> IrradianceMap;
+		Ref<TextureCubeMap> PrefilteredMap;
 	};
 }

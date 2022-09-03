@@ -73,7 +73,8 @@ namespace Frost
 		static void BeginFrame() { s_RendererAPI->BeginFrame(); }
 		static void EndFrame() { s_RendererAPI->EndFrame(); }
 
-		static void BeginScene(const EditorCamera& camera) { s_RendererAPI->BeginScene(camera); }
+		static void BeginScene(Ref<EditorCamera>& camera) { s_RendererAPI->BeginScene(camera); }
+		static void BeginScene(Ref<RuntimeCamera>& camera) { s_RendererAPI->BeginScene(camera); }
 		static void EndScene() { s_RendererAPI->EndScene(); }
 
 		static void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform);
@@ -82,6 +83,7 @@ namespace Frost
 		static void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
 		static void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
 		static void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale);
+		static void SetSky(const SkyLightComponent& skyLightComponent);
 
 		template<typename FuncT>
 		static void Submit(FuncT&& func)

@@ -509,10 +509,10 @@ namespace Frost
 
 			m_Data->ComputeShaderPushConstant.DepthPyramidSize.z = indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand);
 
-			m_Data->ComputeShaderPushConstant.CamFar = renderQueue.m_Camera.GetFarClip();
-			m_Data->ComputeShaderPushConstant.CamNear = renderQueue.m_Camera.GetNearClip();
-			m_Data->ComputeShaderPushConstant.ViewMatrix = renderQueue.m_Camera.GetViewMatrix();
-			m_Data->ComputeShaderPushConstant.ProjectionMaxtrix = renderQueue.m_Camera.GetProjectionMatrix();
+			m_Data->ComputeShaderPushConstant.CamFar = renderQueue.m_Camera->GetFarClip();
+			m_Data->ComputeShaderPushConstant.CamNear = renderQueue.m_Camera->GetNearClip();
+			m_Data->ComputeShaderPushConstant.ViewMatrix = renderQueue.m_Camera->GetViewMatrix();
+			m_Data->ComputeShaderPushConstant.ProjectionMaxtrix = renderQueue.m_Camera->GetProjectionMatrix();
 			m_Data->ComputeShaderPushConstant.ProjectionMaxtrix[1][1] *= -1;
 
 			vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->ComputeShaderPushConstant);

@@ -44,6 +44,8 @@ namespace Frost
 		uint32_t m_SelectedSubmesh = UINT32_MAX;
 
 		bool m_Visibility = true;
+
+		friend class InspectorPanel;
 	};
 
 }

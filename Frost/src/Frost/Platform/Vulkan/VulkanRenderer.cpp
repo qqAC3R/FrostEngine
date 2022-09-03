@@ -38,10 +38,6 @@ namespace Frost
 			Ref<SceneRenderPassPipeline> SceneRenderPasses;
 			Ref<RendererDebugger> s_RendererDebugger;
 
-			/* Camera related */
-			glm::mat4 ProjectionMatrix;
-			glm::mat4 ViewMatrix;
-
 			Vector<VkFence> FencesInCheck;
 			VkFence FencesInFlight[FRAMES_IN_FLIGHT];
 			VkSemaphore AvailableSemapore[FRAMES_IN_FLIGHT], FinishedSemapore[FRAMES_IN_FLIGHT];
@@ -261,13 +257,20 @@ namespace Frost
 		});
 	}
 
-	void VulkanRenderer::BeginScene(const EditorCamera& camera)
+	void VulkanRenderer::BeginScene(Ref<EditorCamera> camera)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		Renderer::Submit([&, camera, currentFrameIndex]()
 		{
-			s_Data->ViewMatrix = camera.GetViewMatrix();
-			s_Data->ProjectionMatrix = camera.GetProjectionMatrix();
+			s_RenderQueue[currentFrameIndex].SetCamera(camera);
+		});
+	}
+
+	void VulkanRenderer::BeginScene(Ref<RuntimeCamera> camera)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, camera, currentFrameIndex]()
+		{
 			s_RenderQueue[currentFrameIndex].SetCamera(camera);
 		});
 	}

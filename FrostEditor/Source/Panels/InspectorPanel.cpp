@@ -1,6 +1,8 @@
 #include "frostpch.h"
 #include "InspectorPanel.h"
 
+#include "Frost/Renderer/Renderer.h"
+
 #include "../UserInterface/UIWidgets.h"
 #include <imgui.h>
 #include <imgui/imgui_internal.h>
@@ -122,12 +124,7 @@ namespace Frost
 
 
 		{
-
-			//ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.22f, 0.25f, 1.0f));
-			//ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.21f, 0.23f, 0.26f, 1.0f));
-			//ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.25f, 0.27f, 0.3f, 1.0f));
 			ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
-
 
 			std::string str = "ADD  " + std::string(ICON_PLUS);
 			if (ImGui::Button(str.c_str()))
@@ -137,7 +134,6 @@ namespace Frost
 
 			}
 			ImGui::PopStyleVar();
-			//ImGui::PopStyleColor(3);
 		}
 
 		if (ImGui::BeginPopup("AddComponent"))
@@ -203,6 +199,16 @@ namespace Frost
 					else
 						FROST_CORE_WARN("This entity already has the Animation Component!");
 				}
+			}
+
+			// Sky Light component
+			if (ImGui::MenuItem("Sky Light Component"))
+			{
+				if (!selectedEntity.HasComponent<SkyLightComponent>())
+					selectedEntity.AddComponent<SkyLightComponent>();
+				else
+					FROST_CORE_WARN("This entity already has the Sky Light Component");
+
 			}
 
 			ImGui::EndPopup();
@@ -305,6 +311,32 @@ namespace Frost
 					
 
 				}
+			}
+		});
+
+		DrawComponent<SkyLightComponent>("SKY LIGHT", entity, [&](auto& component)
+		{
+			std::string skyLightFilepath = "";
+			if (component.IsValid())
+			{
+				skyLightFilepath = component.Filepath;
+			}
+
+			// Draw the mesh's filepath
+			std::string path = UserInterface::DrawFilePath("File Path", skyLightFilepath, "hdr");
+			if (!path.empty())
+			{
+				Renderer::GetSceneEnvironment()->ComputeEnvironmentMap(path, component.RadianceMap, component.PrefilteredMap, component.IrradianceMap);
+
+				component.Filepath = path;
+				component.IsActive = true;
+
+				Renderer::GetSceneEnvironment()->SetHDREnvironmentMap(component.RadianceMap, component.PrefilteredMap, component.IrradianceMap);
+			}
+
+			if (component.IsValid())
+			{
+				ImGui::Checkbox("Active", &component.IsActive);
 			}
 		});
 
@@ -639,6 +671,69 @@ namespace Frost
 			}
 			ImGui::PopStyleVar();
 		});
+
+		DrawComponent<CameraComponent>("CAMERA", entity, [&](auto& component)
+		{
+			constexpr ImGuiTableFlags flags{};
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+			if (ImGui::BeginTable("CameraProperties", 2, flags))
+			{
+				{
+					ImGui::PushID(1);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Primary");
+
+					ImGui::TableNextColumn();
+					ImGui::Checkbox("", &component.Primary);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(2);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("FOV");
+
+					ImGui::TableNextColumn();
+					if (ImGui::DragFloat("", &component.Camera->GetCameraFOV(), 0.1f, 0.0f, 180.0f))
+						component.Camera->RecalculateProjectionMatrix();
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(3);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Near Clip");
+
+					ImGui::TableNextColumn();
+					if (ImGui::DragFloat("", &component.Camera->GetNearClip(), 0.01f, 0.0f, 1.0f))
+						component.Camera->RecalculateProjectionMatrix();
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(4);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Far Clip");
+
+					ImGui::TableNextColumn();
+					if (ImGui::DragFloat("", &component.Camera->GetFarClip(), 2.0f, 1.0f, 10000.0f))
+						component.Camera->RecalculateProjectionMatrix();
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+			ImGui::PopStyleVar();
+		});
+
 
 	}
 

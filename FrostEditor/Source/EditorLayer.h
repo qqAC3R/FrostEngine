@@ -28,12 +28,19 @@
 
 namespace Frost
 {
+	enum class SceneState
+	{
+		Edit,
+		Play
+	};
+
 	class EditorLayer : public Layer
 	{
 	public:
 		EditorLayer()
-			: Layer("Example"), m_EditorCamera(70.0f, 1600.0f / 900.0f, 0.1f, 2000.0f)
+			: Layer("Editor")
 		{
+			m_EditorCamera = Ref<EditorCamera>::Create(85.0, 1600.0f / 900.0f, 0.1f, 2000.0f);
 		}
 
 		~EditorLayer()
@@ -64,47 +71,50 @@ namespace Frost
 			m_AssetBrowser = Ref<AssetBrowser>::Create();
 			m_AssetBrowser->Init(nullptr);
 
-			//for(uint32_t i = 0; i < 50; i++)
-			//{
-			//	auto& sponzaEntity = m_EditorScene->CreateEntity("Sphere");
-			//	auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
-			//	meshComponent.Mesh = Mesh::Load("Resources/Meshes/Sphere.fbx", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
-			//}
-
 			{
-				auto& sponzaEntity = m_EditorScene->CreateEntity("Sponza");
+				auto& sponzaEntity = m_EditorScene->CreateEntity("Plane");
 				auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
 				meshComponent.Mesh = Mesh::Load("Resources/Meshes/Plane.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
-				//meshComponent.Mesh = Mesh::Load("Resources/Meshes/Sponza/Sponza.gltf", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
-
-				auto& transformComponent = sponzaEntity.GetComponent<TransformComponent>();
-				transformComponent.Scale = { 2.5f, 2.5f, 2.5f };
 			}
 
 			{
 				auto& directionalLight = m_EditorScene->CreateEntity("Directional Light");
-				auto& meshComponent = directionalLight.AddComponent<DirectionalLightComponent>();
+				auto& directionalLightComponent = directionalLight.AddComponent<DirectionalLightComponent>();
 			}
-
-
-			Renderer::GetSceneEnvironment()->SetType(SceneEnvironment::Type::Hillaire);
-			//float& cameraExposure = m_EditorCamera.GetExposure();
-			//cameraExposure = 6.0f;
-
 		}
 
 		virtual void OnUpdate(Timestep ts)
 		{
-			m_EditorCamera.OnUpdate(ts);
+			m_EditorCamera->OnUpdate(ts);
 
-			Renderer::BeginScene(m_EditorCamera);
+			if (m_SceneState == SceneState::Play)
+			{
+				CameraComponent* primaryCamera = m_EditorScene->GetPrimaryCamera();
+
+				if (primaryCamera)
+				{
+					if (m_SceneState == SceneState::Play)
+					{
+						primaryCamera->Camera->SetViewportSize(m_ViewportPanel->GetViewportPanelSize().x, m_ViewportPanel->GetViewportPanelSize().y);
+						Renderer::BeginScene(primaryCamera->Camera);
+					}
+				}
+				else
+				{
+					Renderer::BeginScene(m_EditorCamera);
+				}
+			}
+			else
+			{
+				Renderer::BeginScene(m_EditorCamera);
+			}
+
 			m_EditorScene->Update(ts);
 			Renderer::EndScene();
 		}
 
 		virtual void OnImGuiRender()
 		{
-
 			bool showWindow = true;
 			static bool dockSpaceOpen = true;
 			static bool opt_fullscreen = true;
@@ -199,16 +209,12 @@ namespace Frost
 					glm::vec2 viewportPanelSize = m_ViewportPanel->GetViewportPanelSize();
 
 					Renderer::Resize(viewportPanelSize.x, viewportPanelSize.y);
-					m_EditorCamera.SetViewportSize(viewportPanelSize.x, viewportPanelSize.y);
-					m_EditorCamera.SetProjectionMatrix(glm::perspective(70.0f, viewportPanelSize.x / viewportPanelSize.y, 0.1f, 2000.0f));
+					m_EditorCamera->SetViewportSize(viewportPanelSize.x, viewportPanelSize.y);
+					//m_EditorCamera->Resize(viewportPanelSize.x / viewportPanelSize.y);
 				}
 
 
-				Ref<Image2D> texture;
-				if (m_UseRT)
-					texture = Renderer::GetFinalImage(0);
-				else
-					texture = Renderer::GetFinalImage(1);
+				Ref<Image2D> texture = Renderer::GetFinalImage(1);
 				m_ViewportPanel->RenderTexture(texture);
 
 
@@ -225,9 +231,9 @@ namespace Frost
 						ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, windowWidth, windowHeight);
 
 						// Camera
-						const glm::mat4& cameraProjection = m_EditorCamera.GetProjectionMatrix();
+						const glm::mat4& cameraProjection = m_EditorCamera->GetProjectionMatrix();
 						glm::mat4 cameraView = glm::inverse(glm::translate(glm::mat4(1.0f),
-							m_EditorCamera.GetPosition()) * glm::toMat4(m_EditorCamera.GetOrientation())
+							m_EditorCamera->GetPosition()) * glm::toMat4(m_EditorCamera->GetOrientation())
 						);
 
 
@@ -282,20 +288,18 @@ namespace Frost
 			});
 			
 			ImGui::Begin("Settings");
-			//UserInterface::CheckMark("Camera Properties");
-			if (ImGui::Checkbox("UseHillaire", &m_UseHillaire))
-			{
-				if (m_UseHillaire)
-					Renderer::GetSceneEnvironment()->SetType(SceneEnvironment::Type::Hillaire);
-				else
-				{
-					Renderer::GetSceneEnvironment()->SetType(SceneEnvironment::Type::HDRMap);
-				}
-			}
-			//ImGui::Separator();
 			UserInterface::Text("Camera Properties");
-			UserInterface::SliderFloat("Exposure", m_EditorCamera.GetExposure(), 0.0f, 10.0f);
-			UserInterface::SliderFloat("DOF", m_EditorCamera.GetDOF(), 0.0f, 5.0f);
+			UserInterface::SliderFloat("Exposure", m_EditorCamera->GetExposure(), 0.0f, 10.0f);
+			UserInterface::SliderFloat("DOF", m_EditorCamera->GetDOF(), 0.0f, 5.0f);
+			if (ImGui::Button("Play", { 60, 20 }))
+			{
+				m_SceneState = SceneState::Play;
+			}
+			if (ImGui::Button("Stop", { 60, 20 }))
+			{
+				m_SceneState = SceneState::Edit;
+			}
+
 			ImGui::End();
 
 			ImGui::End();
@@ -335,21 +339,20 @@ namespace Frost
 			EventDispatcher dispatcher(event);
 			dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& event) { return OnKeyPressed(event); });
 
-			m_EditorCamera.OnEvent(event);
+			m_EditorCamera->OnEvent(event);
 			m_SceneHierarchyPanel->OnEvent(event);
 			m_InspectorPanel->OnEvent(event);
 		}
 
 		bool OnKeyPressed(KeyPressedEvent& event)
 		{
-			if (event.GetRepeatCount() > 0)
-				return false;
+			if (event.GetRepeatCount() > 0) return false;
 
 			bool leftControl = Input::IsKeyPressed(Key::LeftControl);
 
 			switch (event.GetKeyCode())
 			{
-				// ImGuizmo modes
+			// ImGuizmo modes
 			case Key::Q:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = -1; break;
 			case Key::W:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::TRANSLATE; break;
 			case Key::E:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::ROTATE; break;
@@ -368,10 +371,7 @@ namespace Frost
 					OpenScene();
 					break;
 				}
-
-
 			}
-
 			return false;
 		}
 
@@ -383,23 +383,22 @@ namespace Frost
 		{
 			this->~EditorLayer();
 		}
-
 	private:
-		EditorCamera m_EditorCamera;
+		// Editor Camera
+		Ref<EditorCamera> m_EditorCamera;
 
-		ImVec2 m_ViewPortSize{};
-		int m_GuizmoMode = -1;
-
-		bool m_UseRT = false;
-		bool m_UseHillaire = true;
-
+		// Scenes
 		Ref<Scene> m_EditorScene;
-		//Ref<SceneSerializer> m_SceneSerializer;
 
+		// Panels
 		Ref<SceneHierarchyPanel> m_SceneHierarchyPanel;
 		Ref<InspectorPanel> m_InspectorPanel;
 		Ref<ViewportPanel> m_ViewportPanel;
 		Ref<MaterialEditor> m_MaterialEditor;
 		Ref<AssetBrowser> m_AssetBrowser;
+
+		// Variables
+		int32_t m_GuizmoMode = -1;
+		SceneState m_SceneState = SceneState::Edit;
 	};
 }

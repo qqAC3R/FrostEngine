@@ -164,13 +164,21 @@ namespace Frost
 		s_RendererAPI->Submit(cloudVolume, position, scale);
 	}
 
+	void Renderer::SetSky(const SkyLightComponent& skyLightComponent)
+	{
+		if (s_Data->m_Environment->GetRadianceMap().Raw() != skyLightComponent.RadianceMap.Raw())
+		{
+			s_Data->m_Environment->SetHDREnvironmentMap(skyLightComponent.RadianceMap, skyLightComponent.PrefilteredMap, skyLightComponent.IrradianceMap);
+		}
+	}
+
 	void Renderer::LoadEnvironmentMap(const std::string& filepath)
 	{
 		// TODO: Add some function for the SceneRenderpasses to update the env texture with the new ones
-		Renderer::Submit([&, filepath]() mutable
-		{
-			s_Data->m_Environment->LoadEnvMap(filepath);
-		});
+		//Renderer::Submit([&, filepath]() mutable
+		//{
+		//	s_Data->m_Environment->LoadEnvMap(filepath);
+		//});
 	}
 
 	void Renderer::RenderDebugger()

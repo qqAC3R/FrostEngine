@@ -261,7 +261,7 @@ namespace Frost
 		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
 		// Camera information
-		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.CameraExposure", renderQueue.m_Camera.GetExposure());
+		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.CameraExposure", renderQueue.m_Camera->GetExposure());
 		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.PointLightCount", static_cast<float>(pointLightCount));
 
 		uint32_t width = static_cast<uint32_t>(renderQueue.ViewPortWidth);

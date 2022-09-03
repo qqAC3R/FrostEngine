@@ -3,6 +3,7 @@
 
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/EntitySystem/Entity.h"
+#include "Frost/EntitySystem/Components.h"
 
 #include "Frost/Math/Math.h"
 
@@ -76,6 +77,7 @@ namespace Frost
 
 	void Scene::Update(Timestep ts)
 	{
+		UpdateSkyLight(ts);
 		UpdateMeshComponents(ts);
 		UpdateAnimationControllers(ts);
 		UpdatePointLightComponent(ts);
@@ -122,6 +124,39 @@ namespace Frost
 		return Entity{};
 	}
 
+	CameraComponent* Scene::GetPrimaryCamera()
+	{
+		auto group = m_Registry.group<CameraComponent>(entt::get<TransformComponent>);
+		for (auto& entity : group)
+		{
+			auto [cameraComponent, transformComponent] = group.get<CameraComponent, TransformComponent>(entity);
+			if (cameraComponent.Primary)
+			{
+				cameraComponent.Camera->SetTransform(transformComponent.GetTransform());
+				return &cameraComponent;
+			}
+		}
+		return nullptr;
+	}
+
+	void Scene::UpdateSkyLight(Timestep ts)
+	{
+		// Sky Light
+		auto group = m_Registry.group<SkyLightComponent>(entt::get<IDComponent>);
+		for (auto& entity : group)
+		{
+			auto [skyLightComponent, idComponent] = group.get<SkyLightComponent, IDComponent>(entity);
+			if (skyLightComponent.IsActive)
+			{
+				Renderer::SetSky(skyLightComponent);
+				return;
+			}
+		}
+
+		Renderer::GetSceneEnvironment()->SetDynamicSky();
+
+	}
+
 	void Scene::UpdateMeshComponents(Timestep ts)
 	{
 		// Meshes
@@ -132,12 +167,7 @@ namespace Frost
 			if (mesh.Mesh)
 			{
 				glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
-
 				Renderer::Submit(mesh.Mesh, transform);
-
-				//if(mesh.ActiveAnimation)
-				//	mesh.Mesh->SetActiveAnimation(mesh.ActiveAnimation);
-				//mesh.Mesh->Update(ts);
 			}
 		}
 	}
@@ -153,10 +183,6 @@ namespace Frost
 			{
 				animationController.Controller->OnUpdate(ts);
 				mesh.Mesh->UpdateBoneTransformMatrices(animationController.Controller->GetModelSpaceMatrices());
-
-				//if(mesh.ActiveAnimation)
-				//	mesh.Mesh->SetActiveAnimation(mesh.ActiveAnimation);
-				//mesh.Mesh->Update(ts);
 			}
 		}
 	}

@@ -17,15 +17,16 @@ namespace Frost
 
 		virtual void InitCallbackFunctions() override;
 
-		virtual void LoadEnvMap(const std::string& filepath) override;
+		Ref<Texture2D> GetEnvironmentMap() override { return m_EnvironmentMap; }
+		Ref<TextureCubeMap> GetRadianceMap() override { return m_RadianceMap; }
+		Ref<TextureCubeMap> GetIrradianceMap() override { return m_IrradianceMap; }
+		Ref<TextureCubeMap> GetPrefilteredMap() override { return m_PrefilteredMap; }
 
-		Ref<Texture2D> GetEnvironmentMap() { return m_EnvironmentMap; }
-		Ref<TextureCubeMap> GetRadianceMap() { return m_RadianceMap; }
-		Ref<TextureCubeMap> GetIrradianceMap() { return m_IrradianceMap; }
-		Ref<TextureCubeMap> GetPrefilteredMap() { return m_PrefilteredMap; }
+		virtual void SetDynamicSky() override;
+		virtual void SetHDREnvironmentMap(const Ref<TextureCubeMap>& radianceMap, const Ref<TextureCubeMap>& prefilteredMap, const Ref<TextureCubeMap>& irradianceMap) override;
 
-		virtual void SetType(SceneEnvironment::Type type) override;
-		
+		virtual bool ComputeEnvironmentMap(const std::string& filepath, Ref<TextureCubeMap>& radianceMap, Ref<TextureCubeMap>& prefilteredMap, Ref<TextureCubeMap>& irradianceMap) override;
+
 		virtual glm::vec3 GetSunDirection() override { return m_SunDir; }
 		virtual void SetSunDirection(glm::vec3 sunDir) override { m_SunDir = sunDir; }
 
@@ -46,9 +47,9 @@ namespace Frost
 		void InitSkyBoxPipeline(Ref<RenderPass> renderPass);
 	private:
 		void HDRMaps_Init();
-		void RadianceMapCompute();
-		void PrefilteredMapCompute();
-		void IrradianceMapCompute();
+		void RadianceMapCompute(Ref<TextureCubeMap>& radianceMap, Ref<Texture2D> environmentMap);
+		void PrefilteredMapCompute(Ref<TextureCubeMap>& prefilteredMap, Ref<TextureCubeMap> radianceMap);
+		void IrradianceMapCompute(Ref<TextureCubeMap>& irradianceMap, Ref<TextureCubeMap> radianceMap);
 
 		void TransmittanceLUT_InitData();
 		void TransmittanceLUT_Update();
@@ -65,8 +66,8 @@ namespace Frost
 		void SkyPrefilter_InitData();
 		void SkyPrefilter_Update();
 
-		void AerialPerspective_InitData();
-		void AerialPerspective_Update(const RenderQueue& renderQueue);
+		void AerialPerspective_InitData(); // Deprecated
+		void AerialPerspective_Update(const RenderQueue& renderQueue); // Deprecated
 	private:
 		Ref<Texture2D> m_EnvironmentMap;
 		Ref<TextureCubeMap> m_RadianceMap;

@@ -17,7 +17,9 @@ namespace Frost
 		virtual void BeginFrame() override;
 		virtual void EndFrame() override;
 
-		virtual void BeginScene(const EditorCamera& camera) override;
+		//virtual void BeginScene(const EditorCamera& camera) override;
+		virtual void BeginScene(Ref<EditorCamera> camera) override;
+		virtual void BeginScene(Ref<RuntimeCamera> camera) override;
 		virtual void EndScene() override;
 
 		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform) override;
