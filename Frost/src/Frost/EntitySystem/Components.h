@@ -168,7 +168,6 @@ namespace Frost
 
 		bool IsActive = false;
 		std::string Filepath;
-		//Ref<Texture2D> EnvironmentMap;
 		Ref<TextureCubeMap> RadianceMap;
 		Ref<TextureCubeMap> IrradianceMap;
 		Ref<TextureCubeMap> PrefilteredMap;

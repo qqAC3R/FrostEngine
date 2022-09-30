@@ -71,8 +71,6 @@ namespace Frost
 		{
 			case RendererAPI::API::Vulkan:
 				m_Data.Name += " (Vulkan)"; break;
-			case RendererAPI::API::OpenGL:
-				m_Data.Name += " (OpenGL)"; break;
 			case RendererAPI::API::None:
 				FROST_ASSERT(false, "Renderer::API does not have an API");
 		}

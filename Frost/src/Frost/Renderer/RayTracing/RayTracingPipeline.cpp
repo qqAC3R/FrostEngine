@@ -11,7 +11,6 @@ namespace Frost
 		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-			case RendererAPI::API::OpenGL: FROST_ASSERT(false, "OpenGL::API doesn't support RayTracing!");
 			case RendererAPI::API::Vulkan: return Ref<VulkanRayTracingPipeline>::Create(pipelineCreateInfo);
 		}
 

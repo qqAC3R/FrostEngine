@@ -48,6 +48,11 @@ namespace Frost
 
 
 		GeometryDataInit(1600, 900);
+
+		Renderer::SubmitImageToOutputImageMap("Albedo", [this]() -> Ref<Image2D>
+		{
+			return this->m_Data->GeometryRenderPass->GetColorAttachment(2, 0);
+		});
 	}
 
 
@@ -531,6 +536,12 @@ namespace Frost
 	void VulkanGeometryPass::OnResize(uint32_t width, uint32_t height)
 	{
 		GeometryDataInit(width, height);
+
+		Renderer::SubmitImageToOutputImageMap("Albedo", [this]() -> Ref<Image2D>
+		{
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			return this->m_Data->GeometryRenderPass->GetColorAttachment(2, currentFrameIndex);
+		});
 	}
 
 	void VulkanGeometryPass::OnResizeLate(uint32_t width, uint32_t height)

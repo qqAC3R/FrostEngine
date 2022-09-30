@@ -17,7 +17,7 @@ namespace Frost
 	public:
 		enum class API
 		{
-			None = 0, Vulkan = 1, OpenGL = 2
+			None = 0, Vulkan = 1
 		};
 	public:
 		virtual ~RendererAPI() {}
@@ -30,6 +30,8 @@ namespace Frost
 
 		virtual void BeginFrame() = 0;
 		virtual void EndFrame() = 0;
+
+		virtual void SubmitCmdsToRender() = 0;
 
 		virtual void BeginScene(Ref<EditorCamera> camera) = 0;
 		virtual void BeginScene(Ref<RuntimeCamera> camera) = 0;

@@ -168,6 +168,9 @@ namespace Frost
 			//ImGui::Text(HeapTracker::GetResultAsString().c_str());
 		}
 		ImGui::End();
+
+		//bool open = true;
+		//ImGui::ShowDemoWindow(&open);
 	}
 
 	void VulkanImGuiLayer::OnResize(uint32_t width, uint32_t height)

@@ -169,7 +169,6 @@ namespace Frost
 
 	void VulkanRenderer::BeginFrame()
 	{
-		
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		Renderer::Submit([&, currentFrameIndex]()
 		{
@@ -200,6 +199,11 @@ namespace Frost
 
 	void VulkanRenderer::EndFrame()
 	{
+		Renderer::Submit([&]()
+		{
+			VulkanRenderer::Render();
+		});
+#if 0
 		Renderer::Submit([&]()
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -254,6 +258,64 @@ namespace Frost
 			FROST_VKCHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fenceInFlight));
 
 			VulkanRenderer::Render();
+		});
+#endif
+	}
+
+	void VulkanRenderer::SubmitCmdsToRender()
+	{
+		Renderer::Submit([&]()
+		{
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+			VkFence fenceInFlight = s_Data->FencesInFlight[currentFrameIndex];
+			VkSemaphore finishedSemaphore = s_Data->FinishedSemapore[currentFrameIndex];
+			VkSemaphore availableSemaphore = s_Data->AvailableSemapore[currentFrameIndex];
+
+
+
+			/* Begin recording the frame's commandbuffer */
+			VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+			FROST_VKCHECK(vkBeginCommandBuffer(cmdBuf, &beginInfo));
+
+			// Timestamp query
+			vkCmdResetQueryPool(cmdBuf, s_DebugData->TimestampQueryPools[currentFrameIndex], 0, s_DebugData->QueryCount);
+			vkCmdWriteTimestamp(cmdBuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, s_DebugData->TimestampQueryPools[currentFrameIndex], 0);
+
+
+			/* Update the sky */
+			Renderer::GetSceneEnvironment()->UpdateAtmosphere(s_RenderQueue[currentFrameIndex]);
+
+			/* Updating all the graphics passes */
+			s_Data->SceneRenderPasses->UpdateRenderPasses(s_RenderQueue[currentFrameIndex]);
+
+
+			/* Rendering a quad for the swap chain image */
+			VulkanContext::GetSwapChain()->BeginRenderPass();
+			Application::Get().GetImGuiLayer()->Render();
+			vkCmdEndRenderPass(cmdBuf);
+
+			// Stop the Timestamp query
+			vkCmdWriteTimestamp(cmdBuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, s_DebugData->TimestampQueryPools[currentFrameIndex], 1);
+
+			// End the render command buffer
+			FROST_VKCHECK(vkEndCommandBuffer(cmdBuf));
+			
+
+			VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+			VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+			submitInfo.pWaitDstStageMask = waitStages;
+			submitInfo.waitSemaphoreCount = 1;
+			submitInfo.pWaitSemaphores = &availableSemaphore;
+			submitInfo.signalSemaphoreCount = 1;
+			submitInfo.pSignalSemaphores = &finishedSemaphore;
+			submitInfo.commandBufferCount = 1;
+			submitInfo.pCommandBuffers = &cmdBuf;
+			vkResetFences(device, 1, &fenceInFlight);
+
+			VkQueue graphicsQueue = VulkanContext::GetCurrentDevice()->GetQueueFamilies().GraphicsFamily.Queue;
+			FROST_VKCHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, fenceInFlight));
 		});
 	}
 
@@ -434,6 +496,8 @@ namespace Frost
 			return s_Data->SceneRenderPasses->GetRenderPassData<VulkanRayTracingPass>()->DisplayTexture[currentFrameIndex];
 		
 		return s_Data->SceneRenderPasses->GetRenderPassData<VulkanPostFXPass>()->FinalTexture[currentFrameIndex];
+		
+
 		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanPostFXPass>()->AO_Image[currentFrameIndex];
 		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);
 		//return s_Data->SceneRenderPasses->GetRenderPassData<VulkanGeometryPass>()->RenderPass->GetColorAttachment(0, currentFrameIndex);

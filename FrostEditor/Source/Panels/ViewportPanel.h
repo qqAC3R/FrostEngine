@@ -7,7 +7,7 @@
 
 namespace Frost
 {
-	//class Texture2D;
+	enum class SceneState;
 
 	class ViewportPanel : public Panel
 	{
@@ -25,6 +25,10 @@ namespace Frost
 		void RenderTexture(Ref<Image2D> texture);
 		void EndRender();
 
+		void RenderDebugTools(int32_t imguizmoMode);
+		void RenderSceneButtons(SceneState& sceneState);
+		void RenderViewportRenderPasses();
+
 		bool IsResized() const { return m_IsResized; }
 		glm::vec2 GetViewportPanelSize() const { return m_ViewportSize; }
 	private:
@@ -32,5 +36,9 @@ namespace Frost
 		bool m_Visibility = true;
 		bool m_IsResized = false;
 		bool m_IsResized_Internal = false;
+
+		std::string m_OutputImageID = "FinalImage";
+
+		friend class EditorLayer;
 	};
 }

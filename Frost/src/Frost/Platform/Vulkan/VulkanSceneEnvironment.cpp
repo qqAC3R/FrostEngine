@@ -11,12 +11,10 @@
 
 namespace Frost
 {
-
 	VulkanSceneEnvironment::VulkanSceneEnvironment()
 		: m_Type(SceneEnvironment::Type::Hillaire)
 	{
 		HDRMaps_Init();
-		//LoadEnvMap("");
 
 		TransmittanceLUT_InitData();
 		MultiScatterLUT_InitData();
@@ -53,6 +51,8 @@ namespace Frost
 			func(m_SkyPrefilterMap, m_SkyIrradianceMap);
 
 		m_SkyboxDescriptor->Set("CameraData.SkyMode", (float)SceneEnvironment::Type::Hillaire);
+		m_SkyboxDescriptor->Set("u_EnvTexture", m_SkyPrefilterMap);
+		m_SkyboxDescriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 	}
 
 	void VulkanSceneEnvironment::SetHDREnvironmentMap(const Ref<TextureCubeMap>& radianceMap, const Ref<TextureCubeMap>& prefilteredMap, const Ref<TextureCubeMap>& irradianceMap)

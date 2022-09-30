@@ -25,17 +25,15 @@ namespace Frost
 			return;
 		}
 
-		//ImVec4* colors = ImGui::GetStyle().Colors;
-		//colors[ImGuiCol_WindowBg] = ImVec4(0.09f, 0.12f, 0.14f, 1.00f);
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.09f, 0.12f, 0.15f, 1.0f));
 		//0.12f, 0.14f, 0.17f, 1.00f
 		ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
 		
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 1.0f, 2.0f });
 
 		if (ImGui::Begin("Scene Hierarchy", &m_Visibility))
 		{
-
 			ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.0f);
 			if (ImGui::BeginPopup("Add Entity") || (ImGui::BeginPopupContextWindow(nullptr, 1, false)))
 			{
@@ -74,16 +72,18 @@ namespace Frost
 				{
 					m_SelectedEntity = m_SceneContext->CreateEntity("Drectional Light");
 					m_SelectedEntity.AddComponent<DirectionalLightComponent>();
+					TransformComponent& ts = m_SelectedEntity.GetComponent<TransformComponent>();
+					ts.Rotation = { -90.0f, 0.0f, 0.0f};
 				}
 				ImGui::EndPopup();
 			}
-			ImGui::PopStyleVar();
+			ImGui::PopStyleVar(); // ImGuiStyleVar_PopupRounding
 
 			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
 			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
 			if (ImGui::BeginTable("HierarchyTable", 2, flags))
 			{
-				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoHide);
+				ImGui::TableSetupColumn("  Name", ImGuiTableColumnFlags_NoHide);
 				ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("A").x * 12.0f);
 				ImGui::TableHeadersRow();
 
@@ -107,10 +107,9 @@ namespace Frost
 				ImGui::EndTable();
 
 			}
-			ImGui::PopStyleVar();
-
-			//ImGui::PopStyleColor();
+			ImGui::PopStyleVar(); // ImGuiStyleVar_CellPadding
 		}
+		
 
 
 		if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
@@ -124,10 +123,7 @@ namespace Frost
 
 		ImGui::End();
 		ImGui::PopStyleColor(3);
-		//ImGui::PopStyleColor(2);
-
-
-		//colors[ImGuiCol_WindowBg] = ImVec4(0.12f, 0.14f, 0.17f, 1.00f);// RESET
+		ImGui::PopStyleVar(); // ImGuiStyleVar_WindowPadding
 	}
 
 	void SceneHierarchyPanel::OnEvent(Event& e)
@@ -317,15 +313,6 @@ namespace Frost
 				}
 			}
 			ImGui::TreePop();
-
-
-			/*
-			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
-			bool opened = ImGui::TreeNodeEx((void*)9817239, flags, tag.c_str());
-			if (opened)
-				ImGui::TreePop();
-			*/
-			//ImGui::TreePop();
 		}
 
 		if (!entity.GetComponent<ParentChildComponent>().ParentID)
@@ -344,7 +331,10 @@ namespace Frost
 					m_SelectedSubmesh = NO_SUBMESH_SELECTED;
 				}
 
-				m_SceneContext->DestroyEntity(entity);
+				Renderer::SubmitDeletion([&, entity]()
+				{
+					m_SceneContext->DestroyEntity(entity);
+				});
 			});
 
 		}

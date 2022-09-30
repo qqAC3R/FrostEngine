@@ -16,11 +16,12 @@ namespace Frost
 		Ref<Texture2D> m_SpatialBlueNoiseLut;
 		Ref<Texture2D> m_TemporalBlueNoiseLut;
 		Ref<SceneEnvironment> m_Environment;
-		//Ref<RendererDebugger> m_RendererDebugger;
+		HashMap<std::string, std::function<Ref<Image2D>()>> m_OutputImageMap;
 	};
 
 	RendererAPI* Renderer::s_RendererAPI = nullptr;
 	static RenderCommandQueue* s_CommandQueue = nullptr;
+	static RenderCommandQueue* s_DeletionCommandQueue = nullptr;
 	static RendererData* s_Data = nullptr;
 	static RendererConfig s_RendererConfig = {};
 
@@ -33,13 +34,11 @@ namespace Frost
 
 		// Init the commandQueue and Renderer data
 		s_CommandQueue = new RenderCommandQueue();
+		s_DeletionCommandQueue = new RenderCommandQueue();
 		s_Data = new RendererData();
 
 		// Init the shaders
 		s_Data->m_ShaderLibrary = Ref<ShaderLibrary>::Create();
-
-		//Vector<ShaderArray> shaderArray;
-		//shaderArray.emplace_back("u_AlbedoTexture", 1024);
 
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirectBindless.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPass.glsl");
@@ -115,16 +114,7 @@ namespace Frost
 		// Init the renderpasses
 		s_RendererAPI->InitRenderPasses();
 
-		// Create the renderer debugger
-		//s_Data->m_RendererDebugger = RendererDebugger::Create();
-		//s_Data->m_RendererDebugger->Init();
-
 		s_Data->m_Environment->InitCallbackFunctions();
-		//s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/pink_sunrise_4k.hdr");
-		//s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/dikhololo_night_4k.hdr");
-		//s_Data->m_Environment->LoadEnvMap("Resources/EnvironmentMaps/envmap.JPG");
-		//s_Data->m_Environment->SetType(SceneEnvironment::Type::Hillaire);
-		//s_Data->m_Environment->SetType(SceneEnvironment::Type::HDRMap);
 	}
 
 	void Renderer::ShutDown()
@@ -172,18 +162,24 @@ namespace Frost
 		}
 	}
 
-	void Renderer::LoadEnvironmentMap(const std::string& filepath)
+	void Renderer::SubmitImageToOutputImageMap(const std::string& name, const std::function<Ref<Image2D>()>& func)
 	{
-		// TODO: Add some function for the SceneRenderpasses to update the env texture with the new ones
-		//Renderer::Submit([&, filepath]() mutable
-		//{
-		//	s_Data->m_Environment->LoadEnvMap(filepath);
-		//});
+		s_Data->m_OutputImageMap[name] = func;
 	}
 
 	void Renderer::RenderDebugger()
 	{
 		s_RendererAPI->RenderDebugger();
+	}
+
+	Ref<Image2D> Renderer::GetFinalImage(const std::string& name)
+	{
+		return s_Data->m_OutputImageMap[name]();
+	}
+
+	const HashMap<std::string, std::function<Ref<Image2D>()>>& Renderer::GetOutputImageMap()
+	{
+		return s_Data->m_OutputImageMap;
 	}
 
 	Ref<ShaderLibrary> Renderer::GetShaderLibrary()
@@ -231,9 +227,19 @@ namespace Frost
 		s_CommandQueue->Execute();
 	}
 
+	void Renderer::ExecuteDeletionCommands()
+	{
+		s_DeletionCommandQueue->Execute();
+	}
+
 	RenderCommandQueue& Renderer::GetRenderCommandQueue()
 	{
 		return *s_CommandQueue;
+	}
+
+	RenderCommandQueue& Renderer::GetDeletionCommandQueue()
+	{
+		return *s_DeletionCommandQueue;
 	}
 
 	Ref<RendererDebugger> RendererDebugger::Create()

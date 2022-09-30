@@ -17,6 +17,8 @@ namespace Frost
 		virtual void BeginFrame() override;
 		virtual void EndFrame() override;
 
+		virtual void SubmitCmdsToRender() override;
+
 		//virtual void BeginScene(const EditorCamera& camera) override;
 		virtual void BeginScene(Ref<EditorCamera> camera) override;
 		virtual void BeginScene(Ref<RuntimeCamera> camera) override;

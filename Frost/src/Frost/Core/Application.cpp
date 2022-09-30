@@ -64,16 +64,21 @@ namespace Frost
 				}
 
 				// ImGui
-				m_ImGuiLayer->Begin();
+				m_ImGuiLayer->Begin(); // Send to the queue? + ImGui stuff in the editor layer??
 				for (Layer* layer : m_LayerStack)
 				{
 					layer->OnImGuiRender();
 				}
 
-				Renderer::EndFrame();
+				Renderer::SubmitCmdsToRender(); // Submit commands to the graphics queue
+
+				Renderer::EndFrame(); // Present
 
 				// Execute the RenderCommandBuffers (pointer functions)
 				Renderer::ExecuteCommandBuffer();
+
+
+				Renderer::ExecuteDeletionCommands();
 			}
 		}
 		m_Window->GetGraphicsContext()->WaitDevice();

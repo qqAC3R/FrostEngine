@@ -22,14 +22,27 @@ namespace Frost
 
 		nlohmann::ordered_json out;
 
-		m_Scene->m_Registry.each([&](auto entityID)
+		const entt::registry::entity_type* entity = m_Scene->m_Registry.data();
+		for (size_t i = 0; i < m_Scene->m_Registry.size(); i++)
 		{
-			Entity entity = { entityID, m_Scene.Raw() };
-			if (!entity)
+			Entity ent = { *entity, m_Scene.Raw() };
+			if (!ent)
 				return;
 
-			SerializeEntity(out, entity);
-		});
+			SerializeEntity(out, ent);
+
+			entity++;
+			//entity += sizeof(entt::registry::entity_type);
+		}
+
+			//m_Scene->m_Registry.each_reversed([&](auto entityID) // Custom made function
+			//{
+			//	Entity entity = { entityID, m_Scene.Raw() };
+			//	if (!entity)
+			//		return;
+			//
+			//	SerializeEntity(out, entity);
+			//});
 
 		istream << out.dump(4);
 

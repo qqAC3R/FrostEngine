@@ -57,6 +57,11 @@ namespace Frost
 		AmbientOcclusionInitData (1600, 900);
 		SpatialDenoiserInitData  (1600, 900);
 		SSRInitData              (1600, 900);
+
+		Renderer::SubmitImageToOutputImageMap("FinalImage", [this]() -> Ref<Image2D>
+		{
+			return this->m_Data->FinalTexture[0];
+		});
 	}
 
 	void VulkanPostFXPass::InitLate()
@@ -1583,6 +1588,25 @@ namespace Frost
 		AmbientOcclusionInitData (width, height);
 		SpatialDenoiserInitData  (width, height);
 		SSRInitData              (width, height);
+
+		Renderer::SubmitImageToOutputImageMap("FinalImage", [this]() -> Ref<Image2D>
+		{
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			return this->m_Data->FinalTexture[currentFrameIndex];
+		});
+
+		Renderer::SubmitImageToOutputImageMap("SSR", [this]() -> Ref<Image2D>
+		{
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			return this->m_Data->SSRTexture[currentFrameIndex];
+		});
+
+		Renderer::SubmitImageToOutputImageMap("AO", [this]() -> Ref<Image2D>
+		{
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			return this->m_Data->DenoiserImage[currentFrameIndex];
+		});
+
 	}
 
 	void VulkanPostFXPass::OnResizeLate(uint32_t width, uint32_t height)

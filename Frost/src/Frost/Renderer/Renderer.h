@@ -73,6 +73,9 @@ namespace Frost
 		static void BeginFrame() { s_RendererAPI->BeginFrame(); }
 		static void EndFrame() { s_RendererAPI->EndFrame(); }
 
+		// Submit rendering commands to the graphics queue
+		static void SubmitCmdsToRender() { s_RendererAPI->SubmitCmdsToRender(); }
+
 		static void BeginScene(Ref<EditorCamera>& camera) { s_RendererAPI->BeginScene(camera); }
 		static void BeginScene(Ref<RuntimeCamera>& camera) { s_RendererAPI->BeginScene(camera); }
 		static void EndScene() { s_RendererAPI->EndScene(); }
@@ -84,6 +87,10 @@ namespace Frost
 		static void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
 		static void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale);
 		static void SetSky(const SkyLightComponent& skyLightComponent);
+
+		// We would request a function returning a texture, instead of texture,
+		// because the renderer has 3 frames in flight
+		static void SubmitImageToOutputImageMap(const std::string& name, const std::function<Ref<Image2D>()>& func);
 
 		template<typename FuncT>
 		static void Submit(FuncT&& func)
@@ -98,12 +105,23 @@ namespace Frost
 			new (storageBuffer) FuncT(std::forward<FuncT>(func));
 		}
 
+		template<typename FuncT>
+		static void SubmitDeletion(FuncT&& func)
+		{
+			auto renderCmd = [](void* ptr) {
+				auto pFunc = (FuncT*)ptr;
+				(*pFunc)();
+
+				pFunc->~FuncT();
+			};
+			auto storageBuffer = GetDeletionCommandQueue().Allocate(renderCmd, sizeof(func));
+			new (storageBuffer) FuncT(std::forward<FuncT>(func));
+		}
+
 		static void Resize(uint32_t width, uint32_t height) { s_RendererAPI->Resize(width, height); }
-		static void LoadEnvironmentMap(const std::string& filepath);
 
 		static void RenderDebugger();
 
-		static Ref<Image2D> GetFinalImage(uint32_t id) { return s_RendererAPI->GetFinalImage(id); }
 		static Ref<Texture2D> GetWhiteLUT();
 		static Ref<Texture2D> GetBRDFLut();
 		static Ref<Texture2D> GetNoiseLut();
@@ -115,9 +133,17 @@ namespace Frost
 		static const RendererConfig& GetRendererConfig();
 		static RendererAPI::API GetAPI() { return s_RendererAPI->s_API; }
 
+		static Ref<Image2D> GetFinalImage(uint32_t id) { return s_RendererAPI->GetFinalImage(id); }
+		static Ref<Image2D> GetFinalImage(const std::string& name);
+
+		static const HashMap<std::string, std::function<Ref<Image2D>()>>& GetOutputImageMap();
+
 		static void ExecuteCommandBuffer();
+		static void ExecuteDeletionCommands();
 
 		static RenderCommandQueue& GetRenderCommandQueue();
+	private:
+		static RenderCommandQueue& GetDeletionCommandQueue();
 	private:
 		static RendererAPI* s_RendererAPI;
 		friend class Application;

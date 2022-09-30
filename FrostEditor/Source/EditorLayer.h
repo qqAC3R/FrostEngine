@@ -3,6 +3,7 @@
 #include <Frost.h>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <ImGuizmo.h>
 
 #include "Frost/Core/Input.h"
@@ -28,6 +29,10 @@
 
 namespace Frost
 {
+	// GImGui->FontSize
+	// Window Padding - table
+	// Frame padding - entities
+
 	enum class SceneState
 	{
 		Edit,
@@ -80,6 +85,8 @@ namespace Frost
 			{
 				auto& directionalLight = m_EditorScene->CreateEntity("Directional Light");
 				auto& directionalLightComponent = directionalLight.AddComponent<DirectionalLightComponent>();
+				TransformComponent& ts = directionalLight.GetComponent<TransformComponent>();
+				ts.Rotation = { -90.0f, 0.0f, 0.0f };
 			}
 		}
 
@@ -210,13 +217,16 @@ namespace Frost
 
 					Renderer::Resize(viewportPanelSize.x, viewportPanelSize.y);
 					m_EditorCamera->SetViewportSize(viewportPanelSize.x, viewportPanelSize.y);
-					//m_EditorCamera->Resize(viewportPanelSize.x / viewportPanelSize.y);
 				}
 
-
-				Ref<Image2D> texture = Renderer::GetFinalImage(1);
+				Ref<Image2D> texture = Renderer::GetFinalImage(m_ViewportPanel->m_OutputImageID);
+				//Ref<Image2D> texture = Renderer::GetFinalImage(1);
 				m_ViewportPanel->RenderTexture(texture);
 
+
+				m_ViewportPanel->RenderDebugTools(m_GuizmoMode);
+				m_ViewportPanel->RenderSceneButtons(m_SceneState);
+				m_ViewportPanel->RenderViewportRenderPasses();
 
 				{
 					Entity selectedEntity = m_SceneHierarchyPanel->GetSelectedEntity();
@@ -291,15 +301,6 @@ namespace Frost
 			UserInterface::Text("Camera Properties");
 			UserInterface::SliderFloat("Exposure", m_EditorCamera->GetExposure(), 0.0f, 10.0f);
 			UserInterface::SliderFloat("DOF", m_EditorCamera->GetDOF(), 0.0f, 5.0f);
-			if (ImGui::Button("Play", { 60, 20 }))
-			{
-				m_SceneState = SceneState::Play;
-			}
-			if (ImGui::Button("Stop", { 60, 20 }))
-			{
-				m_SceneState = SceneState::Edit;
-			}
-
 			ImGui::End();
 
 			ImGui::End();

@@ -794,6 +794,20 @@ namespace Frost
 	void VulkanVoxelizationPass::OnResize(uint32_t width, uint32_t height)
 	{
 		VoxelConeTracingInit(width, height);
+
+#if 0
+		Renderer::SubmitImageToOutputMap("VXGI Diffuse", [this]() -> Ref<Image2D>
+		{
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			return this->m_Data->VCT_IndirectDiffuseTexture[currentFrameIndex];
+		});
+
+		Renderer::SubmitImageToOutputMap("VXGI Specular", [this]() -> Ref<Image2D>
+		{
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			return this->m_Data->VCT_IndirectSpecularTexture[currentFrameIndex];
+		});
+#endif
 	}
 
 	void VulkanVoxelizationPass::OnResizeLate(uint32_t width, uint32_t height)

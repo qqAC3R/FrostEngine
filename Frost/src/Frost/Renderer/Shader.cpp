@@ -16,7 +16,6 @@ namespace Frost
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
 			case RendererAPI::API::Vulkan: return CreateRef<VulkanShader>(filepath);
-			case RendererAPI::API::OpenGL: FROST_ASSERT(false, "Haven't added OpenGL yet!"); return nullptr;
 		}
 
 		FROST_ASSERT_MSG("Unknown RendererAPI!");
@@ -29,7 +28,6 @@ namespace Frost
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
 			case RendererAPI::API::Vulkan: return CreateRef<VulkanShader>(filepath, customMemberArraySizes);
-			case RendererAPI::API::OpenGL: FROST_ASSERT(false, "Haven't added OpenGL yet!"); return nullptr;
 		}
 
 		FROST_ASSERT_MSG("Unknown RendererAPI!");
