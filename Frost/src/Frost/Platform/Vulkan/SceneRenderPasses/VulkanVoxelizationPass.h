@@ -45,6 +45,8 @@ namespace Frost
 
 		void ClearBufferInit();
 
+		void UpdateRenderingSettings();
+
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
 
@@ -73,10 +75,10 @@ namespace Frost
 			Vector<HeapBlock> IndirectVoxelCmdBuffer;
 
 
-			int32_t m_VoxelGrid;
-			float m_VoxelSize = 1.0f;
-			glm::vec3 VoxelCameraPosition = { 0.0f, 0.0f, 0.0f };
-			float m_VoxelAABB = 0.0f;
+			int32_t m_VoxelGrid; // Renderer::GetRendererConfig().VoxelTextureResolution
+			//float m_VoxelSize = 1.0f; 
+			glm::vec3 VoxelCameraPosition = { 0.0f, 0.0f, 0.0f }; // Camera position
+			float m_VoxelAABB = 0.0f; // Rounded value of 'm_VoxelGrid' to fixed jittering
 		};
 
 		struct VoxelProjections
@@ -84,7 +86,7 @@ namespace Frost
 			glm::mat4 X;
 			glm::mat4 Y;
 			glm::mat4 Z;
-		} VoxelProj;
+		} m_VoxelAABBProjection;
 
 		struct VoxelizationPushConstant
 		{
@@ -111,7 +113,15 @@ namespace Frost
 			int32_t ConeTraceMaxSteps = 80;
 		} m_VCTPushConstant;
 
-		int32_t m_EnableVoxelization = 0;
+		struct VoxelFilterPushConstant
+		{
+			glm::mat4 CameraViewMatrix;
+
+			glm::vec4 CameraPosition_SampleMipLevel;
+
+			float ProjectionExtents;
+			float VoxelScale;
+		} m_VoxelFilterPushConstant;
 
 		InternalData* m_Data;
 		std::string m_Name;

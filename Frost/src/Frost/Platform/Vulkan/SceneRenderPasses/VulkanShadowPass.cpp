@@ -325,6 +325,7 @@ namespace Frost
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		RendererSettings& rendererSpec = Renderer::GetRendererSettings();
 
 		auto vulkanPipeline = m_Data->ShadowComputePipeline.As<VulkanComputePipeline>();
 		auto vulkanDescriptor = m_Data->ShadowComputeDescriptor[currentFrameIndex].As<VulkanMaterial>();
@@ -335,10 +336,10 @@ namespace Frost
 		vulkanDescriptor->Set("DirectionaLightData.LightViewProjMatrix3", m_Data->CascadeViewProjMatrix[3]);
 		vulkanDescriptor->Set("DirectionaLightData.DirectionalLightDir", renderQueue.m_LightData.DirLight.Direction);
 		vulkanDescriptor->Set("DirectionaLightData.DirectionLightSize", renderQueue.m_LightData.DirLight.Specification.Size);
-		vulkanDescriptor->Set("DirectionaLightData.FadeCascades", FadeCascades);
-		vulkanDescriptor->Set("DirectionaLightData.CascadesFadeFactor", CascadesFadeFactor);
-		vulkanDescriptor->Set("DirectionaLightData.CascadeDebug", m_ShowCascadesDebug);
-		vulkanDescriptor->Set("DirectionaLightData.UsePCSS", UsePCSS);
+		vulkanDescriptor->Set("DirectionaLightData.FadeCascades", rendererSpec.ShadowPass.FadeCascades);
+		vulkanDescriptor->Set("DirectionaLightData.CascadesFadeFactor", rendererSpec.ShadowPass.CascadesFadeFactor);
+		vulkanDescriptor->Set("DirectionaLightData.CascadeDebug", rendererSpec.ShadowPass.m_ShowCascadesDebug);
+		vulkanDescriptor->Set("DirectionaLightData.UsePCSS", rendererSpec.ShadowPass.UsePCSS);
 
 		vulkanDescriptor->Bind(cmdBuf, m_Data->ShadowComputePipeline);
 
@@ -358,13 +359,15 @@ namespace Frost
 
 	void VulkanShadowPass::UpdateCascades(const RenderQueue& renderQueue)
 	{
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+
 		float cascadeSplits[SHADOW_MAP_CASCADE_COUNT];
 		float shadowTextureRes = Renderer::GetRendererConfig().ShadowTextureResolution;
 
 		//float nearClip = renderQueue.m_Camera.GetNearClip();
 		//float farClip = renderQueue.m_Camera.GetFarClip();
-		float nearClip = CameraNearClip;
-		float farClip = CameraFarClip;
+		float nearClip = rendererSettings.ShadowPass.CameraNearClip;
+		float farClip = rendererSettings.ShadowPass.CameraFarClip;
 
 		float clipRange = farClip - nearClip;
 
@@ -381,7 +384,7 @@ namespace Frost
 			float p = (i + 1) / static_cast<float>(SHADOW_MAP_CASCADE_COUNT);
 			float log = minZ * std::pow(ratio, p);
 			float uniform = minZ + range * p;
-			float d = CascadeSplitLambda * (log - uniform) + uniform;
+			float d = rendererSettings.ShadowPass.CascadeSplitLambda * (log - uniform) + uniform;
 			cascadeSplits[i] = (d - nearClip) / clipRange;
 		}
 
@@ -444,7 +447,7 @@ namespace Frost
 			glm::mat4 lightOrthoMatrix = glm::ortho(
 				minExtents.x, maxExtents.x,
 				minExtents.y, maxExtents.y,
-				0.0f + CascadeNearPlaneOffset, (maxExtents.z - minExtents.z) + CascadeFarPlaneOffset
+				0.0f + rendererSettings.ShadowPass.CascadeNearPlaneOffset, (maxExtents.z - minExtents.z) + rendererSettings.ShadowPass.CascadeFarPlaneOffset
 			);
 
 			// Offset to texel space to avoid shimmering (from https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering)
@@ -486,20 +489,21 @@ namespace Frost
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		uint32_t shadowTextureRes = Renderer::GetRendererConfig().ShadowTextureResolution;
+		RendererSettings& rendererSpec = Renderer::GetRendererSettings();
 
 		if (ImGui::CollapsingHeader("Shadow Depth Pass"))
 		{
 			ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
 
-			ImGui::DragFloat("Cascade Split Factor", &CascadeSplitLambda, 0.005f, 0.1f, 1.5f);
-			ImGui::DragFloat("Camera FarClip", &CameraFarClip, 10.0f, 0.0f, 10000.0f);
-			ImGui::DragFloat("Camera NearClip", &CameraNearClip, 0.05f, 0.05f, 1.0);
-			ImGui::DragFloat("Cascade NearPlane Offset", &CascadeNearPlaneOffset, 0.5f);
-			ImGui::DragFloat("Cascade FarPlane Offset", &CascadeFarPlaneOffset, 0.5f);
-			ImGui::DragFloat("Fade Cascades Factor", &CascadesFadeFactor, 0.1f, 0.00f, 10.0f);
-			ImGui::SliderInt("Use PCSS", &UsePCSS, 0, 1);
-			ImGui::SliderInt("Fade Cascades", &FadeCascades, 0, 1);
-			ImGui::SliderInt("Show Cascades", &m_ShowCascadesDebug, 0, 1);
+			ImGui::DragFloat("Cascade Split Factor", &rendererSpec.ShadowPass.CascadeSplitLambda, 0.005f, 0.1f, 1.5f);
+			ImGui::DragFloat("Camera FarClip", &rendererSpec.ShadowPass.CameraFarClip, 10.0f, 0.0f, 10000.0f);
+			ImGui::DragFloat("Camera NearClip", &rendererSpec.ShadowPass.CameraNearClip, 0.05f, 0.05f, 1.0);
+			ImGui::DragFloat("Cascade NearPlane Offset", &rendererSpec.ShadowPass.CascadeNearPlaneOffset, 0.5f);
+			ImGui::DragFloat("Cascade FarPlane Offset", &rendererSpec.ShadowPass.CascadeFarPlaneOffset, 0.5f);
+			ImGui::DragFloat("Fade Cascades Factor", &rendererSpec.ShadowPass.CascadesFadeFactor, 0.1f, 0.00f, 10.0f);
+			ImGui::SliderInt("Use PCSS", &rendererSpec.ShadowPass.UsePCSS, 0, 1);
+			ImGui::SliderInt("Fade Cascades", &rendererSpec.ShadowPass.FadeCascades, 0, 1);
+			ImGui::SliderInt("Show Cascades", &rendererSpec.ShadowPass.m_ShowCascadesDebug, 0, 1);
 
 			auto shadowDepthTexture = m_Data->ShadowDepthRenderPass->GetDepthAttachment(currentFrameIndex);
 			imguiLayer->RenderTexture(shadowDepthTexture, 256, 256);

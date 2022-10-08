@@ -75,6 +75,8 @@ namespace Frost
 
 		void CalculateMipLevels(uint32_t width, uint32_t height);
 
+		void UpdateRenderingSettings();
+
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
 
@@ -145,6 +147,7 @@ namespace Frost
 		std::string m_Name;
 
 
+#if 0
 		struct BloomSettings
 		{
 			bool Enabled = true;
@@ -163,6 +166,7 @@ namespace Frost
 			int32_t RayStepCount = 5;
 			float RayStepSize = 0.04f;
 		} m_SSRSettings;
+#endif
 
 		struct CompositePassSettings {
 			float Gamma;

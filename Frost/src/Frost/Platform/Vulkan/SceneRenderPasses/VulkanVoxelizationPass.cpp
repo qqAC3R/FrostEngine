@@ -177,6 +177,16 @@ namespace Frost
 		delete cpuBuffer;
 	}
 
+	void VulkanVoxelizationPass::UpdateRenderingSettings()
+	{
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+
+		m_VCTPushConstant.UseIndirectDiffuse = rendererSettings.VoxelGI.UseIndirectDiffuse;
+		m_VCTPushConstant.UseIndirectSpecular = rendererSettings.VoxelGI.UseIndirectSpecular;
+		m_VCTPushConstant.ConeTraceMaxSteps = rendererSettings.VoxelGI.ConeTraceMaxSteps;
+		m_VCTPushConstant.ConeTraceMaxDistance = rendererSettings.VoxelGI.ConeTraceMaxDistance;
+	}
+
 	void VulkanVoxelizationPass::VoxelFilterInit()
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
@@ -202,7 +212,10 @@ namespace Frost
 		// If we have 0 meshes, we shouldnt render this pass
 		if (renderQueue.GetQueueSize() == 0) return;
 
-		if (m_EnableVoxelization)
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+		UpdateRenderingSettings();
+
+		if (rendererSettings.VoxelGI.EnableVoxelization)
 		{
 			VulkanRenderer::BeginTimeStampPass("Voxelization Pass");
 			VoxelizationUpdateRendering(renderQueue);
@@ -276,6 +289,7 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		uint32_t voxelVolumeDimensions = Renderer::GetRendererConfig().VoxelTextureResolution;
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 
 		VkBufferImageCopy region{};
 		region.bufferOffset = 0;
@@ -304,7 +318,7 @@ namespace Frost
 
 
 
-		float size = glm::round(m_Data->m_VoxelGrid * m_Data->m_VoxelSize);
+		float size = glm::round(m_Data->m_VoxelGrid * rendererSettings.VoxelGI.VoxelSize);
 		size = size + float(int32_t(size) % 2);
 		m_Data->m_VoxelAABB = size;
 
@@ -315,7 +329,7 @@ namespace Frost
 		float camPosZ = glm::round(camPos.z);
 
 
-		int32_t offsetFactor = int32_t(8.0f * m_Data->m_VoxelSize);
+		int32_t offsetFactor = int32_t(8.0f * rendererSettings.VoxelGI.VoxelSize);
 
 		camPosX = camPosX + abs(int32_t(camPosX) % offsetFactor - offsetFactor);
 		camPosY = camPosY + abs(int32_t(camPosY) % offsetFactor - offsetFactor);
@@ -354,13 +368,13 @@ namespace Frost
 		glm::mat4 viewY = glm::lookAt(glm::vec3(0, size + camPosY, 0), glm::vec3(0, camPosY, 0), glm::vec3(0, 0, -1));
 		glm::mat4 viewZ = glm::lookAt(glm::vec3(0, 0, size + camPosZ), glm::vec3(0, 0, camPosZ), glm::vec3(0, 1, 0));
 
-		VoxelProj.X = projectionMatrix_X * viewX;
-		VoxelProj.Y = projectionMatrix_Y * viewY;
-		VoxelProj.Z = projectionMatrix_Z * viewZ;
+		m_VoxelAABBProjection.X = projectionMatrix_X * viewX;
+		m_VoxelAABBProjection.Y = projectionMatrix_Y * viewY;
+		m_VoxelAABBProjection.Z = projectionMatrix_Z * viewZ;
 
-		m_Data->VoxelizationDescriptor[currentFrameIndex]->Set("VoxelProjections.AxisX", VoxelProj.X);
-		m_Data->VoxelizationDescriptor[currentFrameIndex]->Set("VoxelProjections.AxisY", VoxelProj.Y);
-		m_Data->VoxelizationDescriptor[currentFrameIndex]->Set("VoxelProjections.AxisZ", VoxelProj.Z);
+		m_Data->VoxelizationDescriptor[currentFrameIndex]->Set("VoxelProjections.AxisX", m_VoxelAABBProjection.X);
+		m_Data->VoxelizationDescriptor[currentFrameIndex]->Set("VoxelProjections.AxisY", m_VoxelAABBProjection.Y);
+		m_Data->VoxelizationDescriptor[currentFrameIndex]->Set("VoxelProjections.AxisZ", m_VoxelAABBProjection.Z);
 
 #if 0
 		// https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/wiRenderer.cpp#L3135
@@ -548,52 +562,23 @@ namespace Frost
 		m_Data->VoxelizationRenderPass->Unbind();
 	}
 
-	//struct PushConstant_VoxelFilter
-	//{
-	//	glm::mat4 LightViewProjMatrix;
-	//	glm::mat4 CameraViewMatrix;
-
-	//	glm::vec4 CameraPosition_SampleMipLevel;
-	//	//int SampleMipLevel;
-	//	//glm::vec3 CameraPosition;
-
-	//	glm::vec4 CascadeDepthSplit;
-
-
-	//	float ProjectionExtents;
-	//	int CascadeSampleIndex;
-	//	float VoxelScale;
-	//	int Padding0 = 0;
-	//	//int Padding1 = 0;
-	//};
-
-	struct PushConstant_VoxelFilter
-	{
-		glm::mat4 CameraViewMatrix;
-
-		glm::vec4 CameraPosition_SampleMipLevel;
-
-		float ProjectionExtents;
-		float VoxelScale;
-	};
-	static PushConstant_VoxelFilter s_VoxelFilterPushConstant;
-
 	void VulkanVoxelizationPass::VoxelFilterUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 
 		Ref<VulkanMaterial> vulkanDescriptor = m_Data->VoxelFilterDescriptor[currentFrameIndex].As<VulkanMaterial>();
 		Ref<VulkanComputePipeline> vulkanPipeline = m_Data->VoxelFilterPipeline.As<VulkanComputePipeline>();
 
 
-		s_VoxelFilterPushConstant.ProjectionExtents = m_Data->m_VoxelAABB / 2.0f;
-		s_VoxelFilterPushConstant.VoxelScale = m_Data->m_VoxelSize;
+		m_VoxelFilterPushConstant.ProjectionExtents = m_Data->m_VoxelAABB / 2.0f;
+		m_VoxelFilterPushConstant.VoxelScale = rendererSettings.VoxelGI.VoxelSize;
 
-		s_VoxelFilterPushConstant.CameraPosition_SampleMipLevel = glm::vec4(m_Data->VoxelCameraPosition, 1.0f);
-		s_VoxelFilterPushConstant.CameraViewMatrix = renderQueue.CameraViewMatrix;
+		m_VoxelFilterPushConstant.CameraPosition_SampleMipLevel = glm::vec4(m_Data->VoxelCameraPosition, 1.0f);
+		m_VoxelFilterPushConstant.CameraViewMatrix = renderQueue.CameraViewMatrix;
 
 
 		// Making a barrier to be sure that the voxelization pass has been finished
@@ -636,7 +621,7 @@ namespace Frost
 			VkDescriptorSet descriptorSet = VulkanRenderer::AllocateDescriptorSet(allocInfo);
 
 
-			s_VoxelFilterPushConstant.CameraPosition_SampleMipLevel.w = mip;
+			m_VoxelFilterPushConstant.CameraPosition_SampleMipLevel.w = mip;
 
 			// Voxel Sampler
 			{
@@ -714,7 +699,7 @@ namespace Frost
 			//vulkanDescriptor->Bind(cmdBuf, m_Data->VoxelFilterPipeline);
 			vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, vulkanPipeline->GetVulkanPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
 
-			vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VoxelFilterPushConstant);
+			vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_VoxelFilterPushConstant);
 
 			uint32_t groupX = glm::ceil(mipWidth / 8.0f);
 			uint32_t groupY = glm::ceil(mipHeight / 8.0f);
@@ -751,13 +736,14 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 
 		Ref<VulkanMaterial> vulkanDescriptor = m_Data->VoxelConeTracingDescriptor[currentFrameIndex].As<VulkanMaterial>();
 		Ref<VulkanComputePipeline> vulkanPipeline = m_Data->VoxelConeTracingPipeline.As<VulkanComputePipeline>();
 
 		m_VCTPushConstant.CameraPosition = renderQueue.CameraPosition;
 		m_VCTPushConstant.VoxelSampleOffset = m_Data->VoxelCameraPosition;
-		m_VCTPushConstant.VoxelGrid = glm::round(m_Data->m_VoxelGrid * m_Data->m_VoxelSize);
+		m_VCTPushConstant.VoxelGrid = glm::round(m_Data->m_VoxelGrid * rendererSettings.VoxelGI.VoxelSize);
 
 		vulkanDescriptor->Bind(cmdBuf, m_Data->VoxelConeTracingPipeline);
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_VCTPushConstant);
@@ -777,17 +763,18 @@ namespace Frost
 
 	void VulkanVoxelizationPass::OnRenderDebug()
 	{
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 		if (ImGui::CollapsingHeader("Voxelization Pass (Experimental)"))
 		{
-			ImGui::SliderInt("Enable Voxelization", &m_EnableVoxelization, 0, 1);
+			ImGui::SliderInt("Enable Voxelization", &rendererSettings.VoxelGI.EnableVoxelization, 0, 1);
 			ImGui::Separator();
 			ImGui::SliderInt("Atomic Operation (bool)", &m_VoxelizationPushConstant.AtomicOperation, 0, 1);
-			ImGui::DragFloat("Voxel Size", &m_Data->m_VoxelSize, 0.25f, 0.5f, 2.0f);
+			ImGui::DragFloat("Voxel Size", &rendererSettings.VoxelGI.VoxelSize, 0.25f, 0.5f, 2.0f);
 			//ImGui::SliderInt("Cone Tracing Max Steps", &m_VCTPushConstant.ConeTraceMaxSteps, 0, 200);
 			//ImGui::DragFloat("Cone Tracing Max Distance", &m_VCTPushConstant.ConeTraceMaxDistance, 0.01f, 0, 1000);
 			ImGui::Separator();
-			ImGui::SliderInt("Indirect Diffuse", &m_VCTPushConstant.UseIndirectDiffuse, 0, 1);
-			ImGui::SliderInt("Indirect Specular", &m_VCTPushConstant.UseIndirectSpecular, 0, 1);
+			ImGui::SliderInt("Indirect Diffuse", &rendererSettings.VoxelGI.UseIndirectDiffuse, 0, 1);
+			ImGui::SliderInt("Indirect Specular", &rendererSettings.VoxelGI.UseIndirectSpecular, 0, 1);
 		}
 	}
 

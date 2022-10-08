@@ -60,15 +60,6 @@ namespace Frost
 			glm::vec2 MaxResCascade[SHADOW_MAP_CASCADE_COUNT];
 		};
 
-		float CascadeSplitLambda = 0.90f;
-		float CameraFarClip = 2000.0f;
-		float CameraNearClip = 0.1f;
-		float CascadeFarPlaneOffset = 0.0f, CascadeNearPlaneOffset = 0.0f;
-		int32_t FadeCascades = 1;
-		float CascadesFadeFactor = 10.0f;
-		int32_t m_ShowCascadesDebug = 0;
-		int32_t UsePCSS = 1;
-
 		struct PushConstantData
 		{
 			glm::mat4 ViewProjectionMatrix;

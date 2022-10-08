@@ -2,6 +2,7 @@
 
 #include "Frost/Renderer/RendererAPI.h"
 #include "Frost/Renderer/SceneEnvironment.h"
+#include "Frost/Renderer/RendererSettings.h"
 #define FRAMES_IN_FLIGHT 3
 
 namespace Frost
@@ -131,11 +132,11 @@ namespace Frost
 		static Ref<ShaderLibrary> GetShaderLibrary();
 		static Ref<SceneEnvironment> GetSceneEnvironment();
 		static const RendererConfig& GetRendererConfig();
+		static RendererSettings& GetRendererSettings() { return s_RendererSettings; }
 		static RendererAPI::API GetAPI() { return s_RendererAPI->s_API; }
 
-		static Ref<Image2D> GetFinalImage(uint32_t id) { return s_RendererAPI->GetFinalImage(id); }
+		static Ref<Image2D> GetFinalImage(uint32_t id) { return s_RendererAPI->GetFinalImage(id); } // TODO: Remove
 		static Ref<Image2D> GetFinalImage(const std::string& name);
-
 		static const HashMap<std::string, std::function<Ref<Image2D>()>>& GetOutputImageMap();
 
 		static void ExecuteCommandBuffer();
@@ -146,6 +147,7 @@ namespace Frost
 		static RenderCommandQueue& GetDeletionCommandQueue();
 	private:
 		static RendererAPI* s_RendererAPI;
+		static RendererSettings s_RendererSettings;
 		friend class Application;
 	};
 

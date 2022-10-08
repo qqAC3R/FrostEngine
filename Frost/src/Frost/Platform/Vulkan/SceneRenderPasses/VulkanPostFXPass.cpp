@@ -807,6 +807,8 @@ namespace Frost
 		auto finalImage = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex).As<VulkanImage2D>();
 		finalImage->TransitionLayout(cmdBuf, finalImage->GetVulkanImageLayout());
 
+		UpdateRenderingSettings();
+
 		VulkanRenderer::BeginTimeStampPass("Bloom Pass");
 		if (m_CompositeSetings.UseBloom)
 		{
@@ -814,10 +816,12 @@ namespace Frost
 		}
 		VulkanRenderer::EndTimeStampPass("Bloom Pass");
 
+
 		ColorCorrectionUpdate(renderQueue, TARGET_BLOOM);
 		
+
 		VulkanRenderer::BeginTimeStampPass("HZB Builder");
-		HZBUpdate(renderQueue);
+			HZBUpdate(renderQueue);
 		VulkanRenderer::EndTimeStampPass("HZB Builder");
 		
 
@@ -840,7 +844,7 @@ namespace Frost
 	
 
 		VulkanRenderer::BeginTimeStampPass("Composite Pass");
-		ColorCorrectionUpdate(renderQueue, TARGET_COMPOSITE);
+			ColorCorrectionUpdate(renderQueue, TARGET_COMPOSITE);
 		VulkanRenderer::EndTimeStampPass("Composite Pass");
 	}
 
@@ -849,12 +853,13 @@ namespace Frost
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 
 		auto vulkan_BlurPipeline = m_Data->BlurPipeline.As<VulkanComputePipeline>();
 		auto vulkan_BlurColorTexture = m_Data->BlurredColorBuffer[currentFrameIndex].As<VulkanImage2D>();
 
 		glm::vec4 currentRes = glm::vec4(renderQueue.ViewPortWidth, renderQueue.ViewPortHeight, 0.0f, 0.0f);
-		uint32_t screenMipLevels = m_SSRSettings.UseConeTracing ? m_Data->ScreenMipLevel : 1;
+		uint32_t screenMipLevels = rendererSettings.SSR.UseConeTracing ? m_Data->ScreenMipLevel : 1;
 		for (uint32_t mipLevel = 0; mipLevel < screenMipLevels; mipLevel++)
 		{
 			auto vulkan_BlurDescriptor = m_Data->BlurShaderDescriptor[currentFrameIndex][mipLevel].As<VulkanMaterial>();
@@ -900,6 +905,7 @@ namespace Frost
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 
 		Ref<VulkanMaterial> ssrMaterial = m_Data->SSRDescriptor[currentFrameIndex].As<VulkanMaterial>();
 		Ref<VulkanComputePipeline> ssrPipeline = m_Data->SSRPipeline.As<VulkanComputePipeline>();
@@ -918,9 +924,9 @@ namespace Frost
 		ssrMaterial->Set("UniformBuffer.ViewMatrix", renderQueue.CameraViewMatrix);
 		ssrMaterial->Set("UniformBuffer.InvViewMatrix", invViewMatrix);
 
-		ssrMaterial->Set("UniformBuffer.UseConeTracing", m_SSRSettings.UseConeTracing);
-		ssrMaterial->Set("UniformBuffer.RayStepCount", m_SSRSettings.RayStepCount);
-		ssrMaterial->Set("UniformBuffer.RayStepSize", m_SSRSettings.RayStepSize);
+		ssrMaterial->Set("UniformBuffer.UseConeTracing", rendererSettings.SSR.UseConeTracing);
+		ssrMaterial->Set("UniformBuffer.RayStepCount", rendererSettings.SSR.RayStepCount);
+		ssrMaterial->Set("UniformBuffer.RayStepSize", rendererSettings.SSR.RayStepSize);
 
 
 		ssrMaterial->Bind(cmdBuf, m_Data->SSRPipeline);
@@ -1057,6 +1063,7 @@ namespace Frost
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 
 		auto vulkan_AO_Pipeline = m_Data->AO_Pipeline.As<VulkanComputePipeline>();
 		auto vulkan_AO_Descriptor = m_Data->AO_Descriptor[currentFrameIndex].As<VulkanMaterial>();
@@ -1072,7 +1079,7 @@ namespace Frost
 
 
 		float projectionScale = (height / (2.0f * tanf(fov * 0.5f)));
-		s_AO_pushConstant.AO_Mode = m_AOSettings.AOMode;
+		s_AO_pushConstant.AO_Mode = rendererSettings.AmbientOcclusion.AOMode;
 		s_AO_pushConstant.AO_Data = { projectionScale, width, height };
 		s_AO_pushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 		s_AO_pushConstant.InvProjMatrix = glm::inverse(projMatrix);
@@ -1199,6 +1206,7 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 
 		auto vulkanColorBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex).As<VulkanImage2D>();
 
@@ -1220,7 +1228,11 @@ namespace Frost
 		} bloomPushConstant;
 
 
-		bloomPushConstant.Params = { m_BloomSettings.Threshold, m_BloomSettings.Threshold - m_BloomSettings.Knee, m_BloomSettings.Knee * 2.0f, 0.25f / m_BloomSettings.Knee };
+		bloomPushConstant.Params = { rendererSettings.Bloom.Threshold,
+									 rendererSettings.Bloom.Threshold - rendererSettings.Bloom.Knee,
+									 rendererSettings.Bloom.Knee * 2.0f,
+									 0.25f / rendererSettings.Bloom.Knee 
+		};
 
 		
 		/// Part 1: Prefilter and pick up the color values over the threeshold
@@ -1625,20 +1637,21 @@ namespace Frost
 
 	void VulkanPostFXPass::OnRenderDebug()
 	{
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 		if (ImGui::CollapsingHeader("Screen Space Reflections"))
 		{
-			ImGui::SliderInt("Enable", &m_CompositeSetings.UseSSR, 0, 1);
+			ImGui::SliderInt("Enable", &rendererSettings.SSR.Enabled, 0, 1);
 			ImGui::Separator();
-			ImGui::SliderInt("Cone Tracing", &m_SSRSettings.UseConeTracing, 0, 1);
-			ImGui::SliderInt("RayStep Count", &m_SSRSettings.RayStepCount, 5, 10);
-			ImGui::DragFloat("RayStep Size", &m_SSRSettings.RayStepSize, 0.001f, 0.04f, 0.1f);
+			ImGui::SliderInt("Cone Tracing", &rendererSettings.SSR.UseConeTracing, 0, 1);
+			ImGui::SliderInt("RayStep Count", &rendererSettings.SSR.RayStepCount, 5, 10);
+			ImGui::DragFloat("RayStep Size", &rendererSettings.SSR.RayStepSize, 0.001f, 0.04f, 0.1f);
 		}
 		if (ImGui::CollapsingHeader("Ambient Occlusion"))
 		{
-			ImGui::SliderInt("Enable", &m_CompositeSetings.UseAO, 0, 1);
+			ImGui::SliderInt("Enable", &rendererSettings.AmbientOcclusion.Enabled, 0, 1);
 			ImGui::Separator();
 			ImGui::Text("AO Mode (0 - HBAO; 1 - GTAO)");
-			ImGui::SliderInt(" ", &m_AOSettings.AOMode, 0, 1);
+			ImGui::SliderInt(" ", &rendererSettings.AmbientOcclusion.AOMode, 0, 1);
 
 			ImGui::Text("AO Texture");
 			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -1646,16 +1659,24 @@ namespace Frost
 		}
 		if (ImGui::CollapsingHeader("Bloom"))
 		{
-			ImGui::SliderInt("Enable", &m_CompositeSetings.UseBloom, 0, 1);
+			ImGui::SliderInt("Enable", &rendererSettings.Bloom.Enabled, 0, 1);
 			ImGui::Separator();
-			ImGui::DragFloat("Threshold", &m_BloomSettings.Threshold, 0.1f, 0.0f, 1000.0f);
-			ImGui::SliderFloat("Knee", &m_BloomSettings.Knee, 0.1f, 1.0f);
+			ImGui::DragFloat("Threshold", &rendererSettings.Bloom.Threshold, 0.1f, 0.0f, 1000.0f);
+			ImGui::SliderFloat("Knee", &rendererSettings.Bloom.Knee, 0.1f, 1.0f);
 		}
 	}
 
 	void VulkanPostFXPass::CalculateMipLevels(uint32_t width, uint32_t height)
 	{
 		m_Data->ScreenMipLevel = (uint32_t)std::floor(std::log2(std::max(width, height))) + 1;
+	}
+
+	void VulkanPostFXPass::UpdateRenderingSettings()
+	{
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+		m_CompositeSetings.UseAO = rendererSettings.AmbientOcclusion.Enabled;
+		m_CompositeSetings.UseBloom = rendererSettings.Bloom.Enabled;
+		m_CompositeSetings.UseSSR = rendererSettings.SSR.Enabled;
 	}
 
 	void VulkanPostFXPass::ShutDown()

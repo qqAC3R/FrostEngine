@@ -127,8 +127,6 @@ namespace Frost
 
 			glm::mat4 CustomProjectionMatrix;
 			float CameraFOV;
-			int32_t m_UseTAA = 1;
-			int32_t m_UseVolumetrics = 1;
 		};
 
 		

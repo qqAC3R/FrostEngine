@@ -541,6 +541,8 @@ namespace Frost
 
 	void VulkanVolumetricPass::OnUpdate(const RenderQueue& renderQueue)
 	{
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+
 		if (m_Data->CameraFOV != renderQueue.m_Camera->GetCameraFOV())
 		{
 			m_Data->CustomProjectionMatrix = glm::perspective(glm::radians(renderQueue.m_Camera->GetCameraFOV()), float(renderQueue.ViewPortWidth) / float(renderQueue.ViewPortHeight), 0.1f, 500.0f);
@@ -551,7 +553,7 @@ namespace Frost
 		CloudComputeUpdate(renderQueue);
 		VulkanRenderer::EndTimeStampPass("Cloud Compute Pass");
 
-		if (m_Data->m_UseVolumetrics)
+		if (rendererSettings.Volumetrics.EnableVolumetrics)
 		{
 
 			VulkanRenderer::BeginTimeStampPass("Volumetric Pass (Froxel Populate)");
@@ -563,7 +565,7 @@ namespace Frost
 			VulkanRenderer::EndTimeStampPass("Volumetric Pass (Light Inject)");
 
 			VulkanRenderer::BeginTimeStampPass("Volumetric Pass (TAA)");
-			if (m_Data->m_UseTAA)
+			if (rendererSettings.Volumetrics.UseTAA)
 			{
 				FroxelTAAUpdate(renderQueue);
 			}
@@ -969,10 +971,11 @@ namespace Frost
 
 	void VulkanVolumetricPass::OnRenderDebug()
 	{
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 		if (ImGui::CollapsingHeader("Unified Volumetrics"))
 		{
-			ImGui::SliderInt("Enable", &m_Data->m_UseVolumetrics, 0, 1);
-			ImGui::SliderInt("TAA", &m_Data->m_UseTAA, 0, 1);
+			ImGui::SliderInt("Enable", &rendererSettings.Volumetrics.EnableVolumetrics, 0, 1);
+			ImGui::SliderInt("TAA", &rendererSettings.Volumetrics.UseTAA, 0, 1);
 		}
 	}
 

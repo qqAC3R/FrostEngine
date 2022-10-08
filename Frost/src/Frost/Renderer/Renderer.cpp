@@ -20,6 +20,9 @@ namespace Frost
 	};
 
 	RendererAPI* Renderer::s_RendererAPI = nullptr;
+
+	RendererSettings Renderer::s_RendererSettings;
+
 	static RenderCommandQueue* s_CommandQueue = nullptr;
 	static RenderCommandQueue* s_DeletionCommandQueue = nullptr;
 	static RendererData* s_Data = nullptr;
@@ -36,6 +39,9 @@ namespace Frost
 		s_CommandQueue = new RenderCommandQueue();
 		s_DeletionCommandQueue = new RenderCommandQueue();
 		s_Data = new RendererData();
+
+		// Renderer settings initialization (in the future, this could be changed into importing values from files)
+		s_RendererSettings.Initialize();
 
 		// Init the shaders
 		s_Data->m_ShaderLibrary = Ref<ShaderLibrary>::Create();
