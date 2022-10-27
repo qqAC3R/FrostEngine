@@ -31,13 +31,23 @@ namespace Frost
 		virtual uint32_t GetWidth() const = 0;
 		virtual uint32_t GetHeight() const = 0;
 
+		virtual void SetWindowPosition(int32_t x, int32_t y) = 0;
+		virtual void SetWindowName(const std::string& name) = 0;
+		virtual void SetWindowProjectName(const std::string& projectName) = 0;
+
 		// Windows attributes
 		virtual void EnableCursour() = 0;
 		virtual void DisableCursour() = 0;
 		virtual double GetTime() = 0;
 		virtual void SetEventCallback(const EventCallbackFn& callback) = 0;
 		virtual void SetVSync(bool enabled) = 0;
+
 		virtual bool IsVSync() const = 0;
+		virtual bool IsMaximized() const = 0;
+
+		virtual void RestoreWindow() const = 0;
+		virtual void MinimizeWindow() const = 0;
+		virtual void MaximizeWindow() const = 0;
 
 		virtual void* GetNativeWindow() const = 0;
 		virtual const Scope<GraphicsContext>& GetGraphicsContext() const = 0;

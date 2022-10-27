@@ -8,17 +8,28 @@
 
 namespace Frost
 {
+	static std::string GetNameFromFilepath(const std::string& filepath)
+	{
+		auto lastSlash = filepath.find_last_of("/\\");
+		lastSlash = lastSlash == std::string::npos ? 0 : lastSlash + 1;
+		auto lastDot = filepath.rfind(".");
+		auto count = lastDot == std::string::npos ? filepath.size() - lastSlash : lastDot - lastSlash;
+
+		return filepath.substr(lastSlash, count);
+	}
 
 	SceneSerializer::SceneSerializer(const Ref<Scene>& scene)
 		: m_Scene(scene)
 	{
-
 	}
 
 	void SceneSerializer::Serialize(const std::string& filepath)
 	{
 		std::ofstream istream(filepath);
 		istream.clear();
+
+		// Get the scene name from filepath
+		m_SceneName = GetNameFromFilepath(filepath);
 
 		nlohmann::ordered_json out;
 
@@ -32,17 +43,7 @@ namespace Frost
 			SerializeEntity(out, ent);
 
 			entity++;
-			//entity += sizeof(entt::registry::entity_type);
 		}
-
-			//m_Scene->m_Registry.each_reversed([&](auto entityID) // Custom made function
-			//{
-			//	Entity entity = { entityID, m_Scene.Raw() };
-			//	if (!entity)
-			//		return;
-			//
-			//	SerializeEntity(out, entity);
-			//});
 
 		istream << out.dump(4);
 
@@ -234,6 +235,9 @@ namespace Frost
 
 		std::ifstream instream(filepath);
 		
+		// Get the scene name from filepath
+		m_SceneName = GetNameFromFilepath(filepath);
+
 		instream.seekg(0, std::ios::end);
 		size_t size = instream.tellg();
 		content.resize(size);

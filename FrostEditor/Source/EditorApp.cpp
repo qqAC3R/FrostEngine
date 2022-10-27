@@ -1,5 +1,6 @@
 #include "frostpch.h"
 #include <Frost.h>
+#include <Frost/Core/EntryPoint.h>
 
 #include "EditorLayer.h"
 
@@ -17,9 +18,9 @@ namespace Frost
 		{
 		}
 	};
-}
 
-Frost::Application* Frost::CreateApplication()
-{
-	return new EditorApp();
+	Application* CreateApplication()
+	{
+		return new EditorApp();
+	}
 }

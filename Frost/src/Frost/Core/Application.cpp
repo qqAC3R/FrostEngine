@@ -14,7 +14,7 @@
 namespace Frost
 {
 	Application* Application::s_Instance = nullptr;
-	std::string Application::m_ApplicationVersion = "0.4.0a";
+	std::string Application::m_ApplicationVersion = "0.5.0a";
 
 	Application::Application()
 	{
@@ -24,6 +24,7 @@ namespace Frost
 		FROST_CORE_INFO("Frost Engine v{0}", Application::GetVersion());
 
 		m_Window = Scope<Window>(Window::Create({"Frost Engine", 1600, 900}));
+		m_Window->SetWindowName("Frost");
 		m_Window->SetEventCallback(FROST_BIND_EVENT_FN(Application::OnEvent));
 
 		m_ImGuiLayer = ImGuiLayer::Create();

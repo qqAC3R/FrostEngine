@@ -16,11 +16,14 @@ namespace Frost
 		bool Deserialize(const std::string& filepath);
 		//bool DeserializeRuntime(const std::string& filepath);
 
+		const std::string& GetSceneName() const { return m_SceneName; }
+
 	private:
 		void SerializeEntity(nlohmann::ordered_json& out, Entity entity);
 
 	private:
 		Ref<Scene> m_Scene;
+		std::string m_SceneName;
 	};
 
 

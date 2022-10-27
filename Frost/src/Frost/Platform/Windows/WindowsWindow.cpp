@@ -8,8 +8,15 @@
 
 #include "Frost/Renderer/Renderer.h"
 
+#include "stb_image.h"
+
 namespace Frost
 {
+	bool s_GLFWInitialized = false;
+	static void GLFWErrorCallback(int error, const char* description)
+	{
+		FROST_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
+	}
 
 	Window* Window::Create(const WindowProps& props)
 	{
@@ -56,9 +63,67 @@ namespace Frost
 		m_Data.VSync = enabled;
 	}
 
+	void WindowsWindow::SetWindowPosition(int32_t x, int32_t y)
+	{
+		glfwSetWindowPos(m_Window, x, y);
+	}
+
+	void WindowsWindow::SetWindowName(const std::string& name)
+	{
+		m_Data.Name = name;
+		glfwSetWindowTitle(m_Window, m_Data.Name.c_str());
+	}
+
+	void WindowsWindow::SetWindowProjectName(const std::string& projectName)
+	{
+		std::string version = Application::GetVersion();
+		std::string title = projectName + " | Frost " + version;;
+
+		switch (Renderer::GetAPI())
+		{
+		case RendererAPI::API::Vulkan:
+			title += " (Vulkan)"; break;
+		case RendererAPI::API::None:
+			FROST_ASSERT(false, "Renderer::API does not have an API");
+		}
+
+		title += " | x64 ";
+
+#ifdef FROST_DEBUG
+		title += "Debug";
+#elif FROST_RELEASE
+		title += "Release";
+#endif
+
+		m_Data.Name = title;
+		glfwSetWindowTitle(m_Window, m_Data.Name.c_str());
+	}
+
+	bool WindowsWindow::IsMaximized() const
+	{
+		return (bool)glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED);
+	}
+
+	void WindowsWindow::RestoreWindow() const
+	{
+		glfwRestoreWindow(m_Window);
+	}
+
+	void WindowsWindow::MinimizeWindow() const
+	{
+		glfwIconifyWindow(m_Window);
+	}
+
+	void WindowsWindow::MaximizeWindow() const
+	{
+		glfwMaximizeWindow(m_Window);
+	}
+
 	void WindowsWindow::Resize(uint32_t width, uint32_t height)
 	{
 		m_Context->Resize(width, height);
+		m_Data.Width = width;
+		m_Data.Height = height;
 	}
 
 	void WindowsWindow::Init(const WindowProps& props)
@@ -67,32 +132,28 @@ namespace Frost
 		m_Data.Height = props.Height;
 		m_Data.Name = props.Title;
 
-		switch (Renderer::GetAPI())
+		if (!s_GLFWInitialized)
 		{
-			case RendererAPI::API::Vulkan:
-				m_Data.Name += " (Vulkan)"; break;
-			case RendererAPI::API::None:
-				FROST_ASSERT(false, "Renderer::API does not have an API");
+			int success = glfwInit();
+			FROST_ASSERT(success, "Could not intialize GLFW!");
+			glfwSetErrorCallback(GLFWErrorCallback);
+
+			s_GLFWInitialized = true;
 		}
 
-		m_Data.Name += " | x64 ";
-
-#ifdef FROST_DEBUG
-		m_Data.Name += "Debug";
-#elif FROST_RELEASE
-		m_Data.Name += "Release";
-#endif
-
-		std::string version = Application::GetVersion();
-		m_Data.Name += " | Version: " + version;
-
-		glfwInit();
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		glfwWindowHint(GLFW_DECORATED, false);
 
 		FROST_CORE_INFO("Creating window '{0}' ({1}, {2})", props.Title, props.Width, props.Height);
 
+
+
 		m_Window = glfwCreateWindow(m_Data.Width, m_Data.Height, m_Data.Name.c_str(), nullptr, nullptr);
 		glfwSetWindowUserPointer(m_Window, &m_Data);
+
+		// Set the window's position to the center of the screen
+		const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+		glfwSetWindowPos(m_Window, (mode->width / 2)  - (props.Width / 2), (mode->height / 2) - (props.Height / 2)); // TODO: Add automatic centerization by the resolution
 
 		m_Context = GraphicsContext::Create(m_Window);
 		m_Context->Init();
@@ -187,7 +248,6 @@ namespace Frost
 			MouseMovedEvent event((float)xPos, (float)yPos);
 			data.EventCallback(event);
 		});
-
 	}
 
 	void WindowsWindow::Shutdown()
@@ -200,4 +260,12 @@ namespace Frost
 
 	}
 
+	void WindowsWindow::SetAppIcon()
+	{
+		GLFWimage icon;
+		int channels;
+		icon.pixels = stbi_load("Resources/Editor/Logo_Frost_I.png", &icon.width, &icon.height, &channels, 4);
+		glfwSetWindowIcon(m_Window, 1, &icon);
+		stbi_image_free(icon.pixels);
+	}
 }

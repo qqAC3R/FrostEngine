@@ -19,7 +19,7 @@ namespace Frost
 
 		void Run();
 		void Close() { m_Running = false; }
-		
+
 		void OnEvent(Event& e);
 		
 		bool IsClosed() { return m_Running; }

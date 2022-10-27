@@ -339,7 +339,8 @@ namespace Frost
 	void VulkanImGuiLayer::ResetStyleSettings()
 	{
 		ImGuiStyle& style = ImGui::GetStyle();
-		style.WindowPadding = ImVec2(8.00f, 8.00f);
+		//style.WindowPadding = ImVec2(8.00f, 8.00f);
+		style.WindowPadding = ImVec2(3.00f, 3.00f);
 		style.FramePadding = ImVec2(10.00f, 3.00f);
 		style.CellPadding = ImVec2(6.00f, 6.00f);
 		style.ItemSpacing = ImVec2(6.00f, 6.00f);

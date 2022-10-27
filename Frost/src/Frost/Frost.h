@@ -56,9 +56,3 @@
 #include "Frost/Renderer/RayTracing/ShaderBindingTable.h"
 #include "Frost/Renderer/RayTracing/AccelerationStructures.h"
 /* ------------------------------------------------------ */
-
-
-
-///* -------------------- Entry Point --------------------- *///
-#include "Frost/Core/EntryPoint.h"
-/* ------------------------------------------------------ */
