@@ -5,7 +5,6 @@
 #include <imgui_internal.h>
 #include <ImGuizmo.h>
 
-
 #include "Frost/Core/Input.h"
 #include "Frost/Events/KeyEvent.h"
 #include "Frost/InputCodes/KeyCodes.h"
@@ -41,11 +40,12 @@ namespace Frost
 
 		// Scene initialization
 		m_EditorScene = Ref<Scene>::Create();
+		m_CurrentScene = m_EditorScene;
 
 		// Scene Hierarchy Panel initialization
 		m_SceneHierarchyPanel = Ref<SceneHierarchyPanel>::Create();
 		m_SceneHierarchyPanel->Init(nullptr);
-		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
+		m_SceneHierarchyPanel->SetSceneContext(m_CurrentScene);
 
 		// Inspector Panel initialization
 		m_InspectorPanel = Ref<InspectorPanel>::Create();
@@ -54,6 +54,8 @@ namespace Frost
 
 		m_ViewportPanel = Ref<ViewportPanel>::Create();
 		m_ViewportPanel->Init(nullptr);
+		m_ViewportPanel->SetScenePlayFunction(std::bind(&EditorLayer::OnScenePlay, this));
+		m_ViewportPanel->SetSceneStopFunction(std::bind(&EditorLayer::OnSceneStop, this));
 
 		m_MaterialEditor = Ref<MaterialEditor>::Create();
 		m_MaterialEditor->Init(nullptr);
@@ -66,13 +68,13 @@ namespace Frost
 
 
 		{
-			auto& sponzaEntity = m_EditorScene->CreateEntity("Plane");
+			auto& sponzaEntity = m_CurrentScene->CreateEntity("Plane");
 			auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
 			meshComponent.Mesh = Mesh::Load("Resources/Meshes/Plane.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
 		}
 
 		{
-			auto& directionalLight = m_EditorScene->CreateEntity("Directional Light");
+			auto& directionalLight = m_CurrentScene->CreateEntity("Directional Light");
 			auto& directionalLightComponent = directionalLight.AddComponent<DirectionalLightComponent>();
 			TransformComponent& ts = directionalLight.GetComponent<TransformComponent>();
 			ts.Rotation = { -90.0f, 0.0f, 0.0f };
@@ -81,11 +83,9 @@ namespace Frost
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
-		m_EditorCamera->OnUpdate(ts);
-
 		if (m_SceneState == SceneState::Play)
 		{
-			CameraComponent* primaryCamera = m_EditorScene->GetPrimaryCamera();
+			CameraComponent* primaryCamera = m_CurrentScene->GetPrimaryCamera();
 
 			if (primaryCamera)
 			{
@@ -93,19 +93,27 @@ namespace Frost
 				{
 					primaryCamera->Camera->SetViewportSize(m_ViewportPanel->GetViewportPanelSize().x, m_ViewportPanel->GetViewportPanelSize().y);
 					Renderer::BeginScene(primaryCamera->Camera);
+
+					m_CurrentScene->UpdateRuntime(ts);
 				}
 			}
 			else
 			{
+				m_EditorCamera->OnUpdate(ts);
 				Renderer::BeginScene(m_EditorCamera);
+				m_CurrentScene->Update(ts);
+
+				FROST_CORE_WARN("The scene doesn't have a camera!");
 			}
 		}
 		else
 		{
+			m_EditorCamera->OnUpdate(ts);
 			Renderer::BeginScene(m_EditorCamera);
+			m_CurrentScene->Update(ts);
 		}
 
-		m_EditorScene->Update(ts);
+		
 		Renderer::EndScene();
 	}
 
@@ -228,6 +236,7 @@ namespace Frost
 			m_ViewportPanel->RenderSceneButtons(m_SceneState);
 			m_ViewportPanel->RenderViewportRenderPasses();
 
+			if (m_SceneState != SceneState::Play)
 			{
 				Entity selectedEntity = m_SceneHierarchyPanel->GetSelectedEntity();
 				if (selectedEntity && m_GuizmoMode != -1 && selectedEntity.HasComponent<TransformComponent>())
@@ -301,13 +310,18 @@ namespace Frost
 
 	void EditorLayer::NewScene()
 	{
+		if (m_SceneState == SceneState::Play) return;
+
 		m_EditorScene = Ref<Scene>::Create();
 		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
+		SetCurrentScene(m_EditorScene);
 		Application::Get().GetWindow().SetWindowProjectName("Untilted scene");
 	}
 
 	void EditorLayer::SaveSceneAs()
 	{
+		if (m_SceneState == SceneState::Play) return;
+
 		std::string filepath = FileDialogs::SaveFile("");
 
 		if (!filepath.empty())
@@ -320,15 +334,42 @@ namespace Frost
 
 	void EditorLayer::OpenScene()
 	{
+		if (m_SceneState == SceneState::Play) return;
+
 		std::string filepath = FileDialogs::OpenFile("");
 
 		if (!filepath.empty())
 		{
 			NewScene();
-			SceneSerializer sceneSerializer(m_EditorScene);
+			SceneSerializer sceneSerializer(m_CurrentScene);
 			sceneSerializer.Deserialize(filepath);
 			Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
 		}
+	}
+
+	void EditorLayer::OnScenePlay()
+	{
+		m_SceneState = SceneState::Play;
+
+		m_RuntimeScene = Ref<Scene>::Create();
+		m_EditorScene->CopyTo(m_RuntimeScene);
+		m_SceneHierarchyPanel->SetSceneContext(m_RuntimeScene);
+
+		m_RuntimeScene->OnPhysicsSimulationStart();
+
+		SetCurrentScene(m_RuntimeScene);
+	}
+
+	void EditorLayer::OnSceneStop()
+	{
+		m_SceneState = SceneState::Edit;
+		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
+
+		m_RuntimeScene->OnPhysicsSimulationEnd();
+
+		m_RuntimeScene = nullptr;
+
+		SetCurrentScene(m_EditorScene);
 	}
 
 	void EditorLayer::OnEvent(Event& event)
@@ -355,6 +396,13 @@ namespace Frost
 		case Key::E:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::ROTATE; break;
 		case Key::R:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::SCALE; break;
 
+		case Key::N:
+		{
+			if (!leftControl) break;
+			NewScene();
+			break;
+		}
+
 		case Key::S:
 		{
 			if (!leftControl) break;
@@ -371,4 +419,14 @@ namespace Frost
 		}
 		return false;
 	}
+
+	void EditorLayer::OnResize()
+	{
+	}
+
+	void EditorLayer::OnDetach()
+	{
+		this->~EditorLayer();
+	}
+
 }

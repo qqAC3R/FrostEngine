@@ -38,20 +38,21 @@ namespace Frost
 		virtual void OnEvent(Event& event);
 		bool OnKeyPressed(KeyPressedEvent& event);
 
-		virtual void OnResize()
-		{
-		}
+		virtual void OnResize();
 
-		virtual void OnDetach()
-		{
-			this->~EditorLayer();
-		}
+		virtual void OnDetach();
+	private:
+		void OnScenePlay();
+		void OnSceneStop();
+
+		void SetCurrentScene(Ref<Scene> scene) { m_CurrentScene = scene; }
+
 	private:
 		// Editor Camera
 		Ref<EditorCamera> m_EditorCamera;
 
 		// Scenes
-		Ref<Scene> m_EditorScene;
+		Ref<Scene> m_EditorScene, m_RuntimeScene, m_CurrentScene;
 
 		// Panels
 		Ref<SceneHierarchyPanel> m_SceneHierarchyPanel;

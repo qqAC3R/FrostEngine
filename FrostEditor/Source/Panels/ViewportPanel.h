@@ -31,6 +31,9 @@ namespace Frost
 
 		bool IsResized() const { return m_IsResized; }
 		glm::vec2 GetViewportPanelSize() const { return m_ViewportSize; }
+
+		void SetScenePlayFunction(const std::function<void()>& func) { m_ScenePlayFunc = func; }
+		void SetSceneStopFunction(const std::function<void()>& func) { m_SceneStopFunc = func; }
 	private:
 		glm::vec2 m_ViewportSize = glm::vec2(0.0f);
 		bool m_Visibility = true;
@@ -38,6 +41,8 @@ namespace Frost
 		bool m_IsResized_Internal = false;
 
 		std::string m_OutputImageID = "FinalImage";
+
+		std::function<void()> m_ScenePlayFunc, m_SceneStopFunc;
 
 		friend class EditorLayer;
 	};

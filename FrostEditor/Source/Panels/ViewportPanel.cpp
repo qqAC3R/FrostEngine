@@ -206,14 +206,14 @@ namespace Frost
 			{
 				if (ImGui::Button(ICON_PLAY, { 40, 30 }))
 				{
-					sceneState = SceneState::Play;
+					m_ScenePlayFunc();
 				}
 			}
 			else
 			{
 				if (ImGui::Button(ICON_STOP, { 40, 30 }))
 				{
-					sceneState = SceneState::Edit;
+					m_SceneStopFunc();
 				}
 			}
 
@@ -258,8 +258,6 @@ namespace Frost
 			if (ImGui::Button(ICON_COG, { 40, 30 }))
 			{
 				callPopup = true;
-
-
 			}
 
 			if (callPopup)

@@ -4,6 +4,7 @@
 #include "Frost/Utils/Timer.h"
 
 #include "Frost/Renderer/Renderer.h"
+#include "Frost/Physics/PhysicsEngine.h"
 
 #include "Frost/Core/Input.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
@@ -31,6 +32,8 @@ namespace Frost
 		PushOverlay(m_ImGuiLayer);
 
 		Renderer::Init();
+
+		PhysicsEngine::Initialize();
 	}
 
 	Application::~Application()

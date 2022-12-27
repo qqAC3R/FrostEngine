@@ -8,6 +8,7 @@ namespace Frost
 {
 	class Entity;
 	struct CameraComponent;
+	using EntityMap = HashMap<UUID, Entity>;
 
 	class Scene
 	{
@@ -16,6 +17,10 @@ namespace Frost
 		virtual ~Scene();
 
 		void Update(Timestep ts);
+		void UpdateRuntime(Timestep ts);
+
+		void OnPhysicsSimulationStart();
+		void OnPhysicsSimulationEnd();
 
 		Entity CreateEntity(const std::string name = "New Entity");
 		Entity CreateEntityWithID(const UUID& id, const std::string name = "New Entity");
@@ -33,6 +38,9 @@ namespace Frost
 		const entt::registry& GetRegistry() const { return m_Registry; }
 
 		CameraComponent* GetPrimaryCamera();
+
+		const EntityMap& GetEntityMap() const { return m_EntityIDMap; }
+		void CopyTo(Ref<Scene>& target);
 	private:
 		void UpdateSkyLight(Timestep ts);
 		void UpdateMeshComponents(Timestep ts);
@@ -41,10 +49,11 @@ namespace Frost
 		void UpdateDirectionalLight(Timestep ts);
 		void UpdateBoxFogVolumes(Timestep ts);
 		void UpdateCloudVolumes(Timestep ts);
-
 	private:
 		entt::registry m_Registry;
+		EntityMap m_EntityIDMap;
 
 		friend class SceneSerializer;
+		friend class PhysicsEngine;
 	};
 }

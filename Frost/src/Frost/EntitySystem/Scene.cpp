@@ -5,6 +5,8 @@
 #include "Frost/EntitySystem/Entity.h"
 #include "Frost/EntitySystem/Components.h"
 
+#include "Frost/Physics/PhysicsEngine.h"
+
 #include "Frost/Math/Math.h"
 
 namespace Frost
@@ -22,10 +24,12 @@ namespace Frost
 		Entity entity = Entity(entityHandle, this);
 
 		// Adding the default components
-		entity.AddComponent<IDComponent>();
+		auto& idComponent = entity.AddComponent<IDComponent>();
 		entity.AddComponent<ParentChildComponent>();
 		entity.AddComponent<TagComponent>(name);
 		entity.AddComponent<TransformComponent>();
+
+		m_EntityIDMap[idComponent.ID] = entity;
 
 		return entity;
 	}
@@ -41,6 +45,8 @@ namespace Frost
 		entity.AddComponent<ParentChildComponent>();
 		entity.AddComponent<TagComponent>(name);
 		entity.AddComponent<TransformComponent>();
+
+		m_EntityIDMap[id] = entity;
 
 		return entity;
 	}
@@ -84,6 +90,30 @@ namespace Frost
 		UpdateDirectionalLight(ts);
 		UpdateBoxFogVolumes(ts);
 		UpdateCloudVolumes(ts);
+	}
+
+	void Scene::UpdateRuntime(Timestep ts)
+	{
+		PhysicsEngine::Simulate(ts);
+
+		UpdateSkyLight(ts);
+		UpdateMeshComponents(ts);
+		UpdateAnimationControllers(ts);
+		UpdatePointLightComponent(ts);
+		UpdateDirectionalLight(ts);
+		UpdateBoxFogVolumes(ts);
+		UpdateCloudVolumes(ts);
+	}
+
+	void Scene::OnPhysicsSimulationStart()
+	{
+		PhysicsEngine::CreateScene();
+		PhysicsEngine::CreateActors(this);
+	}
+
+	void Scene::OnPhysicsSimulationEnd()
+	{
+		PhysicsEngine::DeleteScene();
 	}
 
 	const glm::mat4& Scene::GetTransformMatFromEntityAndParent(Entity entity)
@@ -154,7 +184,6 @@ namespace Frost
 		}
 
 		Renderer::GetSceneEnvironment()->SetDynamicSky();
-
 	}
 
 	void Scene::UpdateMeshComponents(Timestep ts)
@@ -295,6 +324,56 @@ namespace Frost
 
 		// Set the Parent to be 0, because we just unparented the entity
 		child.GetComponent<ParentChildComponent>().ParentID = 0;
+	}
+
+	template<typename T>
+	static void CopyComponent(entt::registry& dstRegistry, entt::registry& srcRegistry, const std::unordered_map<UUID, entt::entity>& enttMap)
+	{
+		auto components = srcRegistry.view<T>();
+		for (auto srcEntity : components)
+		{
+			entt::entity destEntity = enttMap.at(srcRegistry.get<IDComponent>(srcEntity).ID);
+
+			auto& srcComponent = srcRegistry.get<T>(srcEntity);
+			auto& destComponent = dstRegistry.emplace_or_replace<T>(destEntity, srcComponent);
+		}
+	}
+
+	void Scene::CopyTo(Ref<Scene>& target)
+	{
+		std::unordered_map<UUID, entt::entity> enttMap;
+		auto idComponents = m_Registry.view<IDComponent>();
+		for (auto entity : idComponents)
+		{
+			auto uuid = m_Registry.get<IDComponent>(entity).ID;
+			auto name = m_Registry.get<TagComponent>(entity).Tag;
+			Entity e = target->CreateEntityWithID(uuid, name);
+			enttMap[uuid] = e.m_Handle;
+		}
+
+
+		CopyComponent<TagComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<TransformComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<MeshComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<AnimationComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<CameraComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<PointLightComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<DirectionalLightComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<FogBoxVolumeComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<CloudVolumeComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<SkyLightComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<RigidBodyComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<BoxColliderComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<SphereColliderComponent>(target->m_Registry, m_Registry, enttMap);
+
+		// Sort IdComponent by by entity handle (which is essentially the order in which they were created)
+		// This ensures a consistent ordering when iterating IdComponent (for example: when rendering scene hierarchy panel)
+		//target->m_Registry.sort<IDComponent>([&target](const auto lhs, const auto rhs)
+		//{
+		//	auto lhsEntity = target->GetEntityMap().find(lhs.ID);
+		//	auto rhsEntity = target->GetEntityMap().find(rhs.ID);
+		//	return static_cast<uint32_t>(lhsEntity->second) < static_cast<uint32_t>(rhsEntity->second);
+		//});
 	}
 
 }

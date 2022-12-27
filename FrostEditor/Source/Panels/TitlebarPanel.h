@@ -18,6 +18,7 @@ namespace Frost
 		virtual void SetVisibility(bool show) override { m_Visibility = show; }
 		virtual void Shutdown() override;
 
+		// TODO: I'm not sure if copying a std::function everyframe is a good option, but I'll change it later
 		void SetMenuBar(const std::function<void()>& func) { m_MenuBarFunction = func; }
 	private:
 		void RenderTitleBar();

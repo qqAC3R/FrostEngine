@@ -172,4 +172,57 @@ namespace Frost
 		Ref<TextureCubeMap> IrradianceMap;
 		Ref<TextureCubeMap> PrefilteredMap;
 	};
+
+	struct RigidBodyComponent
+	{
+		enum class Type { Static, Dynamic };
+		enum class CollisionDetectionType : uint32_t { Discrete, Continuous, ContinuousSpeculative };
+		Type BodyType = Type::Dynamic;
+		float Mass = 1.0f;
+		float LinearDrag = 0.01f;
+		float AngularDrag = 0.05f;
+		bool DisableGravity = false;
+		bool IsKinematic = false;
+		//uint32_t Layer = 0;
+		CollisionDetectionType CollisionDetection = CollisionDetectionType::Discrete;
+
+		bool LockPositionX = false;
+		bool LockPositionY = false;
+		bool LockPositionZ = false;
+		bool LockRotationX = false;
+		bool LockRotationY = false;
+		bool LockRotationZ = false;
+
+		RigidBodyComponent() = default;
+		RigidBodyComponent(const RigidBodyComponent& other) = default;
+	};
+
+	struct BoxColliderComponent
+	{
+		glm::vec3 Size = { 1.0f, 1.0f, 1.0f };
+		glm::vec3 Offset = { 0.0f, 0.0f, 0.0f };
+		bool IsTrigger = false;
+		//AssetHandle Material;
+
+		// The mesh that will be drawn in the editor to show the collision bounds
+		//Ref<Mesh> DebugMesh;
+
+		BoxColliderComponent() = default;
+		BoxColliderComponent(const BoxColliderComponent & other) = default;
+	};
+
+	struct SphereColliderComponent
+	{
+		float Radius = 0.5f;
+		glm::vec3 Offset = { 0.0f, 0.0f, 0.0f };
+		bool IsTrigger = false;
+		//AssetHandle Material;
+
+		// The mesh that will be drawn in the editor to show the collision bounds
+		//Ref<Mesh> DebugMesh;
+
+		SphereColliderComponent() = default;
+		SphereColliderComponent(const SphereColliderComponent& other) = default;
+	};
+
 }

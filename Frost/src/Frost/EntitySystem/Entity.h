@@ -28,6 +28,13 @@ namespace Frost
 		}
 
 		template <typename T>
+		const T& GetComponent() const
+		{
+			const T& component = m_Scene->GetRegistry().get<T>(m_Handle);
+			return component;
+		}
+
+		template <typename T>
 		T& GetComponent()
 		{
 			T& component = m_Scene->GetRegistry().get<T>(m_Handle);
@@ -39,6 +46,9 @@ namespace Frost
 		{
 			return m_Scene->GetRegistry().any_of<T>(m_Handle);
 		}
+
+		TransformComponent& Transform() { return m_Scene->GetRegistry().get<TransformComponent>(m_Handle); }
+		const glm::mat4& Transform() const { return m_Scene->GetRegistry().get<TransformComponent>(m_Handle).GetTransform(); }
 
 		bool IsAncesterOf(Entity entity)
 		{
@@ -83,6 +93,8 @@ namespace Frost
 	private:
 		entt::entity m_Handle = entt::null;
 		Scene* m_Scene = nullptr;
+
+		friend class Scene;
 	};
 
 

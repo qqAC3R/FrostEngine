@@ -24,28 +24,40 @@ IncludeDir["glm"] = "Frost/vendor/glm"
 IncludeDir["stb_image"] = "Frost/vendor/stb_image"
 IncludeDir["spdlog"] = "Frost/vendor/spdlog/include"
 IncludeDir["assimp"] = "Frost/vendor/assimp/include"
-IncludeDir["assimpLib"] = "Frost/vendor/assimp/lib"
+--IncludeDir["assimpLib"] = "Frost/vendor/assimp/lib"
 IncludeDir["vma"] = "Frost/vendor/VulkanMemoryAllocator/include"
 IncludeDir["ImGui"] = "Frost/vendor/ImGui"
 IncludeDir["ImGuizmo"] = "Frost/vendor/ImGuizmo"
+IncludeDir["PhysX"] = "Frost/vendor/PhysX/include"
 IncludeDir["OZZ_Animation"] = "Frost/vendor/ozz-animation/include"
 IncludeDir["SPIRV_Cross"] = "Frost/vendor/SPIRV-Cross/include"
 IncludeDir["FontAwesome"] = "Frost/vendor/FontAwesome"
 IncludeDir["json"] = "Frost/vendor/json/include"
 
 IncludeDir["shaderc"] = "Frost/vendor/shaderc/Include"
-IncludeDir["shadercLib"] = "Frost/vendor/shaderc/Lib"
+--IncludeDir["shadercLib"] = "Frost/vendor/shaderc/Lib"
 
 IncludeDir["entt"] = "Frost/vendor/entt/include"
 
 LibraryDir = {}
 
 LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
+LibraryDir["PhysX"] = "Frost/vendor/PhysX/lib/%{cfg.buildcfg}"
+LibraryDir["shaderc"] = "Frost/vendor/shaderc/Lib"
+LibraryDir["assimp"] = "Frost/vendor/assimp/lib"
 
 Library = {}
 Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
 Library["shaderc"] = "Frost/vendor/shaderc/Lib/shaderc_shared.lib"
 
+
+Library["PhysX"] =                   "%{LibraryDir.PhysX}/PhysX_static_64.lib"
+Library["PhysXCharacterKinematic"] = "%{LibraryDir.PhysX}/PhysXCharacterKinematic_static_64.lib"
+Library["PhysXCommon"] =             "%{LibraryDir.PhysX}/PhysXCommon_static_64.lib"
+Library["PhysXCooking"] =            "%{LibraryDir.PhysX}/PhysXCooking_static_64.lib"
+Library["PhysXExtensions"] =         "%{LibraryDir.PhysX}/PhysXExtensions_static_64.lib"
+Library["PhysXFoundation"] =         "%{LibraryDir.PhysX}/PhysXFoundation_static_64.lib"
+Library["PhysXPvd"] =                "%{LibraryDir.PhysX}/PhysXPvdSDK_static_64.lib"
 
 group "Dependencies"
 	include "Frost/vendor/GLFW"
@@ -89,10 +101,11 @@ project "Frost"
 		"_CRT_SECURE_NO_WARNINGS",
 		"VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1",
 		"VK_USE_PLATFORM_WIN32_KHR",
-		"GLM_FORCE_DEPTH_ZERO_TO_ONE" -- For voxelization
+		"GLM_FORCE_DEPTH_ZERO_TO_ONE", -- For voxelization
+		"PX_PHYSX_STATIC_LIB" -- To use PhysX static libraries
 	}
 
-	includedirs 
+	includedirs
 	{
 		"%{VULKAN_SDK}/Include",
 		"%{prj.name}/src",
@@ -110,6 +123,7 @@ project "Frost"
 		"%{IncludeDir.OZZ_Animation}",
 		"%{IncludeDir.json}",
 		"%{IncludeDir.json}/json",
+		"%{IncludeDir.PhysX}",
 		"%{IncludeDir.FontAwesome}"
 	}
 
@@ -125,27 +139,33 @@ project "Frost"
 		"SPIR-V_Cross",
 		"OZZ-Animation",
 
+		"%{Library.Vulkan}", -- vulkan-1.lib
 		"shaderc_shared.lib",
-		"vulkan-1.lib"
+
+		"assimp-vc143-mt.lib",
+
+
+		-- PhysX
+		"PhysX_static_64.lib",
+		"PhysXCharacterKinematic_static_64.lib",
+		"PhysXCommon_static_64.lib",
+		"PhysXCooking_static_64.lib",
+		"PhysXExtensions_static_64.lib",
+		"PhysXFoundation_static_64.lib",
+		"PhysXPvdSDK_static_64.lib"
 	}
 
 	libdirs
 	{
 		"%{VULKAN_SDK}/Lib",
-		"%{IncludeDir.assimpLib}",
-		"%{IncludeDir.shadercLib}"
-	}
 
-	libdirs
-	{
-		"%{IncludeDir.assimpLib}/Release"
-	}
-	links
-	{
-		"assimp-vc143-mt.lib"
-	}
+		--"%{LibraryDir.assimp}",
+		"%{LibraryDir.assimp}/Release",
 
+		"%{LibraryDir.shaderc}",
+		"%{LibraryDir.PhysX}"
 
+	}
 
 	filter "system:windows"
 		systemversion "latest"
@@ -154,33 +174,32 @@ project "Frost"
 		defines "FROST_DEBUG"
 		runtime "Debug"
 		symbols "on"
---		libdirs
---		{
---			"%{IncludeDir.assimpLib}/Debug"
---		}
---		links
---		{
---			"assimp-vc143-mtd.lib"
---		}
+
+		defines
+		{
+			"_DEBUG"
+		}
 
 	filter "configurations:Release"
 		defines "FROST_RELEASE"
 		runtime "Release"
 		optimize "on"
---		libdirs
---		{
---			"%{IncludeDir.assimpLib}/Release"
---		}
---		links
---		{
---			"assimp-vc143-mt.lib"
---		}
+
+		defines
+		{
+			"NDEBUG"
+		}
 
 
 	filter "configurations:Dist"
 		defines "FROST_DIST"
 		runtime "Release"
 		optimize "on"
+
+		defines
+		{
+			"NDEBUG"
+		}
 
 project "FrostScript-Core"
 	location "FrostScriptCore"
@@ -243,12 +262,27 @@ project "FrostEditor"
 		runtime "Debug"
 		symbols "on"
 
+		defines
+		{
+			"_DEBUG"
+		}
+
 	filter "configurations:Release"
 		defines "FROST_RELEASE"
 		runtime "Release"
 		optimize "on"
 
+		defines
+		{
+			"NDEBUG"
+		}
+
 	filter "configurations:Dist"
 		defines "FROST_DIST"
 		runtime "Release"
 		optimize "on"
+
+		defines
+		{
+			"NDEBUG"
+		}

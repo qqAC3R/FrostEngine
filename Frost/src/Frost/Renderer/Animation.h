@@ -81,7 +81,7 @@ namespace Frost
 		virtual ~AnimationController();
 
 		void SetActiveAnimation(Ref<Animation> animation);
-		Ref<Animation> GetActiveAnimation() { return m_ActiveAnimation; }
+		Ref<Animation> GetActiveAnimation() { return m_ActiveAnimation ? m_ActiveAnimation : nullptr ; }
 
 		float* GetAnimationTime() { return &m_AnimationTime; }
 		const ozz::vector<ozz::math::Float4x4>& GetModelSpaceMatrices() const { return m_ModelSpaceTransforms; }
