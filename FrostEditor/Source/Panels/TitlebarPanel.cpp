@@ -211,40 +211,40 @@ namespace Frost
 			bool maximized = Application::Get().GetWindow().IsMaximized();
 
 			Renderer::SubmitDeletion([maximized]()
-				{
-					if (maximized)
-						Application::Get().GetWindow().RestoreWindow();
-					else
-						Application::Get().GetWindow().MaximizeWindow();
-				});
+			{
+				if (maximized)
+					Application::Get().GetWindow().RestoreWindow();
+				else
+					Application::Get().GetWindow().MaximizeWindow();
+			});
 		}
 		if (ImGui::IsItemActive())
 		{
 			if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
 			{
 				Renderer::SubmitDeletion([windowWidth]()
+				{
+					auto* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
+					int maximized = Application::Get().GetWindow().IsMaximized();
+					if (maximized)
 					{
-						auto* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
-						int maximized = Application::Get().GetWindow().IsMaximized();
-						if (maximized)
-						{
-							//glfwRestoreWindow(window);
-							Application::Get().GetWindow().RestoreWindow();
+						//glfwRestoreWindow(window);
+						Application::Get().GetWindow().RestoreWindow();
 
-							int newWidth, newHeight;
-							newWidth = Application::Get().GetWindow().GetWidth();
-							newHeight = Application::Get().GetWindow().GetHeight();
+						int newWidth, newHeight;
+						newWidth = Application::Get().GetWindow().GetWidth();
+						newHeight = Application::Get().GetWindow().GetHeight();
 
-							// Offset position proportionally to mouse position on titlebar
-							// This ensures we dragging window relatively to cursor position on titlebar
-							// correctly when window size changes
-							if (windowWidth - (float)newWidth > 0.0f)
-								moveOffsetX *= (float)newWidth / windowWidth;
-						}
+						// Offset position proportionally to mouse position on titlebar
+						// This ensures we dragging window relatively to cursor position on titlebar
+						// correctly when window size changes
+						if (windowWidth - (float)newWidth > 0.0f)
+							moveOffsetX *= (float)newWidth / windowWidth;
+					}
 
-						ImVec2 point = ImGui::GetMousePos();
-						Application::Get().GetWindow().SetWindowPosition(point.x - moveOffsetX, point.y - moveOffsetY);
-					});
+					ImVec2 point = ImGui::GetMousePos();
+					Application::Get().GetWindow().SetWindowPosition(point.x - moveOffsetX, point.y - moveOffsetY);
+				});
 			}
 		}
 	}

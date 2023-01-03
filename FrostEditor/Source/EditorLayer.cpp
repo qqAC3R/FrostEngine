@@ -9,6 +9,7 @@
 #include "Frost/Events/KeyEvent.h"
 #include "Frost/InputCodes/KeyCodes.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
+#include "Frost/Physics/PhysicsEngine.h"
 
 #include "Frost/Math/Math.h"
 
@@ -37,7 +38,7 @@ namespace Frost
 		Application::Get().GetWindow().SetWindowProjectName("Untilted scene");
 
 		m_EditorCamera = Ref<EditorCamera>::Create(85.0, 1600.0f / 900.0f, 0.1f, 2000.0f);
-
+#if 1
 		// Scene initialization
 		m_EditorScene = Ref<Scene>::Create();
 		m_CurrentScene = m_EditorScene;
@@ -79,10 +80,12 @@ namespace Frost
 			TransformComponent& ts = directionalLight.GetComponent<TransformComponent>();
 			ts.Rotation = { -90.0f, 0.0f, 0.0f };
 		}
+#endif
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
+#if 1
 		if (m_SceneState == SceneState::Play)
 		{
 			CameraComponent* primaryCamera = m_CurrentScene->GetPrimaryCamera();
@@ -115,10 +118,12 @@ namespace Frost
 
 		
 		Renderer::EndScene();
+#endif
 	}
 
 	void EditorLayer::OnImGuiRender()
 	{
+#if 1
 		Renderer::Submit([&]()
 		{
 			static bool dockSpaceOpen = true;
@@ -144,6 +149,7 @@ namespace Frost
 
 			ImGui::Begin("DockSpace", nullptr, window_flags);
 
+
 			m_TitlebarPanel->SetMenuBar([this]()
 			{
 				if (ImGui::Button("File"))
@@ -160,7 +166,18 @@ namespace Frost
 					if (ImGui::MenuItem("Exit"))
 						Application::Get().Close();
 
-					//ImGui::EndMenu();
+					ImGui::EndPopup();
+				}
+
+				ImGui::SameLine();
+
+				if (ImGui::Button("Debug"))
+					ImGui::OpenPopup("DebugPopup");
+				if (ImGui::BeginPopup("DebugPopup"))
+				{
+					if (ImGui::MenuItem("Physics Debug", "", &m_EnablePhysicsDebugging))
+						PhysicsEngine::EnableDebugRecording(m_EnablePhysicsDebugging);
+
 					ImGui::EndPopup();
 				}
 			});
@@ -305,7 +322,7 @@ namespace Frost
 
 			m_ViewportPanel->EndRender();
 		});
-
+#endif
 	}
 
 	void EditorLayer::NewScene()
@@ -344,6 +361,9 @@ namespace Frost
 			SceneSerializer sceneSerializer(m_CurrentScene);
 			sceneSerializer.Deserialize(filepath);
 			Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
+
+			m_EditorScene = m_CurrentScene;
+			m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
 		}
 	}
 
@@ -377,9 +397,11 @@ namespace Frost
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& event) { return OnKeyPressed(event); });
 
+#if 0
 		m_EditorCamera->OnEvent(event);
 		m_SceneHierarchyPanel->OnEvent(event);
 		m_InspectorPanel->OnEvent(event);
+#endif
 	}
 
 	bool EditorLayer::OnKeyPressed(KeyPressedEvent& event)

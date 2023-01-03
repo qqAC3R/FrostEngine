@@ -223,6 +223,30 @@ namespace Frost
 					FROST_CORE_WARN("This entity already has the Sphere Collider Component!");
 			}
 
+			// Capsule Collider component
+			if (ImGui::MenuItem("Capsule Collider"))
+			{
+				if (!selectedEntity.HasComponent<CapsuleColliderComponent>())
+					selectedEntity.AddComponent<CapsuleColliderComponent>();
+				else
+					FROST_CORE_WARN("This entity already has the Capsule Collider Component!");
+			}
+
+			// Mesh Collider component
+			if (ImGui::MenuItem("Mesh Collider"))
+			{
+				if (!selectedEntity.HasComponent<MeshColliderComponent>())
+				{
+					if (selectedEntity.HasComponent<MeshComponent>())
+						selectedEntity.AddComponent<MeshColliderComponent>();
+					else
+						FROST_CORE_WARN("This entity doesn't have the Mesh Component!");
+
+				}
+				else
+					FROST_CORE_WARN("This entity already has the Mesh Collider Component!");
+			}
+
 			ImGui::Separator();
 
 
@@ -553,7 +577,7 @@ namespace Frost
 				if (ImGui::BeginCombo("##rigidbodytypecombo", componentBodyType.c_str()))
 				{
 
-					bool isStaticSelected = component.BodyType == RigidBodyComponent::Type::Static;
+					bool isStaticSelected = (component.BodyType == RigidBodyComponent::Type::Static);
 
 					if (ImGui::Selectable("Static", isStaticSelected))
 						component.BodyType = RigidBodyComponent::Type::Static;
@@ -580,116 +604,120 @@ namespace Frost
 			}
 
 
-			if (ImGui::BeginTable("RigidBodyProperties2", 2, flags))
+			// Rigid body properties (only for the dynamic type)
+			if (component.BodyType == RigidBodyComponent::Type::Dynamic)
 			{
-				
-				{
-					ImGui::PushID(1);
 
-					ImGui::TableNextColumn();
-					ImGui::Text("Mass");
-
-					ImGui::TableNextColumn();
-					UserInterface::DragFloat("", component.Mass, 0.3f, 0.0f, 1000000.0f);
-
-					ImGui::PopID();
-				}
-
-				{
-					ImGui::PushID(2);
-
-					ImGui::TableNextColumn();
-					ImGui::Text("Linear Drag");
-
-					ImGui::TableNextColumn();
-					UserInterface::DragFloat("", component.LinearDrag, 0.1f, 0.0f, 1000.0f);
-
-					ImGui::PopID();
-				}
-
-				{
-					ImGui::PushID(3);
-
-					ImGui::TableNextColumn();
-					ImGui::Text("Angular Drag");
-
-					ImGui::TableNextColumn();
-					UserInterface::DragFloat("", component.AngularDrag, 0.1f, 0.0f, 1000.0f);
-
-					ImGui::PopID();
-				}
-
-				{
-					ImGui::PushID(4);
-
-					ImGui::TableNextColumn();
-					ImGui::Text("Disable Gravity");
-
-					ImGui::TableNextColumn();
-					ImGui::Checkbox("", &component.DisableGravity);
-
-					ImGui::PopID();
-				}
-
-				ImGui::EndTable();
-			}
-
-
-
-
-
-
-			// Constraints
-			const char* treeNodeName = "RigidBodyConstraints";
-
-			const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap;
-			bool open = ImGui::TreeNodeEx((void*)treeNodeName, treeNodeFlags, "Constraints");
-			
-
-			if (open)
-			{
-				if (ImGui::BeginTable("RigidBodyConstraintsProperties", 2, flags))
+				if (ImGui::BeginTable("RigidBodyProperties2", 2, flags))
 				{
 
 					{
-						ImGui::PushID(5);
+						ImGui::PushID(1);
 
 						ImGui::TableNextColumn();
-						ImGui::Text("Axis X");
+						ImGui::Text("Mass");
 
 						ImGui::TableNextColumn();
-						ImGui::Checkbox("", &component.LockPositionX);
+						UserInterface::DragFloat("", component.Mass, 0.3f, 0.0f, 1000000.0f);
 
 						ImGui::PopID();
 					}
 
 					{
-						ImGui::PushID(6);
+						ImGui::PushID(2);
 
 						ImGui::TableNextColumn();
-						ImGui::Text("Axis Y");
+						ImGui::Text("Linear Drag");
 
 						ImGui::TableNextColumn();
-						ImGui::Checkbox("", &component.LockPositionY);
+						UserInterface::DragFloat("", component.LinearDrag, 0.1f, 0.0f, 1000.0f);
 
 						ImGui::PopID();
 					}
 
 					{
-						ImGui::PushID(7);
+						ImGui::PushID(3);
 
 						ImGui::TableNextColumn();
-						ImGui::Text("Axis Z");
+						ImGui::Text("Angular Drag");
 
 						ImGui::TableNextColumn();
-						ImGui::Checkbox("", &component.LockPositionZ);
+						UserInterface::DragFloat("", component.AngularDrag, 0.1f, 0.0f, 1000.0f);
+
+						ImGui::PopID();
+					}
+
+					{
+						ImGui::PushID(4);
+
+						ImGui::TableNextColumn();
+						ImGui::Text("Disable Gravity");
+
+						ImGui::TableNextColumn();
+						ImGui::Checkbox("", &component.DisableGravity);
 
 						ImGui::PopID();
 					}
 
 					ImGui::EndTable();
 				}
-				ImGui::TreePop();
+
+
+
+
+
+				// Constraints
+				const char* treeNodeName = "RigidBodyConstraints";
+
+				const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap;
+				bool open = ImGui::TreeNodeEx((void*)treeNodeName, treeNodeFlags, "Constraints");
+
+
+				if (open)
+				{
+					if (ImGui::BeginTable("RigidBodyConstraintsProperties", 2, flags))
+					{
+
+						{
+							ImGui::PushID(5);
+
+							ImGui::TableNextColumn();
+							ImGui::Text("Axis X");
+
+							ImGui::TableNextColumn();
+							ImGui::Checkbox("", &component.LockPositionX);
+
+							ImGui::PopID();
+						}
+
+						{
+							ImGui::PushID(6);
+
+							ImGui::TableNextColumn();
+							ImGui::Text("Axis Y");
+
+							ImGui::TableNextColumn();
+							ImGui::Checkbox("", &component.LockPositionY);
+
+							ImGui::PopID();
+						}
+
+						{
+							ImGui::PushID(7);
+
+							ImGui::TableNextColumn();
+							ImGui::Text("Axis Z");
+
+							ImGui::TableNextColumn();
+							ImGui::Checkbox("", &component.LockPositionZ);
+
+							ImGui::PopID();
+						}
+
+						ImGui::EndTable();
+					}
+					ImGui::TreePop();
+				}
 			}
 			
 
@@ -730,6 +758,18 @@ namespace Frost
 					ImGui::PopID();
 				}
 
+				{
+					ImGui::PushID(2);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Offset");
+
+					ImGui::TableNextColumn();
+					ImGui::DragFloat3("", &component.Offset.x, 0.1f, 0.0f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
 				ImGui::EndTable();
 			}
 
@@ -754,6 +794,148 @@ namespace Frost
 
 					ImGui::PopID();
 				}
+
+				{
+					ImGui::PushID(1);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Is Trigger");
+
+					ImGui::TableNextColumn();
+					UserInterface::CheckBox("", component.IsTrigger);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(2);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Offset");
+
+					ImGui::TableNextColumn();
+					ImGui::DragFloat3("", &component.Offset.x, 0.1f, 0.0f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+
+			ImGui::PopStyleVar();
+		});
+
+
+		DrawComponent<CapsuleColliderComponent>("CAPSULE COLLIDER", entity, [&](auto& component)
+		{
+			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+			if (ImGui::BeginTable("CapsuleColliderComponent", 2, flags))
+			{
+
+				{
+					ImGui::PushID(0);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Radius");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Radius, 0.1f, 0.0f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(1);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Height");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Height, 0.1f, 0.0f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(2);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Is Trigger");
+
+					ImGui::TableNextColumn();
+					UserInterface::CheckBox("", component.IsTrigger);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(3);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Offset");
+
+					ImGui::TableNextColumn();
+					ImGui::DragFloat3("", &component.Offset.x, 0.1f, 0.0f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+
+			ImGui::PopStyleVar();
+		});
+
+		DrawComponent<MeshColliderComponent>("MESH COLLIDER", entity, [&](auto& component)
+		{
+			constexpr ImGuiTableFlags flags{};
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+			if (ImGui::BeginTable("MeshColliderProperties", 1, flags))
+			{
+				ImGui::PushID(0);
+
+				std::string componentBodyType = "Triangle";
+				if (component.IsConvex)
+					componentBodyType = "Convex";
+
+				ImGui::TableNextColumn();
+
+
+				ImGui::Text("Collider Type");
+
+				ImGui::SameLine();
+				const float width = ImGui::GetWindowWidth();
+				const float combo_width = width * 0.5f;
+
+
+				if (ImGui::BeginCombo("##meshcollidertypecombo", componentBodyType.c_str()))
+				{
+
+					bool isStaticSelected = (component.IsConvex == true);
+
+					if (ImGui::Selectable("Convex", isStaticSelected))
+						component.IsConvex = true;
+
+					if(isStaticSelected)
+						ImGui::SetItemDefaultFocus();
+
+					if (ImGui::Selectable("Triangle", !isStaticSelected))
+						component.IsConvex = false;
+
+					if (!isStaticSelected)
+						ImGui::SetItemDefaultFocus();
+
+					ImGui::EndCombo();
+				}
+				ImGui::PopID();
+
+
+				ImGui::EndTable();
+			}
+
+			if (ImGui::BeginTable("MeshColliderProperties2", 2, flags))
+			{
 
 				{
 					ImGui::PushID(1);

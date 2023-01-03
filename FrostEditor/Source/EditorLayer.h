@@ -65,5 +65,6 @@ namespace Frost
 		// Variables
 		int32_t m_GuizmoMode = -1;
 		SceneState m_SceneState = SceneState::Edit;
+		bool m_EnablePhysicsDebugging = false;
 	};
 }
