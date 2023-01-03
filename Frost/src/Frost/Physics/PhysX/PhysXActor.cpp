@@ -18,8 +18,8 @@ namespace Frost
 
 	PhysXActor::~PhysXActor()
 	{
-		m_RigidActor->release();
 		m_Colliders.clear();
+		m_RigidActor->release();
 	}
 
 	void PhysXActor::SetTranslation(const glm::vec3& translation, bool autowake /*= true*/)
@@ -278,21 +278,29 @@ namespace Frost
 		m_Colliders.push_back(Ref<PhysX::BoxColliderShape>::Create(collider, *this, entity, offset));
 	}
 
-	void PhysXActor::AddCollider(SphereColliderComponent& collider, Entity entity, const glm::vec3& offset /*= glm::vec3(0.0f)*/)
+	void PhysXActor::AddCollider(SphereColliderComponent& collider, Entity entity, const glm::vec3& offset)
 	{
 		m_Colliders.push_back(Ref<PhysX::SphereColliderShape>::Create(collider, *this, entity, offset));
+	}
+
+	void PhysXActor::AddCollider(CapsuleColliderComponent& collider, Entity entity, const glm::vec3& offset)
+	{
+		m_Colliders.push_back(Ref<PhysX::CapsuleColliderShape>::Create(collider, *this, entity, offset));
+	}
+
+	void PhysXActor::AddCollider(MeshColliderComponent& collider, Entity entity, const glm::vec3& offset)
+	{
+		if(collider.IsConvex)
+			m_Colliders.push_back(Ref<PhysX::ConvexMeshShape>::Create(collider, *this, entity, offset));
+		else
+			m_Colliders.push_back(Ref<PhysX::TriangleMeshShape>::Create(collider, *this, entity, offset));
 	}
 
 	void PhysXActor::CreateRigidActor()
 	{
 		auto& physicsHandle = PhysXInternal::GetPhysXHandle();
 
-		//Ref<Scene> scene = Scene::GetScene(m_Entity.GetSceneUUID());
-		//glm::mat4 transform = scene->GetWorldSpaceTransformMatrix(m_Entity);
 		TransformComponent& transformComponent = m_Entity.GetComponent<TransformComponent>();
-		//glm::mat4 transform = m_Entity.GetComponent<TransformComponent>().GetTransform();
-
-		
 			
 		if (m_RigidBodyData.BodyType == RigidBodyComponent::Type::Static)
 		{
@@ -327,14 +335,27 @@ namespace Frost
 
 		if (m_Entity.HasComponent<BoxColliderComponent>())
 			AddCollider(m_Entity.GetComponent<BoxColliderComponent>(), m_Entity);
+		
 		if (m_Entity.HasComponent<SphereColliderComponent>())
 			AddCollider(m_Entity.GetComponent<SphereColliderComponent>(), m_Entity);
-#if 0
+		
 		if (m_Entity.HasComponent<CapsuleColliderComponent>())
 			AddCollider(m_Entity.GetComponent<CapsuleColliderComponent>(), m_Entity);
+
 		if (m_Entity.HasComponent<MeshColliderComponent>())
-			AddCollider(m_Entity.GetComponent<MeshColliderComponent>(), m_Entity);
-#endif
+		{
+			auto& meshColliderComponent = m_Entity.GetComponent<MeshColliderComponent>();
+
+			if (m_RigidBodyData.BodyType == RigidBodyComponent::Type::Dynamic && !meshColliderComponent.IsConvex)
+			{
+				FROST_CORE_WARN("Triangle meshes can't have a dynamic rigidbody!");
+			}
+			else
+			{
+				meshColliderComponent.CollisionMesh = m_Entity.GetComponent<MeshComponent>().Mesh;
+				AddCollider(m_Entity.GetComponent<MeshColliderComponent>(), m_Entity);
+			}
+		}
 
 		SetMass(m_RigidBodyData.Mass);
 

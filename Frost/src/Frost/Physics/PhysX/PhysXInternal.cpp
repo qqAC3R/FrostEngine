@@ -7,6 +7,7 @@
 #include "Frost/EntitySystem/Components.h"
 
 #include "PhysXDebugger.h"
+#include "CookingFactory.h"
 
 namespace Frost
 {
@@ -57,8 +58,7 @@ namespace Frost
 
 
 
-		// TODO:????
-		//CookingFactory::Initialize();
+		CookingFactory::Initialize();
 
 		PxSetAssertHandler(s_PhysXData->AssertHandler);
 	}
@@ -70,17 +70,22 @@ namespace Frost
 
 	void PhysXInternal::Shutdown()
 	{
-		//CookingFactory::Shutdown();
+		CookingFactory::Shutdown();
+
+		s_PhysXData->PhysXCPUDispatcher->release();
+		s_PhysXData->PhysXCPUDispatcher = nullptr;
+
+		PxCloseExtensions();
+
+		PhysXDebugger::StopDebugging();
+
+		s_PhysXData->PhysXSDK->release();
+		s_PhysXData->PhysXSDK = nullptr;
 
 		PhysXDebugger::Shutdown();
 
 		s_PhysXData->PhysXFoundation->release();
 		s_PhysXData->PhysXFoundation = nullptr;
-
-		PxCloseExtensions();
-
-		s_PhysXData->PhysXSDK->release();
-		s_PhysXData->PhysXSDK = nullptr;
 
 		delete s_PhysXData;
 		s_PhysXData = nullptr;

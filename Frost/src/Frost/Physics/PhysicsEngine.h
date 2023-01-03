@@ -29,10 +29,14 @@ namespace Frost
 
 		static PhysicsSettings& GetSettings() { return s_Settings; }
 
+		static void EnableDebugRecording(bool enable) { m_EnableDebugRecording = enable; }
 	private:
 		static PhysicsSettings s_Settings;
 		static Ref<PhysicsScene> s_Scene;
 		static PhysicsEngine::API s_API;
+		static bool m_EnableDebugRecording;
+
+		friend class PhysXScene;
 	};
 
 }

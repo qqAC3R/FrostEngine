@@ -162,15 +162,13 @@ namespace Frost
 			float free = memoryStats.FreeMemory / 1000000.0f;
 			ImGui::Text("Used Memory: %.2f MB", used);
 			ImGui::Text("Free Memory: %.2f MB", free);
-
-			//ImGui::Separator();
-			//
-			//ImGui::Text(HeapTracker::GetResultAsString().c_str());
 		}
 		ImGui::End();
 
-		//bool open = true;
-		//ImGui::ShowDemoWindow(&open);
+#if 0
+		bool open = true;
+		ImGui::ShowDemoWindow(&open);
+#endif
 	}
 
 	void VulkanImGuiLayer::OnResize(uint32_t width, uint32_t height)

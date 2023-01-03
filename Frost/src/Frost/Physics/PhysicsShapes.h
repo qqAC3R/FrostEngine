@@ -20,7 +20,7 @@ namespace Frost
 	public:
 		virtual ~ColliderShape() {}
 
-		//void SetMaterial(AssetHandle material);
+		//void SetMaterial(material);
 
 		virtual const glm::vec3& GetOffset() const = 0;
 		virtual void SetOffset(const glm::vec3& offset) = 0;

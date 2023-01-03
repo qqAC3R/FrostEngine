@@ -54,12 +54,11 @@ namespace PhysXUtils {
 		return glm::quat(quat.w, quat.x, quat.y, quat.z);
 	}
 
-#if 0
 	CookingResult FromPhysXCookingResult(physx::PxConvexMeshCookingResult::Enum cookingResult)
 	{
 		switch (cookingResult)
 		{
-		case physx::PxConvexMeshCookingResult::eSUCCESS: return CookingResult::Success;
+		case physx::PxConvexMeshCookingResult::eSUCCESS:return CookingResult::Success;
 		case physx::PxConvexMeshCookingResult::eZERO_AREA_TEST_FAILED: return CookingResult::ZeroAreaTestFailed;
 		case physx::PxConvexMeshCookingResult::ePOLYGONS_LIMIT_REACHED: return CookingResult::PolygonLimitReached;
 		case physx::PxConvexMeshCookingResult::eFAILURE: return CookingResult::Failure;
@@ -79,7 +78,6 @@ namespace PhysXUtils {
 
 		return CookingResult::Failure;
 	}
-#endif
 
 	physx::PxBroadPhaseType::Enum PhysXUtils::GetBroadphaseType(BroadphaseType type)
 	{

@@ -18,7 +18,7 @@ namespace Frost
 		////////////////////////////////////////////////////
 
 		Ref()
-			: m_RefCount(new uint32_t(0)), m_Instance(nullptr) {}
+			: m_RefCount(nullptr), m_Instance(nullptr) {}
 
 		Ref(T* pointer)
 			: m_RefCount(new uint32_t(1)), m_Instance(pointer) {
@@ -26,7 +26,7 @@ namespace Frost
 		}
 
 		Ref(std::nullptr_t n)
-			: m_RefCount(new uint32_t(0)), m_Instance(nullptr) {}
+			: m_RefCount(nullptr), m_Instance(nullptr) {}
 
 		Ref(const Ref<T>& refPointer)
 		{
@@ -185,6 +185,11 @@ namespace Frost
 		{
 			if (m_RefCount)
 			{
+				//if (*m_RefCount == UINT32_MAX)
+				//{
+				//	return;
+				//}
+
 				if (*m_RefCount == 0)
 				{
 					delete m_RefCount;

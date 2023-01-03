@@ -205,6 +205,7 @@ namespace Frost
 		//AssetHandle Material;
 
 		// The mesh that will be drawn in the editor to show the collision bounds
+		// TODO: Add debug mesh? 
 		//Ref<Mesh> DebugMesh;
 
 		BoxColliderComponent() = default;
@@ -219,10 +220,46 @@ namespace Frost
 		//AssetHandle Material;
 
 		// The mesh that will be drawn in the editor to show the collision bounds
-		//Ref<Mesh> DebugMesh;
+		//Ref<Mesh> DebugMesh; TODO: Add debug mesh?
 
 		SphereColliderComponent() = default;
 		SphereColliderComponent(const SphereColliderComponent& other) = default;
+	};
+
+	struct CapsuleColliderComponent
+	{
+		float Radius = 0.5f;
+		float Height = 1.0f;
+		glm::vec3 Offset = { 0.0f, 0.0f, 0.0f };
+		bool IsTrigger = false;
+		//AssetHandle Material;
+
+		// TODO: Add debug mesh?
+		//Ref<Mesh> DebugMesh;
+
+		CapsuleColliderComponent() = default;
+		CapsuleColliderComponent(const CapsuleColliderComponent& other) = default;
+	};
+
+	struct MeshColliderComponent
+	{
+		//AssetHandle CollisionMesh;
+		//Vector<Ref<Mesh>> ProcessedMeshes;
+		Ref<Mesh> CollisionMesh;
+		bool IsConvex = false;
+		bool IsTrigger = false;
+		bool OverrideMesh = false; // TODO: What to do with this?
+		//AssetHandle Material;
+
+		// TODO: Add debug mesh?
+		//Ref<Mesh> DebugMesh;
+
+		MeshColliderComponent() = default;
+		MeshColliderComponent(const MeshColliderComponent& other) = default;
+		//MeshColliderComponent(AssetHandle mesh)
+		//	: CollisionMesh(mesh)
+		//{
+		//}
 	};
 
 }

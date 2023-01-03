@@ -31,23 +31,26 @@ namespace Frost
 		// Get the scene name from filepath
 		m_SceneName = GetNameFromFilepath(filepath);
 
-		nlohmann::ordered_json out;
+		nlohmann::ordered_json out = nlohmann::ordered_json();
 
-		const entt::registry::entity_type* entity = m_Scene->m_Registry.data();
-		for (size_t i = 0; i < m_Scene->m_Registry.size(); i++)
+
+		// This loop is in reversed order (because this is how the entt libraries handles each loop)
+		// so we should firstly store the entities in the reverse order in an vector, and then read that vector in reverse
+		Vector<Entity> entities;
+		m_Scene->m_Registry.each([&](auto entity)
 		{
-			Entity ent = { *entity, m_Scene.Raw() };
-			if (!ent)
-				return;
-
-			SerializeEntity(out, ent);
-
-			entity++;
+			Entity ent = { entity, m_Scene.Raw() };
+			if (ent)
+				entities.push_back(ent);
+		});
+		for (int32_t i = entities.size() - 1; i >= 0; i--)
+		{
+			SerializeEntity(out, entities[i]);
 		}
 
 		istream << out.dump(4);
 
-		istream.close();
+ 		istream.close();
 	}
 
 	void SceneSerializer::SerializeEntity(nlohmann::ordered_json& out, Entity entity)
@@ -162,6 +165,54 @@ namespace Frost
 
 			entityOut["SkyLightComponent"]["Filepath"] = skyLightComponent.Filepath;
 			entityOut["SkyLightComponent"]["IsActive"] = skyLightComponent.IsActive;
+		}
+
+		if (entity.HasComponent<RigidBodyComponent>())
+		{
+			RigidBodyComponent& rigidBodyComponent = entity.GetComponent<RigidBodyComponent>();
+
+			entityOut["RigidBodyComponent"]["BodyType"] = ((rigidBodyComponent.BodyType == RigidBodyComponent::Type::Static) ? "Static" : "Dynamic");
+			entityOut["RigidBodyComponent"]["Mass"] = rigidBodyComponent.Mass;
+			entityOut["RigidBodyComponent"]["LinearDrag"] = rigidBodyComponent.LinearDrag;
+			entityOut["RigidBodyComponent"]["AngularDrag"] = rigidBodyComponent.AngularDrag;
+			entityOut["RigidBodyComponent"]["DisableGravity"] = rigidBodyComponent.DisableGravity;
+			entityOut["RigidBodyComponent"]["IsKinematic"] = rigidBodyComponent.IsKinematic;
+		}
+
+		if (entity.HasComponent<BoxColliderComponent>())
+		{
+			BoxColliderComponent& boxColliderComponent = entity.GetComponent<BoxColliderComponent>();
+
+			entityOut["BoxColliderComponent"]["Size"] = { boxColliderComponent.Size.x, boxColliderComponent.Size.y, boxColliderComponent.Size.z };
+			entityOut["BoxColliderComponent"]["Offset"] = { boxColliderComponent.Offset.x, boxColliderComponent.Offset.y, boxColliderComponent.Offset.z };
+			entityOut["BoxColliderComponent"]["IsTrigger"] = boxColliderComponent.IsTrigger;
+		}
+
+		if (entity.HasComponent<SphereColliderComponent>())
+		{
+			SphereColliderComponent& sphereColliderComponent = entity.GetComponent<SphereColliderComponent>();
+
+			entityOut["SphereColliderComponent"]["Radius"] = sphereColliderComponent.Radius;
+			entityOut["SphereColliderComponent"]["Offset"] = { sphereColliderComponent.Offset.x, sphereColliderComponent.Offset.y, sphereColliderComponent.Offset.z };
+			entityOut["SphereColliderComponent"]["IsTrigger"] = sphereColliderComponent.IsTrigger;
+		}
+
+		if (entity.HasComponent<CapsuleColliderComponent>())
+		{
+			CapsuleColliderComponent& capsuleColliderComponent = entity.GetComponent<CapsuleColliderComponent>();
+
+			entityOut["CapsuleColliderComponent"]["Radius"] = capsuleColliderComponent.Radius;
+			entityOut["CapsuleColliderComponent"]["Height"] = capsuleColliderComponent.Height;
+			entityOut["CapsuleColliderComponent"]["Offset"] = { capsuleColliderComponent.Offset.x, capsuleColliderComponent.Offset.y, capsuleColliderComponent.Offset.z };
+			entityOut["CapsuleColliderComponent"]["IsTrigger"] = capsuleColliderComponent.IsTrigger;
+		}
+
+		if (entity.HasComponent<MeshColliderComponent>())
+		{
+			MeshColliderComponent& meshColliderComponent = entity.GetComponent<MeshColliderComponent>();
+
+			entityOut["MeshColliderComponent"]["IsConvex"] = meshColliderComponent.IsConvex;
+			entityOut["MeshColliderComponent"]["IsTrigger"] = meshColliderComponent.IsTrigger;
 		}
 
 		if (entity.HasComponent<DirectionalLightComponent>())
@@ -540,6 +591,63 @@ namespace Frost
 				}
 			}
 
+			// Rigid Body Component
+			if (!entity["RigidBodyComponent"].is_null())
+			{
+				RigidBodyComponent& rigidBodyComponent = ent.AddComponent<RigidBodyComponent>();
+				nlohmann::json rigidBodyIn = entity["RigidBodyComponent"];
+
+				rigidBodyComponent.BodyType = rigidBodyIn["BodyType"] == "Static" ? RigidBodyComponent::Type::Static : RigidBodyComponent::Type::Dynamic;
+				rigidBodyComponent.Mass = rigidBodyIn["Mass"];
+				rigidBodyComponent.LinearDrag = rigidBodyIn["LinearDrag"];
+				rigidBodyComponent.AngularDrag = rigidBodyIn["AngularDrag"];
+				rigidBodyComponent.DisableGravity = rigidBodyIn["DisableGravity"];
+				rigidBodyComponent.IsKinematic = rigidBodyIn["IsKinematic"];
+			}
+
+			// Box Collider Component
+			if (!entity["BoxColliderComponent"].is_null())
+			{
+				BoxColliderComponent& boxColliderComponent = ent.AddComponent<BoxColliderComponent>();
+				nlohmann::json boxColliderIn = entity["BoxColliderComponent"];
+
+				boxColliderComponent.Size = { boxColliderIn["Size"][0], boxColliderIn["Size"][1], boxColliderIn["Size"][2] };
+				boxColliderComponent.Offset = { boxColliderIn["Offset"][0], boxColliderIn["Offset"][1], boxColliderIn["Offset"][2] };
+				boxColliderComponent.IsTrigger = boxColliderIn["IsTrigger"];
+			}
+
+			// Sphere Collider Component
+			if (!entity["SphereColliderComponent"].is_null())
+			{
+				SphereColliderComponent& sphereColliderComponent = ent.AddComponent<SphereColliderComponent>();
+				nlohmann::json sphereColliderIn = entity["SphereColliderComponent"];
+
+				sphereColliderComponent.Radius = sphereColliderIn["Radius"];
+				sphereColliderComponent.Offset = { sphereColliderIn["Offset"][0], sphereColliderIn["Offset"][1], sphereColliderIn["Offset"][2] };
+				sphereColliderComponent.IsTrigger = sphereColliderIn["IsTrigger"];
+			}
+
+			// Capsule Collider Component
+			if (!entity["CapsuleColliderComponent"].is_null())
+			{
+				CapsuleColliderComponent& capsuleColliderComponent = ent.AddComponent<CapsuleColliderComponent>();
+				nlohmann::json capsuleColliderIn = entity["CapsuleColliderComponent"];
+
+				capsuleColliderComponent.Radius = capsuleColliderIn["Radius"];
+				capsuleColliderComponent.Height = capsuleColliderIn["Height"];
+				capsuleColliderComponent.Offset = { capsuleColliderIn["Offset"][0], capsuleColliderIn["Offset"][1], capsuleColliderIn["Offset"][2] };
+				capsuleColliderComponent.IsTrigger = capsuleColliderIn["IsTrigger"];
+			}
+
+			// Mesh Collider Component
+			if (!entity["MeshColliderComponent"].is_null())
+			{
+				MeshColliderComponent& meshColliderComponent = ent.AddComponent<MeshColliderComponent>();
+				nlohmann::json meshColliderIn = entity["MeshColliderComponent"];
+
+				meshColliderComponent.IsConvex = meshColliderIn["IsConvex"];
+				meshColliderComponent.IsTrigger = meshColliderIn["IsTrigger"];
+			}
 
 			// Directional Light Component
 			if (!entity["DirectionalLightComponent"].is_null())

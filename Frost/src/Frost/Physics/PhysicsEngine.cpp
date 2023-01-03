@@ -8,6 +8,7 @@ namespace Frost
 	PhysicsSettings PhysicsEngine::s_Settings;
 	Ref<PhysicsScene> PhysicsEngine::s_Scene;
 	PhysicsEngine::API PhysicsEngine::s_API = PhysicsEngine::API::PhysX;
+	bool PhysicsEngine::m_EnableDebugRecording = false;
 
 	void PhysicsEngine::Initialize()
 	{

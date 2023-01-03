@@ -130,7 +130,7 @@ namespace Frost
 	{
 	private:
 		// The constructor is private for several reasons, firstly beacuse here we pass some custom settings for the mesh to be built,
-		// and that should be done only internally. The user shouldn't access any of that, instead there is the `Load` function which just needs the filepath
+		// and that should be done only internally. The user shouldn't access any of that, instead there is the `Load` function which just requires the filepath
 		struct MeshBuildSettings;
 		Mesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings = {});
 	public:
@@ -178,7 +178,6 @@ namespace Frost
 
 		static Ref<Mesh> LoadCustomMesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings = {});
 	private:
-
 		std::string m_Filepath;
 		bool m_IsLoaded;
 		bool m_IsAnimated;
@@ -233,7 +232,7 @@ namespace Frost
 
 		struct MeshBuildSettings
 		{
-			bool LoadMaterials = true; // Mostly for serialization
+			bool LoadMaterials = true; // Mostly for serialization (it loads materials internally)
 			bool CreateBottomLevelStructure = true; // For ray tracing
 		};
 

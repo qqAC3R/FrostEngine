@@ -6,6 +6,7 @@
 #include "PhysXActor.h"
 #include "PhysXUtils.h"
 #include "PhysXDebugger.h"
+#include "Frost/Physics/PhysicsEngine.h"
 
 namespace Frost
 {
@@ -35,12 +36,15 @@ namespace Frost
 
 		// Create Regions?
 
-		PhysXDebugger::StartDebugging("PhysXScene", true);
+
+		if(PhysicsEngine::m_EnableDebugRecording)
+			PhysXDebugger::StartDebugging("PhysXScene", true);
 	}
 
 	PhysXScene::~PhysXScene()
 	{
-		m_PhysXScene->release();
+		Destroy();
+		//m_PhysXScene->release();
 	}
 
 	void PhysXScene::Simulate(float ts, bool callFixedUpdate)
@@ -92,8 +96,8 @@ namespace Frost
 		}
 
 		m_PhysXScene->removeActor(*physxActor->m_RigidActor);
-		physxActor->m_RigidActor->release();
-		physxActor->m_RigidActor = nullptr;
+		//physxActor->m_RigidActor->release();
+		//physxActor->m_RigidActor = nullptr;
 
 		for (auto it = m_Actors.begin(); it != m_Actors.end(); it++)
 		{
@@ -121,7 +125,8 @@ namespace Frost
 		m_PhysXScene->release();
 		m_PhysXScene = nullptr;
 
-		PhysXDebugger::StopDebugging();
+		if (PhysicsEngine::m_EnableDebugRecording)
+			PhysXDebugger::StopDebugging();
 	}
 
 	void PhysXScene::Advance(float ts)

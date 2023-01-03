@@ -42,6 +42,7 @@ namespace Frost
 		{
 			layer->OnDetach();
 		}
+		PhysicsEngine::ShutDown();
 		Renderer::ShutDown();
 	}
 

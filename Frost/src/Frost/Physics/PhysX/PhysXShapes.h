@@ -71,4 +71,95 @@ namespace Frost::PhysX
 		physx::PxMaterial* m_Material;
 	};
 
+	class CapsuleColliderShape : public ColliderShape
+	{
+	public:
+		CapsuleColliderShape(CapsuleColliderComponent& component, const PhysXActor& actor, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
+		~CapsuleColliderShape();
+
+		// TODO: Physics Materials
+		//void SetMaterial(AssetHandle material);
+
+		// TODO: Add layers
+		//virtual void SetFilterData(const physx::PxFilterData& filterData) override;
+
+		virtual const glm::vec3& GetOffset() const override { return m_Component.Offset; }
+		virtual void SetOffset(const glm::vec3& offset) override;
+
+		virtual bool IsTrigger() const override { return m_Component.IsTrigger; }
+		virtual void SetTrigger(bool isTrigger) override;
+
+		//void DetachFromActor(physx::PxRigidActor* actor);
+		virtual void DetachFromActor(Ref<PhysicsActor> actor) override;
+
+	private:
+		CapsuleColliderComponent& m_Component;
+		physx::PxShape* m_Shape;
+
+		physx::PxMaterial* m_Material;
+	};
+
+
+
+	class ConvexMeshShape : public ColliderShape
+	{
+	public:
+		ConvexMeshShape(MeshColliderComponent& component, const PhysXActor& actor, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
+		~ConvexMeshShape();
+
+		// TODO: Physics Materials
+		//void SetMaterial(AssetHandle material);
+
+		// TODO: Add layers
+		//virtual void SetFilterData(const physx::PxFilterData& filterData) override;
+
+		// TODO?
+		virtual const glm::vec3& GetOffset() const override { return glm::vec3(0.0f); }
+		virtual void SetOffset(const glm::vec3& offset) override {}
+
+		virtual bool IsTrigger() const override { return m_Component.IsTrigger; }
+		virtual void SetTrigger(bool isTrigger) override;
+
+		//void DetachFromActor(physx::PxRigidActor* actor);
+		virtual void DetachFromActor(Ref<PhysicsActor> actor) override;
+
+	private:
+		MeshColliderComponent& m_Component;
+		Vector<physx::PxShape*> m_Shapes;
+
+		physx::PxMaterial* m_Material;
+	};
+
+
+	class TriangleMeshShape : public ColliderShape
+	{
+	public:
+		TriangleMeshShape(MeshColliderComponent& component, const PhysXActor& actor, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
+		~TriangleMeshShape();
+
+		// TODO: Physics Materials
+		//void SetMaterial(AssetHandle material);
+
+		// TODO: Add layers
+		//virtual void SetFilterData(const physx::PxFilterData& filterData) override;
+
+		// TODO?
+		virtual const glm::vec3& GetOffset() const override { return glm::vec3(0.0f); }
+		virtual void SetOffset(const glm::vec3& offset) override {}
+
+		virtual bool IsTrigger() const override { return m_Component.IsTrigger; }
+		virtual void SetTrigger(bool isTrigger) override;
+
+		//void DetachFromActor(physx::PxRigidActor* actor);
+		virtual void DetachFromActor(Ref<PhysicsActor> actor) override;
+
+	private:
+		MeshColliderComponent& m_Component;
+		Vector<physx::PxShape*> m_Shapes;
+
+		physx::PxMaterial* m_Material;
+	};
+	
+
+
 }

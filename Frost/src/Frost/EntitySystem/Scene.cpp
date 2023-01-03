@@ -276,6 +276,7 @@ namespace Frost
 
 	void Scene::DestroyEntity(Entity entity)
 	{
+		
 		ParentChildComponent& pcc = entity.GetComponent<ParentChildComponent>();
 
 		// Remove the current entity from the parent
@@ -299,7 +300,7 @@ namespace Frost
 			}
 		}
 
-		//UnparentEntity(entity);
+		m_EntityIDMap.erase(entity.GetComponent<IDComponent>().ID);
 		m_Registry.destroy(entity.Raw());
 	}
 
@@ -365,6 +366,8 @@ namespace Frost
 		CopyComponent<RigidBodyComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<BoxColliderComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<SphereColliderComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<CapsuleColliderComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<MeshColliderComponent>(target->m_Registry, m_Registry, enttMap);
 
 		// Sort IdComponent by by entity handle (which is essentially the order in which they were created)
 		// This ensures a consistent ordering when iterating IdComponent (for example: when rendering scene hierarchy panel)

@@ -10,6 +10,15 @@ namespace Frost
 	enum class BroadphaseType;
 	enum class FrictionType;
 
+	enum class CookingResult
+	{
+		Success,
+		ZeroAreaTestFailed,
+		PolygonLimitReached,
+		LargeTriangle,
+		Failure
+	};
+
 	namespace PhysXUtils
 	{
 
@@ -27,8 +36,8 @@ namespace Frost
 		glm::vec4 FromPhysXVector(const physx::PxVec4& vector);
 		glm::quat FromPhysXQuat(const physx::PxQuat& quat);
 
-		//CookingResult FromPhysXCookingResult(physx::PxConvexMeshCookingResult::Enum cookingResult);
-		//CookingResult FromPhysXCookingResult(physx::PxTriangleMeshCookingResult::Enum cookingResult);
+		CookingResult FromPhysXCookingResult(physx::PxConvexMeshCookingResult::Enum cookingResult);
+		CookingResult FromPhysXCookingResult(physx::PxTriangleMeshCookingResult::Enum cookingResult);
 
 		physx::PxBroadPhaseType::Enum GetBroadphaseType(BroadphaseType type);
 		physx::PxFrictionType::Enum GetPhysXFrictionType(FrictionType type);

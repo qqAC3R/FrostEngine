@@ -62,9 +62,9 @@ namespace Frost
 
 		void AddCollider(BoxColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
 		void AddCollider(SphereColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
-#if 0
 		void AddCollider(CapsuleColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
 		void AddCollider(MeshColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
+#if 0
 #endif
 
 		virtual void* GetInternalAPIActor() const override { return (void*)&m_RigidActor; }

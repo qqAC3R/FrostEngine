@@ -11,6 +11,8 @@ namespace Frost
 	class PhysicsActor
 	{
 	public:
+		virtual ~PhysicsActor() {}
+
 		static Ref<PhysicsActor> Create(Entity entity);
 
 		virtual glm::vec3 GetTranslation() const = 0;

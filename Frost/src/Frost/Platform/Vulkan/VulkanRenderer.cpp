@@ -150,14 +150,30 @@ namespace Frost
 	{
 		/// Init scene render passes
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
+
+		// Render all the neccesary data into a G-Buffer
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanGeometryPass>::Create());
+
+		// Render the cascaded shadow maps and compute a shadow texture
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanShadowPass>::Create());
+
+		// Voxelize the scene into a 3D texture and then compute Voxel GI
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanVoxelizationPass>::Create());
+
+		// Put everything together to get a PBR looking image
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanCompositePass>::Create());
+
+		// Compute volumetrics (Volumetrics on Froxels and Clouds)
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanVolumetricPass>::Create());
+
+		// Add Post Processing effects to the final image (Bloom, SSR, AO, Color correction)
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanPostFXPass>::Create());
-		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputePass>::Create());
-		//s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
+
+#if 0
+		// Depracated
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputePass>::Create());
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
+#endif
 
 		/// Late init for scene render passes
 		s_Data->SceneRenderPasses->InitLateRenderPasses();

@@ -10,6 +10,8 @@ namespace Frost
 	class PhysicsScene
 	{
 	public:
+		virtual ~PhysicsScene() {}
+
 		virtual void Simulate(float ts, bool callFixedUpdate = true) = 0;
 
 		virtual Ref<PhysicsActor> GetActor(Entity entity) = 0;

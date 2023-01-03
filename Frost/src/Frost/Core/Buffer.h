@@ -51,6 +51,14 @@ namespace Frost
 			return *(T*)((Byte*)Data + offset);
 		}
 
+		Byte* ReadBytes(uint32_t size, uint32_t offset)
+		{
+			FROST_ASSERT(int32_t((offset + size) <= Size), "Buffer overflow!");
+			Byte* buffer = new Byte[size];
+			memcpy(buffer, (Byte*)Data + offset, size);
+			return buffer;
+		}
+
 		void Write(void* data, uint32_t size, uint32_t offset = 0)
 		{
 			FROST_ASSERT(!(offset + size > Size), "Buffer overflow!");
