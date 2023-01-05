@@ -76,68 +76,6 @@ namespace Frost
 		m_LogicalDevice->Init(m_PhysicalDevice);
 		LoadVulkanFunctionPointers();
 
-
-#if 0
-		const uint32_t appVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
-		const uint32_t apiVersion = VK_MAKE_API_VERSION(0, 1, 2, 0);
-	
-		vkb::InstanceBuilder instance_builder;
-		instance_builder.set_app_name("Frost Engine");
-		instance_builder.set_app_version(appVersion);
-		instance_builder.require_api_version(apiVersion);
-#ifdef FROST_DEBUG
-		instance_builder.set_debug_callback(Utils::DebugCallback);
-		instance_builder.enable_validation_layers(true);
-		instance_builder.enable_layer("VK_LAYER_LUNARG_monitor");
-#endif
-
-
-		m_SupportedInstanceExtensions = {
-			VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-			VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-			VK_KHR_SURFACE_EXTENSION_NAME,
-			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-			VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
-		};
-
-		auto sysInfo = vkb::SystemInfo::get_system_info().value();
-
-
-		// Print all available extensions
-		FROST_CORE_TRACE("Instance extensions: ");
-		for (auto& extension : sysInfo.available_extensions)
-		{
-			FROST_CORE_TRACE(" || {0}", extension.extensionName);
-		}
-
-		// Add all available extensions
-		for (auto ext : m_SupportedInstanceExtensions)
-		{
-			if (!sysInfo.is_extension_available(ext))
-			{
-				FROST_CORE_CRITICAL("{0} is not available!\n", ext);
-				FROST_ASSERT(false, "Assert requested!");
-				continue;
-			}
-			instance_builder.enable_extension(ext);
-		}
-
-		// Build the instance
-		auto inst_ret = instance_builder.build();
-		if (!inst_ret)
-		{
-			FROST_CORE_CRITICAL("Failed to create Vulkan instance. Error: {0}", inst_ret.error().message());
-		}
-
-		vkb::Instance instance = inst_ret.value();
-		m_Instance = instance.instance;
-		m_DebugMessenger = instance.debug_messenger;
-		
-		//m_PhysicalDevice = CreateScope<VulkanPhysicalDevice>(instance);
-#endif
-
-		//m_LogicalDevice->Init(m_Instance, m_DebugMessenger);
-		//m_Device->Init(m_PhysicalDevice);
 		m_SwapChain = CreateScope<VulkanSwapChain>(m_Window);
 		VulkanAllocator::Init();
 		VulkanBindlessAllocator::Init();

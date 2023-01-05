@@ -20,7 +20,6 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
-//#include <cmath>
 #include <filesystem>
 
 #define MAX_BONES 400
@@ -78,7 +77,6 @@ namespace Frost
 		if (m_IsAnimated)
 		{
 			m_Skeleton = CreateRef<MeshSkeleton>(scene);
-			//m_AnimationController = CreateRef<AnimationController>();
 		}
 
 
@@ -334,7 +332,6 @@ namespace Frost
 		{
 			m_Textures.reserve(scene->mNumMaterials);
 			m_TexturesFilepaths.resize(scene->mNumMaterials);
-			//m_Materials.resize(scene->mNumMaterials);
 			m_MaterialData.resize(scene->mNumMaterials);
 
 			for (uint32_t i = 0; i < scene->mNumMaterials; i++)
@@ -377,9 +374,6 @@ namespace Frost
 				auto aiMaterial = scene->mMaterials[i];
 				auto aiMaterialName = aiMaterial->GetName();
 
-				//auto mi = Material::Create(m_MeshShader, aiMaterialName.data);
-				//m_Materials[i] = mi;
-				
 				uint32_t textureCount = aiMaterial->GetTextureCount(aiTextureType_DIFFUSE);
 
 				aiColor3D aiColor, aiEmission;
@@ -388,14 +382,12 @@ namespace Frost
 				{
 					glm::vec3 materialColor = { aiColor.r, aiColor.g, aiColor.b };
 
-					//mi->Set("u_MaterialUniform.AlbedoColor", materialColor);
 					m_MaterialData[i].Set("AlbedoColor", glm::vec4(materialColor, 1.0f));
 				}
 
 				// Geting the emission factor
 				if (aiMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, aiEmission) == AI_SUCCESS)
 				{
-					////mi->Set("u_MaterialUniform.Emission", aiEmission.r);
 					m_MaterialData[i].Set("EmissionFactor", aiEmission.r);
 				}
 
@@ -445,10 +437,10 @@ namespace Frost
 					else
 					{
 						FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
-
+	
 						uint32_t textureId = m_TextureAllocatorSlots[albedoTextureIndex];
 						m_Textures[textureId] = whiteTexture;
-
+						
 						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 				}
@@ -486,7 +478,6 @@ namespace Frost
 					else
 					{
 						FROST_CORE_ERROR("Couldn't load albedo texture: {0}", texturePath);
-						
 						uint32_t textureId = m_TextureAllocatorSlots[normalMapTextureIndex];
 						m_Textures[textureId] = whiteTexture;
 
@@ -585,15 +576,16 @@ namespace Frost
 						}
 					}
 
-					if (!metalnessTextureFound)
-					{
-						uint32_t textureId = m_TextureAllocatorSlots[metalnessTextureIndex];
-						m_Textures[textureId] = whiteTexture;
-						
-						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-					}
-
 				}
+
+				if (!metalnessTextureFound)
+				{
+					uint32_t textureId = m_TextureAllocatorSlots[metalnessTextureIndex];
+					m_Textures[textureId] = whiteTexture;
+
+					VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
+				}
+
 			}
 		}
 		else

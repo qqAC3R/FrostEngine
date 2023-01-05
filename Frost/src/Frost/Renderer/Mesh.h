@@ -21,10 +21,6 @@ namespace Assimp
 
 namespace Frost
 {
-	//class Animation;
-	//class MeshSkeleton;
-	//class AnimationController;
-
 	struct Vertex
 	{
 		glm::vec3 Position;
@@ -69,21 +65,12 @@ namespace Frost
 		uint32_t V1, V2, V3;
 	};
 
-	//struct BoneInfo
-	//{
-	//	glm::mat4 BoneOffset;
-	//	glm::mat4 FinalBoneTransform;
-	//};
-
 	struct BoneInfo
 	{
-		//ozz::math::Float4x4 InverseBindPose;
 		glm::mat4 InverseBindPose;
 		uint32_t JointIndex;
 
 		BoneInfo(glm::mat4 inverseBindPose, uint32_t jointIndex) : InverseBindPose(inverseBindPose), JointIndex(jointIndex) {}
-		
-		//BoneInfo(ozz::math::Float4x4 inverseBindPose, uint32_t jointIndex) : InverseBindPose(inverseBindPose), JointIndex(jointIndex) {}
 	};
 
 	// Used by RT for now, tho I'll need to change it

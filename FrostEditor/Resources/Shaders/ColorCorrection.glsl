@@ -9,6 +9,10 @@ layout(binding = 2) uniform sampler2D u_SSRTexture;
 layout(binding = 3) uniform sampler2D u_AOTexture;
 layout(binding = 4) uniform sampler2D u_VolumetricTexture;
 layout(binding = 5) uniform sampler2D u_CloudComputeTex;
+
+// This texture is responsible for firstly adding up the bloom factor (without tone mapping)
+// and then in the SSR we use it for tracing. In the last stage we just add the SSR and do tone mapping.
+// We need 2 textures, because if we had only 1, then we would do tone mapping twice (once for the basic image, then when tracing we will be using the tone mapped texture, and so when we add the SSR on the final tone mapped texture, it will add the tone mapping twice).
 layout(binding = 6, rgba8) uniform writeonly image2D o_Texture_ForSSR;
 layout(binding = 7, rgba8) uniform writeonly image2D o_Texture_Final;
 

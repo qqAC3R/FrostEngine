@@ -51,7 +51,8 @@ namespace Frost
 
 		Renderer::SubmitImageToOutputImageMap("Albedo", [this]() -> Ref<Image2D>
 		{
-			return this->m_Data->GeometryRenderPass->GetColorAttachment(2, 0);
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			return this->m_Data->GeometryRenderPass->GetColorAttachment(2, currentFrameIndex);
 		});
 	}
 

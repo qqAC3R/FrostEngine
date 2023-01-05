@@ -88,6 +88,8 @@ namespace Frost
 		static void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
 		static void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale);
 		static void SetSky(const SkyLightComponent& skyLightComponent);
+		static void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, glm::vec4& color);
+		static void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture);
 
 		// We would request a function returning a texture, instead of texture,
 		// because the renderer has 3 frames in flight
@@ -128,6 +130,7 @@ namespace Frost
 		static Ref<Texture2D> GetNoiseLut();
 		static Ref<Texture2D> GetSpatialBlueNoiseLut();
 		static Ref<Texture2D> GetTemporalNoiseLut();
+		static Ref<Texture2D> GetInternalEditorIcon(const std::string& name);
 
 		static Ref<ShaderLibrary> GetShaderLibrary();
 		static Ref<SceneEnvironment> GetSceneEnvironment();
@@ -145,6 +148,7 @@ namespace Frost
 		static RenderCommandQueue& GetRenderCommandQueue();
 	private:
 		static RenderCommandQueue& GetDeletionCommandQueue();
+		static void InitEditorIcons();
 	private:
 		static RendererAPI* s_RendererAPI;
 		static RendererSettings s_RendererSettings;

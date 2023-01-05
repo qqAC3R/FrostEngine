@@ -17,6 +17,7 @@ namespace Frost
 		Ref<Texture2D> m_TemporalBlueNoiseLut;
 		Ref<SceneEnvironment> m_Environment;
 		HashMap<std::string, std::function<Ref<Image2D>()>> m_OutputImageMap;
+		HashMap<std::string, Ref<Texture2D>> EditorIcons;
 	};
 
 	RendererAPI* Renderer::s_RendererAPI = nullptr;
@@ -88,6 +89,7 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudPerlinNoise.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudWoorleyNoise.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudComputeVolumetric.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BatchRenderer.glsl");
 
 		
 		// Init the pools
@@ -113,6 +115,8 @@ namespace Frost
 		textureSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
 		textureSpec.Format = ImageFormat::RG32F;
 		s_Data->m_NoiseLut = Texture2D::Create("Resources/LUT/Noise.png", textureSpec);
+
+		InitEditorIcons();
 
 		// Environment cubemaps
 		s_Data->m_Environment = SceneEnvironment::Create();
@@ -166,6 +170,16 @@ namespace Frost
 		{
 			s_Data->m_Environment->SetHDREnvironmentMap(skyLightComponent.RadianceMap, skyLightComponent.PrefilteredMap, skyLightComponent.IrradianceMap);
 		}
+	}
+
+	void Renderer::SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, glm::vec4& color)
+	{
+		s_RendererAPI->SubmitBillboards(positon, size, color);
+	}
+
+	void Renderer::SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture)
+	{
+		s_RendererAPI->SubmitBillboards(positon, size, texture);
 	}
 
 	void Renderer::SubmitImageToOutputImageMap(const std::string& name, const std::function<Ref<Image2D>()>& func)
@@ -228,6 +242,11 @@ namespace Frost
 		return s_Data->m_TemporalBlueNoiseLut;
 	}
 
+	Ref<Texture2D> Renderer::GetInternalEditorIcon(const std::string& name)
+	{
+		return s_Data->EditorIcons[name];
+	}
+
 	void Renderer::ExecuteCommandBuffer()
 	{
 		s_CommandQueue->Execute();
@@ -246,6 +265,18 @@ namespace Frost
 	RenderCommandQueue& Renderer::GetDeletionCommandQueue()
 	{
 		return *s_DeletionCommandQueue;
+	}
+
+	void Renderer::InitEditorIcons()
+	{
+		TextureSpecification textureSpec{};
+		textureSpec.Usage = ImageUsage::ReadOnly;
+		textureSpec.Format = ImageFormat::RGBA16F;
+		textureSpec.UseMips = false;
+
+		s_Data->EditorIcons["PointLight"] = Texture2D::Create("Resources/Editor/PointLight.png", textureSpec);
+		s_Data->EditorIcons["DirectionalLight"] = Texture2D::Create("Resources/Editor/DirectionalLight.png", textureSpec);
+		s_Data->EditorIcons["SceneCamera"] = Texture2D::Create("Resources/Editor/SceneCamera.png", textureSpec);
 	}
 
 	Ref<RendererDebugger> RendererDebugger::Create()

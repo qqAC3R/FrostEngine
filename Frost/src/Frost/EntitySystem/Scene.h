@@ -49,6 +49,8 @@ namespace Frost
 		void UpdateDirectionalLight(Timestep ts);
 		void UpdateBoxFogVolumes(Timestep ts);
 		void UpdateCloudVolumes(Timestep ts);
+		// This is only for editor mode, for rendering billboards for cameras (in play mode we shouldn't see camera icon)
+		void UpdateSceneCameras(Timestep ts);
 	private:
 		entt::registry m_Registry;
 		EntityMap m_EntityIDMap;

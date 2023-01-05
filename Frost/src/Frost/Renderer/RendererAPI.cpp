@@ -78,6 +78,28 @@ namespace Frost
 		});
 	}
 
+	void RenderQueue::AddBillBoard(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color)
+	{
+		m_BatchRendererData.push_back({
+			Object2D::ObjectType::Billboard,
+			positon,
+			size,
+			color,
+			nullptr
+		});
+	}
+
+	void RenderQueue::AddBillBoard(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture)
+	{
+		m_BatchRendererData.push_back({
+			Object2D::ObjectType::Billboard,
+			positon,
+			size,
+			glm::vec4(1.0f),
+			texture
+		});
+	}
+
 	void RenderQueue::SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction)
 	{
 		m_LightData.DirLight.Specification = directionalLight;
@@ -91,6 +113,7 @@ namespace Frost
 		m_LightData.PointLights.clear();
 		m_FogVolumeData.clear();
 		m_CloudVolumeData.clear();
+		m_BatchRendererData.clear();
 		CameraViewMatrix = glm::mat4(1.0f);
 		CameraProjectionMatrix = glm::mat4(1.0f);
 	}

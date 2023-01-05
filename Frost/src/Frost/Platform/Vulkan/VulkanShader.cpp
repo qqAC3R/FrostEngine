@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <shaderc/shaderc.hpp>
 #include <spirv-tools/optimizer.hpp>
-//#include <yaml-cpp/yaml.h>
 
 #include <json/nlohmann/json.hpp>
 
@@ -339,16 +338,6 @@ namespace Frost
 
 		{
 			// Hashing the new shader
-			//std::ifstream instream(m_Filepath, std::ios::in | std::ios::binary);
-			//std::string result;
-			//instream.seekg(0, std::ios::end);
-			//size_t size = instream.tellg();
-			//if (size != -1)
-			//{
-			//	result.resize(size);
-			//	instream.seekg(0, std::ios::beg);
-			//	instream.read(&result[0], size);
-			//}
 			m_ShaderSourceHashCode = std::hash<std::string>{}(m_ShaderSource);
 			FROST_CORE_INFO("{0} shader hash code: {1}", m_Name, m_ShaderSourceHashCode);
 		}
@@ -426,7 +415,12 @@ namespace Frost
 			vkDestroyShaderModule(device, shaderModule.second, nullptr);
 		
 		for (auto descriptorSetLayout : m_DescriptorSetLayouts)
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayout.second, nullptr);
+		{
+			// Firstly check if the descriptor set layout is the bindless one, if it is, then don't delete it
+			// because it will be deleted at the end of the program by the bindless allocator (which created it)
+			if(descriptorSetLayout.second != VulkanBindlessAllocator::GetVulkanDescriptorSetLayout())
+				vkDestroyDescriptorSetLayout(device, descriptorSetLayout.second, nullptr);
+		}
 
 		m_ShaderModules.clear();
 	}

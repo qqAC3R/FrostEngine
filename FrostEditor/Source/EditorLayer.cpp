@@ -38,7 +38,7 @@ namespace Frost
 		Application::Get().GetWindow().SetWindowProjectName("Untilted scene");
 
 		m_EditorCamera = Ref<EditorCamera>::Create(85.0, 1600.0f / 900.0f, 0.1f, 2000.0f);
-#if 1
+	
 		// Scene initialization
 		m_EditorScene = Ref<Scene>::Create();
 		m_CurrentScene = m_EditorScene;
@@ -78,14 +78,13 @@ namespace Frost
 			auto& directionalLight = m_CurrentScene->CreateEntity("Directional Light");
 			auto& directionalLightComponent = directionalLight.AddComponent<DirectionalLightComponent>();
 			TransformComponent& ts = directionalLight.GetComponent<TransformComponent>();
+			ts.Translation = { 0.0f, 1.0f, 0.0f };
 			ts.Rotation = { -90.0f, 0.0f, 0.0f };
 		}
-#endif
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
-#if 1
 		if (m_SceneState == SceneState::Play)
 		{
 			CameraComponent* primaryCamera = m_CurrentScene->GetPrimaryCamera();
@@ -118,12 +117,10 @@ namespace Frost
 
 		
 		Renderer::EndScene();
-#endif
 	}
 
 	void EditorLayer::OnImGuiRender()
 	{
-#if 1
 		Renderer::Submit([&]()
 		{
 			static bool dockSpaceOpen = true;
@@ -322,7 +319,6 @@ namespace Frost
 
 			m_ViewportPanel->EndRender();
 		});
-#endif
 	}
 
 	void EditorLayer::NewScene()
@@ -397,11 +393,9 @@ namespace Frost
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& event) { return OnKeyPressed(event); });
 
-#if 0
 		m_EditorCamera->OnEvent(event);
 		m_SceneHierarchyPanel->OnEvent(event);
 		m_InspectorPanel->OnEvent(event);
-#endif
 	}
 
 	bool EditorLayer::OnKeyPressed(KeyPressedEvent& event)

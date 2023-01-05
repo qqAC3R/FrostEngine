@@ -52,7 +52,7 @@ layout(push_constant) uniform Constants
 	mat4 ViewMatrix;
 	uint64_t VertexBufferBDA;
 	uint64_t BoneInformationBDA;
-	uint MaterialIndex;
+	uint MaterialIndex; // Global material index
 	uint IsAnimated;
 } u_PushConstant;
 

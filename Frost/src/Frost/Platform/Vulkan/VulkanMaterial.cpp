@@ -6,7 +6,6 @@
 #include "Frost/Platform/Vulkan/VulkanShader.h"
 #include "Frost/Platform/Vulkan/VulkanTexture.h"
 #include "Frost/Platform/Vulkan/VulkanImage.h"
-#include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanBufferDevice.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanUniformBuffer.h"
 #include "Frost/Platform/Vulkan/RayTracing/VulkanAccelerationStructure.h"

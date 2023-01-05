@@ -18,14 +18,15 @@ namespace Frost
 
 	// Static members
 	std::unordered_map<uint32_t, WeakRef<Texture2D>> VulkanBindlessAllocator::m_TextureSlots;
-	
+	std::queue<uint32_t> VulkanBindlessAllocator::m_EmptyTextureSlots;
+
 	// Vulkan specific
 	HashMap<uint32_t, VkDescriptorSet> VulkanBindlessAllocator::m_DescriptorSet;
 	VkDescriptorSetLayout VulkanBindlessAllocator::m_DescriptorSetLayout;
 	VkDescriptorPool VulkanBindlessAllocator::m_DescriptorPool;
 	uint32_t VulkanBindlessAllocator::m_DescriptorSetNumber = 1;
 	uint32_t VulkanBindlessAllocator::m_DefaultTextureID = 0; // For white texture
-	uint32_t VulkanBindlessAllocator::m_TextureMaxStorage = std::pow(2, 11); // 1024
+	uint32_t VulkanBindlessAllocator::m_TextureMaxStorage = std::pow(2, 11); // 2048
 
 	// std
 	static std::random_device s_RandomDevice;
@@ -110,6 +111,21 @@ namespace Frost
 	{
 		uint32_t descriptorSetLocation = UINT32_MAX;
 
+#if 0
+		// Check firstly if we have empty slots from previous deleted texture, if so then reuse them!
+		// ( We can use the term - Recycle :D )
+		if (!m_EmptyTextureSlots.empty())
+		{
+			uint32_t emptyTextureSlot = m_EmptyTextureSlots.front();
+			AddTextureCustomSlot(texture2d, emptyTextureSlot);
+			m_EmptyTextureSlots.pop();
+
+			FROST_CORE_WARN(emptyTextureSlot);
+
+			return emptyTextureSlot;
+		}
+#endif
+
 		// While loop till we find a empty texture slot
 		while (true)
 		{
@@ -166,7 +182,11 @@ namespace Frost
 
 	void VulkanBindlessAllocator::RemoveTextureCustomSlot(uint32_t slot)
 	{
+		if (slot == VulkanBindlessAllocator::GetWhiteTextureID()) return; // We cannot delete the default texture
+
 		m_TextureSlots[slot] = nullptr;
+		m_TextureSlots.erase(slot);
+		//m_EmptyTextureSlots.push(slot);
 	}
 
 	void VulkanBindlessAllocator::AddTextureInternal(uint32_t slot, const Ref<Texture2D>& texture2d)
@@ -197,7 +217,6 @@ namespace Frost
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-		// TODO: This doesn't work, because we copy this to a pipeline, and then the pipeline deletes it, instead of being deleted by the allocator
 		vkDestroyDescriptorSetLayout(device, m_DescriptorSetLayout, nullptr);
 		vkDestroyDescriptorPool(device, m_DescriptorPool, nullptr);
 	}

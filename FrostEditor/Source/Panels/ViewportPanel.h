@@ -40,7 +40,7 @@ namespace Frost
 		bool m_IsResized = false;
 		bool m_IsResized_Internal = false;
 
-		std::string m_OutputImageID = "FinalImage";
+		std::string m_OutputImageID = "FinalImage_With2D";
 
 		std::function<void()> m_ScenePlayFunc, m_SceneStopFunc;
 

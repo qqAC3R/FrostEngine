@@ -60,7 +60,8 @@ namespace Frost
 
 		Renderer::SubmitImageToOutputImageMap("FinalImage", [this]() -> Ref<Image2D>
 		{
-			return this->m_Data->FinalTexture[0];
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			return this->m_Data->FinalTexture[currentFrameIndex];
 		});
 	}
 
@@ -770,6 +771,7 @@ namespace Frost
 			m_Data->ColorCorrectionTexture[i] = Image2D::Create(imageSpec);
 
 			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.UseMipChain = false;
 			m_Data->FinalTexture[i] = Image2D::Create(imageSpec);
 		}
 

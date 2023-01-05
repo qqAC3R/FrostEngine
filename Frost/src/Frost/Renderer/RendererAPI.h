@@ -23,7 +23,7 @@ namespace Frost
 		virtual ~RendererAPI() {}
 
 		virtual void Init() = 0;
-		virtual void InitRenderPasses() = 0; // TODO: This is temporary
+		virtual void InitRenderPasses() = 0;
 		virtual void Render() = 0;
 		virtual void RenderDebugger() = 0;
 		virtual void ShutDown() = 0;
@@ -43,6 +43,8 @@ namespace Frost
 		virtual void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction) = 0;
 		virtual void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform) = 0;
 		virtual void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale) = 0;
+		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, glm::vec4& color) = 0;
+		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture) = 0;
 
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const = 0;
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
@@ -63,6 +65,8 @@ namespace Frost
 		void Add(Ref<Mesh> mesh, const glm::mat4& transform);
 		void AddFogVolume(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
 		void AddCloudVolume(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale);
+		void AddBillBoard(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color);
+		void AddBillBoard(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture);
 		void AddPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
 		void SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
 
@@ -96,6 +100,23 @@ namespace Frost
 			DirectionalLight DirLight;
 		};
 		LightData m_LightData;
+
+		// 2D Batched objects
+		struct Object2D
+		{
+			enum class ObjectType
+			{
+				Quad, Billboard
+			};
+			ObjectType Type = ObjectType::Quad;
+
+			glm::vec3 Position{ 0.0f };
+			glm::vec2 Size{ 1.0f };
+			glm::vec4 Color{ 1.0f };
+			//uint32_t TexIndex = 0;
+			Ref<Texture2D> Texture;
+		};
+		Vector<Object2D> m_BatchRendererData;
 		
 		// Fog Volume Data
 		struct FogVolume

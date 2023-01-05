@@ -90,6 +90,7 @@ namespace Frost
 		UpdateDirectionalLight(ts);
 		UpdateBoxFogVolumes(ts);
 		UpdateCloudVolumes(ts);
+		UpdateSceneCameras(ts);
 	}
 
 	void Scene::UpdateRuntime(Timestep ts)
@@ -229,6 +230,7 @@ namespace Frost
 			Math::DecomposeTransform(transform, translation, temp, temp);
 
 			Renderer::Submit(pointLight, translation);
+			Renderer::SubmitBillboards(translation, glm::vec2(1.0f), Renderer::GetInternalEditorIcon("PointLight"));
 		}
 	}
 
@@ -240,7 +242,12 @@ namespace Frost
 		{
 			auto [directionalLight, transformComponent] = group.get<DirectionalLightComponent, TransformComponent>(entity);
 
+			glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+			glm::vec3 translation, rotation, scale;
+			Math::DecomposeTransform(transform, translation, rotation, scale);
+
 			Renderer::Submit(directionalLight, transformComponent.GetTransform()[2]);
+			Renderer::SubmitBillboards(translation, glm::vec2(1.0f), Renderer::GetInternalEditorIcon("DirectionalLight"));
 		}
 	}
 
@@ -271,6 +278,22 @@ namespace Frost
 			Math::DecomposeTransform(transform, translation, rotation, scale);
 
 			Renderer::Submit(cloudVolumeComponent, translation, scale);
+		}
+	}
+
+	void Scene::UpdateSceneCameras(Timestep ts)
+	{
+		// Scene Cameras
+		auto group = m_Registry.group<CameraComponent>(entt::get<TransformComponent>);
+		for (auto& entity : group)
+		{
+			auto [cameraComponent, transformComponent] = group.get<CameraComponent, TransformComponent>(entity);
+
+			glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+			glm::vec3 translation, rotation, scale;
+			Math::DecomposeTransform(transform, translation, rotation, scale);
+
+			Renderer::SubmitBillboards(translation, glm::vec2(1.0f), Renderer::GetInternalEditorIcon("SceneCamera"));
 		}
 	}
 

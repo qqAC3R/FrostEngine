@@ -24,6 +24,7 @@
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanVoxelizationPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanShadowPass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanVolumetricPass.h"
+#include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanBatchRenderingPass.h"
 
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 
@@ -134,13 +135,11 @@ namespace Frost
 		{
 			timestampQueryResults.resize(s_DebugData->QueryCount);
 		}
-
 		s_DebugData->ExecutionTimes.resize(Renderer::GetRendererConfig().FramesInFlight);
 		for (auto& executionTimes : s_DebugData->ExecutionTimes)
 		{
 			executionTimes.resize(s_DebugData->QueryCount / 2);
 		}
-
 		VkPhysicalDeviceProperties properties;
 		vkGetPhysicalDeviceProperties(physicalDevice, &properties);
 		s_DebugData->Device_TimestampPeriod = properties.limits.timestampPeriod;
@@ -148,6 +147,12 @@ namespace Frost
 
 	void VulkanRenderer::InitRenderPasses()
 	{
+		// Add the white texture as the default texture for the bindless residency
+		VulkanBindlessAllocator::AddTextureCustomSlot(
+			Renderer::GetWhiteLUT(),
+			VulkanBindlessAllocator::GetWhiteTextureID()
+		);
+
 		/// Init scene render passes
 		s_Data->SceneRenderPasses = Ref<SceneRenderPassPipeline>::Create();
 
@@ -169,6 +174,9 @@ namespace Frost
 		// Add Post Processing effects to the final image (Bloom, SSR, AO, Color correction)
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanPostFXPass>::Create());
 
+		// Batch renderer (For rendering quads/circles/lines/billboards)
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanBatchRenderingPass>::Create());
+		
 #if 0
 		// Depracated
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputePass>::Create());
@@ -355,6 +363,24 @@ namespace Frost
 
 	void VulkanRenderer::EndScene()
 	{
+	}
+
+	void VulkanRenderer::SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, glm::vec4& color)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, currentFrameIndex, positon, color, size]()
+		{
+			s_RenderQueue[currentFrameIndex].AddBillBoard(positon, size, color);
+		});
+	}
+
+	void VulkanRenderer::SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, currentFrameIndex, positon, texture, size]()
+		{
+			s_RenderQueue[currentFrameIndex].AddBillBoard(positon, size, texture);
+		});
 	}
 
 	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform)
