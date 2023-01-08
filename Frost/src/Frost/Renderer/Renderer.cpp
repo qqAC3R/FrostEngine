@@ -60,7 +60,8 @@ namespace Frost
 		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling_V2.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/HiZBufferBuilder.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledLightCulling.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledPointLightCulling.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledRectangularLightCulling.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ScreenSpaceReflections.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GaussianBlur.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VisibilityBuffer.glsl");
@@ -162,6 +163,11 @@ namespace Frost
 	void Renderer::Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale)
 	{
 		s_RendererAPI->Submit(cloudVolume, position, scale);
+	}
+
+	void Renderer::Submit(const RectangularLightComponent& rectLight, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale)
+	{
+		s_RendererAPI->Submit(rectLight, position, rotation, scale);
 	}
 
 	void Renderer::SetSky(const SkyLightComponent& skyLightComponent)
@@ -276,6 +282,7 @@ namespace Frost
 
 		s_Data->EditorIcons["PointLight"] = Texture2D::Create("Resources/Editor/PointLight.png", textureSpec);
 		s_Data->EditorIcons["DirectionalLight"] = Texture2D::Create("Resources/Editor/DirectionalLight.png", textureSpec);
+		s_Data->EditorIcons["RectangularLight"] = Texture2D::Create("Resources/Editor/RectangularLight.png", textureSpec);
 		s_Data->EditorIcons["SceneCamera"] = Texture2D::Create("Resources/Editor/SceneCamera.png", textureSpec);
 	}
 

@@ -30,11 +30,15 @@ namespace Frost
 		void PBRUpdate();
 		// ------------------------------------------------------
 
-		// --------------- Tiled Light Culling ------------------
-		void TiledLightCullingInitData(uint32_t width, uint32_t height);
-		void TiledLightCullingUpdate(const RenderQueue& renderQueue);
+		// --------------- Tiled Point Light Culling ------------------
+		void TiledPointLightCullingInitData(uint32_t width, uint32_t height);
+		void TiledPointLightCullingUpdate(const RenderQueue& renderQueue);
 		// ------------------------------------------------------
 
+		// --------------- Tiled Rectangular Light Culling ------------------
+		void TiledRectLightCullingInitData(uint32_t width, uint32_t height);
+		void TiledRectLightCullingUpdate(const RenderQueue& renderQueue);
+		// ------------------------------------------------------
 		
 
 		void OnEnvMapChangeCallback(const Ref<TextureCubeMap>& prefiltered, const Ref<TextureCubeMap>& irradiance);
@@ -50,15 +54,27 @@ namespace Frost
 			Vector<Ref<Material>> Descriptor;
 			Ref<Shader> CompositeShader;
 
-			// Light data
-			Vector<HeapBlock> PointLightBufferData;
+			// Point Light data
+			Vector<Ref<BufferDevice>> PointLightBufferData;
 			Vector<Ref<BufferDevice>> PointLightIndices;
 			Vector<Ref<BufferDevice>> PointLightIndicesVolumetric;
+			// Point Light culling
+			Ref<Shader> PointLightCullingShader;
+			Ref<ComputePipeline> PointLightCullingPipeline;
+			Vector<Ref<Material>> PointLightCullingDescriptor;
 
-			// Light culling
-			Ref<Shader> LightCullingShader;
-			Ref<ComputePipeline> LightCullingPipeline;
-			Vector<Ref<Material>> LightCullingDescriptor;
+			// Rectangular Light data
+			Vector<Ref<BufferDevice>> RectLightBufferData;
+			Vector<Ref<BufferDevice>> RectLightIndices;
+			Vector<Ref<BufferDevice>> RectLightIndicesVolumetric;
+			// Rectangular Light culling
+			Ref<Shader> RectLightCullingShader;
+			Ref<ComputePipeline> RectLightCullingPipeline;
+			Vector<Ref<Material>> RectLightCullingDescriptor;
+
+
+			Ref<Image2D> LTC1_Lut;
+			Ref<Image2D> LTC2_Lut;
 		};
 		InternalData* m_Data;
 
@@ -78,10 +94,9 @@ namespace Frost
 			glm::mat4 ViewProjectionMatrix;
 
 			glm::vec2 ScreenSize;
-			int PointLightCount;
-
+			int NumberOfLights;
 		};
-		TiledLightCullPushConstant m_TiledLIghtCullPushConstant;
+		TiledLightCullPushConstant m_TiledLightCullPushConstant;
 
 
 		friend class SceneRenderPassPipeline;

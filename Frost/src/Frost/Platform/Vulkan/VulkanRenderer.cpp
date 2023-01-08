@@ -434,6 +434,15 @@ namespace Frost
 		});
 	}
 
+	void VulkanRenderer::Submit(const RectangularLightComponent& rectLight, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, rectLight, position, rotation, scale, currentFrameIndex]()
+		{
+			s_RenderQueue[currentFrameIndex].AddRectangularLight(rectLight, position, rotation, scale);
+		});
+	}
+
 	void VulkanRenderer::Resize(uint32_t width, uint32_t height)
 	{
 		Renderer::Submit([width, height]()

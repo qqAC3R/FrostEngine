@@ -343,7 +343,7 @@ namespace Frost
 
 		vulkanDescriptor->Bind(cmdBuf, m_Data->ShadowComputePipeline);
 
-		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->CascadeDepthSplit);
+		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->CascadeDepthSplit[0]);
 
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
@@ -409,7 +409,8 @@ namespace Frost
 			};
 
 			// Project frustum corners into world space
-			glm::mat4 invCam = glm::inverse(renderQueue.CameraProjectionMatrix * renderQueue.CameraViewMatrix);
+
+			glm::mat4 invCam = glm::inverse(renderQueue.m_Camera->GetViewProjection() * renderQueue.CameraViewMatrix);
 			for (uint32_t i = 0; i < 8; i++)
 			{
 				glm::vec4 invCorner = invCam * glm::vec4(frustumCorners[i], 1.0f);
@@ -449,6 +450,7 @@ namespace Frost
 				minExtents.y, maxExtents.y,
 				0.0f + rendererSettings.ShadowPass.CascadeNearPlaneOffset, (maxExtents.z - minExtents.z) + rendererSettings.ShadowPass.CascadeFarPlaneOffset
 			);
+			//glm::mat4 lightOrthoMatrix = glm::ortho(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.0f, maxExtents.z - minExtents.z);
 
 			// Offset to texel space to avoid shimmering (from https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering)
 			glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
@@ -461,8 +463,10 @@ namespace Frost
 			roundOffset.w = 0.0f;
 			lightOrthoMatrix[3] += roundOffset;
 
-			m_Data->CascadeViewProjMatrix[i] = lightOrthoMatrix * lightViewMatrix;
+
+
 			m_Data->CascadeDepthSplit[i] = (nearClip + splitDist * clipRange) * -1.0f;
+			m_Data->CascadeViewProjMatrix[i] = lightOrthoMatrix * lightViewMatrix;
 
 			lastSplitDist = cascadeSplits[i];
 		}

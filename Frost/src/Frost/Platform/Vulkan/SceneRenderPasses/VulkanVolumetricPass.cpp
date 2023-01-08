@@ -130,8 +130,13 @@ namespace Frost
 			Ref<Image2D> shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetColorAttachment(0, i);
 			Ref<Texture2D> temporalBlueNoiseLUT = Renderer::GetTemporalNoiseLut();
 
-			Ref<BufferDevice> pointLightBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->PointLightBufferData[i].DeviceBuffer;
+			Ref<BufferDevice> pointLightBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->PointLightBufferData[i];
 			Ref<BufferDevice> pointLightIndicesBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->PointLightIndicesVolumetric[i];
+
+			Ref<BufferDevice> rectLightBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RectLightBufferData[i];
+			Ref<BufferDevice> rectLightIndicesBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RectLightIndicesVolumetric[i];
+
+			Ref<Image2D> ltc2Lut = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->LTC2_Lut;
 
 			descriptor->Set("u_TemporalBlueNoiseLUT", temporalBlueNoiseLUT);
 			descriptor->Set("u_ShadowDepthTexture", shadowDepthTexture);
@@ -139,8 +144,12 @@ namespace Frost
 			descriptor->Set("u_EmissionPhaseFroxel", m_Data->EmissionPhaseFroxelTexture[i]);
 			descriptor->Set("u_ScatExtinctionFroxel_Output", m_Data->ScatExtinctionFroxelTexture[i]); // The same volume texture, but outputting on the texel that we are reading,
 																									  // so no need to sync
-			descriptor->Set("LightData", pointLightBuffer);
-			descriptor->Set("VisibleLightData", pointLightIndicesBuffer);
+			descriptor->Set("PointLightData", pointLightBuffer);
+			descriptor->Set("VisiblePointLightData", pointLightIndicesBuffer);
+
+			descriptor->Set("RectangularLightData", rectLightBuffer);
+			descriptor->Set("VisibleRectLightData", rectLightIndicesBuffer);
+			descriptor->Set("u_LTC2Lut", ltc2Lut);
 
 			descriptor->UpdateVulkanDescriptorIfNeeded();
 		}
@@ -645,6 +654,7 @@ namespace Frost
 		float LightCullingWorkgroupX;
 		glm::vec2 ViewportSize;
 		float PointLightCount;
+		float RectangularLightCount;
 	};
 	static VolumetricLightInjectPushConstant s_VolumetricLightInjectPushConstant;
 
@@ -689,6 +699,7 @@ namespace Frost
 		s_VolumetricLightInjectPushConstant.DirectionalLightDir = renderQueue.m_LightData.DirLight.Direction;
 		s_VolumetricLightInjectPushConstant.Time = s_FroxelPopulatePushConstant.Time;
 		s_VolumetricLightInjectPushConstant.PointLightCount = (uint32_t)renderQueue.m_LightData.PointLights.size();
+		s_VolumetricLightInjectPushConstant.RectangularLightCount = (uint32_t)renderQueue.m_LightData.RectangularLights.size();
 		s_VolumetricLightInjectPushConstant.ViewportSize = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
 		s_VolumetricLightInjectPushConstant.LightCullingWorkgroupX = std::ceil(renderQueue.ViewPortWidth / 16.0f);
 
@@ -981,7 +992,7 @@ namespace Frost
 
 	void VulkanVolumetricPass::OnResize(uint32_t width, uint32_t height)
 	{
-		m_Data->CustomProjectionMatrix = glm::perspective(glm::radians(m_Data->CameraFOV), float(width) / float(height), 0.1f, 500.0f);
+		m_Data->CustomProjectionMatrix = glm::perspective(glm::radians(m_Data->CameraFOV), float(width) / float(height), 0.1f, 1000.0f);
 
 		CloudComputeInitData(width, height);
 

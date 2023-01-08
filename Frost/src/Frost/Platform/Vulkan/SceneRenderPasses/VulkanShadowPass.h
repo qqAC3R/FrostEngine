@@ -54,7 +54,7 @@ namespace Frost
 			Vector<HeapBlock> IndirectVoxelCmdBuffer;
 
 			glm::mat4 CascadeViewProjMatrix[SHADOW_MAP_CASCADE_COUNT];
-			float CascadeDepthSplit[SHADOW_MAP_CASCADE_COUNT];
+			glm::vec4 CascadeDepthSplit;
 
 			glm::vec2 MinResCascade[SHADOW_MAP_CASCADE_COUNT];
 			glm::vec2 MaxResCascade[SHADOW_MAP_CASCADE_COUNT];

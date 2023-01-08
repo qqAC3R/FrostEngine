@@ -41,6 +41,7 @@ namespace Frost
 		virtual void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform) = 0;
 		virtual void Submit(const PointLightComponent& pointLight, const glm::vec3& position) = 0;
 		virtual void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction) = 0;
+		virtual void Submit(const RectangularLightComponent& rectLight, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale) = 0;
 		virtual void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform) = 0;
 		virtual void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale) = 0;
 		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, glm::vec4& color) = 0;
@@ -68,6 +69,7 @@ namespace Frost
 		void AddBillBoard(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color);
 		void AddBillBoard(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture);
 		void AddPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
+		void AddRectangularLight(const RectangularLightComponent& rectangularLight, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale);
 		void SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
 
 		void Reset();
@@ -96,7 +98,18 @@ namespace Frost
 				glm::vec3 Direction;
 			};
 
+			struct RectangularLightData
+			{
+				glm::vec3 Radiance;
+				float Intensity;
+				glm::vec4 Vertex0; // W component stores the TwoSided bool
+				glm::vec4 Vertex1; // W component stores the Radius for it to be culled
+				glm::vec4 Vertex2;
+				glm::vec4 Vertex3;
+			};
+
 			Vector<PointLight> PointLights;
+			Vector<RectangularLightData> RectangularLights;
 			DirectionalLight DirLight;
 		};
 		LightData m_LightData;

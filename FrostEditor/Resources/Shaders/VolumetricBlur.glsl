@@ -3,7 +3,7 @@
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-#define KERNEL_RADIUS 6
+#define KERNEL_RADIUS 3
 //#define SHARPNESS 5.0
 
 layout(binding = 0) uniform sampler2D u_SrcTex;

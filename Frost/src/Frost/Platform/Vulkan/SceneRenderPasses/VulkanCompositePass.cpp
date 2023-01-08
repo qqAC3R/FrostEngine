@@ -16,6 +16,9 @@
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanShadowPass.h"
 #include "Frost/Platform/Vulkan/VulkanSceneEnvironment.h"
 
+//#include "Frost/Renderer/AreaLightLUT.h"
+#include "../../FrostEditor/Resources/LUT/AreaLightLUT.h"
+
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -37,10 +40,22 @@ namespace Frost
 		m_Data = new InternalData();
 
 		m_Data->CompositeShader = Renderer::GetShaderLibrary()->Get("PBRDeffered");
-		m_Data->LightCullingShader = Renderer::GetShaderLibrary()->Get("TiledLightCulling");
+		m_Data->PointLightCullingShader = Renderer::GetShaderLibrary()->Get("TiledPointLightCulling");
+		m_Data->RectLightCullingShader = Renderer::GetShaderLibrary()->Get("TiledRectangularLightCulling");
+
+		ImageSpecification imageSpec{};
+		imageSpec.Format = ImageFormat::RGBA32F;
+		imageSpec.Width = 64;
+		imageSpec.Height = 64;
+		imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+		imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+		imageSpec.UseMipChain = false;
+		m_Data->LTC1_Lut = Image2D::Create(imageSpec, &LTC1);
+		m_Data->LTC2_Lut = Image2D::Create(imageSpec, &LTC2);
 
 		// Initialize the renderpass
-		TiledLightCullingInitData(1600, 900);
+		TiledPointLightCullingInitData(1600, 900);
+		TiledRectLightCullingInitData(1600, 900);
 		PBRInitData(1600, 900);
 
 		// Init the scene enviorment maps
@@ -114,9 +129,16 @@ namespace Frost
 			descriptor->Set("u_VoxelIndirectDiffuseTex", voxelIndirectDiffuseTex);
 			descriptor->Set("u_VoxelIndirectSpecularTex", voxelIndirectSpecularTex);
 			descriptor->Set("u_BRDFLut", brdfLut);
+			descriptor->Set("u_LTC1Lut", m_Data->LTC1_Lut);
+			descriptor->Set("u_LTC2Lut", m_Data->LTC2_Lut);
 
-			descriptor->Set("u_LightData", m_Data->PointLightBufferData[i].DeviceBuffer);
-			descriptor->Set("u_VisibleLightData", m_Data->PointLightIndices[i]);
+			// Point Lights
+			descriptor->Set("u_PointLightData",        m_Data->PointLightBufferData[i]);
+			descriptor->Set("u_VisiblePointLightData", m_Data->PointLightIndices[i]);
+
+			// Rectangular Lights
+			descriptor->Set("u_RectangularLightData", m_Data->RectLightBufferData[i]);
+			descriptor->Set("u_VisibleRectLightData", m_Data->RectLightIndices[i]);
 
 			descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 		}
@@ -126,7 +148,7 @@ namespace Frost
 	{
 	}
 
-	void VulkanCompositePass::TiledLightCullingInitData(uint32_t width, uint32_t height)
+	void VulkanCompositePass::TiledPointLightCullingInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		uint32_t maxPointLightCount = Renderer::GetRendererConfig().MaxPointLightCount;
@@ -141,32 +163,32 @@ namespace Frost
 				// (maxPointLightCount * sizeof(RenderQueue::LightData::PointLight) - Size of 1024 point lights
 				uint32_t lightDataSize = maxPointLightCount * sizeof(RenderQueue::LightData::PointLight);
 
-				pointLightBufferData.DeviceBuffer = BufferDevice::Create(lightDataSize, { BufferUsage::Storage });
-				pointLightBufferData.HostBuffer.Allocate(lightDataSize);
+				pointLightBufferData = BufferDevice::Create(lightDataSize, { BufferUsage::Storage });
 			}
 		}
 
 		// Pipeline
 		ComputePipeline::CreateInfo computePipelineCI{};
-		computePipelineCI.Shader = m_Data->LightCullingShader;
-		if(!m_Data->LightCullingPipeline)
-			m_Data->LightCullingPipeline = ComputePipeline::Create(computePipelineCI);
+		computePipelineCI.Shader = m_Data->PointLightCullingShader;
+		if(!m_Data->PointLightCullingPipeline)
+			m_Data->PointLightCullingPipeline = ComputePipeline::Create(computePipelineCI);
 
 		// Descriptor
+		m_Data->PointLightCullingDescriptor.resize(framesInFlight);
 		m_Data->PointLightIndices.resize(framesInFlight);
-		m_Data->LightCullingDescriptor.resize(framesInFlight);
 		m_Data->PointLightIndicesVolumetric.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
-			if(!m_Data->LightCullingDescriptor[i])
-				m_Data->LightCullingDescriptor[i] = Material::Create(m_Data->LightCullingShader, "Tiled_LightCulling");
+			if (!m_Data->PointLightCullingDescriptor[i])
+				m_Data->PointLightCullingDescriptor[i] = Material::Create(m_Data->PointLightCullingShader, "Tiled_PointLightCulling");
 
-			auto descriptor = m_Data->LightCullingDescriptor[i].As<VulkanMaterial>();
+			auto descriptor = m_Data->PointLightCullingDescriptor[i].As<VulkanMaterial>();
 
 			// Light indices buffer
 			uint32_t workGroupsX = std::ceil(width / 16.0f);
 			uint32_t workGroupsY = std::ceil(height / 16.0f);
-			uint64_t lightIndicesBufferSize = workGroupsX * workGroupsY * 1024 * sizeof(int32_t); // 16x16 (tiles) * 1024 (lights per tile)
+			uint64_t lightIndicesBufferSize = workGroupsX * workGroupsY * maxPointLightCount * sizeof(int32_t); // 16x16 (tiles) * 1024 (lights per tile)
+			// For Point Lights
 			m_Data->PointLightIndices[i] = BufferDevice::Create(lightIndicesBufferSize, { BufferUsage::Storage });
 			m_Data->PointLightIndicesVolumetric[i] = BufferDevice::Create(lightIndicesBufferSize, { BufferUsage::Storage });
 
@@ -174,9 +196,65 @@ namespace Frost
 			const Ref<Image2D>& depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(i);
 
 			// Setting up the data into the descriptor
-			descriptor->Set("u_LightData", m_Data->PointLightBufferData[i].DeviceBuffer);
+			descriptor->Set("u_LightData", m_Data->PointLightBufferData[i]);
 			descriptor->Set("u_VisibleLightsBuffer", m_Data->PointLightIndices[i]);
 			descriptor->Set("u_VisibleLightsVolumetricBuffer", m_Data->PointLightIndicesVolumetric[i]);
+			descriptor->Set("u_DepthBuffer", depthBuffer);
+			descriptor->UpdateVulkanDescriptorIfNeeded();
+		}
+	}
+
+	void VulkanCompositePass::TiledRectLightCullingInitData(uint32_t width, uint32_t height)
+	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		uint32_t maxRectLightCount = Renderer::GetRendererConfig().MaxRectangularLightCount;
+
+		// Allocating data for lights
+		if (m_Data->RectLightBufferData.empty())
+		{
+			m_Data->RectLightBufferData.resize(framesInFlight);
+			for (auto& rectLightBufferData : m_Data->RectLightBufferData)
+			{
+				// sizeof(uint32_t) - Number of rectangular lights in the scene 
+				// (maxRectLightCount * sizeof(RenderQueue::LightData::RectangularLightData) - Size of 64 rectangular lights
+				uint32_t lightDataSize = maxRectLightCount * sizeof(RenderQueue::LightData::RectangularLightData);
+
+				rectLightBufferData = BufferDevice::Create(lightDataSize, { BufferUsage::Storage });
+			}
+		}
+
+		// Pipeline
+		ComputePipeline::CreateInfo computePipelineCI{};
+		computePipelineCI.Shader = m_Data->RectLightCullingShader;
+		if (!m_Data->RectLightCullingPipeline)
+			m_Data->RectLightCullingPipeline = ComputePipeline::Create(computePipelineCI);
+
+		// Descriptor
+		m_Data->RectLightCullingDescriptor.resize(framesInFlight);
+		m_Data->RectLightIndices.resize(framesInFlight);
+		m_Data->RectLightIndicesVolumetric.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			if (!m_Data->RectLightCullingDescriptor[i])
+				m_Data->RectLightCullingDescriptor[i] = Material::Create(m_Data->RectLightCullingShader, "Tiled_RectangularLightCulling");
+
+			auto descriptor = m_Data->RectLightCullingDescriptor[i].As<VulkanMaterial>();
+
+			// Light indices buffer
+			uint32_t workGroupsX = std::ceil(width / 16.0f);
+			uint32_t workGroupsY = std::ceil(height / 16.0f);
+			uint64_t lightIndicesBufferSize = workGroupsX * workGroupsY * maxRectLightCount * sizeof(int32_t); // 16x16 (tiles) * 64 (lights per tile)
+			// For Rectangular Lights
+			m_Data->RectLightIndices[i] = BufferDevice::Create(lightIndicesBufferSize, { BufferUsage::Storage });
+			m_Data->RectLightIndicesVolumetric[i] = BufferDevice::Create(lightIndicesBufferSize, { BufferUsage::Storage });
+
+			// Depth buffer neccesary for the `i` frmae
+			const Ref<Image2D>& depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(i);
+
+			// Setting up the data into the descriptor
+			descriptor->Set("u_LightData", m_Data->RectLightBufferData[i]);
+			descriptor->Set("u_VisibleLightsBuffer", m_Data->RectLightIndices[i]);
+			descriptor->Set("u_VisibleLightsVolumetricBuffer", m_Data->RectLightIndicesVolumetric[i]);
 			descriptor->Set("u_DepthBuffer", depthBuffer);
 			descriptor->UpdateVulkanDescriptorIfNeeded();
 		}
@@ -212,10 +290,6 @@ namespace Frost
 			vulkanDepthImage->TransitionLayout(cmdBuf, vulkanDepthImage->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		}
 
-		VulkanRenderer::BeginTimeStampPass("Light Culling Pass");
-		TiledLightCullingUpdate(renderQueue);
-		VulkanRenderer::EndTimeStampPass("Light Culling Pass");
-
 		{
 			// From the GBuffer, blit the depth texture to render the environment cubemap
 			auto vulkanSrcDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(currentFrameIndex);
@@ -225,23 +299,35 @@ namespace Frost
 
 
 
-		VulkanRenderer::BeginTimeStampPass("Lightning Pass (PBR)");
 
 
 		// Setting up the light data
 		// Gathering the data
 		auto pointLightData = renderQueue.m_LightData.PointLights.data();
-		void* pointLightDataCPUPointer = m_Data->PointLightBufferData[currentFrameIndex].HostBuffer.Data;
 		uint32_t pointLightCount = static_cast<uint32_t>(renderQueue.m_LightData.PointLights.size());
 		uint32_t pointLightDataSize = (pointLightCount * sizeof(RenderQueue::LightData::PointLight));
 
-		// Writting into a cpu buffer
-		m_Data->PointLightBufferData[currentFrameIndex].HostBuffer.Write((void*)pointLightData, pointLightDataSize, 0);
+		auto rectLightData = renderQueue.m_LightData.RectangularLights.data();
+		uint32_t rectLightCount = static_cast<uint32_t>(renderQueue.m_LightData.RectangularLights.size());
+		uint32_t rectLightDataSize = (rectLightCount * sizeof(RenderQueue::LightData::RectangularLightData));
 
 		// Copying the cpu buffer into the gpu
-		m_Data->PointLightBufferData[currentFrameIndex].DeviceBuffer->SetData(pointLightDataSize, pointLightDataCPUPointer);
+		m_Data->PointLightBufferData[currentFrameIndex]->SetData(pointLightDataSize, (void*)pointLightData);
+		m_Data->RectLightBufferData[currentFrameIndex]->SetData(rectLightDataSize, (void*)rectLightData);
+
+
+		VulkanRenderer::BeginTimeStampPass("Light Culling Pass (Point Light)");
+		TiledPointLightCullingUpdate(renderQueue);
+		VulkanRenderer::EndTimeStampPass("Light Culling Pass (Point Light)");
+
+		VulkanRenderer::BeginTimeStampPass("Light Culling Pass (Rectangular Light)");
+		TiledRectLightCullingUpdate(renderQueue);
+		VulkanRenderer::EndTimeStampPass("Light Culling Pass (Rectangular Light)");
 
 		
+
+		VulkanRenderer::BeginTimeStampPass("Lightning Pass (PBR)");
+
 		m_PushConstantData.CameraPosition.w = static_cast<float>(pointLightCount);
 
 		m_Data->RenderPass->Bind();
@@ -263,6 +349,7 @@ namespace Frost
 		// Camera information
 		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.CameraExposure", renderQueue.m_Camera->GetExposure());
 		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.PointLightCount", static_cast<float>(pointLightCount));
+		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.RectangularLightCount", static_cast<float>(rectLightCount));
 
 		uint32_t width = static_cast<uint32_t>(renderQueue.ViewPortWidth);
 		float workGroupX = std::ceil(renderQueue.ViewPortWidth / 16.0f);
@@ -281,28 +368,62 @@ namespace Frost
 		VulkanRenderer::EndTimeStampPass("Lightning Pass (PBR)");
 	}
 
-	void VulkanCompositePass::TiledLightCullingUpdate(const RenderQueue& renderQueue)
+	void VulkanCompositePass::TiledPointLightCullingUpdate(const RenderQueue& renderQueue)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
-		auto& vulkanDescriptor = m_Data->LightCullingDescriptor[currentFrameIndex].As<VulkanMaterial>();
-		auto& vulkanComputePipeline = m_Data->LightCullingPipeline.As<VulkanComputePipeline>();
+		auto& vulkanDescriptor = m_Data->PointLightCullingDescriptor[currentFrameIndex].As<VulkanMaterial>();
+		auto& vulkanComputePipeline = m_Data->PointLightCullingPipeline.As<VulkanComputePipeline>();
 		auto& vulkanLightIndicesBuffer = m_Data->PointLightIndices[currentFrameIndex].As<VulkanBufferDevice>();
 
 
 		// Updating the data for the tiled light culling shader
-		m_TiledLIghtCullPushConstant.ScreenSize = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
-		m_TiledLIghtCullPushConstant.PointLightCount = static_cast<uint32_t>(renderQueue.m_LightData.PointLights.size());
+		m_TiledLightCullPushConstant.ScreenSize = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
+		m_TiledLightCullPushConstant.NumberOfLights = static_cast<uint32_t>(renderQueue.m_LightData.PointLights.size());
 		
-		m_TiledLIghtCullPushConstant.ProjectionMatrix = renderQueue.CameraProjectionMatrix;
-		m_TiledLIghtCullPushConstant.ProjectionMatrix[1][1] *= -1;
-		m_TiledLIghtCullPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
-		m_TiledLIghtCullPushConstant.ViewProjectionMatrix = m_TiledLIghtCullPushConstant.ProjectionMatrix * renderQueue.CameraViewMatrix;
+		m_TiledLightCullPushConstant.ProjectionMatrix = renderQueue.CameraProjectionMatrix;
+		m_TiledLightCullPushConstant.ProjectionMatrix[1][1] *= -1;
+		m_TiledLightCullPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
+		m_TiledLightCullPushConstant.ViewProjectionMatrix = m_TiledLightCullPushConstant.ProjectionMatrix * renderQueue.CameraViewMatrix;
 
 		// Setting up the rendererData
-		vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_TiledLIghtCullPushConstant);
+		vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_TiledLightCullPushConstant);
 
-		vulkanDescriptor->Bind(cmdBuf, m_Data->LightCullingPipeline);
+		vulkanDescriptor->Bind(cmdBuf, m_Data->PointLightCullingPipeline);
+
+		uint32_t groupX = std::ceil(renderQueue.ViewPortWidth / 16.0f);
+		uint32_t groupY = std::ceil(renderQueue.ViewPortHeight / 16.0f);
+		vulkanComputePipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+
+		// Putting a memory barrier to wait till the tiled compute shader finishes
+		vulkanLightIndicesBuffer->SetMemoryBarrier(cmdBuf,
+			VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+		);
+	}
+
+	void VulkanCompositePass::TiledRectLightCullingUpdate(const RenderQueue& renderQueue)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		auto& vulkanDescriptor = m_Data->RectLightCullingDescriptor[currentFrameIndex].As<VulkanMaterial>();
+		auto& vulkanComputePipeline = m_Data->RectLightCullingPipeline.As<VulkanComputePipeline>();
+		auto& vulkanLightIndicesBuffer = m_Data->RectLightIndices[currentFrameIndex].As<VulkanBufferDevice>();
+
+
+		// Updating the data for the tiled light culling shader
+		//m_TiledLightCullPushConstant.ScreenSize = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
+		m_TiledLightCullPushConstant.NumberOfLights = static_cast<uint32_t>(renderQueue.m_LightData.RectangularLights.size());
+		//
+		//m_TiledLightCullPushConstant.ProjectionMatrix = renderQueue.CameraProjectionMatrix;
+		//m_TiledLightCullPushConstant.ProjectionMatrix[1][1] *= -1;
+		//m_TiledLightCullPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
+		//m_TiledLightCullPushConstant.ViewProjectionMatrix = m_TiledLightCullPushConstant.ProjectionMatrix * renderQueue.CameraViewMatrix;
+
+		// Setting up the rendererData
+		vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_TiledLightCullPushConstant);
+
+		vulkanDescriptor->Bind(cmdBuf, m_Data->RectLightCullingPipeline);
 
 		uint32_t groupX = std::ceil(renderQueue.ViewPortWidth / 16.0f);
 		uint32_t groupY = std::ceil(renderQueue.ViewPortHeight / 16.0f);
@@ -330,7 +451,8 @@ namespace Frost
 
 	void VulkanCompositePass::OnResize(uint32_t width, uint32_t height)
 	{
-		TiledLightCullingInitData(width, height);
+		TiledPointLightCullingInitData(width, height);
+		TiledRectLightCullingInitData(width, height);
 		PBRInitData(width, height);
 	}
 

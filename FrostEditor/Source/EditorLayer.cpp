@@ -37,7 +37,7 @@ namespace Frost
 	{
 		Application::Get().GetWindow().SetWindowProjectName("Untilted scene");
 
-		m_EditorCamera = Ref<EditorCamera>::Create(85.0, 1600.0f / 900.0f, 0.1f, 2000.0f);
+		m_EditorCamera = Ref<EditorCamera>::Create(85.0, 1600.0f / 900.0f, 0.1f, 1000.0f);
 	
 		// Scene initialization
 		m_EditorScene = Ref<Scene>::Create();

@@ -76,7 +76,7 @@ uint GetCascadeIndex(float viewPosZ)
 	{
 		if(viewPosZ < u_DirLightData.CascadeDepthSplit[i])
 		{	
-			cascadeIndex = i + 1;
+			cascadeIndex = i + 2;
 		}
 	}
 	return cascadeIndex;
@@ -170,7 +170,6 @@ void main()
 			float shadowFactor = HardShadows_SampleShadowTexture(shadowPos, cascadeIndex);
 			
 			val.rgb *= shadowFactor;
-			//val.rgb = voxelPosition;
 			
 			val.a = 1.0f;
 		}

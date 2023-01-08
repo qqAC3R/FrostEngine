@@ -238,6 +238,16 @@ namespace Frost
 			entityOut["PointLightComponent"]["Falloff"] = pointLightComponent.Falloff;
 		}
 
+		if (entity.HasComponent<RectangularLightComponent>())
+		{
+			RectangularLightComponent& rectLightComponent = entity.GetComponent<RectangularLightComponent>();
+
+			entityOut["RectangularLightComponent"]["Radiance"] = { rectLightComponent.Radiance.x, rectLightComponent.Radiance.y, rectLightComponent.Radiance.z };
+			entityOut["RectangularLightComponent"]["Intensity"] = rectLightComponent.Intensity;
+			entityOut["RectangularLightComponent"]["Radius"] = rectLightComponent.Radius;
+			entityOut["RectangularLightComponent"]["TwoSided"] = rectLightComponent.TwoSided;
+		}
+
 		if (entity.HasComponent<FogBoxVolumeComponent>())
 		{
 			FogBoxVolumeComponent& fogBoxVolumeComponent = entity.GetComponent<FogBoxVolumeComponent>();
@@ -674,6 +684,18 @@ namespace Frost
 				pointLightComponent.Intensity = pointLightIn["Intensity"];
 				pointLightComponent.Radius = pointLightIn["Radius"];
 				pointLightComponent.Falloff = pointLightIn["Falloff"];
+			}
+
+			// Rectangular Light Component
+			if (!entity["RectangularLightComponent"].is_null())
+			{
+				RectangularLightComponent& rectLightComponent = ent.AddComponent<RectangularLightComponent>();
+				nlohmann::json rectLightIn = entity["RectangularLightComponent"];
+
+				rectLightComponent.Radiance = { rectLightIn["Radiance"][0], rectLightIn["Radiance"][1], rectLightIn["Radiance"][2] };
+				rectLightComponent.Intensity = rectLightIn["Intensity"];
+				rectLightComponent.Radius = rectLightIn["Radius"];
+				rectLightComponent.TwoSided = rectLightIn["TwoSided"];
 			}
 
 			// Fog Box Volume Component

@@ -75,6 +75,12 @@ namespace Frost
 					TransformComponent& ts = m_SelectedEntity.GetComponent<TransformComponent>();
 					ts.Rotation = { -90.0f, 0.0f, 0.0f};
 				}
+				if (ImGui::MenuItem("Rectangular Light"))
+				{
+					m_SelectedEntity = m_SceneContext->CreateEntity("Rectangular Light");
+					m_SelectedEntity.AddComponent<RectangularLightComponent>();
+					TransformComponent& ts = m_SelectedEntity.GetComponent<TransformComponent>();
+				}
 				ImGui::EndPopup();
 			}
 			ImGui::PopStyleVar(); // ImGuiStyleVar_PopupRounding

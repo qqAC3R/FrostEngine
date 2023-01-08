@@ -88,6 +88,7 @@ namespace Frost
 		UpdateAnimationControllers(ts);
 		UpdatePointLightComponent(ts);
 		UpdateDirectionalLight(ts);
+		UpdateRectangularLightComponent(ts);
 		UpdateBoxFogVolumes(ts);
 		UpdateCloudVolumes(ts);
 		UpdateSceneCameras(ts);
@@ -102,6 +103,7 @@ namespace Frost
 		UpdateAnimationControllers(ts);
 		UpdatePointLightComponent(ts);
 		UpdateDirectionalLight(ts);
+		UpdateRectangularLightComponent(ts);
 		UpdateBoxFogVolumes(ts);
 		UpdateCloudVolumes(ts);
 	}
@@ -231,6 +233,23 @@ namespace Frost
 
 			Renderer::Submit(pointLight, translation);
 			Renderer::SubmitBillboards(translation, glm::vec2(1.0f), Renderer::GetInternalEditorIcon("PointLight"));
+		}
+	}
+
+	void Scene::UpdateRectangularLightComponent(Timestep ts)
+	{
+		// Rectangular lights
+		auto group = m_Registry.group<RectangularLightComponent>(entt::get<TransformComponent>);
+		for (auto& entity : group)
+		{
+			auto [rectangularLight, transformComponent] = group.get<RectangularLightComponent, TransformComponent>(entity);
+
+			glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+			glm::vec3 translation, rotation, scale;
+			Math::DecomposeTransform(transform, translation, rotation, scale);
+
+			Renderer::Submit(rectangularLight, translation, rotation, scale);
+			Renderer::SubmitBillboards(translation, glm::vec2(1.0f), Renderer::GetInternalEditorIcon("RectangularLight"));
 		}
 	}
 
@@ -377,15 +396,17 @@ namespace Frost
 
 
 		CopyComponent<TagComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<ParentChildComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<TransformComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<MeshComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<AnimationComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<CameraComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<PointLightComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<DirectionalLightComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<SkyLightComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<RectangularLightComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<FogBoxVolumeComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<CloudVolumeComponent>(target->m_Registry, m_Registry, enttMap);
-		CopyComponent<SkyLightComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<RigidBodyComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<BoxColliderComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<SphereColliderComponent>(target->m_Registry, m_Registry, enttMap);

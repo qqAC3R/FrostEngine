@@ -125,6 +125,20 @@ namespace Frost
 		float Phase = 0.0f;
 	};
 
+	struct RectangularLightComponent
+	{
+		RectangularLightComponent() = default;
+		RectangularLightComponent(glm::vec3 radiance, float intensity, float twoSided)
+			: Radiance(radiance), Intensity(intensity), TwoSided(twoSided)
+		{
+		}
+
+		glm::vec3 Radiance = { 1.0f, 1.0f, 1.0f };
+		float Intensity = 1.0f;
+		float Radius = 1.0f;
+		bool TwoSided = false;
+	};
+
 	struct FogBoxVolumeComponent
 	{
 		FogBoxVolumeComponent() = default;

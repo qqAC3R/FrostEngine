@@ -109,7 +109,6 @@ void main()
 
 	float distanceToFarPlane = length(worldSpaceMax.xyz - u_PushConstant.CameraPosition);
 
-
 	vec4 result = GetValueFromFroxel(worlSpacePos, distanceToFarPlane, uv, noise.rgb);
 
 	imageStore(u_VolumetricTex, invoke, vec4(result.rgb, result.a));

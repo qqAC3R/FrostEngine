@@ -194,6 +194,15 @@ namespace Frost
 					FROST_CORE_WARN("This entity already has the Sky Light Component");
 			}
 
+			// Rectangular Light component
+			if (ImGui::MenuItem("Rectangular Light Component"))
+			{
+				if (!selectedEntity.HasComponent<RectangularLightComponent>())
+					selectedEntity.AddComponent<RectangularLightComponent>();
+				else
+					FROST_CORE_WARN("This entity already has the Rectangular Light Component");
+			}
+
 			ImGui::Separator();
 
 			// Rigid body component
@@ -543,6 +552,67 @@ namespace Frost
 					ImGui::PopID();
 				}
 
+
+
+				ImGui::EndTable();
+			}
+			ImGui::PopStyleVar();
+		});
+
+		DrawComponent<RectangularLightComponent>("RECTANGULAR LIGHT", entity, [](auto& component)
+		{
+			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+			if (ImGui::BeginTable("RectangularLightProperties", 2, flags))
+			{
+				{
+					ImGui::PushID(0);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Radiance");
+
+					ImGui::TableNextColumn();
+					UserInterface::DrawVec3ColorEdit("", component.Radiance);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(1);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Intensity");
+
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Intensity, 0.055f, 0.0f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+
+				{
+					ImGui::PushID(2);
+				
+					ImGui::TableNextColumn();
+					ImGui::Text("Radius");
+				
+					ImGui::TableNextColumn();
+					UserInterface::DragFloat("", component.Radius, 0.055f, 0.0f, 1000.0f);
+				
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(3);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Two Sided");
+
+					ImGui::TableNextColumn();
+					UserInterface::CheckBox("", component.TwoSided);
+
+					ImGui::PopID();
+				}
 
 
 				ImGui::EndTable();

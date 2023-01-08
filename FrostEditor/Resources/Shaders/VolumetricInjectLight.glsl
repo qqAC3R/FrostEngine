@@ -6,6 +6,11 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 #define PI 3.141592654
 
+const float LtcLutTextureSize = 64.0; // ltc_texture size
+const float LtcLutTextureScale = (LtcLutTextureSize - 1.0) / LtcLutTextureSize;
+const float LtcLutTextureBias  = 0.5 / LtcLutTextureSize;
+
+
 layout(binding = 0) uniform sampler3D u_ScatExtinctionFroxel;
 layout(binding = 1) uniform sampler3D u_EmissionPhaseFroxel;
 layout(binding = 2) uniform sampler2D u_ShadowDepthTexture;
@@ -39,13 +44,36 @@ struct PointLight
     vec3 Position;
 };
 
-layout(binding = 6, scalar) readonly buffer LightData {
-	PointLight PointLights[];
-} u_LightData;
+struct RectangularLight
+{
+	vec3 Radiance;
+	float Intensity;
+	vec4 Vertex0; // W component stores the TwoSided bool
+	vec4 Vertex1; // W component stores the Radius for it to be culled
+	vec4 Vertex2;
+	vec4 Vertex3;
+};
 
-layout(binding = 7, scalar) readonly buffer VisibleLightData {
+// Point lights
+layout(binding = 6, scalar) readonly buffer PointLightData {
+	PointLight PointLights[];
+} u_PointLightData;
+
+layout(binding = 7) readonly buffer VisiblePointLightData {
 	int Indices[];
-} u_VisibleLightData;
+} u_VisiblePointLightData;
+
+// Rectangular lights
+layout(binding = 8) uniform sampler2D u_LTC2Lut;
+
+layout(binding = 9) readonly buffer RectangularLightData {
+	RectangularLight RectLights[];
+} u_RectLightData;
+
+layout(binding = 10) readonly buffer VisibleRectLightData {
+	int Indices[];
+} u_VisibleRectLightData;
+
 
 layout(push_constant) uniform PushConstant
 {
@@ -60,18 +88,29 @@ layout(push_constant) uniform PushConstant
 
 	vec2 ViewportSize;
 	float PointLightCount;
+	float RectangularLightCount;
 } u_PushConstant;
 
 
-// --------------------- Tiled Light Culling --------------------------
-int GetLightBufferIndex(int i, vec2 uv)
+// --------------------- Tiled Point Light Culling --------------------------
+int GetPointLightBufferIndex(int i, vec2 uv)
 {
 	vec2 coord = vec2(u_PushConstant.ViewportSize * uv);
     ivec2 tileID = ivec2(coord) / ivec2(16, 16); //Current Fragment position / Tile count
     uint index = tileID.y * uint(u_PushConstant.LightCullingWorkgroupX) + tileID.x;
 
     uint offset = index * 1024;
-    return u_VisibleLightData.Indices[offset + i];
+    return u_VisiblePointLightData.Indices[offset + i];
+}
+// --------------------- Tiled Rectangular Light Culling --------------------------
+int GetRectangularLightBufferIndex(int i, vec2 uv)
+{
+	vec2 coord = vec2(u_PushConstant.ViewportSize * uv);
+    ivec2 tileID = ivec2(coord) / ivec2(16, 16); //Current Fragment position / Tile count
+    uint index = tileID.y * uint(u_PushConstant.LightCullingWorkgroupX) + tileID.x;
+
+    uint offset = index * 1024;
+    return u_VisibleRectLightData.Indices[offset + i];
 }
 
 // ---------------------- CASCADED SHADOW MAPS ------------------------
@@ -99,7 +138,7 @@ uint GetCascadeIndex(float viewPosZ)
 	{
 		if(viewPosZ < u_DirLightData.CascadeDepthSplit[i])
 		{	
-			cascadeIndex = i + 1;
+			cascadeIndex = i + 2;
 		}
 	}
 	return cascadeIndex;
@@ -150,13 +189,117 @@ float GetMiePhase(float cosTheta, float g)
 	return scale * num / denom;
 }
 
-vec3 GetPointLightContribution(PointLight pointLight, vec3 worldPos)
+vec3 GetPointLightContribution(PointLight pointLight, vec3 worldPos, vec3 viewVector, float phase)
 {
 	float Ld          = length(pointLight.Position - worldPos); //  Light distance
 	float attenuation = clamp(1.0 - (Ld * Ld) / (pointLight.Radius * pointLight.Radius), 0.0, 1.0);
 	attenuation      *= mix(attenuation, 1.0, pointLight.Falloff);
 
-	return pointLight.Intensity * pointLight.Radiance * attenuation;
+	vec3 lightDir = normalize(pointLight.Position - worldPos);
+
+	float phaseFunction = GetMiePhase(
+		dot(normalize(viewVector), lightDir),
+		phase
+	);
+
+	return pointLight.Intensity * pointLight.Radiance * phaseFunction * attenuation;
+}
+
+// Vector form without project to the plane (dot with the normal)
+// Use for proxy sphere clipping
+vec3 IntegrateEdgeVec(vec3 v1, vec3 v2)
+{
+    // Using built-in acos() function will result flaws
+    // Using fitting result for calculating acos()
+    float x = dot(v1, v2);
+    float y = abs(x);
+
+    float a = 0.8543985 + (0.4965155 + 0.0145206*y)*y;
+    float b = 3.4175940 + (4.1616724 + y)*y;
+    float v = a / b;
+
+    float theta_sintheta = (x > 0.0) ? v : 0.5*inversesqrt(max(1.0 - x*x, 1e-7)) - v;
+
+    return cross(v1, v2)*theta_sintheta;
+}
+vec3 EvaluateLTC(mat3 invM, RectangularLight rectLight, vec3 worldPos, vec3 viewVector, vec3 averageLightDir)
+{
+	bool twoSided = bool(rectLight.Vertex0.w > 0.0);
+
+	vec3 T1, T2;
+	T1 = normalize(viewVector - averageLightDir * dot(viewVector, averageLightDir));
+	T2 = cross(averageLightDir, T1);
+
+	invM = invM * transpose(mat3(T1, T2, averageLightDir));
+
+	// polygon (allocate 4 vertices for clipping)
+	vec3 L[4];
+	// transform polygon from LTC back to origin D0 (cosine weighted)
+	L[0] = invM * (rectLight.Vertex0.xyz - worldPos);
+	L[1] = invM * (rectLight.Vertex1.xyz - worldPos);
+	L[2] = invM * (rectLight.Vertex2.xyz - worldPos);
+	L[3] = invM * (rectLight.Vertex3.xyz - worldPos);
+
+	// cos weighted space
+    L[0] = normalize(L[0]);
+    L[1] = normalize(L[1]);
+    L[2] = normalize(L[2]);
+    L[3] = normalize(L[3]);
+
+	// integrate
+    vec3 integral = vec3(0.0);
+    integral += IntegrateEdgeVec(L[0], L[1]);
+    integral += IntegrateEdgeVec(L[1], L[2]);
+    integral += IntegrateEdgeVec(L[2], L[3]);
+    integral += IntegrateEdgeVec(L[3], L[0]);
+
+	float formFactor = length(integral);
+
+	// use tabulated horizon-clipped sphere
+    // check if the shading point is behind the light
+    vec3 dir = rectLight.Vertex0.xyz - worldPos; // LTC space
+    vec3 lightNormal = cross(rectLight.Vertex1.xyz - rectLight.Vertex0.xyz, rectLight.Vertex3.xyz - rectLight.Vertex0.xyz);
+    bool behind = (dot(dir, lightNormal) < 0.0);
+	float z = integral.z / formFactor * mix(1.0, -1.0, float(behind));
+
+	vec2 uv = vec2(z * 0.5 + 0.5, formFactor); // range [0, 1]
+    uv = uv * LtcLutTextureScale + vec2(LtcLutTextureBias);
+
+	// Fetch the form factor for horizon clipping
+    float scale = texture(u_LTC2Lut, uv).w;
+
+	float sum = formFactor * scale;
+	if(!behind && rectLight.Vertex0.w == 0.0)
+		sum = 0.0;
+
+	// Outgoing radiance (solid angle) for the entire polygon
+    return vec3(sum);
+	
+}
+vec3 ComputeRectangularLightContribution(RectangularLight rectLight, vec3 centerRectLightPos, vec3 worldPos, vec3 viewVector, float phase)
+{
+	// Attenuation
+	float rectLightRadius = rectLight.Vertex1.w;
+	float falloff = 3.0;
+
+	float Ld          = length(centerRectLightPos - worldPos); //  Light distance
+	float attenuation = clamp(1.0 - (Ld * Ld) / (rectLightRadius * rectLightRadius), 0.0, 1.0);
+	attenuation      *= mix(attenuation, 1.0, falloff);
+
+	if(attenuation == 0.0)
+		return vec3(0.0);
+	
+	vec3 avgLightDir = normalize(centerRectLightPos - worldPos);
+
+	// Need to multiply by \pi to account for all incident light as evaluateLTC divides by \pi implicitly.
+	vec3 radiance = PI * EvaluateLTC(mat3(1.0), rectLight, worldPos, viewVector, avgLightDir);
+	
+	float phaseFunction = GetMiePhase(
+		dot(normalize(viewVector), avgLightDir),
+		phase
+	);
+
+	return rectLight.Radiance * rectLight.Intensity * radiance * attenuation;
 }
 
 // Sample a dithering function.
@@ -176,7 +319,7 @@ void main()
 		return;
 
 	vec3 noise = (SampleNoise(invoke.xy).rgb * 2.0 - vec3(1.0)) / vec3(numFroxels);
-	vec2 uv = (vec2(invoke.xy) + vec2(0.5)) / vec2(numFroxels.xy) + noise.xy;
+	vec2 uv = (vec2(invoke.xy) + vec2(0.5)) / vec2(numFroxels.xy);// + noise.xy;
 
 	// Compute the world space position of the froxel's texel
 	vec4 worldSpaceMax = u_PushConstant.InvViewProjMatrix * vec4(uv * 2.0 - vec2(1.0), 1.0, 1.0);
@@ -197,20 +340,55 @@ void main()
 	float visibility = SampleShadowTexture(shadowCoord, cascadeIndex);
 
 	
-	vec3 pointLightContribution = vec3(1.0);
+	// Compute the point light factor for the point light contribution (all point lights color into a singe froxel)
+	vec3 pointLightFactor = vec3(0.0);
 	if(scattExtinction.w > 0.0f)
 	{
 		for(int i = 0; i < u_PushConstant.PointLightCount; i++)
 		{
-			int lightIndex = GetLightBufferIndex(int(i), uv);
+			int lightIndex = GetPointLightBufferIndex(int(i), uv);
 			if (lightIndex == -1)
 				break;
 
-			PointLight pointLight = u_LightData.PointLights[lightIndex];
+			const PointLight pointLight = u_PointLightData.PointLights[lightIndex];
 
 			if(length(pointLight.Position - worldSpacePosition) <= pointLight.Radius)
 			{
-				pointLightContribution += GetPointLightContribution(pointLight, worldSpacePosition);
+				pointLightFactor += GetPointLightContribution(
+					pointLight,
+					worldSpacePosition,
+					direction,
+					emissionPhase.w
+				);
+			}
+		}
+	}
+
+	vec3 rectangularLightFactor = vec3(0.0);
+	if(scattExtinction.w > 0.0f)
+	{
+		for(int i = 0; i < u_PushConstant.RectangularLightCount; i++)
+		{
+			int lightIndex = GetRectangularLightBufferIndex(int(i), uv);
+			if (lightIndex == -1)
+				break;
+
+			const RectangularLight rectLight = u_RectLightData.RectLights[lightIndex];
+
+			vec3 centerRectLightPos = ( rectLight.Vertex0.xyz +
+										rectLight.Vertex1.xyz +
+										rectLight.Vertex2.xyz +
+										rectLight.Vertex3.xyz ) / 4.0;
+
+			if(length(centerRectLightPos - worldSpacePosition) <= rectLight.Vertex1.w/*Radius*/)
+			{
+				rectangularLightFactor += ComputeRectangularLightContribution(
+					rectLight,
+					centerRectLightPos,
+					worldSpacePosition,
+					direction,
+					emissionPhase.w
+				);
 			}
 		}
 	}
@@ -223,7 +401,12 @@ void main()
 	vec3 mieScattering = scattExtinction.xyz;
 	vec3 extinction = vec3(scattExtinction.w);
 	vec3 voxelAlbedo = mieScattering / extinction;
-	vec3 fogVolumesContribution = max(voxelAlbedo * phaseFunction * visibility * pointLightContribution * u_DirLightData.Intensity, vec3(0.0)) + emissionPhase.rgb;
+	vec3 fogVolumesContribution = max(voxelAlbedo * phaseFunction * visibility * 1.0f * u_DirLightData.Intensity, vec3(0.0)) + emissionPhase.rgb;
+
+	// Compute the light integral for the point lights
+	vec3 pointLightContribution = max(pointLightFactor * max(visibility, 0.1), vec3(0.0));
+	vec3 rectLightContribution = max(rectangularLightFactor * max(visibility, 0.1), vec3(0.0));
+
 
 
 
@@ -245,7 +428,7 @@ void main()
 	}
 
 
-	vec3 finalResult = (fogVolumesContribution + dirLightContribution);
+	vec3 finalResult = (rectLightContribution + pointLightContribution + fogVolumesContribution + dirLightContribution);
 
 	imageStore(u_ScatExtinctionFroxel_Output, invoke, vec4(finalResult, scattExtinction.w + dirLightExtinction.x));
 }

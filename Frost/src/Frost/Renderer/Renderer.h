@@ -38,6 +38,7 @@ namespace Frost
 
 		// Forward+
 		uint32_t MaxPointLightCount = static_cast<uint32_t>(std::pow(2, 10)); // 1024
+		uint32_t MaxRectangularLightCount = static_cast<uint32_t>(std::pow(2, 10)); // 64
 
 		// Shadow Pass
 		uint32_t ShadowTextureResolution = 2048;
@@ -85,6 +86,7 @@ namespace Frost
 		static void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform);
 		static void Submit(const PointLightComponent& pointLight, const glm::vec3& position);
 		static void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
+		static void Submit(const RectangularLightComponent& rectLight, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale);
 		static void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
 		static void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale);
 		static void SetSky(const SkyLightComponent& skyLightComponent);

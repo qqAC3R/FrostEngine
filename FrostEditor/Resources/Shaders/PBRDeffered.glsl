@@ -27,6 +27,9 @@ const float Epsilon = 0.00001;
 // Constant normal incidence Fresnel factor for all dielectrics.
 const vec3 Fdielectric = vec3(0.04);
 
+const float LtcLutTextureSize = 64.0; // ltc_texture size
+const float LtcLutTextureScale = (LtcLutTextureSize - 1.0) / LtcLutTextureSize;
+const float LtcLutTextureBias  = 0.5 / LtcLutTextureSize;
 
 struct PointLight
 {
@@ -44,6 +47,16 @@ struct DirectionalLight
 	float Multiplier;
 };
 
+struct RectangularLight
+{
+	vec3 Radiance;
+	float Intensity;
+	vec4 Vertex0; // W component stores the TwoSided bool
+	vec4 Vertex1; // W component stores the Radius for it to be culled
+	vec4 Vertex2;
+	vec4 Vertex3;
+};
+
 // Output color
 layout(location = 0) out vec4 o_Color;
 
@@ -55,24 +68,29 @@ layout(location = 1) in vec2 v_TexCoord;
 layout(binding = 0) uniform sampler2D u_PositionTexture;
 layout(binding = 1) uniform sampler2D u_AlbedoTexture;
 layout(binding = 2) uniform sampler2D u_NormalTexture;
-layout(binding = 3, scalar) readonly buffer u_LightData { // Using scalar, it will fix our byte padding issues?
+
+// Point lights
+layout(binding = 3, scalar) readonly buffer u_PointLightData { // Using scalar, it will fix our byte padding issues?
 	PointLight u_PointLights[];
-} LightData;
+} PointLightData;
 
-layout(binding = 4, scalar) readonly buffer u_VisibleLightData { // Using scalar, it will fix our byte padding issues?
+layout(binding = 4) readonly buffer u_VisiblePointLightData {
 	int Indices[];
-} VisibleLightData;
+} VisiblePointLightData;
 
+// PBR
 layout(binding = 5) uniform samplerCube u_RadianceFilteredMap;
 layout(binding = 6) uniform samplerCube u_IrradianceMap;
 layout(binding = 7) uniform sampler2D u_BRDFLut;
 
+// Camera Information/other stuff
 layout(binding = 8) uniform UniformBuffer
 {
 	float CameraGamma;
 	float CameraExposure;
 	float PointLightCount;
 	float LightCullingWorkgroup;
+	float RectangularLightCount;
 } u_UniformBuffer;
 
 // Voxel Cone Tracing
@@ -82,8 +100,20 @@ layout(binding = 10) uniform sampler2D u_VoxelIndirectSpecularTex;
 // Shadow depth texture
 layout(binding = 11) uniform sampler2D u_ShadowTexture;
 
+// Rectangular lights
+layout(binding = 12) readonly buffer u_RectangularLightData {
+	RectangularLight u_RectLights[];
+} RectangularLightData;
+
+layout(binding = 13) readonly buffer u_VisibleRectLightData {
+	int Indices[];
+} VisibleRectLightData;
+
+layout(binding = 14) uniform sampler2D u_LTC1Lut;
+layout(binding = 15) uniform sampler2D u_LTC2Lut;
 
 
+// Push constants (general information)
 layout(push_constant) uniform PushConstant
 {
     vec4 CameraPosition; // vec4 - camera position + float pointLightCount + lightCullingWorkgroup.x
@@ -93,13 +123,15 @@ layout(push_constant) uniform PushConstant
 } u_PushConstant;
 
 
+
+// Global variables
 struct SurfaceProperties
 {
     vec3 WorldPos;
     vec3 Normal;
     vec3 ViewVector;
     
-    vec4 Albedo;
+    vec3 Albedo;
     float Roughness;
     float Metalness;
     float Emission;
@@ -112,13 +144,22 @@ vec3 s_IndirectSpecular = vec3(1.0f);
 
 
 // =======================================================
-int GetLightBufferIndex(int i)
+int GetPointLightBufferIndex(int i)
 {
     ivec2 tileID = ivec2(gl_FragCoord.xy) / ivec2(16, 16); //Current Fragment position / Tile count
     uint index = tileID.y * uint(u_UniformBuffer.LightCullingWorkgroup) + tileID.x;
 
     uint offset = index * 1024;
-    return VisibleLightData.Indices[offset + i];
+    return VisiblePointLightData.Indices[offset + i];
+}
+// =======================================================
+int GetRectangularLightBufferIndex(int i)
+{
+    ivec2 tileID = ivec2(gl_FragCoord.xy) / ivec2(16, 16); //Current Fragment position / Tile count
+    uint index = tileID.y * uint(u_UniformBuffer.LightCullingWorkgroup) + tileID.x;
+
+    uint offset = index * 1024;
+    return VisibleRectLightData.Indices[offset + i];
 }
 // =======================================================
 vec4 UpsampleTent9(sampler2D tex, float lod, vec2 uv, float radius)
@@ -233,7 +274,7 @@ vec3 ComputePointLightContribution(PointLight pointLight)
 	vec3 LightPosition = vec3(pointLight.Position);
 
 	// Get the values from the surfaces
-	vec3 albedo = m_Surface.Albedo.rgb;
+	vec3 albedo = m_Surface.Albedo.rgb * m_Surface.Emission;
 	float roughness = m_Surface.Roughness;
 	float metalness = m_Surface.Metalness;
 
@@ -288,7 +329,7 @@ vec3 ComputePointLightContribution(PointLight pointLight)
 vec3 ComputeDirectionalLightContribution(DirectionalLight directionalLight)
 {
 	// Get the values from the surfaces
-	vec3 albedo = m_Surface.Albedo.rgb;
+	vec3 albedo = m_Surface.Albedo.rgb * m_Surface.Emission;
 	float roughness = m_Surface.Roughness;
 	float metalness = m_Surface.Metalness;
 
@@ -335,6 +376,149 @@ vec3 ComputeDirectionalLightContribution(DirectionalLight directionalLight)
 }
 
 
+// Vector form without project to the plane (dot with the normal)
+// Use for proxy sphere clipping
+vec3 IntegrateEdgeVec(vec3 v1, vec3 v2)
+{
+    // Using built-in acos() function will result flaws
+    // Using fitting result for calculating acos()
+    float x = dot(v1, v2);
+    float y = abs(x);
+
+    float a = 0.8543985 + (0.4965155 + 0.0145206*y)*y;
+    float b = 3.4175940 + (4.1616724 + y)*y;
+    float v = a / b;
+
+    float theta_sintheta = (x > 0.0) ? v : 0.5*inversesqrt(max(1.0 - x*x, 1e-7)) - v;
+
+    return cross(v1, v2)*theta_sintheta;
+}
+vec3 EvaluateLTC(mat3 invM, RectangularLight rectLight)
+{
+	vec3 T1, T2;
+	T1 = normalize(m_Surface.ViewVector - m_Surface.Normal * dot(m_Surface.ViewVector, m_Surface.Normal));
+	T2 = cross(m_Surface.Normal, T1);
+
+	invM = invM * transpose(mat3(T1, T2, m_Surface.Normal));
+
+	// polygon (allocate 4 vertices for clipping)
+	vec3 L[4];
+	// transform polygon from LTC back to origin D0 (cosine weighted)
+	L[0] = invM * (rectLight.Vertex0.xyz - m_Surface.WorldPos);
+	L[1] = invM * (rectLight.Vertex1.xyz - m_Surface.WorldPos);
+	L[2] = invM * (rectLight.Vertex2.xyz - m_Surface.WorldPos);
+	L[3] = invM * (rectLight.Vertex3.xyz - m_Surface.WorldPos);
+
+	// use tabulated horizon-clipped sphere
+    // check if the shading point is behind the light
+    vec3 dir = rectLight.Vertex0.xyz - m_Surface.WorldPos; // LTC space
+    vec3 lightNormal = cross(rectLight.Vertex1.xyz - rectLight.Vertex0.xyz, rectLight.Vertex3.xyz - rectLight.Vertex0.xyz);
+    bool behind = (dot(dir, lightNormal) < 0.0);
+
+	// cos weighted space
+    L[0] = normalize(L[0]);
+    L[1] = normalize(L[1]);
+    L[2] = normalize(L[2]);
+    L[3] = normalize(L[3]);
+
+	// integrate
+    vec3 integral = vec3(0.0);
+    integral += IntegrateEdgeVec(L[0], L[1]);
+    integral += IntegrateEdgeVec(L[1], L[2]);
+    integral += IntegrateEdgeVec(L[2], L[3]);
+    integral += IntegrateEdgeVec(L[3], L[0]);
+
+	// form factor of the polygon in direction integral
+    float len = length(integral);
+
+	float z = integral.z/len;
+    if (behind)
+        z = -z;
+
+	vec2 uv = vec2(z * 0.5 + 0.5, len); // range [0, 1]
+    uv = uv * LtcLutTextureScale + LtcLutTextureBias;
+
+	// Fetch the form factor for horizon clipping
+    float scale = texture(u_LTC2Lut, uv).w;
+
+	float sum = len * scale;
+	if(!behind && rectLight.Vertex0.w == 0.0)
+		sum = 0.0;
+
+	// Outgoing radiance (solid angle) for the entire polygon
+    return vec3(sum);
+}
+vec3 ComputeAreaLightContribution()
+{
+	vec3 N = m_Surface.Normal;
+	vec3 V = m_Surface.ViewVector;
+	vec3 P = m_Surface.WorldPos;
+	float dotNV = clamp(dot(N, V), 0.0, 1.0);
+
+	vec3 albedo = vec3(m_Surface.Albedo * m_Surface.Emission);
+	vec3 metalness = vec3(m_Surface.Metalness);
+
+	// Get the UVs for the LUT from the Roughness and sqrt(1-cos_theta)
+	vec2 uv = vec2(m_Surface.Roughness, sqrt(1.0 - dotNV));
+	uv = uv * LtcLutTextureScale;
+
+	// Get the 4 paramaters for the inverse M
+	vec4 t1 = texture(u_LTC1Lut, uv);
+
+	// Get 2 parameters for Fresnel calculation
+	vec4 t2 = texture(u_LTC2Lut, uv);
+
+	mat3 invM = mat3(
+		vec3(t1.x, 0, t1.y),
+		vec3(  0,  1,    0),
+		vec3(t1.z, 0, t1.w)
+	);
+
+	uint areaLightsCount = uint(u_UniformBuffer.RectangularLightCount);
+
+	vec3 result = vec3(0.0);
+	for (uint i = 0; i < areaLightsCount; i++)
+	{
+		int lightIndex = GetRectangularLightBufferIndex(int(i));
+        if (lightIndex == -1)
+            break;
+
+		const RectangularLight rectLight = RectangularLightData.u_RectLights[lightIndex];
+
+
+		// Attenuation
+		vec3 centerRectLightPos = ( rectLight.Vertex0.xyz +
+									rectLight.Vertex1.xyz +
+									rectLight.Vertex2.xyz +
+									rectLight.Vertex3.xyz ) / 4;
+		float rectLightRadius = rectLight.Vertex1.w;
+		float falloff = 3.0f;
+
+		float Ld          = length(centerRectLightPos - m_Surface.WorldPos); //  Light distance
+		float attenuation = clamp(1.0 - (Ld * Ld) / (rectLightRadius * rectLightRadius), 0.0, 1.0);
+		attenuation      *= mix(attenuation, 1.0, falloff);
+
+		if(attenuation == 0.0)
+			continue;
+
+
+		// Evaluate LTC shading
+		vec3 diffuse = EvaluateLTC(mat3(1.0), rectLight);
+		vec3 specular = EvaluateLTC(invM, rectLight);
+
+		// GGX BRDF shadowing and Fresnel
+		// t2.x: shadowedF90 (F90 normally it should be 1.0)
+		// t2.y: Smith function for Geometric Attenuation Term, it is dot(V or L, H).
+		specular *= metalness * t2.x + (1.0 - metalness) * t2.y;
+
+		// Add contribution
+		result += attenuation * (rectLight.Radiance * rectLight.Intensity * (specular + albedo * diffuse));
+	}
+
+	return vec3(result);
+}
+
+
 // A fast approximation of specular AO given the diffuse AO. [Lagarde14]
 float ComputeSpecularAO(float nDotV, float ao, float roughness)
 {
@@ -344,7 +528,7 @@ float ComputeSpecularAO(float nDotV, float ao, float roughness)
 vec3 ComputeIBLContriubtion()
 {
 	// Get the values from the surfaces
-	vec3 albedo = m_Surface.Albedo.rgb;
+	vec3 albedo = m_Surface.Albedo.rgb * m_Surface.Emission;
 	float roughness = clamp(m_Surface.Roughness, 0.0f, 0.95f);
 	float metalness = m_Surface.Metalness;
 
@@ -352,7 +536,7 @@ vec3 ComputeIBLContriubtion()
 	vec3 V = m_Surface.ViewVector;
 	vec3 N = m_Surface.Normal;
 
-	float nDotV = max(dot(N, V), 0.0);
+	float nDotV = min(max(dot(N, V), 0.0), 0.99);
 	vec3 R = normalize(reflect(V, N));
 
 	// Remap material properties.
@@ -423,7 +607,7 @@ void main()
 
 
     // Sampling the textures from gbuffer
-    m_Surface.Albedo =      texture(u_AlbedoTexture, v_TexCoord).rgba;
+    m_Surface.Albedo =      texture(u_AlbedoTexture, v_TexCoord).rgb;
     m_Surface.Metalness =   texture(u_NormalTexture, v_TexCoord).b;
     m_Surface.Roughness =   texture(u_NormalTexture, v_TexCoord).a;
     m_Surface.Emission =    texture(u_AlbedoTexture, v_TexCoord).a;
@@ -445,15 +629,17 @@ void main()
 
 	for(uint i = 0; i < pointLightCount; i++)
 	{
-		int lightIndex = GetLightBufferIndex(int(i));
+		int lightIndex = GetPointLightBufferIndex(int(i));
         if (lightIndex == -1)
             break;
 
-		PointLight pointLight = LightData.u_PointLights[lightIndex];
+		PointLight pointLight = PointLightData.u_PointLights[lightIndex];
 		Lo += ComputePointLightContribution(pointLight);// * pointLight.Intensity;
 
 		heatMap += 0.1f;
 	}
+
+	Lo += ComputeAreaLightContribution();
 
 
 	// Calculating all directional lights contribution
@@ -479,5 +665,5 @@ void main()
     o_Color = vec4(result, 1.0f);
 
 	if(u_PushConstant.UseLightHeatMap == 1)
-		o_Color.rgb += + vec3(heatMap);
+		o_Color.rgb += vec3(heatMap);
 }

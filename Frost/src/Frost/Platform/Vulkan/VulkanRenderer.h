@@ -28,6 +28,7 @@ namespace Frost
 		virtual void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform) override;
 		virtual void Submit(const PointLightComponent& pointLight, const glm::vec3& position) override;
 		virtual void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction) override;
+		virtual void Submit(const RectangularLightComponent& rectLight, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale) override;
 		virtual void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform) override;
 		virtual void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale) override;
 		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, glm::vec4& color) override;

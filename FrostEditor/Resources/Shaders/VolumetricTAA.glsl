@@ -35,6 +35,31 @@ bool InFrustum(vec3 ndc)
 	return xAxis && yAxis && zAxis;
 }
 
+vec4 SpatialFilter(vec3 coord)
+{
+	vec3 texel = 1.0.xxx / vec3(textureSize(u_CurrentVolumetricFroxel, 0).xyz);
+	
+	float weight;
+	vec3 offset;
+	vec4 accum = 0.0.xxxx;
+	float totalWeight = 0.0;
+	for (int i = -1; i <= 1; i++)
+	{
+		for (int j = -1; j <= 1; j++)
+		{
+			for (int k = -1; k <= 1; k++)
+			{
+				offset = texel * vec3(i, j, k);
+				weight = exp(-2.29 * dot(coord - offset, coord - offset));
+				totalWeight += weight;
+				accum += weight * texture(u_CurrentVolumetricFroxel, coord + offset);
+			}
+		}
+	}
+	
+	return max(accum / totalWeight, 0.0.xxxx);
+}
+
 void main()
 {
 	ivec3 invoke = ivec3(gl_GlobalInvocationID.xyz);
@@ -50,27 +75,28 @@ void main()
 	vec3 uvw = vec3(uv, w);
 
 	// Box blur + Computing the min/max of the neighboring pixels for clamping the history buffer texel color
-	vec4 currentResult = vec4(0.0);
-	vec4 neighbouringTexels[8];
-	vec4 pixelMinClamp = vec4(1.0f);
-	vec4 pixelMaxClamp = vec4(0.0f);
-	neighbouringTexels[0] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5, -0.5, -0.5) * texel);
-	neighbouringTexels[1] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5, -0.5, -0.5) * texel);
-	neighbouringTexels[2] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5,  0.5, -0.5) * texel);
-	neighbouringTexels[3] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5,  0.5, -0.5) * texel);
-	neighbouringTexels[4] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5, -0.5,  0.5) * texel);
-	neighbouringTexels[5] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5, -0.5,  0.5) * texel);
-	neighbouringTexels[6] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5,  0.5,  0.5) * texel);
-	neighbouringTexels[7] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5,  0.5,  0.5) * texel);
+	vec4 currentResult = SpatialFilter(uvw);
+	//vec4 currentResult = vec4(0.0);
+	//vec4 neighbouringTexels[8];
+	//vec4 pixelMinClamp = vec4(1.0f);
+	//vec4 pixelMaxClamp = vec4(0.0f);
+	//neighbouringTexels[0] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5, -0.5, -0.5) * texel);
+	//neighbouringTexels[1] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5, -0.5, -0.5) * texel);
+	//neighbouringTexels[2] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5,  0.5, -0.5) * texel);
+	//neighbouringTexels[3] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5,  0.5, -0.5) * texel);
+	//neighbouringTexels[4] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5, -0.5,  0.5) * texel);
+	//neighbouringTexels[5] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5, -0.5,  0.5) * texel);
+	//neighbouringTexels[6] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5,  0.5,  0.5) * texel);
+	//neighbouringTexels[7] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5,  0.5,  0.5) * texel);
 
-	for(uint i = 0; i < 8; i++)
+	//for(uint i = 0; i < 8; i++)
 	{
-		currentResult += neighbouringTexels[i];
+		//currentResult += neighbouringTexels[i];
 
-		pixelMinClamp = min(pixelMinClamp, neighbouringTexels[i]);
-		pixelMaxClamp = max(pixelMaxClamp, neighbouringTexels[i]);
+		//pixelMinClamp = min(pixelMinClamp, neighbouringTexels[i]);
+		//pixelMaxClamp = max(pixelMaxClamp, neighbouringTexels[i]);
 	}
-	currentResult /= 8.0;
+	//currentResult /= 8.0;
 
 	// Temporal AA
 	// Get current texel's world space position for it to be converted into
@@ -93,16 +119,19 @@ void main()
 	previousZ /= previousFarPlaneLength;
 	previousZ = pow(previousZ, 1.0 / 2.0);
 
-	// Sampling the history buffer
+
 	vec4 lastFrameResult = texture(u_PreviousVolumetricFroxel, vec3(previousUV, previousZ));
 
-	// Mixing it up a bit more for the edges to not flicker so much
-	lastFrameResult = mix(clamp(lastFrameResult, pixelMinClamp, pixelMaxClamp), lastFrameResult, 0.75f);
+	//// Sampling the history buffer
+	//vec4 lastFrameResult = texture(u_PreviousVolumetricFroxel, vec3(previousUV, previousZ));
+	//
+	//// Mixing it up a bit more for the edges to not flicker so much
+	//lastFrameResult = mix(clamp(lastFrameResult, pixelMinClamp, pixelMaxClamp), lastFrameResult, 0.75f);
 
 	// Compute the final result
 	vec4 finalResult;
 	if(InFrustum(previousPosNDC))
-		finalResult = mix(lastFrameResult, currentResult, 0.05);
+		finalResult = mix(lastFrameResult, currentResult, 0.2);
 	else
 		finalResult = currentResult;
 		

@@ -5,17 +5,18 @@
 #define TILE_SIZE 16
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 
-struct PointLight
+struct RectangularLight
 {
     vec3 Radiance;
 	float Intensity;
-    float Radius;
-    float Falloff;
-    vec3 Position;
+	vec4 Vertex0; // W component stores the TwoSided bool
+	vec4 Vertex1; // W component stores the Radius for it to be culled
+	vec4 Vertex2;
+	vec4 Vertex3;
 };
 
 layout(binding = 0, scalar) readonly buffer u_LightData { // Using scalar, it will fix our byte padding issues?
-	PointLight u_PointLights[];
+	RectangularLight u_RectangularLights[];
 } LightData;
 
 layout(binding = 1) writeonly buffer u_VisibleLightsBuffer {
@@ -33,7 +34,7 @@ layout(push_constant) uniform PushConstant
     mat4 ViewProjectionMatrix;
 
     vec2 ScreenSize;
-    int PointLightCount;
+    int NumberOfLights;
 } u_PushConstant;
 
 
@@ -53,7 +54,6 @@ shared uint visibleLightCountNoDepth;
 
 // Shared thread local storage(TLS) for visible indices, will be written out to the global buffer(u_VisibleLightsBuffer) at the end.
 shared int visibleLightIndices[2048];
-//shared int visibleLightIndicesNoDepth[1024];
 
 
 void main()
@@ -151,15 +151,20 @@ void main()
     // Parallelize the threads against the lights now
     // Can handle 256(TILE_SIZE * TILE_SIZE) simultaniously
     uint threadCount = TILE_SIZE * TILE_SIZE;
-    uint passCount = (u_PushConstant.PointLightCount + threadCount - 1) / threadCount;
+    uint passCount = (u_PushConstant.NumberOfLights + threadCount - 1) / threadCount;
     for (uint i = 0; i < passCount; i++)
     {
         uint lightIndex = i * threadCount + gl_LocalInvocationIndex;
-        if(lightIndex >= u_PushConstant.PointLightCount)
+        if(lightIndex >= u_PushConstant.NumberOfLights)
             break;
 
-        vec4 position = vec4(LightData.u_PointLights[lightIndex].Position, 1.0f);
-        float radius = LightData.u_PointLights[lightIndex].Radius;
+        vec3 center = ( LightData.u_RectangularLights[lightIndex].Vertex0.xyz +
+                        LightData.u_RectangularLights[lightIndex].Vertex1.xyz +
+                        LightData.u_RectangularLights[lightIndex].Vertex2.xyz +
+                        LightData.u_RectangularLights[lightIndex].Vertex3.xyz ) / 4.0;
+
+        vec4 position = vec4(center, 1.0f);
+        float radius = LightData.u_RectangularLights[lightIndex].Vertex1.w;
 
 
         // Check if light radius is in frustums
@@ -180,7 +185,7 @@ void main()
         }
 
 
-
+        // Check if light radius is in frustum (no depth)
         float distanceNoDepth = 0.0;
         for (uint j = 0; j < 6; j++)
         {

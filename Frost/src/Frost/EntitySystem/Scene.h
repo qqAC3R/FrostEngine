@@ -46,6 +46,7 @@ namespace Frost
 		void UpdateMeshComponents(Timestep ts);
 		void UpdateAnimationControllers(Timestep ts);
 		void UpdatePointLightComponent(Timestep ts);
+		void UpdateRectangularLightComponent(Timestep ts);
 		void UpdateDirectionalLight(Timestep ts);
 		void UpdateBoxFogVolumes(Timestep ts);
 		void UpdateCloudVolumes(Timestep ts);
