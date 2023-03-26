@@ -112,18 +112,20 @@ namespace Frost
 		pipelineCreateInfo.VertexBufferLayout = bufferLayout;
 		pipelineCreateInfo.UseDepthTest = true;
 		pipelineCreateInfo.UseDepthWrite = true;
-		pipelineCreateInfo.Topology = PrimitiveTopology::Triangles;
+		pipelineCreateInfo.Topology = PrimitiveTopology::TriangleStrip;
 		pipelineCreateInfo.DepthCompareOperation = DepthCompare::LessOrEqual;
 		m_SkyboxPipeline = Pipeline::Create(pipelineCreateInfo);
 		
 		//auto envCubeMap = m_PrefilteredMap;
 		auto skyViewLut = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetSkyViewLUT();
 		auto transmittanceLut = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetTransmittanceLUT();
+		auto multiScatterLut = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetMultiScatterLUT();
 
 		//m_SkyboxDescriptor->Set("u_EnvTexture", envCubeMap);
 		m_SkyboxDescriptor->Set("u_EnvTexture", m_SkyIrradianceMap);
 		m_SkyboxDescriptor->Set("u_HillaireLUT", skyViewLut);
 		m_SkyboxDescriptor->Set("u_TransmittanceLUT", transmittanceLut);
+		m_SkyboxDescriptor->Set("u_MultiScatterLUT", multiScatterLut);
 
 		m_SkyboxDescriptor->Set("CameraData.Gamma", 2.2f);
 		m_SkyboxDescriptor->Set("CameraData.Exposure", 0.1f);
@@ -528,22 +530,35 @@ namespace Frost
 		m_SkyboxDescriptor->Set("CameraData.SunIntensity", atmosphereParams.SunDirection_Intensity.w);
 		m_SkyboxDescriptor->Set("CameraData.SunSize", atmosphereParams.ViewPos_SunSize.w);
 
-
 		m_SkyboxDescriptor->Set("CameraData.Exposure", renderQueue.m_Camera->GetExposure());
 		m_SkyboxDescriptor->Set("CameraData.Lod", renderQueue.m_Camera->GetDOF());
 
 
+		
+		m_SkyboxDescriptor->Set("CameraData.RayleighScattering", atmosphereParams.RayleighScattering);
+		m_SkyboxDescriptor->Set("CameraData.RayleighAbsorption", atmosphereParams.RayleighAbsorption);
+		m_SkyboxDescriptor->Set("CameraData.MieScattering", atmosphereParams.MieScattering);
+		m_SkyboxDescriptor->Set("CameraData.MieAbsorption", atmosphereParams.MieAbsorption);
+		m_SkyboxDescriptor->Set("CameraData.OzoneAbsorption", atmosphereParams.OzoneAbsorption);
+		m_SkyboxDescriptor->Set("CameraData.ViewPos", glm::vec3(atmosphereParams.ViewPos_SunSize));
+
+		m_SkyboxDescriptor->Set("CameraData.GroundRadius", atmosphereParams.PlanetAbledo_Radius.w);
+		m_SkyboxDescriptor->Set("CameraData.AtmosphereRadius", atmosphereParams.AtmosphereRadius);
 
 
 		m_SkyboxDescriptor->Bind(m_SkyboxPipeline);
-		Vector<glm::mat4> pushConstant(2);
+		Vector<glm::mat4> pushConstant(3);
 		pushConstant[0] = renderQueue.m_Camera->GetProjectionMatrix();
+		pushConstant[0][1][1] *= -1;
 		pushConstant[1] = renderQueue.m_Camera->GetViewMatrix();
+		pushConstant[2] = glm::inverse(renderQueue.m_Camera->GetViewProjectionVK());
 
 		vulkanSkyboxPipeline->BindVulkanPushConstant("u_PushConstant", pushConstant.data());
 
-		vkCmdDraw(cmdBuf, 36, 1, 0, 0);
+		vkCmdDraw(cmdBuf, 4, 1, 0, 0);
 	}
+
+
 
 	void VulkanSceneEnvironment::UpdateAtmosphere(const RenderQueue& renderQueue)
 	{
@@ -552,11 +567,17 @@ namespace Frost
 		glm::vec3 sunDir = glm::radians(-renderQueue.m_LightData.DirLight.Direction);
 
 		glm::vec4 sunDir_Intensity = { sunDir.x, sunDir.y, sunDir.z, renderQueue.m_LightData.DirLight.Specification.Intensity };
-		//float viewPosY = (6.360f + 0.0002f) + glm::clamp(renderQueue.CameraPosition.y / 100000.0f, 0.0f, 0.099f);
 
-		float sunSize = renderQueue.m_LightData.DirLight.Specification.Size;
-		atmosphereParams.ViewPos_SunSize.w = sunSize;
-
+//#define DYNAMIC_SKY
+#ifdef DYNAMIC_SKY
+		float viewPosX = (renderQueue.CameraPosition.x / 100000.0f);
+		float viewPosY = (atmosphereParams.PlanetAbledo_Radius.w + 0.0002f) + (renderQueue.CameraPosition.y / 100000.0f);
+		float viewPosZ = (renderQueue.CameraPosition.z / 100000.0f);
+		
+		atmosphereParams.ViewPos_SunSize.y = viewPosY;
+		atmosphereParams.ViewPos_SunSize.x = viewPosX;
+		atmosphereParams.ViewPos_SunSize.z = viewPosZ;
+#else
 		// If nothing changed since the last frame, don't compute it again since its useless
 		if (atmosphereParams.SunDirection_Intensity == sunDir_Intensity)
 		{
@@ -564,7 +585,17 @@ namespace Frost
 		}
 
 		atmosphereParams.SunDirection_Intensity = sunDir_Intensity;
-		//atmosphereParams.ViewPos_SunSize.y = viewPosY;
+		float sunSize = renderQueue.m_LightData.DirLight.Specification.Size;
+		atmosphereParams.ViewPos_SunSize.w = sunSize;
+#endif
+
+		if (glm::length(glm::vec3(atmosphereParams.ViewPos_SunSize)) < atmosphereParams.PlanetAbledo_Radius.w)
+		{
+			glm::vec3 pos = glm::vec3(atmosphereParams.ViewPos_SunSize) * ((atmosphereParams.PlanetAbledo_Radius.w + 0.0002f) / glm::length(glm::vec3(atmosphereParams.ViewPos_SunSize)));
+			atmosphereParams.ViewPos_SunSize.x = pos.x;
+			atmosphereParams.ViewPos_SunSize.y = pos.y;
+			atmosphereParams.ViewPos_SunSize.z = pos.z;
+		}
 
 		TransmittanceLUT_Update();
 		MultiScatterLUT_Update();

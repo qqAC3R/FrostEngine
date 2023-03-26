@@ -104,14 +104,22 @@ namespace Frost
 		glm::mat4 WorldSpaceMatrix;
 	};
 
-	struct MaterialUniform
+	// Here we should keep the meshes that are loaded once with the engine
+	struct DefaultMeshStorage
+	{
+		Ref<Mesh> Cube;
+		Ref<Mesh> Sphere;
+		Ref<Mesh> Capsule;
+	};
+
+	/*struct MaterialUniform
 	{
 		glm::vec3 AlbedoColor = glm::vec3(0.8f);
 		float Emission = 0.0f;
 		float Roughness = 0.0f;
 		float Metalness = 0.0f;
 		bool UseNormalMap = false;
-	};
+	};*/
 
 	class Mesh
 	{
@@ -120,6 +128,7 @@ namespace Frost
 		// and that should be done only internally. The user shouldn't access any of that, instead there is the `Load` function which just requires the filepath
 		struct MeshBuildSettings;
 		Mesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings = {});
+		Mesh(const Vector<Vertex>& vertices, const Vector<Index>& indices, const glm::mat4& transform);
 	public:
 		virtual ~Mesh();
 
@@ -159,11 +168,15 @@ namespace Frost
 
 		void SetNewTexture(uint32_t textureId, Ref<Texture2D> texture);
 
+		static const DefaultMeshStorage& GetDefaultMeshes();
 		static Ref<Mesh> Load(const std::string& filepath, MaterialInstance material = {});
 	private:
 		void TraverseNodes(aiNode* node, const glm::mat4& parentTransform = glm::mat4(1.0f), uint32_t level = 0);
 
 		static Ref<Mesh> LoadCustomMesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings = {});
+
+		static void InitDefaultMeshes();
+		static void DestroyDefaultMeshes();
 	private:
 		std::string m_Filepath;
 		bool m_IsLoaded;
@@ -228,6 +241,8 @@ namespace Frost
 
 		friend class Animation;
 		friend class SceneSerializer;
+		friend class CookingFactory;
+		friend class Renderer;
 		friend class Ref<Mesh>;
 	};
 }

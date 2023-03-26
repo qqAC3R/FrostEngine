@@ -10,6 +10,7 @@
 #include "Frost/InputCodes/KeyCodes.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
 #include "Frost/Physics/PhysicsEngine.h"
+#include "Frost/Renderer/Renderer.h"
 
 #include "Frost/Math/Math.h"
 
@@ -69,9 +70,9 @@ namespace Frost
 
 
 		{
-			auto& sponzaEntity = m_CurrentScene->CreateEntity("Plane");
+			auto& sponzaEntity = m_CurrentScene->CreateEntity("Cube");
 			auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
-			meshComponent.Mesh = Mesh::Load("Resources/Meshes/Plane.obj", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
+			meshComponent.Mesh = Mesh::Load("Resources/Meshes/cube.gltf", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
 		}
 
 		{
@@ -112,8 +113,21 @@ namespace Frost
 		{
 			m_EditorCamera->OnUpdate(ts);
 			Renderer::BeginScene(m_EditorCamera);
+			Renderer::SetEditorActiveEntity((uint32_t)m_SceneHierarchyPanel->GetSelectedEntity().Raw());
 			m_CurrentScene->Update(ts);
+
+			// Render selected entity - physics debug mesh (if it has)
+			if (m_EnablePhysicsVisualization)
+			{
+				Entity selectedEntity = m_SceneHierarchyPanel->GetSelectedEntity();
+				if(selectedEntity) m_CurrentScene->UpdatePhysicsDebugMesh(selectedEntity);
+			}
 		}
+
+		//if (Input::IsMouseButtonPressed(Mouse::Button0))
+		//{
+		//	MouseButtonPressed();
+		//}
 
 		
 		Renderer::EndScene();
@@ -172,8 +186,13 @@ namespace Frost
 					ImGui::OpenPopup("DebugPopup");
 				if (ImGui::BeginPopup("DebugPopup"))
 				{
-					if (ImGui::MenuItem("Physics Debug", "", &m_EnablePhysicsDebugging))
+					if (ImGui::MenuItem("Physics Scene Debugger", "", &m_EnablePhysicsDebugging))
 						PhysicsEngine::EnableDebugRecording(m_EnablePhysicsDebugging);
+
+					if (ImGui::MenuItem("Physics Collider Visualization", "", &m_EnablePhysicsVisualization))
+					{
+					}
+						
 
 					ImGui::EndPopup();
 				}
@@ -234,6 +253,7 @@ namespace Frost
 			if (m_ViewportPanel->IsResized())
 			{
 				glm::vec2 viewportPanelSize = m_ViewportPanel->GetViewportPanelSize();
+				m_ViewportSize = viewportPanelSize;
 
 				Renderer::Resize(viewportPanelSize.x, viewportPanelSize.y);
 				m_EditorCamera->SetViewportSize(viewportPanelSize.x, viewportPanelSize.y);
@@ -249,6 +269,16 @@ namespace Frost
 			m_ViewportPanel->RenderDebugTools(m_GuizmoMode);
 			m_ViewportPanel->RenderSceneButtons(m_SceneState);
 			m_ViewportPanel->RenderViewportRenderPasses();
+
+
+			{
+				auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
+				auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
+				auto viewportOffset = ImGui::GetWindowPos();
+
+				m_ViewportBounds[0] = { viewportMinRegion.x + viewportOffset.x, viewportMinRegion.y + viewportOffset.y };
+				m_ViewportBounds[1] = { viewportMaxRegion.x + viewportOffset.x, viewportMaxRegion.y + viewportOffset.y };
+			}
 
 			if (m_SceneState != SceneState::Play)
 			{
@@ -294,6 +324,7 @@ namespace Frost
 					);
 
 
+					m_IsGuizmoUsing = ImGuizmo::IsUsing();
 					if (ImGuizmo::IsUsing() && !Input::IsKeyPressed(Key::LeftAlt) && !Input::IsMouseButtonPressed(Mouse::Button1))
 					{
 						Entity parent = m_EditorScene->FindEntityByUUID(selectedEntity.GetParent());
@@ -388,10 +419,21 @@ namespace Frost
 		SetCurrentScene(m_EditorScene);
 	}
 
+	std::pair<uint32_t, uint32_t> EditorLayer::GetMouseViewportSpace()
+	{	
+		auto [mx, my] = ImGui::GetMousePos();
+		mx -= m_ViewportBounds[0].x;
+		my -= m_ViewportBounds[0].y;
+		glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
+
+		return { mx, my };
+	}
+
 	void EditorLayer::OnEvent(Event& event)
 	{
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& event) { return OnKeyPressed(event); });
+		dispatcher.Dispatch<MouseButtonPressedEvent>([this](MouseButtonPressedEvent& event) { return OnMouseButtonPressed(event); });
 
 		m_EditorCamera->OnEvent(event);
 		m_SceneHierarchyPanel->OnEvent(event);
@@ -407,33 +449,79 @@ namespace Frost
 		switch (event.GetKeyCode())
 		{
 			// ImGuizmo modes
-		case Key::Q:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = -1; break;
-		case Key::W:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::TRANSLATE; break;
-		case Key::E:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::ROTATE; break;
-		case Key::R:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::SCALE; break;
+			case Key::Q:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = -1; break;
+			case Key::W:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::TRANSLATE; break;
+			case Key::E:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::ROTATE; break;
+			case Key::R:   if (!ImGuizmo::IsUsing()) m_GuizmoMode = ImGuizmo::OPERATION::SCALE; break;
 
-		case Key::N:
-		{
-			if (!leftControl) break;
-			NewScene();
-			break;
-		}
+			case Key::N:
+			{
+				if (!leftControl) break;
+				NewScene();
+				break;
+			}
 
-		case Key::S:
-		{
-			if (!leftControl) break;
-			SaveSceneAs();
-			break;
-		}
+			case Key::S:
+			{
+				if (!leftControl) break;
+				SaveSceneAs();
+				break;
+			}
 
-		case Key::O:
-		{
-			if (!leftControl) break;
-			OpenScene();
-			break;
-		}
+			case Key::O:
+			{
+				if (!leftControl) break;
+				OpenScene();
+				break;
+			}
 		}
 		return false;
+	}
+
+	bool EditorLayer::OnMouseButtonPressed(MouseButtonPressedEvent& event)
+	{
+#if 1
+		if (event.GetMouseButton() == Mouse::Button0)
+		{
+
+			std::pair<uint32_t, uint32_t> m = GetMouseViewportSpace();
+
+			uint32_t mx = m.first, my = m.second;
+
+			Renderer::SubmitDeletion([&, mx, my]()
+			{
+
+				if (mx >= 0 && my >= 0 && mx < (int)m_ViewportSize.x && my < (int)m_ViewportSize.y && !m_IsGuizmoUsing)
+				{
+					uint32_t entityID = Renderer::ReadPixelFromFramebufferEntityID((uint32_t)mx, (uint32_t)my);
+
+					m_SceneHierarchyPanel->SetSelectedEntityByID(entityID);
+					
+				}
+			});
+
+		}
+
+		return false;
+#endif
+	}
+
+	void EditorLayer::MouseButtonPressed()
+	{
+		std::pair<uint32_t, uint32_t> m = GetMouseViewportSpace();
+
+		uint32_t mx = m.first, my = m.second;
+
+		Renderer::SubmitDeletion([&, mx, my]()
+		{
+			if (mx >= 0 && my >= 0 && mx < (int)m_ViewportSize.x && my < (int)m_ViewportSize.y && !m_IsGuizmoUsing)
+			{
+				uint32_t entityID = Renderer::ReadPixelFromFramebufferEntityID((uint32_t)mx, (uint32_t)my);
+
+				m_SceneHierarchyPanel->SetSelectedEntityByID(entityID);
+			}
+		});
+
 	}
 
 	void EditorLayer::OnResize()

@@ -225,6 +225,9 @@ namespace Frost
 		features12.bufferDeviceAddress = true;
 
 		VkPhysicalDeviceFeatures2 features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+		features.features.wideLines = true;
+		features.features.independentBlend = true;
+		features.features.fillModeNonSolid = true;
 		features.features.multiDrawIndirect = true;
 		features.features.samplerAnisotropy = true;
 		features.features.shaderStorageImageWriteWithoutFormat = true;

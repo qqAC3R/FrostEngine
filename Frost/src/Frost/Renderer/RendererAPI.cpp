@@ -37,13 +37,24 @@ namespace Frost
 		ViewPortHeight = (uint32_t)camera->m_ViewportHeight;
 	}
 
-	void RenderQueue::Add(Ref<Mesh> mesh, const glm::mat4& transform)
+	void RenderQueue::Add(Ref<Mesh> mesh, const glm::mat4& transform, uint32_t entityID)
 	{
 		RenderQueue::RenderData& data = m_Data.emplace_back();
 		data.Mesh = mesh;
 		data.Transform = transform;
+		data.EntityID = entityID;
 
 		m_SubmeshCount += mesh->GetSubMeshes().size();
+	}
+
+	void RenderQueue::AddWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth)
+	{
+		m_WireframeRenderData.push_back({
+			mesh,
+			transform,
+			color,
+			lineWidth
+		});
 	}
 
 	void RenderQueue::AddPointLight(const PointLightComponent& pointLight, const glm::vec3& position)
@@ -136,6 +147,7 @@ namespace Frost
 		m_FogVolumeData.clear();
 		m_CloudVolumeData.clear();
 		m_BatchRendererData.clear();
+		m_WireframeRenderData.clear();
 		CameraViewMatrix = glm::mat4(1.0f);
 		CameraProjectionMatrix = glm::mat4(1.0f);
 	}

@@ -25,6 +25,10 @@ namespace Frost
 
 		void GenerateMipMaps(VkCommandBuffer cmdBuffer, VkImageLayout newImageLayout);
 		void BlitImage(VkCommandBuffer cmdBuf, const Ref<Image2D>& srcImage, uint32_t mipLevel = 0);
+		void CopyImage(VkCommandBuffer cmdBuf, const Ref<Image2D>& srcImage);
+
+		void MapMemory(void** data);
+		void UnMapMemory();
 
 		virtual uint32_t GetWidth() const override { return m_ImageSpecification.Width; }
 		virtual uint32_t GetHeight() const override { return m_ImageSpecification.Height; }
@@ -77,7 +81,7 @@ namespace Frost
 	{
 		void CreateImage(uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels,
 			VkImageType type, VkFormat format, VkImageTiling tiling,
-			VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+			VkImageUsageFlags usage, ImageMemoryProperties memoryProperties,
 			VkImage& image, VulkanMemoryInfo& imageMemory,
 			VkImageCreateFlags optionalFlags = 0
 		);
@@ -92,6 +96,8 @@ namespace Frost
 		VkSamplerMipmapMode GetImageSamplerMipMapMode(ImageFilter imageFiltering);
 		VkImageUsageFlags GetImageUsageFlags(ImageUsage imageUsage);
 		VkImageLayout GetImageLayout(ImageUsage imageUsage);
+		VkImageTiling GetImageTiling(ImageTiling imageTiling);
+		MemoryUsage GetMemoryProperties(ImageMemoryProperties memoryProperties);
 		VkAccessFlags GetAccessFlagsFromLayout(VkImageLayout imageLayout);
 		VkSamplerReductionMode GetSamplerReductionMode(ReductionMode reductionMode);
 		VkPipelineStageFlags GetPipelineStageFlagsFromLayout(VkImageLayout imageLayout);

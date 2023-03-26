@@ -37,15 +37,18 @@ namespace Frost
 		virtual void BeginScene(Ref<RuntimeCamera> camera) = 0;
 		virtual void EndScene() = 0;
 
-		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform) = 0;
-		virtual void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform) = 0;
+		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform, uint32_t entityID) = 0;
 		virtual void Submit(const PointLightComponent& pointLight, const glm::vec3& position) = 0;
 		virtual void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction) = 0;
 		virtual void Submit(const RectangularLightComponent& rectLight, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale) = 0;
 		virtual void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform) = 0;
 		virtual void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale) = 0;
-		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, glm::vec4& color) = 0;
+		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color) = 0;
 		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture) = 0;
+		virtual void SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth) = 0;
+
+		virtual uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y) = 0;
+		virtual void SetEditorActiveEntity(uint32_t selectedEntityId) = 0;
 
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const = 0;
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
@@ -62,8 +65,10 @@ namespace Frost
 
 		void SetCamera(Ref<EditorCamera> camera);
 		void SetCamera(Ref<RuntimeCamera> camera);
+		void SetEditorActiveEntity(uint32_t selectedEntityId) { m_SelectedEntityID = selectedEntityId; }
 
-		void Add(Ref<Mesh> mesh, const glm::mat4& transform);
+		void Add(Ref<Mesh> mesh, const glm::mat4& transform, uint32_t entityID = UINT32_MAX);
+		void AddWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.0f), float lineWidth = 1.0f);
 		void AddFogVolume(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
 		void AddCloudVolume(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale);
 		void AddBillBoard(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color);
@@ -80,8 +85,10 @@ namespace Frost
 		{
 			Ref<Mesh> Mesh = nullptr;
 			glm::mat4 Transform{};
+			uint32_t EntityID;
 		};
 		Vector<RenderQueue::RenderData> m_Data;
+		uint32_t m_SelectedEntityID;
 
 		struct LightData
 		{
@@ -130,6 +137,15 @@ namespace Frost
 			Ref<Texture2D> Texture;
 		};
 		Vector<Object2D> m_BatchRendererData;
+
+		struct RenderWireframeData
+		{
+			Ref<Mesh> Mesh = nullptr;
+			glm::mat4 Transform{};
+			glm::vec4 Color;
+			float LineWidth = 1.0f;
+		};
+		Vector<RenderWireframeData> m_WireframeRenderData;
 		
 		// Fog Volume Data
 		struct FogVolume

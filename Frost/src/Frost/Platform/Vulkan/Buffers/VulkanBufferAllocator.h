@@ -25,7 +25,8 @@ namespace Frost
 	enum class MemoryUsage
 	{
 		CPU_ONLY,
-		CPU_AND_GPU,
+		CPU_TO_GPU,
+		GPU_TO_CPU,
 		GPU_ONLY
 	};
 

@@ -275,17 +275,17 @@ namespace Frost
 
 	void PhysXActor::AddCollider(BoxColliderComponent& collider, Entity entity, const glm::vec3& offset)
 	{
-		m_Colliders.push_back(Ref<PhysX::BoxColliderShape>::Create(collider, *this, entity, offset));
+		m_Colliders.push_back(Ref<PhysX::BoxColliderShape>::Create(collider, *this, entity, collider.Offset));
 	}
 
 	void PhysXActor::AddCollider(SphereColliderComponent& collider, Entity entity, const glm::vec3& offset)
 	{
-		m_Colliders.push_back(Ref<PhysX::SphereColliderShape>::Create(collider, *this, entity, offset));
+		m_Colliders.push_back(Ref<PhysX::SphereColliderShape>::Create(collider, *this, entity, collider.Offset));
 	}
 
 	void PhysXActor::AddCollider(CapsuleColliderComponent& collider, Entity entity, const glm::vec3& offset)
 	{
-		m_Colliders.push_back(Ref<PhysX::CapsuleColliderShape>::Create(collider, *this, entity, offset));
+		m_Colliders.push_back(Ref<PhysX::CapsuleColliderShape>::Create(collider, *this, entity, collider.Offset));
 	}
 
 	void PhysXActor::AddCollider(MeshColliderComponent& collider, Entity entity, const glm::vec3& offset)
@@ -300,7 +300,8 @@ namespace Frost
 	{
 		auto& physicsHandle = PhysXInternal::GetPhysXHandle();
 
-		TransformComponent& transformComponent = m_Entity.GetComponent<TransformComponent>();
+		//TransformComponent& transformComponent = m_Entity.GetComponent<TransformComponent>();
+		glm::mat4 transformComponent = m_Entity.GetGlobalTransform();
 			
 		if (m_RigidBodyData.BodyType == RigidBodyComponent::Type::Static)
 		{
@@ -348,12 +349,20 @@ namespace Frost
 
 			if (m_RigidBodyData.BodyType == RigidBodyComponent::Type::Dynamic && !meshColliderComponent.IsConvex)
 			{
-				FROST_CORE_WARN("Triangle meshes can't have a dynamic rigidbody!");
+				FROST_CORE_WARN("[PhysXActor] Triangle meshes can't have a dynamic rigidbody!");
 			}
 			else
 			{
-				meshColliderComponent.CollisionMesh = m_Entity.GetComponent<MeshComponent>().Mesh;
-				AddCollider(m_Entity.GetComponent<MeshColliderComponent>(), m_Entity);
+				Ref<Mesh> collisionMesh = m_Entity.GetComponent<MeshComponent>().Mesh;
+				if (!collisionMesh->IsAnimated())
+				{
+					meshColliderComponent.CollisionMesh = collisionMesh;
+					AddCollider(m_Entity.GetComponent<MeshColliderComponent>(), m_Entity);
+				}
+				else
+				{
+					FROST_CORE_WARN("[PhysXActor] Mesh Colliders don't support dynamic meshes!");
+				}
 			}
 		}
 

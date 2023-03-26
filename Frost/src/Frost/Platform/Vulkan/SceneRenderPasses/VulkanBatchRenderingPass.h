@@ -24,17 +24,41 @@ namespace Frost
 		virtual void OnResizeLate(uint32_t width, uint32_t height) override;
 		virtual void ShutDown() override;
 
+		uint32_t ReadPixelFromTextureEntityID(uint32_t x, uint32_t y);
+
 		virtual void* GetInternalData() override { return (void*)m_Data; }
 
 		virtual const std::string& GetName() override { return m_Name; }
 	private:
 
-		// ------------------- PBR Deffered --------------------
+		// ------------------- Batch Renderer --------------------
 		void BatchRendererInitData(uint32_t width, uint32_t height);
 		void BatchRendererUpdate(const RenderQueue& renderQueue);
 		void SubmitBillboard(const RenderQueue& renderQueue, const RenderQueue::Object2D& object2d);
 		void SubmitQuad(const RenderQueue::Object2D& object2d); // TODO
 		// ------------------------------------------------------
+
+		// ------------------- Render Wireframe --------------------
+		void RenderWireframeInitData(uint32_t width, uint32_t height);
+		void RenderWireframeUpdate(const RenderQueue& renderQueue);
+		// ------------------------------------------------------
+
+		// ------------------- Render Grid --------------------
+		void RenderGridInitData(uint32_t width, uint32_t height);
+		void RenderGridUpdate(const RenderQueue& renderQueue);
+		// ------------------------------------------------------
+
+		// ------------ On Click Select Entity ----------------
+		void SelectEntityInitData(uint32_t width, uint32_t height);
+		//void SelectEntityUpdate(const RenderQueue& renderQueue);
+		// ------------------------------------------------------
+
+		// ------------ Glow Selected Entity ----------------
+		void GlowSelectedEntityInitData(uint32_t width, uint32_t height);
+		void GlowSelectedEntityUpdate(const RenderQueue& renderQueue);
+		void BlurSelectedEntityUpdate(const RenderQueue& renderQueue);
+		// ------------------------------------------------------
+
 
 	private:
 		std::string m_Name;
@@ -56,6 +80,34 @@ namespace Frost
 			uint32_t QuadCount = 0;
 			QuadVertex* QuadVertexBufferBase = nullptr;
 			QuadVertex* QuadVertexBufferPtr = nullptr;
+
+
+			Ref<Shader> RenderWireframeShader;
+			Ref<Pipeline> RenderWireframePipeline;
+
+			Ref<Shader> RenderGridShader;
+			Ref<Pipeline> RenderGridPipeline;
+			Ref<BufferDevice> GridVertexBuffer;
+			Ref<IndexBuffer> GridIndexBuffer;
+
+			Vector<Ref<Image2D>> EntityIDTexture_CPU;
+			uint32_t* TextureDataCPU;
+			glm::ivec2 ViewportSize;
+			//uint32_t ViewportSize[2];
+
+
+
+			Ref<Shader> LineDetectionShader;
+			Ref<ComputePipeline> LineDetectionPipeline;
+			Vector<Ref<Material>> LineDetectionMaterial;
+			
+			Ref<Shader> GlowSelectedEntityShader;
+			Ref<ComputePipeline> GlowSelectedEntityPipeline;
+			Vector<Ref<Material>> GlowSelectedEntityMaterial;
+			Vector<Ref<Image2D>> GlowSelectedEntityTexturePing;
+			Vector<Ref<Image2D>> GlowSelectedEntityTexturePong;
+
+
 		};
 		InternalData* m_Data;
 
@@ -78,6 +130,30 @@ namespace Frost
 			glm::vec2 TexCoord;
 			uint32_t TexIndex;
 		};
+
+		struct RenderWireframePushConstant
+		{
+			glm::mat4 WorldSpaceMatrix;
+			glm::vec4 Color;
+		};
+		RenderWireframePushConstant m_WireframePushConstant;
+
+		struct RenderGridPushConstant
+		{
+			glm::mat4 WorldSpaceMatrix;
+			float GridScale = 16.025f;
+			float GridSize = 0.025f;
+		};
+		RenderGridPushConstant m_GridPushConstant;
+
+		struct GlowSelectedEntityPushConstant
+		{
+			glm::vec4 SelectedEntityColor = glm::vec4(0.3, 0.3, 0.8, 1.0f);
+			uint32_t SelectedEntityID;
+			uint32_t FilterMode;
+			float CosTime;
+		};
+		GlowSelectedEntityPushConstant m_GlowSelectedEntityPushConstant;
 
 		friend class SceneRenderPassPipeline;
 		friend class VulkanRendererDebugger;

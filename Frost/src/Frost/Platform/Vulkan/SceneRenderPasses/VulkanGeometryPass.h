@@ -124,7 +124,8 @@ namespace Frost
 			uint64_t BoneInformationBDA;
 			uint32_t MaterialIndex;
 			uint32_t IsAnimated = 0;
-		};
+			uint32_t EntityID;
+		} m_GeometryPushConstant;
 
 		InternalData* m_Data;
 		std::string m_Name;

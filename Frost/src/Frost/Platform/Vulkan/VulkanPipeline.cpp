@@ -69,7 +69,7 @@ namespace Frost
 		VkPipelineRasterizationStateCreateInfo rasterizer{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
 		rasterizer.depthClampEnable = VK_FALSE;
 		rasterizer.rasterizerDiscardEnable = VK_FALSE;
-		rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+		rasterizer.polygonMode = createInfo.Wireframe ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
 		rasterizer.lineWidth = createInfo.LineWidth;
 		rasterizer.cullMode = Utils::GetVulkanCullMode(createInfo.Cull);
 		rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -91,6 +91,8 @@ namespace Frost
 			switch (attachment->GetSpecification().Format)
 			{
 				case ImageFormat::R8:
+				case ImageFormat::R32:
+				case ImageFormat::R32I:
 				{
 					auto& colorAttachment = colorBlendAttachment.emplace_back();
 					colorAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT;
@@ -158,7 +160,8 @@ namespace Frost
 			VulkanContext::SetStructDebugName("PipelineLayout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, m_PipelineLayout);
 		}
 
-		std::array<VkDynamicState, 2> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+		std::vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+		if (createInfo.LineWidth > 1.0f) dynamicStates.push_back(VK_DYNAMIC_STATE_LINE_WIDTH);
 
 		VkPipelineDynamicStateCreateInfo dynamicStatesCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
 		dynamicStatesCreateInfo.dynamicStateCount = dynamicStates.size();

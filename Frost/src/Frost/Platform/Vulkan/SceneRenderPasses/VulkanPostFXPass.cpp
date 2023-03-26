@@ -46,9 +46,11 @@ namespace Frost
 		m_Data->BloomShader = Renderer::GetShaderLibrary()->Get("Bloom");
 		m_Data->ApplyAerialShader = Renderer::GetShaderLibrary()->Get("ApplyAerial");
 		m_Data->ColorCorrectionShader = Renderer::GetShaderLibrary()->Get("ColorCorrection");
+		//m_Data->BloomConvolutionShader = Renderer::GetShaderLibrary()->Get("BloomConvolution");
 
 		CalculateMipLevels       (1600, 900);
 		BloomInitData            (1600, 900);
+		//BloomConvolutionInitData (1600, 900);
 		//ApplyAerialInitData      (1600, 900);
 		ColorCorrectionInitData  (1600, 900);
 		HZBInitData              (1600, 900);
@@ -694,6 +696,40 @@ namespace Frost
 		}
 	}
 
+#if 0
+	void VulkanPostFXPass::BloomConvolutionInitData(uint32_t width, uint32_t height)
+	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		// Pipeline creation
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader;
+		if (!m_Data->BloomConvPipeline)
+			m_Data->BloomConvPipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+		m_Data->BloomConv_PingTexture.resize(framesInFlight);
+		m_Data->BloomConv_PongTexture.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			ImageSpecification imageSpec{};
+			imageSpec.Width = width;
+			imageSpec.Height = height;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+
+			imageSpec.Format = ImageFormat::RGBA16F;
+			imageSpec.Usage = ImageUsage::Storage;
+
+			m_Data->BloomConv_PingTexture[i] = Image2D::Create(imageSpec);
+			m_Data->BloomConv_PongTexture[i] = Image2D::Create(imageSpec);
+		}
+
+		if (!m_Data->BloomConvDescriptor)
+			m_Data->BloomConvDescriptor = Material::Create(m_Data->BloomConvolutionShader, "BloomConvolution");
+	}
+#endif
+
 	void VulkanPostFXPass::ApplyAerialInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
@@ -800,7 +836,6 @@ namespace Frost
 		}
 	}
 
-
 	void VulkanPostFXPass::OnUpdate(const RenderQueue& renderQueue)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
@@ -872,7 +907,9 @@ namespace Frost
 				currentRes.y /= 2;
 			}
 			currentRes.z = static_cast<float>(mipLevel);
-			currentRes.w = mipLevel == 0 ? 0.0f : 1.0f;
+
+#define GAUSSIAN_MODE_ONE_PASS 0.0f
+			currentRes.w = GAUSSIAN_MODE_ONE_PASS;
 
 			vulkan_BlurDescriptor->Bind(cmdBuf, m_Data->BlurPipeline);
 			vulkan_BlurPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &currentRes);
@@ -1200,6 +1237,267 @@ namespace Frost
 		vulkanApplyAerialPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
+#if 0
+	void VulkanPostFXPass::BloomConvolutionUpdate(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+
+		Ref<VulkanMaterial> vulkanBloomConvDescriptor = m_Data->BloomConvDescriptor.As<VulkanMaterial>();
+		Ref<VulkanComputePipeline> vulkanBloomConvPipeline = m_Data->BloomConvPipeline.As<VulkanComputePipeline>();
+
+
+		Ref<VulkanImage2D> vulkanPingFFTTex = m_Data->BloomConv_PingTexture[currentFrameIndex].As<VulkanImage2D>();
+		Ref<VulkanImage2D> vulkanPongFFTTex = m_Data->BloomConv_PongTexture[currentFrameIndex].As<VulkanImage2D>();
+
+		//Ref<VulkanImage2D> vulkanThresholdBloomTex = m_Data->Bloom_DownsampledTexture[currentFrameIndex].As<VulkanImage2D>();
+		Ref<VulkanImage2D> vulkanThresholdBloomTex = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, currentFrameIndex).As<VulkanImage2D>();
+
+
+
+		VkDescriptorSetLayout descriptorSetLayout = vulkanBloomConvDescriptor->GetVulkanDescriptorLayout()[0];
+
+		
+
+		struct BloomComputePushConstants
+		{
+			glm::vec2 Resolution;
+			float SubtransformSize;
+			float Horizontal;
+			float IsNotInverse;
+			float Normalization;
+		} bloomConvPushConstant;
+
+		float workGroupSize = 32.0f;
+		uint32_t width = renderQueue.ViewPortWidth;
+		uint32_t height = renderQueue.ViewPortHeight;
+		//float log2Result = std::log(2);
+		
+		float xIterations = std::round(std::log2(width)) ;
+		float yIterations = std::round(std::log2(height));
+		float iterations = xIterations + yIterations;
+
+		bool pingPong = false;
+
+		for (int i = 0; i < iterations; i++)
+		{
+
+			VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+			allocInfo.descriptorSetCount = 1;
+			allocInfo.pSetLayouts = &descriptorSetLayout;
+			VkDescriptorSet descriptorSet = VulkanRenderer::AllocateDescriptorSet(allocInfo);
+
+			if (i == 0)
+			{
+				// Input texture
+				{
+					auto inputImageInfo = vulkanThresholdBloomTex->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
+
+					VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+					wds.dstBinding = 0;
+					wds.dstArrayElement = 0;
+					wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+					wds.pImageInfo = &inputImageInfo;
+					wds.descriptorCount = 1;
+					wds.dstSet = descriptorSet;
+
+					vkUpdateDescriptorSets(device, 1, &wds, 0, nullptr);
+
+				}
+				{
+					auto outputImageInfo = vulkanPingFFTTex->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
+
+					VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+					wds.dstBinding = 1;
+					wds.dstArrayElement = 0;
+					wds.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+					wds.pImageInfo = &outputImageInfo;
+					wds.descriptorCount = 1;
+					wds.dstSet = descriptorSet;
+
+					vkUpdateDescriptorSets(device, 1, &wds, 0, nullptr);
+				}
+			}
+			else
+			{
+				// 0 - sampler, 1 - image
+				Ref<VulkanImage2D> FFTTex0, FFTTex1;
+
+				if (pingPong)
+				{
+					FFTTex0 = vulkanPingFFTTex;
+					FFTTex1 = vulkanPongFFTTex;
+				}
+				else
+				{
+					FFTTex1 = vulkanPingFFTTex;
+					FFTTex0 = vulkanPongFFTTex;
+				}
+
+
+				// Input texture
+				{
+					// Get the prefiltered (blurred) color buffer
+					// I could've used the normal buffer, from the renderpass, but I'm lazy to write more code
+					auto inputImageInfo = FFTTex0->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
+
+					VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+					wds.dstBinding = 0;
+					wds.dstArrayElement = 0;
+					wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+					wds.pImageInfo = &inputImageInfo;
+					wds.descriptorCount = 1;
+					wds.dstSet = descriptorSet;
+
+					vkUpdateDescriptorSets(device, 1, &wds, 0, nullptr);
+
+				}
+				{
+					auto outputImageInfo = FFTTex1->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
+
+					VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+					wds.dstBinding = 1;
+					wds.dstArrayElement = 0;
+					wds.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+					wds.pImageInfo = &outputImageInfo;
+					wds.descriptorCount = 1;
+					wds.dstSet = descriptorSet;
+
+					vkUpdateDescriptorSets(device, 1, &wds, 0, nullptr);
+				}
+
+
+			}
+
+			vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, vulkanBloomConvPipeline->GetVulkanPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
+
+			bloomConvPushConstant.Horizontal = i < xIterations;
+			bloomConvPushConstant.Resolution = { (float)width, (float)height };
+			bloomConvPushConstant.IsNotInverse = 1.0f;
+			bloomConvPushConstant.Normalization = 0.0f; //TODO: Im not sure ??
+			bloomConvPushConstant.SubtransformSize = std::pow(2, (bloomConvPushConstant.Horizontal ? i : (i - xIterations)) + 1);;
+
+			vulkanBloomConvPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &bloomConvPushConstant);
+
+
+
+			uint32_t workGroupsX = std::ceil(width / workGroupSize);
+			uint32_t workGroupsY = std::ceil(height / workGroupSize);
+			vulkanBloomConvPipeline->Dispatch(cmdBuf, workGroupsX, workGroupsY, 1);
+
+			if (pingPong)
+			{
+				vulkanPongFFTTex->TransitionLayout(cmdBuf, vulkanPongFFTTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			}
+			else
+			{
+				vulkanPingFFTTex->TransitionLayout(cmdBuf, vulkanPingFFTTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			}
+			pingPong = !pingPong;
+		}
+
+#if 0
+
+		for (int i = 0; i < 1; i++)
+		{
+
+			VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+			allocInfo.descriptorSetCount = 1;
+			allocInfo.pSetLayouts = &descriptorSetLayout;
+			VkDescriptorSet descriptorSet = VulkanRenderer::AllocateDescriptorSet(allocInfo);
+
+			// 0 - sampler, 1 - image
+			Ref<VulkanImage2D> FFTTex0, FFTTex1;
+
+			if (pingPong)
+			{
+				FFTTex0 = vulkanPingFFTTex;
+				FFTTex1 = vulkanPongFFTTex;
+			}
+			else
+			{
+				FFTTex1 = vulkanPingFFTTex;
+				FFTTex0 = vulkanPongFFTTex;
+			}
+
+
+			// Input texture
+			{
+				// Get the prefiltered (blurred) color buffer
+				// I could've used the normal buffer, from the renderpass, but I'm lazy to write more code
+				auto inputImageInfo = FFTTex0->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
+
+				VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				wds.dstBinding = 0;
+				wds.dstArrayElement = 0;
+				wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				wds.pImageInfo = &inputImageInfo;
+				wds.descriptorCount = 1;
+				wds.dstSet = descriptorSet;
+
+				vkUpdateDescriptorSets(device, 1, &wds, 0, nullptr);
+
+			}
+			{
+				auto outputImageInfo = FFTTex1->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
+
+				VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				wds.dstBinding = 1;
+				wds.dstArrayElement = 0;
+				wds.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				wds.pImageInfo = &outputImageInfo;
+				wds.descriptorCount = 1;
+				wds.dstSet = descriptorSet;
+
+				vkUpdateDescriptorSets(device, 1, &wds, 0, nullptr);
+			}
+
+
+			vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, vulkanBloomConvPipeline->GetVulkanPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
+
+			bloomConvPushConstant.Horizontal = i < xIterations;
+			bloomConvPushConstant.Resolution = { (float)width, (float)height };
+			bloomConvPushConstant.IsNotInverse = 0.0f;
+
+			if (i == 0)
+			{
+				bloomConvPushConstant.Normalization = 1.0f;
+			}
+			else
+			{
+				bloomConvPushConstant.Normalization = 0.0f;
+			}
+
+
+			bloomConvPushConstant.SubtransformSize = std::pow(2, (i % int32_t(iterations / 2)) + 1);
+			//bloomConvPushConstant.SubtransformSize = std::pow(2, (bloomConvPushConstant.Horizontal ? i : (i - xIterations)) + 1);;
+
+			vulkanBloomConvPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &bloomConvPushConstant);
+
+
+
+			uint32_t workGroupsX = std::ceil(width / workGroupSize);
+			uint32_t workGroupsY = std::ceil(height / workGroupSize);
+			vulkanBloomConvPipeline->Dispatch(cmdBuf, workGroupsX, workGroupsY, 1);
+
+			if (pingPong)
+			{
+				vulkanPongFFTTex->TransitionLayout(cmdBuf, vulkanPongFFTTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			}
+			else
+			{
+				vulkanPingFFTTex->TransitionLayout(cmdBuf, vulkanPingFFTTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			}
+			pingPong = !pingPong;
+		}
+#endif
+
+	}
+#endif
+
 	void VulkanPostFXPass::BloomUpdate(const RenderQueue& renderQueue)
 	{
 		if (m_Data->ScreenMipLevel <= 1) return;
@@ -1282,7 +1580,6 @@ namespace Frost
 				vkUpdateDescriptorSets(device, 1, &wds, 0, nullptr);
 			}
 
-			//vulkanBloomDescriptor->Bind(cmdBuf, m_Data->BloomPipeline);
 			vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, vulkanBloomPipeline->GetVulkanPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
 
 			vulkanBloomPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &bloomPushConstant);
@@ -1310,6 +1607,8 @@ namespace Frost
 			);
 		}
 
+		//BloomConvolutionUpdate(renderQueue);
+#if 1
 		/// Part 2: Downsample the prefiltered thresholded texture
 		{
 			uint32_t totalMips = int32_t(m_Data->ScreenMipLevel - 2) > 1 ?
@@ -1588,12 +1887,14 @@ namespace Frost
 
 			}
 		}
+#endif
 	}
 
 	void VulkanPostFXPass::OnResize(uint32_t width, uint32_t height)
 	{
 		CalculateMipLevels       (width, height);
 		BloomInitData            (width, height);
+		//BloomConvolutionInitData (width, height);
 		//ApplyAerialInitData      (width, height);
 		ColorCorrectionInitData  (width, height);
 		SSRFilterInitData        (width, height);

@@ -9,6 +9,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "CookingFactory.h"
+
 namespace Frost {
 namespace PhysXUtils {
 
@@ -50,34 +52,9 @@ namespace PhysXUtils {
 	glm::vec3 FromPhysXVector(const physx::PxVec3& vector) { return *(glm::vec3*)&vector; }
 	glm::vec4 FromPhysXVector(const physx::PxVec4& vector) { return *(glm::vec4*)&vector; }
 	glm::quat FromPhysXQuat(const physx::PxQuat& quat) {
-		//return *(glm::quat*)&quat;
 		return glm::quat(quat.w, quat.x, quat.y, quat.z);
 	}
 
-	CookingResult FromPhysXCookingResult(physx::PxConvexMeshCookingResult::Enum cookingResult)
-	{
-		switch (cookingResult)
-		{
-		case physx::PxConvexMeshCookingResult::eSUCCESS:return CookingResult::Success;
-		case physx::PxConvexMeshCookingResult::eZERO_AREA_TEST_FAILED: return CookingResult::ZeroAreaTestFailed;
-		case physx::PxConvexMeshCookingResult::ePOLYGONS_LIMIT_REACHED: return CookingResult::PolygonLimitReached;
-		case physx::PxConvexMeshCookingResult::eFAILURE: return CookingResult::Failure;
-		}
-
-		return CookingResult::Failure;
-	}
-
-	CookingResult FromPhysXCookingResult(physx::PxTriangleMeshCookingResult::Enum cookingResult)
-	{
-		switch (cookingResult)
-		{
-		case physx::PxTriangleMeshCookingResult::eSUCCESS: return CookingResult::Success;
-		case physx::PxTriangleMeshCookingResult::eLARGE_TRIANGLE: return CookingResult::LargeTriangle;
-		case physx::PxTriangleMeshCookingResult::eFAILURE: return CookingResult::Failure;
-		}
-
-		return CookingResult::Failure;
-	}
 
 	physx::PxBroadPhaseType::Enum PhysXUtils::GetBroadphaseType(BroadphaseType type)
 	{

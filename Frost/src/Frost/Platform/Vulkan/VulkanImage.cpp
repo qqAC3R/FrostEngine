@@ -13,6 +13,7 @@ namespace Frost
 		VkFormat textureFormat = Utils::GetImageFormat(specification.Format);
 		VkImageUsageFlags usageFlags = Utils::GetImageUsageFlags(specification.Usage);
 		VkImageLayout newImageLayout = Utils::GetImageLayout(specification.Usage);
+		VkImageTiling imageTiling = Utils::GetImageTiling(specification.Tiling);
 
 		// Calculate the mip chain levels
 		if (specification.UseMipChain)
@@ -24,10 +25,11 @@ namespace Frost
 		// (for creation we use `VK_IMAGE_LAYOUT_UNDEFINED` layout, which will be later changed to the user's input")
 		Utils::CreateImage(specification.Width, specification.Height, 1, m_MipLevelCount,
 			VK_IMAGE_TYPE_2D, textureFormat,
-			VK_IMAGE_TILING_OPTIMAL,
+			imageTiling, // Most of the time it will be VK_IMAGE_TILING_OPTIMAL
 			usageFlags | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, // Need the trasnfer src/dst bits for generating the mips
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, // GPU only
-			m_Image, m_ImageMemory);
+			specification.MemoryProperties, // Most of the time it will be GPU only
+			m_Image, m_ImageMemory
+		);
 
 		// Recording a temporary commandbuffer for transitioning
 		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics ,true);
@@ -118,7 +120,7 @@ namespace Frost
 		// Making a staging buffer to copy the data
 		VkBuffer stagingBuffer;
 		VulkanMemoryInfo stagingBufferMemory;
-		VulkanAllocator::AllocateBuffer(imageSize, { BufferUsage::TransferSrc }, MemoryUsage::CPU_AND_GPU, stagingBuffer, stagingBufferMemory);
+		VulkanAllocator::AllocateBuffer(imageSize, { BufferUsage::TransferSrc }, MemoryUsage::CPU_TO_GPU, stagingBuffer, stagingBufferMemory);
 
 		// Copying the data
 		void* copyData;
@@ -133,7 +135,7 @@ namespace Frost
 			VK_IMAGE_TYPE_2D, textureFormat,
 			VK_IMAGE_TILING_OPTIMAL,
 			usageFlags | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, // Need the trasnfer src/dst bits for generating the mips
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, // GPU only
+			ImageMemoryProperties::GPU_ONLY, // GPU only
 			m_Image, m_ImageMemory
 		);
 
@@ -269,6 +271,11 @@ namespace Frost
 		VkImageAspectFlags imageAspectMask{};
 		switch (m_ImageSpecification.Format)
 		{
+		case ImageFormat::R32:
+		case ImageFormat::R32I:
+			imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blitFilter = VK_FILTER_NEAREST;
+			break;
 		case ImageFormat::Depth32:
 		case ImageFormat::Depth24Stencil8:
 			imageAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -366,6 +373,11 @@ namespace Frost
 		VkImageAspectFlags imageAspectMask{};
 		switch (m_ImageSpecification.Format)
 		{
+		case ImageFormat::R32:
+		case ImageFormat::R32I:
+			imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blitFilter = VK_FILTER_NEAREST;
+			break;
 		case ImageFormat::Depth32:
 		case ImageFormat::Depth24Stencil8:
 			imageAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -468,6 +480,117 @@ namespace Frost
 		);
 	}
 
+	void VulkanImage2D::CopyImage(VkCommandBuffer cmdBuf, const Ref<Image2D>& srcImage)
+	{
+		VkImageAspectFlags imageAspectMask{};
+		switch (m_ImageSpecification.Format)
+		{
+		case ImageFormat::R32:
+		case ImageFormat::R32I:
+			imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			break;
+		case ImageFormat::Depth32:
+		case ImageFormat::Depth24Stencil8:
+			imageAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			break;
+		default:
+			imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		}
+
+		VkImageSubresourceRange subresourceRange{};
+		subresourceRange.aspectMask = imageAspectMask;
+		subresourceRange.baseArrayLayer = 0;
+		subresourceRange.layerCount = 1;
+		subresourceRange.levelCount = 1;
+		subresourceRange.baseMipLevel = 0;
+
+
+		// #SOURCE
+		// Getting all the information neccesary
+		Ref<VulkanImage2D> vulkanSrcImage = srcImage.As<VulkanImage2D>();
+		int32_t blitImageWidth = vulkanSrcImage->m_ImageSpecification.Width;
+		int32_t blitImageHeight = vulkanSrcImage->m_ImageSpecification.Height;
+		VkImage vulkanSrcRawImage = vulkanSrcImage->GetVulkanImage();
+		VkImageLayout initialSrcImageLayout = vulkanSrcImage->GetVulkanImageLayout();
+
+
+		// Transition the src image to `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL`
+		Utils::InsertImageMemoryBarrier(cmdBuf, vulkanSrcRawImage,
+			Utils::GetAccessFlagsFromLayout(initialSrcImageLayout),
+			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+			initialSrcImageLayout,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			Utils::GetPipelineStageFlagsFromLayout(initialSrcImageLayout),
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+			subresourceRange
+		);
+
+
+
+
+		// #DESTIONATION
+		// Transition the dst (this class) image to `VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL`
+		Utils::InsertImageMemoryBarrier(cmdBuf, m_Image,
+			Utils::GetAccessFlagsFromLayout(m_ImageLayout),
+			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			m_ImageLayout,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			subresourceRange
+		);
+
+
+		// Otherwise use image copy (requires us to manually flip components)
+		VkImageCopy imageCopyRegion{};
+		imageCopyRegion.srcSubresource.aspectMask = imageAspectMask;
+		imageCopyRegion.srcSubresource.layerCount = 1;
+		imageCopyRegion.dstSubresource.aspectMask = imageAspectMask;
+		imageCopyRegion.dstSubresource.layerCount = 1;
+		imageCopyRegion.extent.width = blitImageWidth;
+		imageCopyRegion.extent.height = blitImageHeight;
+		imageCopyRegion.extent.depth = 1;
+
+		vkCmdCopyImage(cmdBuf,
+			vulkanSrcRawImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			m_Image,           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			1, &imageCopyRegion
+		);
+
+
+		// Transition both images to the layouts they had before the blit
+		Utils::InsertImageMemoryBarrier(cmdBuf, vulkanSrcRawImage,
+			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+			Utils::GetAccessFlagsFromLayout(initialSrcImageLayout),
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			initialSrcImageLayout,
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+			Utils::GetPipelineStageFlagsFromLayout(initialSrcImageLayout),
+			subresourceRange
+		);
+
+		Utils::InsertImageMemoryBarrier(cmdBuf, m_Image,
+			Utils::GetAccessFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			Utils::GetAccessFlagsFromLayout(m_ImageLayout),
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			m_ImageLayout,
+			Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			Utils::GetPipelineStageFlagsFromLayout(m_ImageLayout),
+			subresourceRange
+		);
+	}
+
+	void VulkanImage2D::MapMemory(void** data)
+	{
+		VkBuffer temp;
+		VulkanAllocator::BindBuffer(temp, m_ImageMemory, data);
+	}
+
+	void VulkanImage2D::UnMapMemory()
+	{
+		VulkanAllocator::UnbindBuffer(m_ImageMemory);
+	}
+
 	void VulkanImage2D::UpdateDescriptor()
 	{
 		m_DescriptorInfo[DescriptorImageType::Sampled].imageView = m_ImageView;
@@ -503,7 +626,7 @@ namespace Frost
 
 		void CreateImage(uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels,
 						 VkImageType type, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
-						 VkMemoryPropertyFlags properties,
+						 ImageMemoryProperties memoryProperties,
 						 VkImage& image, VulkanMemoryInfo& imageMemory,
 						 VkImageCreateFlags optionalFlags)
 		{
@@ -526,7 +649,11 @@ namespace Frost
 			// https://stackoverflow.com/questions/46186474/write-a-rgba8-image-as-a-r32ui
 			// TODO: This should be added if we want to add atomic increment in the voxel texture
 
-			VulkanAllocator::AllocateImage(imageInfo, MemoryUsage::GPU_ONLY, image, imageMemory);
+
+			// Most of the time it will be MemoryUsage::GPU_ONLY
+			MemoryUsage memoryUsage = Utils::GetMemoryProperties(memoryProperties);
+
+			VulkanAllocator::AllocateImage(imageInfo, memoryUsage, image, imageMemory);
 		}
 
 		void CreateImageView(VkImageView& imageView, VkImage image, VkImageUsageFlags imageUsage, VkFormat format, uint32_t mipLevels, uint32_t textureDepth)
@@ -643,6 +770,7 @@ namespace Frost
 			{
 				case ImageFormat::R8:               return VK_FORMAT_R8_UNORM;
 				case ImageFormat::R32:              return VK_FORMAT_R32_SFLOAT;
+				case ImageFormat::R32I:             return VK_FORMAT_R32_UINT;
 				case ImageFormat::RG32F:			return VK_FORMAT_R32G32_SFLOAT;
 				case ImageFormat::RGBA8:            return VK_FORMAT_R8G8B8A8_UNORM;
 				case ImageFormat::RGBA16F:          return VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -697,7 +825,7 @@ namespace Frost
 				case ImageUsage::ReadOnly:		  return VK_IMAGE_USAGE_SAMPLED_BIT;
 				case ImageUsage::ColorAttachment: return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 				case ImageUsage::DepthStencil:    return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-				case ImageUsage::None:            FROST_ASSERT_MSG("ImageUsage::None is invalid!");
+				case ImageUsage::None:            break;
 			}
 			return VkImageUsageFlags();
 		}
@@ -710,9 +838,33 @@ namespace Frost
 				case ImageUsage::ReadOnly:           return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				case ImageUsage::ColorAttachment:    return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 				case ImageUsage::DepthStencil:       return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
-				case ImageUsage::None:               FROST_ASSERT_MSG("ImageUsage::None is invalid!");
+				case ImageUsage::None:               break;
 			}
-			return VkImageLayout();
+			return VK_IMAGE_LAYOUT_UNDEFINED;
+		}
+
+		VkImageTiling GetImageTiling(ImageTiling imageTiling)
+		{
+			switch (imageTiling)
+			{
+				case ImageTiling::Optimal:  return VK_IMAGE_TILING_OPTIMAL;
+				case ImageTiling::Linear:   return VK_IMAGE_TILING_LINEAR;
+			}
+			FROST_ASSERT_MSG("ImageTiling is invalid!");
+			return VkImageTiling();
+		}
+
+		MemoryUsage GetMemoryProperties(ImageMemoryProperties memoryProperties)
+		{
+			switch (memoryProperties)
+			{
+				case ImageMemoryProperties::CPU_ONLY:     return MemoryUsage::CPU_ONLY;
+				case ImageMemoryProperties::CPU_TO_GPU:   return MemoryUsage::CPU_TO_GPU;
+				case ImageMemoryProperties::GPU_TO_CPU:   return MemoryUsage::GPU_TO_CPU;
+				case ImageMemoryProperties::GPU_ONLY:     return MemoryUsage::GPU_ONLY;
+			}
+			FROST_ASSERT_MSG("ImageMemoryProperties is invalid!");
+			return MemoryUsage();
 		}
 
 		VkAccessFlags GetAccessFlagsFromLayout(VkImageLayout imageLayout)

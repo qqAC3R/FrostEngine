@@ -4,6 +4,8 @@
 #include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
 #include "Frost/Renderer/Renderer.h"
 
+#include "Frost/Physics/PhysX/CookingFactory.h"
+
 #include "Entity.h"
 
 namespace Frost
@@ -624,6 +626,7 @@ namespace Frost
 				boxColliderComponent.Size = { boxColliderIn["Size"][0], boxColliderIn["Size"][1], boxColliderIn["Size"][2] };
 				boxColliderComponent.Offset = { boxColliderIn["Offset"][0], boxColliderIn["Offset"][1], boxColliderIn["Offset"][2] };
 				boxColliderComponent.IsTrigger = boxColliderIn["IsTrigger"];
+				//boxColliderComponent.DebugMesh = Renderer::GetDefaultMeshes().Cube;
 			}
 
 			// Sphere Collider Component
@@ -657,6 +660,25 @@ namespace Frost
 
 				meshColliderComponent.IsConvex = meshColliderIn["IsConvex"];
 				meshColliderComponent.IsTrigger = meshColliderIn["IsTrigger"];
+
+				// Add the debug meshes
+				if (ent.HasComponent<MeshComponent>())
+				{
+					MeshComponent& meshComponent = ent.GetComponent<MeshComponent>();
+					if (meshComponent.IsMeshValid())
+					{
+						if (!meshComponent.Mesh->IsAnimated())
+						{
+							meshColliderComponent.CollisionMesh = meshComponent.Mesh;
+							CookingResult result = CookingFactory::CookMesh(meshColliderComponent, false);
+						}
+						else
+						{
+							meshColliderComponent.ResetMesh();
+							FROST_CORE_WARN("[SceneSerializer] Mesh Colliders don't support dynamic meshes!");
+						}
+					}
+				}
 			}
 
 			// Directional Light Component

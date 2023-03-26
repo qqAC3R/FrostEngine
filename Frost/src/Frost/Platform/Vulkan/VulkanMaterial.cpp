@@ -643,6 +643,11 @@ namespace Frost
 		Set<glm::mat4>(name, value);
 	}
 
+	void VulkanMaterial::Set(const std::string& name, const glm::vec4& value)
+	{
+		Set<glm::vec4>(name, value);
+	}
+
 	Ref<BufferDevice> VulkanMaterial::GetBuffer(const std::string& name)
 	{
 		FROST_ASSERT(bool(m_MaterialData.find(name) != m_MaterialData.end()), "Couldn't find the member");

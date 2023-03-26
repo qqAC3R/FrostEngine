@@ -49,6 +49,7 @@ namespace Frost
 
 		TransformComponent& Transform() { return m_Scene->GetRegistry().get<TransformComponent>(m_Handle); }
 		const glm::mat4& Transform() const { return m_Scene->GetRegistry().get<TransformComponent>(m_Handle).GetTransform(); }
+		const glm::mat4& GetGlobalTransform() const { return m_Scene->GetTransformMatFromEntityAndParent(*this); }
 
 		bool IsAncesterOf(Entity entity)
 		{

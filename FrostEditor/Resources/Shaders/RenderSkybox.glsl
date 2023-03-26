@@ -5,9 +5,11 @@ layout(push_constant) uniform Constants
 {
 	mat4 ProjectionMatrix;
 	mat4 ViewMatrix;
+	mat4 InvProjectionViewMatrix;
 } u_PushConstant;
 
 layout(location = 0) out vec3 v_FragmentPos;
+layout(location = 1) out vec2 v_TexCoord;
 
 // Taken from: https://gist.github.com/rikusalminen/9393151
 vec3 CreateCube(int vertexID)
@@ -36,6 +38,24 @@ vec3 CreateCube(int vertexID)
 	return n + mirror * (1 - 2 * (idx & 1)) * u + mirror * (1 - 2 * (idx >> 1)) * v;
 }
 
+//{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+//{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+//{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+//{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+
+struct QuadInfo
+{
+	vec2 Position;
+	vec2 TexCoord;
+};
+
+QuadInfo quadData[4] = {
+	{{ 1.0, -1.0 }, { 0.0, 1.0 }},
+	{{-1.0, -1.0 }, { 1.0, 1.0 }},
+	{{ 1.0,  1.0 }, { 0.0, 0.0 }},
+	{{-1.0,  1.0 }, { 1.0, 0.0 }},
+};
+
 void main()
 {
 	//v_FragmentPos = a_Position;
@@ -50,7 +70,14 @@ void main()
 	mat4 modViewProjection = mat4(mat3(u_PushConstant.ViewMatrix));
 	vec4 clipPosition = vkProjectionMatrix * modViewProjection * vec4(cubeCoords, 1.0f);
 	
-	gl_Position = clipPosition.xyww;
+	//gl_Position = clipPosition.xyww;
+
+	//v_TexCoord = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
+	//gl_Position = vec4(v_TexCoord * 2.0 - 1.0, 1.0, 1.0);
+	v_TexCoord = quadData[gl_VertexIndex].TexCoord;
+	gl_Position = vec4(quadData[gl_VertexIndex].Position, 1.0, 1.0);
+
+	v_FragmentPos = mat3(inverse(u_PushConstant.ViewMatrix)) * vec3(inverse(u_PushConstant.ProjectionMatrix) * gl_Position);
 }
 
 #type fragment
@@ -62,6 +89,7 @@ layout(location = 0) out vec4 o_Color;
 
 // Input
 layout(location = 0) in vec3 v_FragmentPos;
+layout(location = 1) in vec2 v_TexCoord;
 
 #define SKYBOX_MODE_HDRMAP   0
 #define SKYBOX_MODE_HILLAIRE 1
@@ -76,6 +104,7 @@ layout(location = 0) in vec3 v_FragmentPos;
 layout(binding = 0) uniform samplerCube u_EnvTexture;
 layout(binding = 1) uniform sampler2D   u_HillaireLUT;
 layout(binding = 2) uniform sampler2D   u_TransmittanceLUT;
+layout(binding = 4) uniform sampler2D   u_MultiScatterLUT;
 
 layout(binding = 3) uniform CameraData {
 	float Gamma;
@@ -94,9 +123,25 @@ layout(binding = 3) uniform CameraData {
 	float AtmosphereRadius;
 
 	float SunSize;
+	float Temp0;
+
+
+	vec4 RayleighScattering;
+	vec4 RayleighAbsorption;
+	vec4 MieScattering;
+	vec4 MieAbsorption;
+	vec4 OzoneAbsorption;
 
 } m_CameraData;
 
+struct ScatteringParams
+{
+	vec4 RayleighScattering; //  Rayleigh scattering base (x, y, z) and height falloff (w).
+	vec4 RayleighAbsorption; //  Rayleigh absorption base (x, y, z) and height falloff (w).
+	vec4 MieScattering; //  Mie scattering base (x, y, z) and height falloff (w).
+	vec4 MieAbsorption; //  Mie absorption base (x, y, z) and height falloff (w).
+	vec4 OzoneAbsorption; //  Ozone absorption base (x, y, z) and scale (w).
+};
 
 // From http://filmicworlds.com/blog/filmic-tonemapping-operators/
 vec3 Uncharted2Tonemap(vec3 color)
@@ -128,6 +173,24 @@ float ArcCos(float x)
 	return acos(clamp(x, -1.0, 1.0));
 }
 
+
+float raySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
+    // - r0: ray origin
+    // - rd: normalized ray direction
+    // - s0: sphere center
+    // - sr: sphere radius
+    // - Returns distance from r0 to first intersecion with sphere,
+    //   or -1.0 if no intersection.
+    float a = dot(rd, rd);
+    vec3 s0_r0 = r0 - s0;
+    float b = 2.0 * dot(rd, s0_r0);
+    float c = dot(s0_r0, s0_r0) - (sr * sr);
+    if (b*b - 4.0*a*c < 0.0) {
+        return -1.0;
+    }
+    return (-b - sqrt((b*b) - 4.0*a*c))/(2.0*a);
+}
+
 float RayIntersectSphere(vec3 rayOrigin, vec3 rayDirection, float radius)
 {
 	float b = dot(rayOrigin, rayDirection);
@@ -144,6 +207,27 @@ float RayIntersectSphere(vec3 rayOrigin, vec3 rayDirection, float radius)
 	  return (-b + sqrt(discr));
 	
 	return -b - sqrt(discr);
+}
+
+// From https://www.shadertoy.com/view/wlBXWK
+vec2 RayIntersectSphere2D(
+    vec3 rayOrigin, // starting position of the ray
+    vec3 rayDir, // the direction of the ray
+    float radius // and the sphere radius
+)
+{
+    // ray-sphere intersection that assumes
+    // the sphere is centered at the origin.
+    // No intersection when result.x > result.y
+    float a = dot(rayDir, rayDir);
+    float b = 2.0 * dot(rayDir, rayOrigin);
+    float c = dot(rayOrigin, rayOrigin) - (radius * radius);
+    float d = (b*b) - 4.0*a*c;
+    if (d < 0.0) return vec2(1e5,-1e5);
+    return vec2(
+        (-b - sqrt(d))/(2.0*a),
+        (-b + sqrt(d))/(2.0*a)
+    );
 }
 
 vec3 SampleHLUT(sampler2D tex,
@@ -203,6 +287,163 @@ vec3 ComputeSunLuminance(vec3 e, vec3 s, float size, float intensity)
 	return intensity * comp * vec3(1.0) * limbDarkening;
 }
 
+// ------------------------------------------------------------------
+vec3 GetValFromLUT(sampler2D u_LUT,
+				   vec3 pos,
+				   vec3 sunDir,
+				   float groundRadius,
+				   float atmosphereRadius)
+{
+	float height = length(pos);
+	vec3 up = pos / height;
+
+	float sunCosZenithAngle = dot(sunDir, up);
+
+	float u = clamp(0.5f + 0.5f * sunCosZenithAngle, 0.0f, 1.0f);
+	float v = max(0.0f, min(1.0f, (height - groundRadius) / (atmosphereRadius - groundRadius)));
+
+	return texture(u_LUT, vec2(u, v)).rgb;
+}
+
+float GetMiePhase(float cosTheta)
+{
+	const float g = 0.8;
+	const float scale = 3.0 / (8.0 * PI);
+	
+	float num = (1.0 - g * g) * (1.0 + cosTheta * cosTheta);
+	float denom = (2.0 + g * g) * pow((1.0 + g * g - 2.0 * g * cosTheta), 1.5);
+	
+	return scale * num / denom;
+}
+
+float GetRayleighPhase(float cosTheta)
+{
+	const float k = 3.0 / (16.0 * PI);
+	return k * (1.0 + cosTheta * cosTheta);
+}
+
+vec3 ComputeRayleighScattering(vec3 pos, ScatteringParams params, float groundRadius)
+{
+	float altitude = (length(pos) - groundRadius) * 1000.0; // convert into KM
+	float rayleighDensity = exp(-altitude / params.RayleighScattering.w);
+
+	return params.RayleighScattering.rgb * rayleighDensity;
+}
+
+vec3 ComputeMieScattering(vec3 pos, ScatteringParams params, float groundRadius)
+{
+	float altitude = (length(pos) - groundRadius) * 1000.0; // convert into KM
+	float mieDensity = exp(-altitude / params.MieScattering.w);
+
+	return params.MieScattering.rgb * mieDensity;
+}
+
+vec3 ComputeExtinction(vec3 pos, ScatteringParams params, float groundRadius)
+{
+	float altitude = (length(pos) - groundRadius) * 1000.0; // transform distance into KM
+
+	// Calculate the density for rayLeigh and mie scattering
+	float rayLeighDensity = exp(-altitude / params.RayleighScattering.w);
+	float mieDensity = exp(-altitude / params.MieScattering.w);
+
+	vec3 rayleighScattering = params.RayleighScattering.rgb * rayLeighDensity;
+	vec3 rayleighAbsorption = params.RayleighAbsorption.rgb * rayLeighDensity;
+
+	vec3 mieScattering = params.MieScattering.rgb * mieDensity;
+	vec3 mieAbsorption = params.MieAbsorption.rgb * mieDensity;
+
+	vec3 ozoneAbsorption = params.OzoneAbsorption.w * params.OzoneAbsorption.rgb * max(0.0, 1.0 - abs(altitude - 25.0) / 15.0);
+
+	return rayleighScattering + vec3(rayleighAbsorption + mieScattering + mieAbsorption) + ozoneAbsorption;
+}
+
+
+vec3 RaymarchScattering(vec3 pos,
+						vec3 rayDir,
+						vec3 sunDir,
+						float tMax,
+                        ScatteringParams params,
+						float groundRadius,
+                        float atmoRadius)
+{
+	vec2 atmosIntercept = RayIntersectSphere2D(pos, rayDir, atmoRadius);
+    float terraIntercept = RayIntersectSphere(pos, rayDir, groundRadius);
+
+	float mindist, maxdist;
+
+	if (atmosIntercept.x < atmosIntercept.y){
+        // there is an atmosphere intercept!
+        // start at the closest atmosphere intercept
+        // trace the distance between the closest and farthest intercept
+        mindist = atmosIntercept.x > 0.0 ? atmosIntercept.x : 0.0;
+		maxdist = atmosIntercept.y > 0.0 ? atmosIntercept.y : 0.0;
+    } else {
+        // no atmosphere intercept means no atmosphere!
+        return vec3(0.0);
+    }
+
+	// if in the atmosphere start at the camera
+    if (length(pos) < atmoRadius) mindist=0.0;
+
+	
+
+	// if there's a terra intercept that's closer than the atmosphere one,
+    // use that instead!
+    if (terraIntercept > 0.0){ // confirm valid intercepts			
+        maxdist = terraIntercept;
+    }
+
+	// start marching at the min dist
+    pos = pos + mindist * rayDir;
+
+
+	float cosTheta = dot(rayDir, sunDir);
+	
+	float miePhaseValue = GetMiePhase(cosTheta);
+	float rayleighPhaseValue = GetRayleighPhase(-cosTheta);
+
+	vec3 luminance = vec3(0.0);
+	vec3 transmittance = vec3(1.0);
+	float t = 0.0;
+
+	
+#define NUM_STEPS 16
+
+	for(float i = 0.0; i < float(NUM_STEPS); i += 1.0)
+	{
+		//float newT = ((i + 0.3) / float(NUM_STEPS)) * tMax;
+		float newT = ((i + 0.3) / float(NUM_STEPS)) * clamp(maxdist-mindist, 0.0f, 1.5f);
+		float dt = newT - t;
+		t = newT;
+
+		vec3 newPos = pos + t * rayDir;
+
+		vec3 rayleighScattering = ComputeRayleighScattering(newPos, params, groundRadius);
+		vec3 mieScattering = ComputeMieScattering(newPos, params, groundRadius);
+		vec3 extinction = ComputeExtinction(newPos, params, groundRadius);
+
+		vec3 sampleTransmittance = exp(-dt * extinction);
+
+		// Sample LUTS
+		vec3 sunTransmittance = GetValFromLUT(u_TransmittanceLUT, newPos, sunDir, groundRadius, atmoRadius);
+		vec3 psiMS = GetValFromLUT(u_MultiScatterLUT, newPos, sunDir, groundRadius, atmoRadius);
+
+		vec3 rayleighInScattering = rayleighScattering * (rayleighPhaseValue * sunTransmittance + psiMS);
+		vec3 mieInScattering = mieScattering * (miePhaseValue * sunTransmittance + psiMS);
+
+		vec3 inScattering = (rayleighInScattering + mieInScattering);
+
+		// Integrated scattering within path segment.
+		vec3 scatteringIntegral = (inScattering - inScattering * sampleTransmittance) / extinction;
+
+		luminance += scatteringIntegral * transmittance;
+
+		transmittance *= sampleTransmittance;
+	}
+
+	return luminance;
+}
+
 void main()
 {
 	vec3 color = vec3(0.0f);
@@ -239,7 +480,11 @@ void main()
 			float groundRadius = m_CameraData.GroundRadius;
 			float atmosphereRadius = m_CameraData.AtmosphereRadius;
 
-			color = ComputeSunLuminance(viewDir, sunPos, sunSize, sunIntensity);
+			if(raySphereIntersect(viewPos, viewDir, vec3(0.0f), groundRadius) < 0.0f)
+			{
+				color = ComputeSunLuminance(viewDir, sunPos, sunSize, sunIntensity);
+				
+			}
 
 
 			vec3 groundTrans = SampleHLUT(
@@ -258,18 +503,51 @@ void main()
                 atmosphereRadius
 			);
 
+
 			float comp = float(RayIntersectSphere(viewPos, viewDir, groundRadius) < 0.0);
 
-			color *= comp * groundTrans / spaceTrans;
+			//color *= comp * groundTrans / spaceTrans;
+
 
 			float skyIntensity = 3.0f;
-			color += skyIntensity * SampleSkyViewLUT(
-				u_HillaireLUT,
-				viewPos,
-				viewDir,
-				sunPos,
-				groundRadius
-			);
+
+			if (length(viewPos) < atmosphereRadius * 1.0)
+			{
+				color += SampleSkyViewLUT(
+					u_HillaireLUT,
+					viewPos,
+					viewDir,
+					sunPos,
+					groundRadius
+				);
+			}
+			else
+			{
+
+				ScatteringParams params;
+				params.RayleighScattering = m_CameraData.RayleighScattering;
+				params.RayleighAbsorption = m_CameraData.RayleighAbsorption;
+				params.MieScattering = m_CameraData.MieScattering;
+				params.MieAbsorption = m_CameraData.MieAbsorption;
+				params.OzoneAbsorption = m_CameraData.OzoneAbsorption;
+
+				// As mentioned in section 7 of the paper, switch to direct raymarching outside atmosphere
+				vec3 luminance = RaymarchScattering(
+										viewPos,
+										viewDir,
+										sunPos,
+										0.0,
+										params,
+										groundRadius,
+										atmosphereRadius
+				);
+
+				color += min(max(vec3(0.0f), luminance), vec3(1.0f));
+        
+			}
+
+			color *= skyIntensity;
+			
 
 			color *= m_CameraData.Exposure;
 

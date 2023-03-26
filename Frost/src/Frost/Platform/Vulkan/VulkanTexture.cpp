@@ -113,7 +113,7 @@ namespace Frost
 			VK_IMAGE_TYPE_2D, textureFormat,
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | usageFlags,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			ImageMemoryProperties::GPU_ONLY,
 			m_Image, m_ImageMemory
 		);
 
@@ -379,7 +379,8 @@ namespace Frost
 		}
 		else
 		{
-			throw std::runtime_error("Could not find a matching memory type");
+			FROST_ASSERT_INTERNAL("Could not find a matching memory type");
+			return 0;
 		}
 	}
 
@@ -497,7 +498,7 @@ namespace Frost
 			VK_IMAGE_TYPE_3D, textureFormat,
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | usageFlags,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			ImageMemoryProperties::GPU_ONLY,
 			m_Image, m_ImageMemory,
 			optionalFlags
 		);

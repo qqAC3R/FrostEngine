@@ -72,7 +72,6 @@ namespace Frost
 			Ref<ComputePipeline> RectLightCullingPipeline;
 			Vector<Ref<Material>> RectLightCullingDescriptor;
 
-
 			Ref<Image2D> LTC1_Lut;
 			Ref<Image2D> LTC2_Lut;
 		};

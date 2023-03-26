@@ -198,7 +198,8 @@ namespace Frost
 			switch (usage)
 			{
 			case MemoryUsage::CPU_ONLY:	   return VMA_MEMORY_USAGE_CPU_ONLY;
-			case MemoryUsage::CPU_AND_GPU: return VMA_MEMORY_USAGE_CPU_TO_GPU;
+			case MemoryUsage::CPU_TO_GPU:  return VMA_MEMORY_USAGE_CPU_TO_GPU;
+			case MemoryUsage::GPU_TO_CPU:  return VMA_MEMORY_USAGE_CPU_TO_GPU;
 			case MemoryUsage::GPU_ONLY:    return VMA_MEMORY_USAGE_GPU_ONLY;
 			}
 			return VMA_MEMORY_USAGE_UNKNOWN;

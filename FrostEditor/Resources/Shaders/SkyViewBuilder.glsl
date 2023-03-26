@@ -66,6 +66,27 @@ float RayIntersectSphere(vec3 rayOrigin, vec3 rayDirection, float radius)
 	return -b - sqrt(discr);
 }
 
+// From https://www.shadertoy.com/view/wlBXWK
+vec2 RayIntersectSphere2D(
+    vec3 rayOrigin, // starting position of the ray
+    vec3 rayDir, // the direction of the ray
+    float radius // and the sphere radius
+)
+{
+    // ray-sphere intersection that assumes
+    // the sphere is centered at the origin.
+    // No intersection when result.x > result.y
+    float a = dot(rayDir, rayDir);
+    float b = 2.0 * dot(rayDir, rayOrigin);
+    float c = dot(rayOrigin, rayOrigin) - (radius * radius);
+    float d = (b*b) - 4.0*a*c;
+    if (d < 0.0) return vec2(1e5,-1e5);
+    return vec2(
+        (-b - sqrt(d))/(2.0*a),
+        (-b + sqrt(d))/(2.0*a)
+    );
+}
+
 vec3 GetValFromLUT(sampler2D u_LUT,
 				   vec3 pos,
 				   vec3 sunDir,
@@ -144,6 +165,35 @@ vec3 RaymarchScattering(vec3 pos,
 						float groundRadius,
                         float atmoRadius)
 {
+	vec2 atmosIntercept = RayIntersectSphere2D(pos, rayDir, atmoRadius);
+    float terraIntercept = RayIntersectSphere(pos, rayDir, groundRadius);
+
+	float mindist, maxdist;
+
+	if (atmosIntercept.x < atmosIntercept.y){
+        // there is an atmosphere intercept!
+        // start at the closest atmosphere intercept
+        // trace the distance between the closest and farthest intercept
+        mindist = atmosIntercept.x > 0.0 ? atmosIntercept.x : 0.0;
+		maxdist = atmosIntercept.y > 0.0 ? atmosIntercept.y : 0.0;
+    } else {
+        // no atmosphere intercept means no atmosphere!
+        return vec3(0.0);
+    }
+
+	// if in the atmosphere start at the camera
+    if (length(pos) < atmoRadius) mindist=0.0;
+
+	// if there's a terra intercept that's closer than the atmosphere one,
+    // use that instead!
+    if (terraIntercept > 0.0){ // confirm valid intercepts			
+        maxdist = terraIntercept;
+    }
+
+	// start marching at the min dist
+    pos = pos + mindist * rayDir;
+
+
 	float cosTheta = dot(rayDir, sunDir);
 	
 	float miePhaseValue = GetMiePhase(cosTheta);
@@ -153,9 +203,12 @@ vec3 RaymarchScattering(vec3 pos,
 	vec3 transmittance = vec3(1.0f);
 	float t = 0.0f;
 
+	
+
 	for(float i = 0.0f; i < float(NUM_STEPS); i += 1.0f)
 	{
-		float newT = ((i + 0.3) / float(NUM_STEPS)) * tMax;
+		//float newT = ((i + 0.3) / float(NUM_STEPS)) * tMax;
+		float newT = ((i + 0.3) / float(NUM_STEPS)) * (maxdist-mindist);
 		float dt = newT - t;
 		t = newT;
 
@@ -244,6 +297,8 @@ void main()
 										groundRadius,
 										atmosphereRadius
 	);
+
+	luminance = min(max(vec3(0.0f), luminance), vec3(1.0f));
 
 	imageStore(u_SkyViewImage, globalInvocation, vec4(vec3(luminance), 1.0f));
 

@@ -129,6 +129,14 @@ vec3 UpsampleTent9(sampler2D tex, float lod, vec2 uv, vec2 texelSize, float radi
     return result * (1.0f / 16.0f);
 }
 
+vec3 rgb2yuv (vec3 rgb) {
+    return vec3 (
+        rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114,
+        rgb.r * -0.169 + rgb.g * -0.331 + rgb.b * 0.5,
+        rgb.r * 0.5 + rgb.g * -0.419 + rgb.b * -0.081
+    );
+}
+
 void main()
 {
 	vec2 imgSize = vec2(imageSize(o_Image));
@@ -150,6 +158,7 @@ void main()
         vec2 texelSize = 1.0f / texSize;
 		color.rgb = DownSampleBox13(u_Texture, 0, texCoords, texelSize);
         color.rgb = Prefilter(color, texCoords);
+        //color.rgb = rgb2yuv(color.rgb);
 	}
     else if (u_PushConstant.Mode == MODE_DOWNSAMPLE)
     {

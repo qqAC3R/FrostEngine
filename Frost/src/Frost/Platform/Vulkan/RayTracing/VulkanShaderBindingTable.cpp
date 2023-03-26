@@ -89,7 +89,7 @@ namespace Frost
 
 			VulkanAllocator::AllocateBuffer(sbtSize,
 											{ BufferUsage::TransferSrc, BufferUsage::ShaderAddress, BufferUsage::ShaderBindingTable },
-											MemoryUsage::CPU_AND_GPU,
+											MemoryUsage::CPU_TO_GPU,
 											buffer, memory);
 
 

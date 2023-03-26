@@ -346,6 +346,31 @@ namespace Frost
 		}
 	}
 
+	void SceneHierarchyPanel::SetSelectedEntityByID(uint32_t entityID)
+	{
+		if (entityID == UINT32_MAX)
+		{
+			m_SelectedEntity = {};
+			return;
+		}
+
+		bool entityFound = false;
+
+		m_SceneContext->GetRegistry().each([&](auto entity)
+		{
+			Entity ent = { entity, m_SceneContext.Raw() };
+			if ((uint32_t)entity == entityID)
+			{
+				m_SelectedEntity = ent;
+				entityFound = true;
+				return;
+			}
+		});
+
+		if(!entityFound)
+			m_SelectedEntity = {};
+	}
+
 	void SceneHierarchyPanel::AddLateFunction(const std::function<void()>& func)
 	{
 		m_LateDeletionFunctions.push_back(func);
@@ -362,4 +387,5 @@ namespace Frost
 	void SceneHierarchyPanel::Shutdown()
 	{
 	}
+
 }

@@ -18,6 +18,11 @@ namespace Frost
 				case FramebufferTextureFormat::R8:	 
 					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R8_UNORM);
 
+				case FramebufferTextureFormat::R32:	 
+					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R32_SINT);
+				case FramebufferTextureFormat::R32I:	 
+					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R32_UINT);
+
 				case FramebufferTextureFormat::RGBA8:	 
 					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R8G8B8A8_UNORM);
 
@@ -51,6 +56,8 @@ namespace Frost
 			switch (framebufferFormat)
 			{
 				case FramebufferTextureFormat::R8:				 return ImageFormat::R8;
+				case FramebufferTextureFormat::R32:				 return ImageFormat::R32;
+				case FramebufferTextureFormat::R32I:			 return ImageFormat::R32I;
 				case FramebufferTextureFormat::RGBA8:            return ImageFormat::RGBA8;
 				case FramebufferTextureFormat::RGBA16F:          return ImageFormat::RGBA16F;
 				case FramebufferTextureFormat::RGBA32F:          return ImageFormat::RGBA32F;

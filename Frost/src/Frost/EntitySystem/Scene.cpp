@@ -91,7 +91,9 @@ namespace Frost
 		UpdateRectangularLightComponent(ts);
 		UpdateBoxFogVolumes(ts);
 		UpdateCloudVolumes(ts);
+
 		UpdateSceneCameras(ts);
+		//UpdatePhysicsDebugMeshes(ts);
 	}
 
 	void Scene::UpdateRuntime(Timestep ts)
@@ -106,6 +108,8 @@ namespace Frost
 		UpdateRectangularLightComponent(ts);
 		UpdateBoxFogVolumes(ts);
 		UpdateCloudVolumes(ts);
+
+		//UpdatePhysicsDebugMeshes(ts);
 	}
 
 	void Scene::OnPhysicsSimulationStart()
@@ -199,7 +203,7 @@ namespace Frost
 			if (mesh.Mesh)
 			{
 				glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
-				Renderer::Submit(mesh.Mesh, transform);
+				Renderer::Submit(mesh.Mesh, transform, (uint32_t)entity);
 			}
 		}
 	}
@@ -313,6 +317,117 @@ namespace Frost
 			Math::DecomposeTransform(transform, translation, rotation, scale);
 
 			Renderer::SubmitBillboards(translation, glm::vec2(1.0f), Renderer::GetInternalEditorIcon("SceneCamera"));
+		}
+	}
+
+	void Scene::UpdatePhysicsDebugMesh(Entity selectedEntity)
+	{
+		// Physics Debug Meshes
+		if(selectedEntity.HasComponent<BoxColliderComponent>())
+		{
+			BoxColliderComponent& boxColliderComponent = selectedEntity.GetComponent<BoxColliderComponent>();
+
+			glm::mat4 globalTransform = GetTransformMatFromEntityAndParent(selectedEntity);
+			globalTransform = glm::scale(glm::translate(globalTransform, boxColliderComponent.Offset * glm::vec3(2.0f)), boxColliderComponent.Size);
+
+			Renderer::SubmitWireframeMesh(boxColliderComponent.DebugMesh, globalTransform, glm::vec4(0.0f, 0.9f, 0.2f, 1.0f), 2.0f);
+		}
+
+
+		if (selectedEntity.HasComponent<SphereColliderComponent>())
+		{
+			SphereColliderComponent& sphereColliderComponent = selectedEntity.GetComponent<SphereColliderComponent>();
+
+			glm::mat4 globalTransform = GetTransformMatFromEntityAndParent(selectedEntity);
+			globalTransform = glm::scale(glm::translate(globalTransform, sphereColliderComponent.Offset * glm::vec3(1.0f)), glm::vec3(sphereColliderComponent.Radius * 2.0f));
+
+			Renderer::SubmitWireframeMesh(sphereColliderComponent.DebugMesh, globalTransform, glm::vec4(0.0f, 0.9f, 0.2f, 1.0f), 2.0f);
+		}
+
+
+		if (selectedEntity.HasComponent<CapsuleColliderComponent>())
+		{
+			CapsuleColliderComponent& capsuleColliderComponent = selectedEntity.GetComponent<CapsuleColliderComponent>();
+
+			glm::mat4 globalTransform = GetTransformMatFromEntityAndParent(selectedEntity);
+
+			Renderer::SubmitWireframeMesh(capsuleColliderComponent.DebugMesh, globalTransform, glm::vec4(0.0f, 0.9f, 0.2f, 1.0f), 2.0f);
+		}
+
+		if (selectedEntity.HasComponent<MeshColliderComponent>())
+		{
+			MeshColliderComponent& meshColliderComponent = selectedEntity.GetComponent<MeshColliderComponent>();
+
+			if (meshColliderComponent.ProcessedMeshes.size())
+			{
+				glm::mat4 globalTransform = GetTransformMatFromEntityAndParent(selectedEntity);
+
+				for (uint32_t i = 0; i < meshColliderComponent.ProcessedMeshes.size(); i++)
+				{
+					if (meshColliderComponent.ProcessedMeshes[i])
+						Renderer::SubmitWireframeMesh(meshColliderComponent.ProcessedMeshes[i], globalTransform, glm::vec4(0.0f, 0.9f, 0.2f, 1.0f), 2.0f);
+				}
+
+			}
+
+		}
+	}
+
+	void Scene::UpdatePhysicsDebugMeshes(Timestep ts)
+	{
+		// Physics Debug Meshes
+		auto groupBoxColliders = m_Registry.group<BoxColliderComponent>(entt::get<TransformComponent>);
+		for (auto& entity : groupBoxColliders)
+		{
+			auto [boxColliderComponent, transformComponent] = groupBoxColliders.get<BoxColliderComponent, TransformComponent>(entity);
+
+			glm::mat4 globalTransform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+			globalTransform = glm::scale(glm::translate(globalTransform, boxColliderComponent.Offset * glm::vec3(2.0f)), boxColliderComponent.Size);
+
+			Renderer::SubmitWireframeMesh(boxColliderComponent.DebugMesh, globalTransform, glm::vec4(0.0f, 0.9f, 0.2f, 1.0f), 2.0f);
+		}
+
+
+		auto groupSphereColliders = m_Registry.group<SphereColliderComponent>(entt::get<TransformComponent>);
+		for (auto& entity : groupSphereColliders)
+		{
+			auto [sphereColliderComponent, transformComponent] = groupSphereColliders.get<SphereColliderComponent, TransformComponent>(entity);
+
+			glm::mat4 globalTransform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+			globalTransform = glm::scale(glm::translate(globalTransform, sphereColliderComponent.Offset * glm::vec3(1.0f)), glm::vec3(sphereColliderComponent.Radius * 2.0f));
+
+			Renderer::SubmitWireframeMesh(sphereColliderComponent.DebugMesh, globalTransform, glm::vec4(0.0f, 0.9f, 0.2f, 1.0f), 2.0f);
+		}
+
+
+		auto groupCapsuleColliders = m_Registry.group<CapsuleColliderComponent>(entt::get<TransformComponent>);
+		for (auto& entity : groupCapsuleColliders)
+		{
+			auto [capsuleColliderComponent, transformComponent] = groupCapsuleColliders.get<CapsuleColliderComponent, TransformComponent>(entity);
+
+			glm::mat4 globalTransform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+
+			Renderer::SubmitWireframeMesh(capsuleColliderComponent.DebugMesh, globalTransform, glm::vec4(0.0f, 0.9f, 0.2f, 1.0f), 2.0f);
+		}
+
+		auto groupMeshColliders = m_Registry.group<MeshColliderComponent>(entt::get<TransformComponent>);
+		for (auto& entity : groupMeshColliders)
+		{
+			auto [meshColliderComponent, transformComponent] = groupMeshColliders.get<MeshColliderComponent, TransformComponent>(entity);
+
+			if (meshColliderComponent.ProcessedMeshes.size())
+			{
+				glm::mat4 globalTransform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+
+				for (uint32_t i = 0; i < meshColliderComponent.ProcessedMeshes.size(); i++)
+				{
+					if(meshColliderComponent.ProcessedMeshes[i])
+						Renderer::SubmitWireframeMesh(meshColliderComponent.ProcessedMeshes[i], globalTransform, glm::vec4(0.0f, 0.9f, 0.2f, 1.0f), 2.0f);
+
+				}
+
+			}
+
 		}
 	}
 

@@ -274,7 +274,7 @@ vec3 ComputePointLightContribution(PointLight pointLight)
 	vec3 LightPosition = vec3(pointLight.Position);
 
 	// Get the values from the surfaces
-	vec3 albedo = m_Surface.Albedo.rgb * m_Surface.Emission;
+	vec3 albedo = m_Surface.Albedo.rgb;
 	float roughness = m_Surface.Roughness;
 	float metalness = m_Surface.Metalness;
 
@@ -329,7 +329,7 @@ vec3 ComputePointLightContribution(PointLight pointLight)
 vec3 ComputeDirectionalLightContribution(DirectionalLight directionalLight)
 {
 	// Get the values from the surfaces
-	vec3 albedo = m_Surface.Albedo.rgb * m_Surface.Emission;
+	vec3 albedo = m_Surface.Albedo.rgb;
 	float roughness = m_Surface.Roughness;
 	float metalness = m_Surface.Metalness;
 
@@ -455,7 +455,7 @@ vec3 ComputeAreaLightContribution()
 	vec3 P = m_Surface.WorldPos;
 	float dotNV = clamp(dot(N, V), 0.0, 1.0);
 
-	vec3 albedo = vec3(m_Surface.Albedo * m_Surface.Emission);
+	vec3 albedo = vec3(m_Surface.Albedo);
 	vec3 metalness = vec3(m_Surface.Metalness);
 
 	// Get the UVs for the LUT from the Roughness and sqrt(1-cos_theta)
@@ -528,7 +528,7 @@ float ComputeSpecularAO(float nDotV, float ao, float roughness)
 vec3 ComputeIBLContriubtion()
 {
 	// Get the values from the surfaces
-	vec3 albedo = m_Surface.Albedo.rgb * m_Surface.Emission;
+	vec3 albedo = m_Surface.Albedo.rgb;
 	float roughness = clamp(m_Surface.Roughness, 0.0f, 0.95f);
 	float metalness = m_Surface.Metalness;
 
@@ -640,6 +640,8 @@ void main()
 	}
 
 	Lo += ComputeAreaLightContribution();
+
+	Lo += m_Surface.Albedo * m_Surface.Emission;
 
 
 	// Calculating all directional lights contribution

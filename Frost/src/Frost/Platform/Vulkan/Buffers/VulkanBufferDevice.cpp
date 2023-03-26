@@ -18,7 +18,7 @@ namespace Frost
 		
 		// CPU_ONLY means that the memory is preferably fast to access by GPU and fast to be mapped by the host (tho it is uncached).
 		// This fits the best for uniform/storage buffers that are used everyframe.
-		VulkanAllocator::AllocateBuffer(size, usages, MemoryUsage::CPU_AND_GPU, m_Buffer, m_BufferMemory);
+		VulkanAllocator::AllocateBuffer(size, usages, MemoryUsage::CPU_TO_GPU, m_Buffer, m_BufferMemory);
 		VulkanContext::SetStructDebugName("Buffer", VK_OBJECT_TYPE_BUFFER, m_Buffer);
 		GetBufferAddress();
 		UpdateDescriptor();

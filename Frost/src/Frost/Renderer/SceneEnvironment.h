@@ -22,7 +22,7 @@ namespace Frost
 
 		glm::vec4 ViewPos_SunSize = glm::vec4(0.0f, 6.360f + 0.0002f, 0.0f, 2.0f);
 
-		float AtmosphereRadius = 6.460f;
+		float AtmosphereRadius = 6.562f;
 
 		// Used for generating the irradiance map
 		float Roughness = 0.0f;

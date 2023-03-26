@@ -33,7 +33,9 @@ namespace Frost::PhysX
 
 		m_Shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, !m_Component.IsTrigger);
 		m_Shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, m_Component.IsTrigger);
-		m_Shape->setLocalPose(PhysXUtils::ToPhysXTransform(glm::translate(glm::mat4(1.0f), m_Component.Offset)));
+		//m_Shape->setLocalPose(PhysXUtils::ToPhysXTransform(glm::translate(glm::mat4(1.0f), m_Component.Offset)));
+		m_Shape->setLocalPose(PhysXUtils::ToPhysXTransform(offset + m_Component.Offset, glm::vec3(0.0f)));
+
 	}
 
 	BoxColliderShape::~BoxColliderShape()

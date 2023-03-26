@@ -3,11 +3,13 @@
 
 #include "Frost/Renderer/Renderer.h"
 
-#include "../UserInterface/UIWidgets.h"
+#include "UserInterface/UIWidgets.h"
 #include <imgui.h>
 #include <imgui/imgui_internal.h>
 
 #include "IconsFontAwesome.hpp"
+
+#include "Frost/Physics/PhysX/CookingFactory.h"
 
 namespace Frost
 {
@@ -218,7 +220,10 @@ namespace Frost
 			if (ImGui::MenuItem("Box Collider"))
 			{
 				if (!selectedEntity.HasComponent<BoxColliderComponent>())
-					selectedEntity.AddComponent<BoxColliderComponent>();
+				{
+					BoxColliderComponent& boxCollider = selectedEntity.AddComponent<BoxColliderComponent>();
+					//boxCollider.DebugMesh = Renderer::GetDefaultMeshes().Cube;
+				}
 				else
 					FROST_CORE_WARN("This entity already has the Box Collider Component!");
 			}
@@ -246,14 +251,35 @@ namespace Frost
 			{
 				if (!selectedEntity.HasComponent<MeshColliderComponent>())
 				{
-					if (selectedEntity.HasComponent<MeshComponent>())
-						selectedEntity.AddComponent<MeshColliderComponent>();
-					else
-						FROST_CORE_WARN("This entity doesn't have the Mesh Component!");
 
+					if (selectedEntity.HasComponent<MeshComponent>())
+					{
+						MeshComponent& meshComponent = selectedEntity.GetComponent<MeshComponent>();
+						MeshColliderComponent& meshColliderComponent = selectedEntity.AddComponent<MeshColliderComponent>();
+
+						if (meshComponent.IsMeshValid())
+						{
+							if (!meshComponent.Mesh->IsAnimated())
+							{
+								meshColliderComponent.CollisionMesh = meshComponent.Mesh;
+								CookingResult result = CookingFactory::CookMesh(meshColliderComponent, false);
+							}
+							else
+							{
+								meshColliderComponent.ResetMesh();
+								FROST_CORE_WARN("[InspectorPanel] Mesh Colliders don't support dynamic meshes!");
+							}
+						}
+					}
+					else
+					{
+						FROST_CORE_WARN("This entity doesn't have the Mesh Component!");
+					}
 				}
 				else
+				{
 					FROST_CORE_WARN("This entity already has the Mesh Collider Component!");
+				}
 			}
 
 			ImGui::Separator();
@@ -305,7 +331,12 @@ namespace Frost
 		{
 			animationComponent = &entity.GetComponent<AnimationComponent>();
 		}
-		DrawComponent<MeshComponent>("MESH", entity, [animationComponent](auto& component)
+		MeshColliderComponent* meshColliderComponent = nullptr;
+		if (entity.HasComponent<MeshColliderComponent>())
+		{
+			meshColliderComponent = &entity.GetComponent<MeshColliderComponent>();
+		}
+		DrawComponent<MeshComponent>("MESH", entity, [meshColliderComponent, animationComponent](auto& component)
 		{
 			std::string meshFilepath = "";
 			if (component.Mesh.Raw() != nullptr)
@@ -321,6 +352,25 @@ namespace Frost
 			if (!path.empty())
 			{
 				component.Mesh = Mesh::Load(path);
+
+				if (meshColliderComponent != nullptr)
+				{
+					if (component.IsMeshValid())
+					{
+						if (!component.Mesh->IsAnimated())
+						{
+							meshColliderComponent->ResetMesh();
+							meshColliderComponent->CollisionMesh = component.Mesh;
+							CookingResult result = CookingFactory::CookMesh(*meshColliderComponent, false);
+						}
+						else
+						{
+							meshColliderComponent->ResetMesh();
+							FROST_CORE_WARN("[InspectorPanel] Mesh Colliders don't support dynamic meshes!");
+						}
+					}
+				}
+
 
 				if (animationComponent != nullptr)
 				{
@@ -835,7 +885,7 @@ namespace Frost
 					ImGui::Text("Offset");
 
 					ImGui::TableNextColumn();
-					ImGui::DragFloat3("", &component.Offset.x, 0.1f, 0.0f, 1000.0f);
+					ImGui::DragFloat3("", &component.Offset.x, 0.1f, -1000.0f, 1000.0f);
 
 					ImGui::PopID();
 				}
@@ -884,7 +934,7 @@ namespace Frost
 					ImGui::Text("Offset");
 
 					ImGui::TableNextColumn();
-					ImGui::DragFloat3("", &component.Offset.x, 0.1f, 0.0f, 1000.0f);
+					ImGui::DragFloat3("", &component.Offset.x, 0.1f, -1000.0f, 1000.0f);
 
 					ImGui::PopID();
 				}
@@ -946,7 +996,7 @@ namespace Frost
 					ImGui::Text("Offset");
 
 					ImGui::TableNextColumn();
-					ImGui::DragFloat3("", &component.Offset.x, 0.1f, 0.0f, 1000.0f);
+					ImGui::DragFloat3("", &component.Offset.x, 0.1f, -1000.0f, 1000.0f);
 
 					ImGui::PopID();
 				}

@@ -23,12 +23,14 @@ namespace Frost
 		{
 			FROST_ASSERT_INTERNAL(scene);
 			m_SelectedEntity = {};
+			m_SelectedSubmesh = UINT32_MAX;
 			m_SceneContext = scene;
 		}
 
 		Entity& GetSelectedEntity() { return m_SelectedEntity; }
 		uint32_t GetSelectedEntitySubmesh() { return m_SelectedSubmesh; }
 
+		void SetSelectedEntityByID(uint32_t entityID);
 	private:
 		void DrawEntityNode(Entity& entity);
 

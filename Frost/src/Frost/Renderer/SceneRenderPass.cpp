@@ -4,26 +4,8 @@
 namespace Frost
 {
 
-	template <class T>
-	Ref<T> SceneRenderPassPipeline::GetRenderPass()
-	{
-		// Getting the id of the renderPass (by template)
-		auto typeIdx = std::type_index(typeid(T));
 
-
-		// Checking if the id of the renderPass is found
-		auto it = m_RenderPassesByTypeId.find(typeIdx);
-
-		if (it == m_RenderPassesByTypeId.end())
-		{
-			FROST_WARN("Error: The requested of RenderPass {0} does not exist.", typeIdx);
-			return nullptr;
-		}
-
-		// Return the renderPass as the type from the template
-		return it->second.As<T>();
-	}
-
+#if 0
 	template <class T>
 	Ref<T> SceneRenderPassPipeline::GetRenderPass(const std::string& name)
 	{
@@ -44,6 +26,7 @@ namespace Frost
 	{
 		return GetRenderPass<SceneRenderPass>(name);
 	}
+#endif
 
 
 	void SceneRenderPassPipeline::UpdateRenderPasses(const RenderQueue& renderQueue)

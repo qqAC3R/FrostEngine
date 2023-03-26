@@ -10,14 +10,18 @@ namespace Frost
 	struct RendererData
 	{
 		Ref<ShaderLibrary> m_ShaderLibrary;
+
 		Ref<Texture2D> m_WhiteTexture;
 		Ref<Texture2D> m_BRDFLut;
 		Ref<Texture2D> m_NoiseLut;
 		Ref<Texture2D> m_SpatialBlueNoiseLut;
 		Ref<Texture2D> m_TemporalBlueNoiseLut;
 		Ref<SceneEnvironment> m_Environment;
+		
 		HashMap<std::string, std::function<Ref<Image2D>()>> m_OutputImageMap;
+
 		HashMap<std::string, Ref<Texture2D>> EditorIcons;
+		DefaultMeshStorage DefaultMeshes;
 	};
 
 	RendererAPI* Renderer::s_RendererAPI = nullptr;
@@ -91,6 +95,11 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudWoorleyNoise.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudComputeVolumetric.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BatchRenderer.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Wireframe.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SceneGrid.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EntityGlow.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/LineDetection.glsl");
+		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolution.glsl");
 
 		
 		// Init the pools
@@ -118,6 +127,7 @@ namespace Frost
 		s_Data->m_NoiseLut = Texture2D::Create("Resources/LUT/Noise.png", textureSpec);
 
 		InitEditorIcons();
+		Mesh::InitDefaultMeshes();
 
 		// Environment cubemaps
 		s_Data->m_Environment = SceneEnvironment::Create();
@@ -131,18 +141,14 @@ namespace Frost
 	void Renderer::ShutDown()
 	{
 		s_RendererAPI->ShutDown();
+		Mesh::DestroyDefaultMeshes();
 		delete s_CommandQueue;
 		delete s_Data;
 	}
 
-	void Renderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform)
+	void Renderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform, uint32_t entityID)
 	{
-		s_RendererAPI->Submit(mesh, transform);
-	}
-
-	void Renderer::Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform)
-	{
-		s_RendererAPI->Submit(mesh, material, transform);
+		s_RendererAPI->Submit(mesh, transform, entityID);
 	}
 
 	void Renderer::Submit(const PointLightComponent& pointLight, const glm::vec3& position)
@@ -178,7 +184,7 @@ namespace Frost
 		}
 	}
 
-	void Renderer::SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, glm::vec4& color)
+	void Renderer::SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color)
 	{
 		s_RendererAPI->SubmitBillboards(positon, size, color);
 	}
@@ -186,6 +192,21 @@ namespace Frost
 	void Renderer::SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture)
 	{
 		s_RendererAPI->SubmitBillboards(positon, size, texture);
+	}
+
+	void Renderer::SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth)
+	{
+		s_RendererAPI->SubmitWireframeMesh(mesh, transform, color, lineWidth);
+	}
+
+	uint32_t Renderer::ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y)
+	{
+		return s_RendererAPI->ReadPixelFromFramebufferEntityID(x, y);
+	}
+
+	void Renderer::SetEditorActiveEntity(uint32_t selectedEntityId)
+	{
+		s_RendererAPI->SetEditorActiveEntity(selectedEntityId);
 	}
 
 	void Renderer::SubmitImageToOutputImageMap(const std::string& name, const std::function<Ref<Image2D>()>& func)

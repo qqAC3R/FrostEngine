@@ -82,18 +82,21 @@ namespace Frost
 		static void BeginScene(Ref<RuntimeCamera>& camera) { s_RendererAPI->BeginScene(camera); }
 		static void EndScene() { s_RendererAPI->EndScene(); }
 
-		static void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform);
-		static void Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform);
+		static void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform, uint32_t entityID = UINT32_MAX);
 		static void Submit(const PointLightComponent& pointLight, const glm::vec3& position);
 		static void Submit(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
 		static void Submit(const RectangularLightComponent& rectLight, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale);
 		static void Submit(const FogBoxVolumeComponent& fogVolume, const glm::mat4& transform);
 		static void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale);
 		static void SetSky(const SkyLightComponent& skyLightComponent);
-		static void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, glm::vec4& color);
+		static void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color);
 		static void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture);
+		static void SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.0f), float lineWidth = 1.0f);
 
-		// We would request a function returning a texture, instead of texture,
+		static uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y);
+		static void SetEditorActiveEntity(uint32_t selectedEntityId);
+
+		// We must request a function returning a texture, instead of texture,
 		// because the renderer has 3 frames in flight
 		static void SubmitImageToOutputImageMap(const std::string& name, const std::function<Ref<Image2D>()>& func);
 

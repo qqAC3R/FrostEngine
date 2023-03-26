@@ -101,6 +101,13 @@ namespace Frost
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
+				// Id Entity Attachment // Attachment 4
+				{
+					FramebufferTextureFormat::R32I, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
 				// Depth Attachment
 				{
 					FramebufferTextureFormat::Depth, ImageUsage::DepthStencil,
@@ -198,8 +205,6 @@ namespace Frost
 
 				m_Data->DebugDeviceBuffer = BufferDevice::Create(sizeof(glm::mat4) * 1024, { BufferUsage::Storage });
 
-
-				// Mesh specs for the compute shader (occlusion culling) TODO: Only 1??
 				m_Data->MeshSpecs.DeviceBuffer = BufferDevice::Create(sizeof(MeshData_OC) * maxCountMeshes, { BufferUsage::Storage });
 				m_Data->MeshSpecs.HostBuffer.Allocate(sizeof(MeshData_OC) * maxCountMeshes);
 			}
@@ -471,18 +476,19 @@ namespace Frost
 
 
 			// Set the transform matrix and model matrix of the submesh into a constant buffer
-			PushConstant pushConstant;
-			pushConstant.MaterialIndex = indirectMeshData[i].MaterialOffset;
-			pushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
-			pushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
-			pushConstant.IsAnimated = static_cast<uint32_t>(mesh->IsAnimated());
+			
+			m_GeometryPushConstant.MaterialIndex = indirectMeshData[i].MaterialOffset;
+			m_GeometryPushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
+			m_GeometryPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
+			m_GeometryPushConstant.IsAnimated = static_cast<uint32_t>(mesh->IsAnimated());
+			m_GeometryPushConstant.EntityID = renderQueue.m_Data[meshIndex].EntityID;
 
 			if(mesh->IsAnimated())
-				pushConstant.BoneInformationBDA = mesh->GetBoneUniformBuffer(currentFrameIndex).As<VulkanUniformBuffer>()->GetVulkanBufferAddress();
+				m_GeometryPushConstant.BoneInformationBDA = mesh->GetBoneUniformBuffer(currentFrameIndex).As<VulkanUniformBuffer>()->GetVulkanBufferAddress();
 			else
-				pushConstant.BoneInformationBDA = 0;
+				m_GeometryPushConstant.BoneInformationBDA = 0;
 
-			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&pushConstant);
+			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_GeometryPushConstant);
 
 			uint32_t submeshCount = meshData.SubmeshCount;
 			uint32_t offset = indirectMeshData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);

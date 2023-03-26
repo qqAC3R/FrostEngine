@@ -118,7 +118,7 @@ float GetRayleighPhase(float cosTheta)
 
 vec3 ComputeRayleighScattering(vec3 pos, ScatteringParams params, float groundRadius)
 {
-	float altitude = (length(pos) - groundRadius) * 1000.0f; // convert into KM
+	float altitude = (length(pos) - groundRadius) * 1000.0; // convert into KM
 	float rayleighDensity = exp(-altitude / params.RayleighScattering.w);
 
 	return params.RayleighScattering.rgb * rayleighDensity;
@@ -126,7 +126,7 @@ vec3 ComputeRayleighScattering(vec3 pos, ScatteringParams params, float groundRa
 
 vec3 ComputeMieScattering(vec3 pos, ScatteringParams params, float groundRadius)
 {
-	float altitude = (length(pos) - groundRadius) * 1000.0f; // convert into KM
+	float altitude = (length(pos) - groundRadius) * 1000.0; // convert into KM
 	float mieDensity = exp(-altitude / params.MieScattering.w);
 
 	return params.MieScattering.rgb * mieDensity;

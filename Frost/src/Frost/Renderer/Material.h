@@ -30,6 +30,7 @@ namespace Frost
 		virtual void Set(const std::string& name, int32_t value) = 0;
 		virtual void Set(const std::string& name, uint32_t value) = 0;
 		virtual void Set(const std::string& name, const glm::vec3& value) = 0;
+		virtual void Set(const std::string& name, const glm::vec4& value) = 0;
 		virtual void Set(const std::string& name, const glm::mat4& value) = 0;
 
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) = 0;

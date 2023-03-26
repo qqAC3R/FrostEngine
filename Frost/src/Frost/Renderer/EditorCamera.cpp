@@ -18,6 +18,7 @@ namespace Frost
 	EditorCamera::EditorCamera(float fov, float aspectRatio, float nearClip, float farClip)
 		: Camera(fov, aspectRatio, nearClip, farClip)
 	{
+
 		m_CameraType = Camera::Type::Editor;
 
 		m_FocalPoint = glm::vec3(0.0f);

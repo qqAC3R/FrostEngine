@@ -3,6 +3,9 @@
 
 #include "PhysXInternal.h"
 #include "Frost/Utils/FileSystem.h"
+#include "PhysXUtils.h"
+
+#include <PhysX/PxPhysicsAPI.h>
 
 namespace Frost
 {
@@ -16,6 +19,12 @@ namespace Frost
 		{
 		}
 	};
+
+	namespace PhysXUtils
+	{
+		static CookingResult FromPhysXCookingResult(physx::PxConvexMeshCookingResult::Enum cookingResult);
+		static CookingResult FromPhysXCookingResult(physx::PxTriangleMeshCookingResult::Enum cookingResult);
+	}
 
 	static CookingData* s_CookingData = nullptr;
 	void CookingFactory::Initialize()
@@ -102,7 +111,6 @@ namespace Frost
 		}
 		else
 		{
-#if 1
 			Buffer colliderBuffer = FileSystem::ReadBytes(filepath);
 
 			if (colliderBuffer.Size > 0)
@@ -126,10 +134,9 @@ namespace Frost
 
 				result = CookingResult::Success;
 			}
-#endif
 		}
 
-#if 0
+#if 1
 		// TODO: Generate debug mesh!
 		if (result == CookingResult::Success && component.ProcessedMeshes.size() == 0)
 		{
@@ -297,8 +304,36 @@ namespace Frost
 			trimesh->release();
 		}
 
-		//Ref<MeshAsset> meshAsset = Ref<MeshAsset>::Create(vertices, indices, colliderData.Transform);
-		//component.ProcessedMeshes.push_back(Ref<Mesh>::Create(meshAsset));
+		Ref<Mesh> mesh = Ref<Mesh>::Create(vertices, indices, colliderData.Transform);
+		component.ProcessedMeshes.push_back(mesh);
 	}
 
+	namespace PhysXUtils
+	{
+
+		static CookingResult FromPhysXCookingResult(physx::PxConvexMeshCookingResult::Enum cookingResult)
+		{
+			switch (cookingResult)
+			{
+			case physx::PxConvexMeshCookingResult::eSUCCESS:return CookingResult::Success;
+			case physx::PxConvexMeshCookingResult::eZERO_AREA_TEST_FAILED: return CookingResult::ZeroAreaTestFailed;
+			case physx::PxConvexMeshCookingResult::ePOLYGONS_LIMIT_REACHED: return CookingResult::PolygonLimitReached;
+			case physx::PxConvexMeshCookingResult::eFAILURE: return CookingResult::Failure;
+			}
+
+			return CookingResult::Failure;
+		}
+
+		static CookingResult FromPhysXCookingResult(physx::PxTriangleMeshCookingResult::Enum cookingResult)
+		{
+			switch (cookingResult)
+			{
+			case physx::PxTriangleMeshCookingResult::eSUCCESS: return CookingResult::Success;
+			case physx::PxTriangleMeshCookingResult::eLARGE_TRIANGLE: return CookingResult::LargeTriangle;
+			case physx::PxTriangleMeshCookingResult::eFAILURE: return CookingResult::Failure;
+			}
+
+			return CookingResult::Failure;
+		}
+	}
 }

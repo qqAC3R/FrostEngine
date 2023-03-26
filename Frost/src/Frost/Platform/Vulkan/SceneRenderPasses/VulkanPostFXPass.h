@@ -61,6 +61,13 @@ namespace Frost
 		void BloomUpdate(const RenderQueue& renderQueue);
 		// --------------------------------------------------------
 
+#if 0
+		// ------------------- Bloom Convolution ------------------------------
+		void BloomConvolutionInitData(uint32_t width, uint32_t height);
+		void BloomConvolutionUpdate(const RenderQueue& renderQueue);
+		// --------------------------------------------------------
+#endif
+
 
 		// ---------------- Hillaire 2020 -------------------------
 		void ApplyAerialInitData(uint32_t width, uint32_t height); // Deprecated
@@ -128,6 +135,17 @@ namespace Frost
 			Vector<Ref<Material>> BloomDescriptor;
 			Vector<Ref<Image2D>> Bloom_DownsampledTexture;
 			Vector<Ref<Image2D>> Bloom_UpsampledTexture;
+
+
+#if 0
+			// Bloom Convolution pass
+			Ref<Shader> BloomConvolutionShader;
+			Ref<ComputePipeline> BloomConvPipeline;
+			Ref<Material> BloomConvDescriptor;
+			Vector<Ref<Image2D>> BloomConv_PingTexture;
+			Vector<Ref<Image2D>> BloomConv_PongTexture;
+#endif
+
 
 			// Apply Aerial Perspective + Exponential fog
 			Ref<Shader> ApplyAerialShader;

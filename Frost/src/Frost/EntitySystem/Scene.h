@@ -50,13 +50,16 @@ namespace Frost
 		void UpdateDirectionalLight(Timestep ts);
 		void UpdateBoxFogVolumes(Timestep ts);
 		void UpdateCloudVolumes(Timestep ts);
-		// This is only for editor mode, for rendering billboards for cameras (in play mode we shouldn't see camera icon)
+		// This is only for editor mode (debug), for rendering billboards/wireframe meshes (in play mode we shouldn't see camera icon)
 		void UpdateSceneCameras(Timestep ts);
+		void UpdatePhysicsDebugMesh(Entity selectedEntity);
+		void UpdatePhysicsDebugMeshes(Timestep ts);
 	private:
 		entt::registry m_Registry;
 		EntityMap m_EntityIDMap;
 
 		friend class SceneSerializer;
+		friend class EditorLayer;
 		friend class PhysicsEngine;
 	};
 }

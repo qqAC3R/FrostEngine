@@ -365,7 +365,7 @@ namespace Frost
 	{
 	}
 
-	void VulkanRenderer::SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, glm::vec4& color)
+	void VulkanRenderer::SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		Renderer::Submit([&, currentFrameIndex, positon, color, size]()
@@ -383,19 +383,36 @@ namespace Frost
 		});
 	}
 
-	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform)
+	void VulkanRenderer::SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		Renderer::Submit([&, mesh, transform, currentFrameIndex]()
+		Renderer::Submit([&, currentFrameIndex, mesh, transform, color, lineWidth]()
 		{
-			s_RenderQueue[currentFrameIndex].Add(mesh, transform);
+			s_RenderQueue[currentFrameIndex].AddWireframeMesh(mesh, transform, color, lineWidth);
 		});
 	}
 
-	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, Ref<Material> material, const glm::mat4& transform)
+	uint32_t VulkanRenderer::ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y)
 	{
-		// TODO: Materials dont acutally work
-		//s_RenderQueue.Add(mesh, material, transform);
+		return s_Data->SceneRenderPasses->GetRenderPass<VulkanBatchRenderingPass>()->ReadPixelFromTextureEntityID(x, y);
+	}
+
+	void VulkanRenderer::SetEditorActiveEntity(uint32_t selectedEntityId)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, currentFrameIndex, selectedEntityId]()
+		{
+			s_RenderQueue[currentFrameIndex].SetEditorActiveEntity(selectedEntityId);
+		});
+	}
+
+	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform, uint32_t entityID)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, mesh, transform, entityID, currentFrameIndex]()
+		{
+			s_RenderQueue[currentFrameIndex].Add(mesh, transform, entityID);
+		});
 	}
 
 	void VulkanRenderer::Submit(const PointLightComponent& pointLight, const glm::vec3& position)

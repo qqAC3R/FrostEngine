@@ -386,6 +386,8 @@ namespace Frost
 		m_TiledLightCullPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 		m_TiledLightCullPushConstant.ViewProjectionMatrix = m_TiledLightCullPushConstant.ProjectionMatrix * renderQueue.CameraViewMatrix;
 
+		//vulkanDescriptor->Set("UniformBuffer.NumberOfLights", static_cast<uint32_t>(renderQueue.m_LightData.PointLights.size()));
+
 		// Setting up the rendererData
 		vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_TiledLightCullPushConstant);
 

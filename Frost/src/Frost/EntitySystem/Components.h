@@ -72,6 +72,16 @@ namespace Frost
 		}
 
 		Ref<Mesh> Mesh = nullptr;
+
+		bool IsMeshValid()
+		{
+			// Check if the mesh pointer is valid, then check if it loaded
+			if (Mesh)
+			{
+				return Mesh->IsLoaded();
+			}
+			return false;
+		}
 	};
 
 	struct AnimationComponent
@@ -117,8 +127,8 @@ namespace Frost
 		DirectionalLightComponent() = default;
 
 		glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
-		float Intensity = 5.0f;
-		float Size = 2.0f;
+		float Intensity = 3.0f;
+		float Size = 1.0f;
 
 		float VolumeDensity = 0.0f;
 		float Absorption = 1.0f;
@@ -216,13 +226,13 @@ namespace Frost
 		glm::vec3 Size = { 1.0f, 1.0f, 1.0f };
 		glm::vec3 Offset = { 0.0f, 0.0f, 0.0f };
 		bool IsTrigger = false;
-		//AssetHandle Material;
+		//AssetHandle Material; // TODO: Physics material system?
 
 		// The mesh that will be drawn in the editor to show the collision bounds
-		// TODO: Add debug mesh? 
-		//Ref<Mesh> DebugMesh;
+		Ref<Mesh> DebugMesh;
 
-		BoxColliderComponent() = default;
+		BoxColliderComponent()
+			: DebugMesh(Mesh::GetDefaultMeshes().Cube) {}
 		BoxColliderComponent(const BoxColliderComponent & other) = default;
 	};
 
@@ -231,12 +241,13 @@ namespace Frost
 		float Radius = 0.5f;
 		glm::vec3 Offset = { 0.0f, 0.0f, 0.0f };
 		bool IsTrigger = false;
-		//AssetHandle Material;
+		//AssetHandle Material; // TODO: Physics material system?
 
 		// The mesh that will be drawn in the editor to show the collision bounds
-		//Ref<Mesh> DebugMesh; TODO: Add debug mesh?
+		Ref<Mesh> DebugMesh;
 
-		SphereColliderComponent() = default;
+		SphereColliderComponent()
+			: DebugMesh(Mesh::GetDefaultMeshes().Sphere) {}
 		SphereColliderComponent(const SphereColliderComponent& other) = default;
 	};
 
@@ -246,20 +257,21 @@ namespace Frost
 		float Height = 1.0f;
 		glm::vec3 Offset = { 0.0f, 0.0f, 0.0f };
 		bool IsTrigger = false;
-		//AssetHandle Material;
+		//AssetHandle Material;  // TODO: Physics material system?
 
-		// TODO: Add debug mesh?
-		//Ref<Mesh> DebugMesh;
+		// The mesh that will be drawn in the editor to show the collision bounds
+		Ref<Mesh> DebugMesh;
 
-		CapsuleColliderComponent() = default;
+		CapsuleColliderComponent()
+			: DebugMesh(Mesh::GetDefaultMeshes().Capsule) {}
 		CapsuleColliderComponent(const CapsuleColliderComponent& other) = default;
 	};
 
 	struct MeshColliderComponent
 	{
 		//AssetHandle CollisionMesh;
-		//Vector<Ref<Mesh>> ProcessedMeshes;
-		Ref<Mesh> CollisionMesh;
+		Vector<Ref<Mesh>> ProcessedMeshes;
+		Ref<Mesh> CollisionMesh = nullptr;
 		bool IsConvex = false;
 		bool IsTrigger = false;
 		bool OverrideMesh = false; // TODO: What to do with this?
@@ -270,10 +282,13 @@ namespace Frost
 
 		MeshColliderComponent() = default;
 		MeshColliderComponent(const MeshColliderComponent& other) = default;
-		//MeshColliderComponent(AssetHandle mesh)
-		//	: CollisionMesh(mesh)
-		//{
-		//}
+		
+		void ResetMesh()
+		{
+			CollisionMesh = nullptr;
+			ProcessedMeshes.clear();
+		}
+
 	};
 
 }

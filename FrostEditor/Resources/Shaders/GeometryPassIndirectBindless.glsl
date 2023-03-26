@@ -46,6 +46,7 @@ layout(location = 3) out vec3 v_Tangent;
 layout(location = 4) out vec3 v_ViewPosition;
 layout(location = 5) out flat int v_BufferIndex;
 layout(location = 6) out flat int v_TextureIndex;
+layout(location = 7) out flat uint v_EntityID;
 
 layout(push_constant) uniform Constants
 {
@@ -54,6 +55,7 @@ layout(push_constant) uniform Constants
 	uint64_t BoneInformationBDA;
 	uint MaterialIndex; // Global material index
 	uint IsAnimated;
+	uint EntityID;
 } u_PushConstant;
 
 void main()
@@ -64,9 +66,6 @@ void main()
 
 	// If the mesh is animated, then compute the bone transform matrix
 	mat4 boneTransform = mat4(1.0);
-
-	//uint isAnimated = ((u_PushConstant.IsAnimated << 31) >> 31);
-	//uint isAnimationEnabled = (u_PushConstant.IsAnimated >> 1);
 
 	if(u_PushConstant.IsAnimated  == 1)
 	{
@@ -119,6 +118,7 @@ void main()
 	int meshIndex = int(u_PushConstant.MaterialIndex + materialIndex);
 	v_BufferIndex = int(meshIndex);
 	v_TextureIndex = int(materialIndex);
+	v_EntityID = u_PushConstant.EntityID;
 
 	// Compute world position
 	vec4 worldPos = a_WorldSpaceMatrix * boneTransform * vec4(position, 1.0f);
@@ -136,6 +136,7 @@ layout(location = 0) out vec4 o_WoldPos;
 layout(location = 1) out vec4 o_Normals;
 layout(location = 2) out vec4 o_Albedo;
 layout(location = 3) out vec4 o_ViewPos;
+layout(location = 4) out uint o_MeshID;
 
 layout(location = 0) in vec3 v_FragmentPos;
 layout(location = 1) in vec2 v_TexCoord;
@@ -144,6 +145,7 @@ layout(location = 3) in vec3 v_Tangent;
 layout(location = 4) in vec3 v_ViewPosition;
 layout(location = 5) in flat int v_BufferIndex;
 layout(location = 6) in flat int v_TextureIndex;
+layout(location = 7) in flat uint v_EntityID;
 
 struct MaterialData
 {
@@ -264,7 +266,7 @@ void main()
 	// Albedo color
 	vec3 albedoTextureColor = SampleTexture(albedoTextureID).rgb;
 	o_Albedo = vec4(albedoTextureColor * albedoFactor, 1.0f);
-	o_Albedo.a = emissionFactor + 1.0f;
+	o_Albedo.a = emissionFactor;
 	
 	// Composite (roughness and metalness)
 	float metalness = metalnessFactor * SampleTexture(metalnessTextureID).r;
@@ -272,4 +274,6 @@ void main()
 
 	o_Normals.z = metalness;
 	o_Normals.w = roughness;
+
+	o_MeshID = v_EntityID;
 }

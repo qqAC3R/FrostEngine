@@ -37,6 +37,8 @@ namespace Frost
 
 		virtual void OnEvent(Event& event);
 		bool OnKeyPressed(KeyPressedEvent& event);
+		bool OnMouseButtonPressed(MouseButtonPressedEvent& event);
+		void MouseButtonPressed();
 
 		virtual void OnResize();
 
@@ -46,7 +48,7 @@ namespace Frost
 		void OnSceneStop();
 
 		void SetCurrentScene(Ref<Scene> scene) { m_CurrentScene = scene; }
-
+		std::pair<uint32_t, uint32_t> GetMouseViewportSpace();
 	private:
 		// Editor Camera
 		Ref<EditorCamera> m_EditorCamera;
@@ -66,5 +68,10 @@ namespace Frost
 		int32_t m_GuizmoMode = -1;
 		SceneState m_SceneState = SceneState::Edit;
 		bool m_EnablePhysicsDebugging = false;
+		bool m_EnablePhysicsVisualization = true;
+		bool m_IsGuizmoUsing = false;
+
+		glm::vec2 m_ViewportSize;
+		glm::vec2 m_ViewportBounds[2];
 	};
 }

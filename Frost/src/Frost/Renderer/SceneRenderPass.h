@@ -59,10 +59,38 @@ namespace Frost
 		void ResizeRenderPasses(uint32_t width, uint32_t height);
 
 		template <class T>
-		Ref<T> GetRenderPass();
+		Ref<T> GetRenderPass()
+		{
+#if 0
+			// Getting the id of the renderPass (by template)
+			auto typeIdx = std::type_index(typeid(T));
 
-		template <class T>
-		Ref<T> GetRenderPass(const std::string& name);
+
+			// Checking if the id of the renderPass is found
+			auto it = m_RenderPassesByTypeId.find(typeIdx);
+
+			if (it == m_RenderPassesByTypeId.end())
+			{
+				FROST_WARN("Error: The requested of RenderPass {0} does not exist.", typeIdx);
+				return nullptr;
+			}
+
+			// Return the renderPass as the type from the template
+			return it->second.As<T>();
+#endif
+
+			if (!std::is_base_of<SceneRenderPass, T>::value)
+				FROST_CORE_ERROR("The SceneRenderPass needs to derive the main class");
+
+			auto typeIdx = std::type_index(typeid(T));
+			if (m_RenderPassesByTypeId.find(typeIdx) == m_RenderPassesByTypeId.end())
+				FROST_ASSERT(false, "Couldn't find the renderpass");
+
+			return m_RenderPassesByTypeId[typeIdx];
+		}
+
+		//template <class T>
+		//Ref<T> GetRenderPass(const std::string& name);
 		Ref<SceneRenderPass> GetRenderPass(const std::string& name);
 
 		template <typename T>

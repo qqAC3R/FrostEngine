@@ -2,12 +2,19 @@
 
 #include "Frost/Core/Engine.h"
 #include "Frost/Renderer/Mesh.h"
-#include "PhysXUtils.h"
-
-#include <PhysX/PxPhysicsAPI.h>
+#include "Frost/EntitySystem/Components.h"
 
 namespace Frost
 {
+	enum class CookingResult
+	{
+		Success,
+		ZeroAreaTestFailed,
+		PolygonLimitReached,
+		LargeTriangle,
+		Failure
+	};
+
 	struct MeshColliderData
 	{
 		Byte* Data;

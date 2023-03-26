@@ -26,6 +26,7 @@
 
 namespace Frost
 {
+	static DefaultMeshStorage s_DefaultMeshStorage;
 
 	Ref<Mesh> Mesh::Load(const std::string& filepath, MaterialInstance material /*= {}*/)
 	{
@@ -35,6 +36,30 @@ namespace Frost
 	Ref<Mesh> Mesh::LoadCustomMesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings /*= {}*/)
 	{
 		return CreateRef<Mesh>(filepath, material, meshBuildSettings);
+	}
+
+	void Mesh::InitDefaultMeshes()
+	{
+		s_DefaultMeshStorage.Cube = Mesh::Load("Resources/Meshes/.Default/Cube.fbx");
+		s_DefaultMeshStorage.Sphere = Mesh::Load("Resources/Meshes/.Default/Sphere.fbx");
+		s_DefaultMeshStorage.Capsule = Mesh::Load("Resources/Meshes/.Default/Capsule.fbx");
+	}
+
+	const DefaultMeshStorage& Mesh::GetDefaultMeshes()
+	{
+		return s_DefaultMeshStorage;
+	}
+
+	void Mesh::DestroyDefaultMeshes()
+	{
+		s_DefaultMeshStorage.Cube.~Ref();
+		s_DefaultMeshStorage.Cube = nullptr;
+
+		s_DefaultMeshStorage.Sphere.~Ref();
+		s_DefaultMeshStorage.Sphere = nullptr;
+
+		s_DefaultMeshStorage.Capsule.~Ref();
+		s_DefaultMeshStorage.Capsule = nullptr;
 	}
 
 	namespace Utils
@@ -603,6 +628,24 @@ namespace Frost
 		}
 
 		return;
+	}
+
+	Mesh::Mesh(const Vector<Vertex>& vertices, const Vector<Index>& indices, const glm::mat4& transform)
+	{
+		Submesh submesh;
+		submesh.BaseVertex = 0;
+		submesh.BaseIndex = 0;
+		submesh.IndexCount = (uint32_t)indices.size() * 3u;
+		submesh.Transform = transform;
+		m_Submeshes.push_back(submesh);
+
+		m_Vertices = vertices;
+		m_Indices = indices;
+
+		m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), (uint32_t)(m_Vertices.size() * sizeof(Vertex)));
+		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)(m_Indices.size() * sizeof(Index)));
+
+		m_IsLoaded = true;
 	}
 
 	void Mesh::TraverseNodes(aiNode* node, const glm::mat4& parentTransform, uint32_t level)
