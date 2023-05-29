@@ -5,6 +5,7 @@
 
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/Physics/PhysicsEngine.h"
+#include "Frost/Script/ScriptEngine.h"
 
 #include "Frost/Core/Input.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
@@ -32,8 +33,8 @@ namespace Frost
 		PushOverlay(m_ImGuiLayer);
 
 		Renderer::Init();
-
 		PhysicsEngine::Initialize();
+		ScriptEngine::Init("Resources/Scripts/FrostScriptCore.dll");
 	}
 
 	Application::~Application()
@@ -42,6 +43,7 @@ namespace Frost
 		{
 			layer->OnDetach();
 		}
+		ScriptEngine::ShutDown();
 		PhysicsEngine::ShutDown();
 		Renderer::ShutDown();
 	}

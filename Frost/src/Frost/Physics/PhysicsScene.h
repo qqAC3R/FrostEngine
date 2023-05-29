@@ -7,6 +7,14 @@
 
 namespace Frost
 {
+	struct RaycastHit
+	{
+		uint64_t HitEntity;
+		glm::vec3 Position;
+		glm::vec3 Normal;
+		float Distance;
+	};
+
 	class PhysicsScene
 	{
 	public:
@@ -18,6 +26,8 @@ namespace Frost
 
 		virtual Ref<PhysicsActor> CreateActor(Entity entity) = 0;
 		virtual void RemoveActor(Ref<PhysicsActor> actor) = 0;
+
+		virtual bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, RaycastHit* outHit) = 0;
 
 		virtual glm::vec3 GetGravity() const = 0;
 		virtual void SetGravity(const glm::vec3& gravity) = 0;

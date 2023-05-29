@@ -35,6 +35,7 @@ layout(binding = 4) uniform DirectionaLightData
 } u_DirLightData;
 
 vec2 s_UV;
+float delta = 0.0;
 
 vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
 {
@@ -44,11 +45,11 @@ vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
 	case 1:
 		return coord * vec2(0.5f);
 	case 2:
-		return vec2(coord.x * 0.5f + 0.5f, coord.y * 0.5f);
+		return vec2(coord.x * 0.5f + 0.5f + delta, coord.y * 0.5f);
 	case 3:
-		return vec2(coord.x * 0.5f, coord.y * 0.5f + 0.5f);
+		return vec2(coord.x * 0.5f, coord.y * 0.5f + 0.5f + delta);
 	case 4:
-		return coord * vec2(0.5f) + vec2(0.5f);
+		return coord * vec2(0.5f) + vec2(0.5f + delta);
 	}
 }
 
@@ -112,7 +113,7 @@ float HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 {
 	float shadow = 1.0;
 	//float bias = GetShadowBias();
-	float bias = 0.005;
+	float bias = 0.001;
 
 	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
 	{
@@ -248,7 +249,7 @@ float FindBlockerDistance_DirectionalLight(vec4 shadowCoords, uint cascadeIndex,
 float PCF_DirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius)
 {
 	//float bias = GetShadowBias();
-	float bias = 0.005;
+	float bias = 0.001;
 	int numPCFSamples = GetSamplesRequiredForCascadeIndex(cascadeIndex);
 
 	float sum = 0;
@@ -292,10 +293,10 @@ void main()
 	if (any(greaterThanEqual(globalInvocation, imgSize)))
 		return;
 
-	float viewPosZ = texture(u_ViewPositionTexture, uv).z;
+	float viewPosZ = texelFetch(u_ViewPositionTexture, globalInvocation, 0).z;
 	uint cascadeIndex = GetCascadeIndex(viewPosZ);
 
-	vec3 position = texture(u_PositionTexture, uv).rgb;
+	vec3 position = texelFetch(u_PositionTexture, globalInvocation, 0).rgb;
 
 	float lightSize = u_DirLightData.DirectionLightSize;
 
@@ -309,20 +310,9 @@ void main()
 		
 		float cascadeTransitionFade = u_DirLightData.CascadesFadeFactor;
 
-		//float c0 = smoothstep(u_PushConstant.CascadeDepthSplit[0] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[0] - cascadeTransitionFade * 0.5f, viewPosZ);
 		float c1 = smoothstep(u_PushConstant.CascadeDepthSplit[1] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[1] - cascadeTransitionFade * 0.5f, viewPosZ);
 		float c2 = smoothstep(u_PushConstant.CascadeDepthSplit[2] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[2] - cascadeTransitionFade * 0.5f, viewPosZ);
 
-		//if (c0 > 0.0 && c0 < 1.0)
-		//{
-		//	vec4 shadowCoord0 = (GetCascadeMatrix(0)) * vec4(position, 1.0); shadowCoord0 /= shadowCoord.w;
-		//	vec4 shadowCoord1 = (GetCascadeMatrix(1)) * vec4(position, 1.0); shadowCoord1 /= shadowCoord.w;
-		//
-		//	float shadowFactor0 = PCSS_SampleShadowTexture(shadowCoord0, 0, lightSize);
-		//	float shadowFactor1 = PCSS_SampleShadowTexture(shadowCoord1, 1, lightSize);
-		//
-		//	shadowFactor = mix(shadowFactor0, shadowFactor1, c0);
-		//}
 		if(c1 > 0.0 && c1 < 1.0)
 		{
 			vec4 shadowCoord1 = (GetCascadeMatrix(1)) * vec4(position, 1.0); shadowCoord1 /= shadowCoord.w;

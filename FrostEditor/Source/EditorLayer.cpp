@@ -11,6 +11,7 @@
 #include "Frost/InputCodes/MouseButtonCodes.h"
 #include "Frost/Physics/PhysicsEngine.h"
 #include "Frost/Renderer/Renderer.h"
+#include "Frost/Script/ScriptEngine.h"
 
 #include "Frost/Math/Math.h"
 
@@ -37,6 +38,7 @@ namespace Frost
 	void EditorLayer::OnAttach()
 	{
 		Application::Get().GetWindow().SetWindowProjectName("Untilted scene");
+		ScriptEngine::LoadAppAssembly("SandboxProject/Assets/Scripts/Binaries/Sandbox.dll");
 
 		m_EditorCamera = Ref<EditorCamera>::Create(85.0, 1600.0f / 900.0f, 0.1f, 1000.0f);
 	
@@ -50,7 +52,7 @@ namespace Frost
 		m_SceneHierarchyPanel->SetSceneContext(m_CurrentScene);
 
 		// Inspector Panel initialization
-		m_InspectorPanel = Ref<InspectorPanel>::Create();
+		m_InspectorPanel = Ref<InspectorPanel>::Create(this);
 		m_InspectorPanel->Init(nullptr);
 		m_InspectorPanel->SetHierarchy(m_SceneHierarchyPanel);
 
@@ -68,13 +70,8 @@ namespace Frost
 		m_TitlebarPanel = Ref<TitlebarPanel>::Create();
 		m_TitlebarPanel->Init(nullptr);
 
-
-		{
-			auto& sponzaEntity = m_CurrentScene->CreateEntity("Cube");
-			auto& meshComponent = sponzaEntity.AddComponent<MeshComponent>();
-			meshComponent.Mesh = Mesh::Load("Resources/Meshes/cube.gltf", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
-		}
-
+#if 0
+		// Default Scene
 		{
 			auto& directionalLight = m_CurrentScene->CreateEntity("Directional Light");
 			auto& directionalLightComponent = directionalLight.AddComponent<DirectionalLightComponent>();
@@ -82,10 +79,35 @@ namespace Frost
 			ts.Translation = { 0.0f, 1.0f, 0.0f };
 			ts.Rotation = { -90.0f, 0.0f, 0.0f };
 		}
+
+		{
+			auto& cube = m_CurrentScene->CreateEntity("Cube");
+			auto& meshComponent = cube.AddComponent<MeshComponent>();
+			meshComponent.Mesh = Mesh::Load("Resources/Meshes/cube.gltf", { glm::vec3(1.0f), glm::vec3(1.0f), 0.0f, 1.0f });
+		}
+
+
+		{
+			auto& camera = m_CurrentScene->CreateEntity("Camera");
+			camera.AddComponent<CameraComponent>();
+			auto& scriptComponent = camera.AddComponent<ScriptComponent>();
+			scriptComponent.ModuleName = "Frost.Player";
+		}
+#endif
+		SceneSerializer sceneSerializer(m_CurrentScene);
+		sceneSerializer.Deserialize("Resources/Scenes/.Default.fsc");
+		Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
+		
+		m_EditorScene = m_CurrentScene;
+		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
+		ScriptEngine::SetSceneContext(m_CurrentScene.Raw());
+
+		ScriptEngine::OnHotReload("SandboxProject/Assets/Scripts/Binaries/Sandbox.dll");
+
 		if (m_SceneState == SceneState::Play)
 		{
 			CameraComponent* primaryCamera = m_CurrentScene->GetPrimaryCamera();
@@ -124,11 +146,7 @@ namespace Frost
 			}
 		}
 
-		//if (Input::IsMouseButtonPressed(Mouse::Button0))
-		//{
-		//	MouseButtonPressed();
-		//}
-
+		OnMouseClickSelectEntity();
 		
 		Renderer::EndScene();
 	}
@@ -239,6 +257,7 @@ namespace Frost
 			// Inspector panel rendering
 			m_InspectorPanel->Render();
 
+
 			// Material editor rendering
 			m_MaterialEditor->SetActiveEntity(m_SceneHierarchyPanel->GetSelectedEntity());
 			m_MaterialEditor->SetActiveSubmesh(m_SceneHierarchyPanel->GetSelectedEntitySubmesh());
@@ -270,6 +289,7 @@ namespace Frost
 			m_ViewportPanel->RenderSceneButtons(m_SceneState);
 			m_ViewportPanel->RenderViewportRenderPasses();
 
+			m_IsViewPortFocused = ImGui::IsWindowFocused();
 
 			{
 				auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
@@ -347,7 +367,6 @@ namespace Frost
 
 				}
 			}
-
 			m_ViewportPanel->EndRender();
 		});
 	}
@@ -402,7 +421,12 @@ namespace Frost
 		m_EditorScene->CopyTo(m_RuntimeScene);
 		m_SceneHierarchyPanel->SetSceneContext(m_RuntimeScene);
 
-		m_RuntimeScene->OnPhysicsSimulationStart();
+		// Reload
+		//ScriptEngine::ReloadAssembly("SandboxProject/Assets/Scripts/Binaries/Sandbox.dll");
+		ScriptEngine::LoadAppAssembly("SandboxProject/Assets/Scripts/Binaries/Sandbox.dll");
+
+		m_RuntimeScene->OnRuntimeStart();
+
 
 		SetCurrentScene(m_RuntimeScene);
 	}
@@ -412,7 +436,7 @@ namespace Frost
 		m_SceneState = SceneState::Edit;
 		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
 
-		m_RuntimeScene->OnPhysicsSimulationEnd();
+		m_RuntimeScene->OnRuntimeEnd();
 
 		m_RuntimeScene = nullptr;
 
@@ -433,7 +457,6 @@ namespace Frost
 	{
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& event) { return OnKeyPressed(event); });
-		dispatcher.Dispatch<MouseButtonPressedEvent>([this](MouseButtonPressedEvent& event) { return OnMouseButtonPressed(event); });
 
 		m_EditorCamera->OnEvent(event);
 		m_SceneHierarchyPanel->OnEvent(event);
@@ -478,9 +501,9 @@ namespace Frost
 		return false;
 	}
 
+#if 0
 	bool EditorLayer::OnMouseButtonPressed(MouseButtonPressedEvent& event)
 	{
-#if 1
 		if (event.GetMouseButton() == Mouse::Button0)
 		{
 
@@ -491,7 +514,7 @@ namespace Frost
 			Renderer::SubmitDeletion([&, mx, my]()
 			{
 
-				if (mx >= 0 && my >= 0 && mx < (int)m_ViewportSize.x && my < (int)m_ViewportSize.y && !m_IsGuizmoUsing)
+				if (mx >= 0 && my >= 0 && mx < (int)m_ViewportSize.x && my < (int)m_ViewportSize.y && !m_IsGuizmoUsing && m_IsViewPortFocused)
 				{
 					uint32_t entityID = Renderer::ReadPixelFromFramebufferEntityID((uint32_t)mx, (uint32_t)my);
 
@@ -503,25 +526,38 @@ namespace Frost
 		}
 
 		return false;
-#endif
 	}
+#endif
 
-	void EditorLayer::MouseButtonPressed()
+	void EditorLayer::OnMouseClickSelectEntity()
 	{
-		std::pair<uint32_t, uint32_t> m = GetMouseViewportSpace();
-
-		uint32_t mx = m.first, my = m.second;
-
-		Renderer::SubmitDeletion([&, mx, my]()
+		if (Input::IsMouseButtonPressed(Mouse::Button0))
 		{
-			if (mx >= 0 && my >= 0 && mx < (int)m_ViewportSize.x && my < (int)m_ViewportSize.y && !m_IsGuizmoUsing)
+			if (!m_WasMousePressedPrevFrame)
 			{
-				uint32_t entityID = Renderer::ReadPixelFromFramebufferEntityID((uint32_t)mx, (uint32_t)my);
+				{
+					std::pair<uint32_t, uint32_t> m = GetMouseViewportSpace();
 
-				m_SceneHierarchyPanel->SetSelectedEntityByID(entityID);
+					uint32_t mx = m.first, my = m.second;
+
+					Renderer::SubmitDeletion([&, mx, my]()
+					{
+						if (mx >= 0 && my >= 0 && mx < (int)m_ViewportSize.x && my < (int)m_ViewportSize.y && !m_IsGuizmoUsing && m_IsViewPortFocused)
+						{
+							uint32_t entityID = Renderer::ReadPixelFromFramebufferEntityID((uint32_t)mx, (uint32_t)my);
+
+							m_SceneHierarchyPanel->SetSelectedEntityByID(entityID);
+						}
+					});
+				}
+
+				m_WasMousePressedPrevFrame = true;
 			}
-		});
-
+		}
+		else
+		{
+			m_WasMousePressedPrevFrame = false;
+		}
 	}
 
 	void EditorLayer::OnResize()
@@ -532,5 +568,4 @@ namespace Frost
 	{
 		this->~EditorLayer();
 	}
-
 }

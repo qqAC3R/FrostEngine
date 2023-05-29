@@ -12,6 +12,8 @@ namespace Frost
 		RG32F,
 		RGBA8, RGBA16F, RGBA16UNORM, RGBA32F,
 
+		RGBA_BC7,
+
 		// Depth/Stencil
 		Depth24Stencil8, Depth32
 	};

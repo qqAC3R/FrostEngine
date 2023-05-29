@@ -6,6 +6,10 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
+#include "Frost/EntitySystem/Entity.h"
+#include "Frost/EntitySystem/Components.h"
+#include "Panels/SceneHierarchyPanel.h"
+
 namespace Frost
 {
 
@@ -95,11 +99,15 @@ namespace Frost
 		ImGuiIO& io = ImGui::GetIO();
 		auto boldFont = io.Fonts->Fonts[0];
 
+		float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+		ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
+
+
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(3);
 		ImGui::SetColumnWidth(0, columnWidth);
-		ImGui::SetColumnWidth(1, columnWidth + 100.0f);
+		ImGui::SetColumnWidth(1, ImGui::GetWindowWidth() - columnWidth - buttonSize.x - 45.0f);
 		ImGui::Text(label.c_str());
 		ImGui::NextColumn();
 
@@ -111,8 +119,8 @@ namespace Frost
 
 		ImGui::NextColumn();
 
-		float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
-		ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
+		//float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+		//ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
 		std::string path;
 		if (ImGui::Button("..", buttonSize))
 		{
@@ -128,6 +136,53 @@ namespace Frost
 	void UserInterface::CheckBox(const std::string& label, bool& value)
 	{
 		ImGui::Checkbox(label.c_str(), &value);
+	}
+
+	bool UserInterface::InputText(const std::string& label, const char* buffer)
+	{
+		//char buffer[256];
+		//memset(buffer, 0, sizeof(buffer));
+		//std::strncpy(buffer, component.ModuleName.c_str(), sizeof(buffer));
+		//ImGui::SetNextItemWidth(-1.0f);
+		//bool action = ImGui::InputText("##Tag", buffer, sizeof(buffer));
+		return false;
+	}
+
+	bool UserInterface::PropertyEntityReference(const char* label, Entity& entity)
+	{
+		bool receivedValidEntity = false;
+
+		ImVec2 originalButtonTextAlign = ImGui::GetStyle().ButtonTextAlign;
+		{
+			//ImGui::GetStyle().ButtonTextAlign = { 0.0f, 0.5f };
+			float width = ImGui::GetContentRegionAvail().x;
+			float itemHeight = 23.0f;
+
+			std::string buttonText = "Null";
+
+			if (entity)
+				buttonText = entity.GetComponent<TagComponent>().Tag;
+
+			ImGui::Button(buttonText.c_str(), {width, itemHeight});
+		}
+		ImGui::GetStyle().ButtonTextAlign = originalButtonTextAlign;
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			auto data = ImGui::AcceptDragDropPayload(HIERARCHY_ENTITY_DRAG_DROP);
+			if (data)
+			{
+				entity = *(Entity*)data->Data;
+				receivedValidEntity = true;
+			}
+
+			ImGui::EndDragDropTarget();
+		}
+
+		//ImGui::PopItemWidth();
+		//ImGui::NextColumn();
+
+		return receivedValidEntity;
 	}
 
 	void UserInterface::Text(const std::string& text)

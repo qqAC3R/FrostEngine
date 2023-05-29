@@ -24,7 +24,6 @@ IncludeDir["glm"] = "Frost/vendor/glm"
 IncludeDir["stb_image"] = "Frost/vendor/stb_image"
 IncludeDir["spdlog"] = "Frost/vendor/spdlog/include"
 IncludeDir["assimp"] = "Frost/vendor/assimp/include"
---IncludeDir["assimpLib"] = "Frost/vendor/assimp/lib"
 IncludeDir["vma"] = "Frost/vendor/VulkanMemoryAllocator/include"
 IncludeDir["ImGui"] = "Frost/vendor/ImGui"
 IncludeDir["ImGuizmo"] = "Frost/vendor/ImGuizmo"
@@ -33,11 +32,9 @@ IncludeDir["OZZ_Animation"] = "Frost/vendor/ozz-animation/include"
 IncludeDir["SPIRV_Cross"] = "Frost/vendor/SPIRV-Cross/include"
 IncludeDir["FontAwesome"] = "Frost/vendor/FontAwesome"
 IncludeDir["json"] = "Frost/vendor/json/include"
-
 IncludeDir["shaderc"] = "Frost/vendor/shaderc/Include"
---IncludeDir["shadercLib"] = "Frost/vendor/shaderc/Lib"
-
 IncludeDir["entt"] = "Frost/vendor/entt/include"
+IncludeDir["Mono"] = "Frost/vendor/mono/include"
 
 LibraryDir = {}
 
@@ -45,11 +42,14 @@ LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
 LibraryDir["PhysX"] = "Frost/vendor/PhysX/lib/%{cfg.buildcfg}"
 LibraryDir["shaderc"] = "Frost/vendor/shaderc/Lib"
 LibraryDir["assimp"] = "Frost/vendor/assimp/lib"
+LibraryDir["Mono"] = "Frost/vendor/mono/lib/%{cfg.buildcfg}"
 
 Library = {}
+
+Library["Mono"] = "%{LibraryDir.Mono}/mono-2.0-sgen.lib"
+
 Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
 Library["shaderc"] = "Frost/vendor/shaderc/Lib/shaderc_shared.lib"
-
 
 Library["PhysX"] =                   "%{LibraryDir.PhysX}/PhysX_static_64.lib"
 Library["PhysXCharacterKinematic"] = "%{LibraryDir.PhysX}/PhysXCharacterKinematic_static_64.lib"
@@ -124,7 +124,8 @@ project "Frost"
 		"%{IncludeDir.json}",
 		"%{IncludeDir.json}/json",
 		"%{IncludeDir.PhysX}",
-		"%{IncludeDir.FontAwesome}"
+		"%{IncludeDir.FontAwesome}",
+		"%{IncludeDir.Mono}"
 	}
 
 	flags
@@ -144,6 +145,9 @@ project "Frost"
 
 		"assimp-vc143-mt.lib",
 
+		--"CMP_Framework_MD.lib",
+
+		"mono-2.0-sgen.lib",
 
 		-- PhysX
 		"PhysX_static_64.lib",
@@ -162,9 +166,12 @@ project "Frost"
 		--"%{LibraryDir.assimp}",
 		"%{LibraryDir.assimp}/Release",
 
+		"%{LibraryDir.Mono}",
+
+		--"%{LibraryDir.Compressonator}",
+
 		"%{LibraryDir.shaderc}",
 		"%{LibraryDir.PhysX}"
-
 	}
 
 	filter "system:windows"
@@ -201,11 +208,33 @@ project "Frost"
 			"NDEBUG"
 		}
 
-project "FrostScript-Core"
+project "FrostScriptCore"
 	location "FrostScriptCore"
-	kind "ConsoleApp"
+	kind "SharedLib"
 	language "C#"
-	staticruntime "off"
+	dotnetframework "4.7.2"
+
+	targetdir("%{wks.location}/FrostEditor/Resources/Scripts")
+	objdir("%{wks.location}/FrostEditor/Resources/Scripts/Intermediates")
+
+	files
+	{
+		"%{prj.name}/Source/**.cs",
+		"%{prj.name}/Properties/**.cs",
+	}
+
+	filter "configurations:Debug"
+		optimize "Off"
+		symbols "Default"
+
+	filter "configurations:Release"
+		optimize "On"
+		symbols "Default"
+
+	filter "configurations:Dist"
+		optimize "Full"
+		symbols "Off"
+
 group ""
 
 project "FrostEditor"

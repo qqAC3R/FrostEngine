@@ -18,6 +18,7 @@
 #include <ozz/animation/offline/animation_builder.h>
 #include <ozz/animation/runtime/animation.h>
 #include <ozz/animation/runtime/local_to_model_job.h>
+#include <ozz/animation/runtime/blending_job.h>
 #include <ozz/base/span.h>
 
 #include <ozz/base/maths/simd_math.h>
@@ -242,4 +243,6 @@ namespace Frost
 		}
 	}
 
+	// TODO: Add blending animation
+	// https://github.com/guillaumeblanc/ozz-animation/blob/7fd3642f170f8ecaa31e911267e838eaf149b462/samples/additive/sample_additive.cc
 }

@@ -78,7 +78,7 @@ namespace Frost
 
 		m_SwapChain = CreateScope<VulkanSwapChain>(m_Window);
 		VulkanAllocator::Init();
-		VulkanBindlessAllocator::Init();
+		BindlessAllocator::Init();
 	}
 
 	void VulkanContext::CreateInstance()

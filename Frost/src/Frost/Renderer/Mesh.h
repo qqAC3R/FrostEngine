@@ -243,6 +243,7 @@ namespace Frost
 		friend class SceneSerializer;
 		friend class CookingFactory;
 		friend class Renderer;
+		friend struct MaterialMeshPointer;
 		friend class Ref<Mesh>;
 	};
 }

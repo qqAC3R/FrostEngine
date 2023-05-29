@@ -14,6 +14,8 @@ namespace Frost
 		PhysXActor(Entity entity);
 		~PhysXActor();
 
+		virtual void SetSimulationData(uint32_t layerId) override;
+
 		virtual glm::vec3 GetTranslation() const override { return PhysXUtils::FromPhysXVector(m_RigidActor->getGlobalPose().p); }
 		virtual void SetTranslation(const glm::vec3& translation, bool autowake = true) override;
 
@@ -43,6 +45,10 @@ namespace Frost
 		virtual void SetLinearDrag(float drag) const override;
 		virtual void SetAngularDrag(float drag) const override;
 
+		virtual glm::vec3 GetKinematicTargetPosition() const override;
+		virtual glm::vec3 GetKinematicTargetRotation() const override;
+		virtual void SetKinematicTarget(const glm::vec3& targetPosition, const glm::vec3& targetRotation) const override;
+
 		virtual bool IsKinematic() const override { return IsDynamic() && m_RigidBodyData.IsKinematic; }
 		virtual void SetKinematic(bool isKinematic) override;
 
@@ -60,10 +66,13 @@ namespace Frost
 		virtual Entity GetEntity() const override { return m_Entity; }
 		virtual const TransformComponent& GetTransform() const override { return m_Entity.GetComponent<TransformComponent>(); }
 
-		void AddCollider(BoxColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
-		void AddCollider(SphereColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
-		void AddCollider(CapsuleColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
-		void AddCollider(MeshColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
+		virtual void AddCollider(BoxColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f)) override;
+		virtual void AddCollider(SphereColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f)) override;
+		virtual void AddCollider(CapsuleColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f)) override;
+		virtual void AddCollider(MeshColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f)) override;
+
+		virtual const Vector<Ref<ColliderShape>>& GetColliders() const override { return m_Colliders; }
+		virtual Vector<Ref<ColliderShape>>& GetColliders() override { return m_Colliders; }
 
 		virtual void* GetInternalAPIActor() const override { return (void*)&m_RigidActor; }
 		physx::PxRigidActor* GetPhysXActor() const { return m_RigidActor; }

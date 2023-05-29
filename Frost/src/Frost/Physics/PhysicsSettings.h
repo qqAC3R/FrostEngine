@@ -45,9 +45,16 @@ namespace Frost
 		LiveDebug
 	};
 
+	enum class CollisionDetectionType : uint32_t
+	{
+		Discrete,
+		Continuous,
+		ContinuousSpeculative
+	};
+
 	struct PhysicsSettings
 	{
-		float FixedTimestep = 0.02;
+		float FixedTimestep = 0.02f;
 		glm::vec3 Gravity = { 0.0f, -9.81f, 0.0f };
 		BroadphaseType BroadphaseAlgorithm = BroadphaseType::AutomaticBoxPrune;
 		glm::vec3 WorldBoundsMin = glm::vec3(-1.0f);

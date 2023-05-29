@@ -15,18 +15,20 @@
 
 namespace Frost
 {
-
+#if 0
 	// Static members
 	std::unordered_map<uint32_t, WeakRef<Texture2D>> VulkanBindlessAllocator::m_TextureSlots;
 	std::queue<uint32_t> VulkanBindlessAllocator::m_EmptyTextureSlots;
+#endif
+
+	// Get the global variables from "BindlessAllocator.cpp"
+	extern std::unordered_map<uint32_t, WeakRef<Texture2D>> m_TextureSlots;
+	extern std::queue<uint32_t> m_EmptyTextureSlots;
 
 	// Vulkan specific
 	HashMap<uint32_t, VkDescriptorSet> VulkanBindlessAllocator::m_DescriptorSet;
 	VkDescriptorSetLayout VulkanBindlessAllocator::m_DescriptorSetLayout;
 	VkDescriptorPool VulkanBindlessAllocator::m_DescriptorPool;
-	uint32_t VulkanBindlessAllocator::m_DescriptorSetNumber = 1;
-	uint32_t VulkanBindlessAllocator::m_DefaultTextureID = 0; // For white texture
-	uint32_t VulkanBindlessAllocator::m_TextureMaxStorage = std::pow(2, 11); // 2048
 
 	// std
 	static std::random_device s_RandomDevice;
@@ -44,13 +46,13 @@ namespace Frost
 	void VulkanBindlessAllocator::Init()
 	{
 		// Random generator initialization
-		s_UniformDistribution = std::uniform_int_distribution<uint64_t>(1, m_TextureMaxStorage - 1);
+		s_UniformDistribution = std::uniform_int_distribution<uint64_t>(1, BindlessAllocator::GetMaxTextureStorage() - 1);
 
 		///////////////////////////////////////////////////////////
 		// Descriptor Pool
 		///////////////////////////////////////////////////////////
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-		uint32_t textureCount = m_TextureMaxStorage * framesInFlight; // ('m_TextureMaxStorage'  textures) * ('framesInFlight' texture sets)
+		uint32_t textureCount = BindlessAllocator::GetMaxTextureStorage() * framesInFlight; // ('m_TextureMaxStorage'  textures) * ('framesInFlight' texture sets)
 
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		Vector<VkDescriptorPoolSize> poolSizes =
@@ -182,7 +184,7 @@ namespace Frost
 
 	void VulkanBindlessAllocator::RemoveTextureCustomSlot(uint32_t slot)
 	{
-		if (slot == VulkanBindlessAllocator::GetWhiteTextureID()) return; // We cannot delete the default texture
+		if (slot == BindlessAllocator::GetWhiteTextureID()) return; // We cannot delete the default texture
 
 		m_TextureSlots[slot] = nullptr;
 		m_TextureSlots.erase(slot);

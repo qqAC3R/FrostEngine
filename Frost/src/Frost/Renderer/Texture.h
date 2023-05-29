@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Frost/Core/Buffer.h"
 #include "Frost/Renderer/Image.h"
 
 namespace Frost
@@ -35,7 +36,13 @@ namespace Frost
 	{
 	public:
 		virtual const Ref<Image2D> GetImage2D() const = 0;
+
+		virtual Buffer GetWritableBuffer() = 0; // CPU Buffer
+		virtual void SetToWriteableBuffer(void* data) = 0; // CPU Buffer
+		virtual void SubmitDataToGPU() = 0;
+
 		static Ref<Texture2D> Create(const std::string& filepath, TextureSpecification textureSpec = {});
+		static Ref<Texture2D> Create(uint32_t width, uint32_t height, TextureSpecification textureSpec = {});
 	};
 
 	class TextureCubeMap : public Image

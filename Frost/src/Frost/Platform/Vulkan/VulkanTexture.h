@@ -13,6 +13,7 @@ namespace Frost
 	{
 	public:
 		VulkanTexture2D(const std::string& filepath, const TextureSpecification& textureSpec);
+		VulkanTexture2D(uint32_t width, uint32_t height, const TextureSpecification& textureSpec);
 		virtual ~VulkanTexture2D();
 
 		virtual void Destroy() override;
@@ -23,6 +24,10 @@ namespace Frost
 
 		virtual TextureSpecification& GetSpecification() override { return m_TextureSpecification; }
 		virtual const TextureSpecification& GetSpecification() const override { return m_TextureSpecification; }
+
+		virtual Buffer GetWritableBuffer() override; // CPU BufferQ
+		virtual void SetToWriteableBuffer(void* data) override; // CPU BufferQ
+		virtual void SubmitDataToGPU() override;
 
 		virtual void GenerateMipMaps() override;
 
@@ -36,6 +41,7 @@ namespace Frost
 		}
 	private:
 		Ref<Image2D> m_Image = nullptr;
+		Buffer m_TextureData;
 		TextureSpecification m_TextureSpecification;
 		uint32_t m_Width;
 		uint32_t m_Height;

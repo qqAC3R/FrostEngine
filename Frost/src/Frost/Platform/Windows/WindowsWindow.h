@@ -24,6 +24,7 @@ namespace Frost
 
 		// Window attributes
 		virtual void EnableCursour() override;
+		virtual void HideCursour() override;
 		virtual void DisableCursour() override;
 		virtual double GetTime() override;
 		virtual void SetEventCallback(const EventCallbackFn& callback) override { m_Data.EventCallback = callback; }

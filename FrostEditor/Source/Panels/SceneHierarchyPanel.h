@@ -4,6 +4,8 @@
 #include "Frost/EntitySystem/Scene.h"
 #include "Frost/EntitySystem/Entity.h"
 
+#define HIERARCHY_ENTITY_DRAG_DROP "scene_entity_hierarchy"
+
 namespace Frost
 {
 	
@@ -38,6 +40,7 @@ namespace Frost
 		void ExecuteLateFunctions();
 	private:
 		Ref<Scene> m_SceneContext = nullptr;
+		Entity m_PreviousEntity = {};
 		Entity m_SelectedEntity = {};
 
 		Vector<std::function<void()>> m_LateDeletionFunctions;

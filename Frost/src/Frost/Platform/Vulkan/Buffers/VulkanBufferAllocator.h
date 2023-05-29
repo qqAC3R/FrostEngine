@@ -24,9 +24,18 @@ namespace Frost
 
 	enum class MemoryUsage
 	{
+		// Memory will be mappable on host. It usually means CPU(system) memory.
 		CPU_ONLY,
+
+		// Memory that is both mappable on host (guarantees to be `HOST_VISIBLE`) and preferably fast to access by GPU.
+		// Usage: Resources written frequently by host (dynamic), read by device. E.g. textures (with LINEAR layout), vertex buffers, uniform buffers updated every frame or every draw call.
 		CPU_TO_GPU,
+		
+		// Memory mappable on host (guarantees to be `HOST_VISIBLE`) and cached.
+		// Usage: Resources written by device, read by host - results of some computations, e.g.screen capture, average scene luminance for HDR tone mapping.
 		GPU_TO_CPU,
+
+		// Memory will be used on device only, so fast access from the device is preferred.
 		GPU_ONLY
 	};
 

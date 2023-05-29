@@ -204,7 +204,7 @@ namespace Frost
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		auto reflectedData = GetShaderReflectionData();
-		uint32_t bindlessDescriptorSetNumber = VulkanBindlessAllocator::GetDescriptorSetNumber();
+		uint32_t bindlessDescriptorSetNumber = BindlessAllocator::GetDescriptorSetNumber();
 
 		if (reflectedData.GetDescriptorSetMax() == UINT32_MAX) return;
 

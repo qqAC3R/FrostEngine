@@ -15,6 +15,7 @@ namespace Frost
 		{
 			None = 0, PhysX = 1
 		};
+		static PhysicsEngine::API GetAPI() { return s_API; }
 	public:
 		static void Initialize();
 		static void ShutDown();

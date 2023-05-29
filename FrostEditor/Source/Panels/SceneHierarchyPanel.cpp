@@ -4,10 +4,10 @@
 #include "Frost/InputCodes/KeyCodes.h"
 #include "Frost/Renderer/Renderer.h"
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include "IconsFontAwesome.hpp"
 
-#define HIERARCHY_ENTITY_DND "HiEnT!"
 #define NO_SUBMESH_SELECTED UINT32_MAX
 
 namespace Frost
@@ -84,6 +84,21 @@ namespace Frost
 				ImGui::EndPopup();
 			}
 			ImGui::PopStyleVar(); // ImGuiStyleVar_PopupRounding
+
+
+			ImRect windowRect = { ImGui::GetWindowContentRegionMin(), ImGui::GetWindowContentRegionMax() };
+			if (ImGui::BeginDragDropTargetCustom(windowRect, ImGui::GetCurrentWindow()->ID))
+			{
+				const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("scene_entity_hierarchy", ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
+
+				if (payload)
+				{
+					Entity& entity = *(Entity*)payload->Data;
+					m_SceneContext->UnparentEntity(entity);
+				}
+				ImGui::EndDragDropTarget();
+			}
+
 
 			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
 			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
@@ -187,29 +202,36 @@ namespace Frost
 
 		bool opened = ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, tag.c_str());
 		
-
-		if (ImGui::IsItemClicked())
-		{
-			m_SelectedEntity = entity;
-			m_SelectedSubmesh = NO_SUBMESH_SELECTED;
-		}
-
-		if (isEntitySelected)
-		{
-			ImGui::PopStyleColor();
-		}
-
+		bool isClicked = ImGui::IsItemClicked();
 
 		// Drag and drop
-		if (ImGui::BeginDragDropSource())
+		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers))
 		{
 			ImGui::Text(entity.GetComponent<TagComponent>().Tag.c_str());
-			ImGui::SetDragDropPayload(HIERARCHY_ENTITY_DND, &entity, sizeof(Entity));
+			ImGui::SetDragDropPayload(HIERARCHY_ENTITY_DRAG_DROP, &entity, sizeof(Entity));
 			ImGui::EndDragDropSource();
+
+			if (m_SelectedEntity)
+			{
+				m_SelectedEntity = m_PreviousEntity;
+				//m_PreviousEntity = {};
+				m_SelectedSubmesh = NO_SUBMESH_SELECTED;
+
+			}
 		}
+		else
+		{
+			if (isClicked)
+			{
+				m_PreviousEntity = m_SelectedEntity;
+				m_SelectedEntity = entity;
+				m_SelectedSubmesh = NO_SUBMESH_SELECTED;
+			}
+		}
+
 		if (ImGui::BeginDragDropTarget())
 		{
-			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(HIERARCHY_ENTITY_DND);
+			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(HIERARCHY_ENTITY_DRAG_DROP);
 			if (payload)
 			{
 				Entity& droppedEntity = *(Entity*)payload->Data;
@@ -217,6 +239,14 @@ namespace Frost
 			}
 			ImGui::EndDragDropTarget();
 		}
+
+
+		if (isEntitySelected)
+		{
+			ImGui::PopStyleColor();
+		}
+
+
 
 		if (m_SelectedEntity && isEntitySelected)
 		{

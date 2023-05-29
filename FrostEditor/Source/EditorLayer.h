@@ -37,8 +37,8 @@ namespace Frost
 
 		virtual void OnEvent(Event& event);
 		bool OnKeyPressed(KeyPressedEvent& event);
-		bool OnMouseButtonPressed(MouseButtonPressedEvent& event);
-		void MouseButtonPressed();
+		//bool OnMouseButtonPressed(MouseButtonPressedEvent& event);
+		void OnMouseClickSelectEntity();
 
 		virtual void OnResize();
 
@@ -70,8 +70,12 @@ namespace Frost
 		bool m_EnablePhysicsDebugging = false;
 		bool m_EnablePhysicsVisualization = true;
 		bool m_IsGuizmoUsing = false;
+		bool m_WasMousePressedPrevFrame = false;
+		bool m_IsViewPortFocused = false;
 
 		glm::vec2 m_ViewportSize;
 		glm::vec2 m_ViewportBounds[2];
+
+		friend class InspectorPanel;
 	};
 }

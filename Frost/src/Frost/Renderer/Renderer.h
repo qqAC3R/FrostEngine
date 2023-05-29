@@ -52,10 +52,13 @@ namespace Frost
 
 	// Memory Usage:
 	/*
-		Shadow Map = 64mb * 3 = 192mb
-		3D Voxel texture = 73.15mb * 3 = 219.45mb
+		Shadow Map = 67MB * 3 = 201MB
+		3D Voxel texture = 67MB * 3 = 201MB
+		   - Clear Buffer - 67MB * 1 = 67MB
+
+		Volumetric Froxels - (41MB * 3 textures) * 3 FIF = 123MB
 	
-		GBuffer = (8mb * 4 attachments + 4mb (depth) ) * 3 = 108mb
+		GBuffer = (8MB * 4 attachments + 4MB (depth) ) * 3 = 108MB
 	
 		Radiance Map = 64mb
 	

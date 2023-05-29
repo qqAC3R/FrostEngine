@@ -14,6 +14,15 @@ namespace Frost
 		Entity() = default;
 		Entity(const entt::entity& handle, Scene* scene);
 
+		~Entity() {}
+
+		/*template <typename T>
+		T& AddComponent()
+		{
+			T& component = m_Scene->GetRegistry().emplace<T>(m_Handle);
+			return component;
+		}*/
+
 		template <typename T, typename... Args>
 		T& AddComponent(Args&&... args)
 		{
@@ -80,9 +89,10 @@ namespace Frost
 			return entity.IsAncesterOf(*this);
 		}
 
-		UUID GetUUID() { return GetComponent<IDComponent>().ID; }
-		UUID GetParent() { return GetComponent<ParentChildComponent>().ParentID; }
-		const Vector<UUID>& GetChildren() { return GetComponent<ParentChildComponent>().ChildIDs; }
+		UUID GetUUID() const { return GetComponent<IDComponent>().ID; }
+		UUID GetParent() const { return GetComponent<ParentChildComponent>().ParentID; }
+		const Vector<UUID>& GetChildren() const { return GetComponent<ParentChildComponent>().ChildIDs; }
+		UUID GetSceneUUID() const { return m_Scene->GetUUID(); }
 
 		entt::entity Raw() { return m_Handle; }
 
@@ -96,6 +106,7 @@ namespace Frost
 		Scene* m_Scene = nullptr;
 
 		friend class Scene;
+		friend class ScriptEngine;
 	};
 
 

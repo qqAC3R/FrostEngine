@@ -70,7 +70,10 @@ namespace Frost
 		return std::filesystem::is_directory(filepath);
 	}
 
-	
+	std::filesystem::file_time_type FileSystem::GetLastWriteTime(const std::string& filepath)
+	{
+		return std::filesystem::last_write_time(std::filesystem::path(filepath));
+	}
 
 	bool FileSystem::ShowFileInExplorer(const std::filesystem::path& path)
 	{

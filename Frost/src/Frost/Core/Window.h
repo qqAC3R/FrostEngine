@@ -37,6 +37,7 @@ namespace Frost
 
 		// Windows attributes
 		virtual void EnableCursour() = 0;
+		virtual void HideCursour() = 0;
 		virtual void DisableCursour() = 0;
 		virtual double GetTime() = 0;
 		virtual void SetEventCallback(const EventCallbackFn& callback) = 0;

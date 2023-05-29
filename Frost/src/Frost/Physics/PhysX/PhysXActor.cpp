@@ -2,8 +2,10 @@
 #include "PhysXActor.h"
 
 #include "PhysXInternal.h"
-#include "Frost/Physics/PhysicsEngine.h"
 #include "PhysXShapes.h"
+
+#include "Frost/Physics/PhysicsEngine.h"
+#include "Frost/Physics/PhysicsLayer.h"
 
 #include <glm/gtx/compatibility.hpp>
 
@@ -20,6 +22,17 @@ namespace Frost
 	{
 		m_Colliders.clear();
 		m_RigidActor->release();
+	}
+
+	void PhysXActor::SetSimulationData(uint32_t layerId)
+	{
+		const PhysicsLayer& layerInfo = PhysicsLayerManager::GetLayer(layerId);
+
+		if (layerInfo.CollidesWith == 0)
+			return;
+
+		for (auto& collider : m_Colliders)
+			collider->SetFilterData(layerInfo, m_RigidBodyData.CollisionDetection);
 	}
 
 	void PhysXActor::SetTranslation(const glm::vec3& translation, bool autowake /*= true*/)
@@ -238,6 +251,49 @@ namespace Frost
 		actor->setAngularDamping(drag);
 	}
 
+	glm::vec3 PhysXActor::GetKinematicTargetPosition() const
+	{
+		if (!IsKinematic())
+		{
+			FROST_CORE_WARN("Trying to set kinematic target for a non-kinematic actor.");
+			return glm::vec3(0.0f, 0.0f, 0.0f);
+		}
+
+		physx::PxRigidDynamic* actor = m_RigidActor->is<physx::PxRigidDynamic>();
+		FROST_ASSERT_INTERNAL(actor);
+		physx::PxTransform target;
+		actor->getKinematicTarget(target);
+		return PhysXUtils::FromPhysXVector(target.p);
+	}
+
+	glm::vec3 PhysXActor::GetKinematicTargetRotation() const
+	{
+		if (!IsKinematic())
+		{
+			FROST_CORE_WARN("Trying to set kinematic target for a non-kinematic actor.");
+			return glm::vec3(0.0f, 0.0f, 0.0f);
+		}
+
+		physx::PxRigidDynamic* actor = m_RigidActor->is<physx::PxRigidDynamic>();
+		FROST_ASSERT_INTERNAL(actor);
+		physx::PxTransform target;
+		actor->getKinematicTarget(target);
+		return glm::eulerAngles(PhysXUtils::FromPhysXQuat(target.q));
+	}
+
+	void PhysXActor::SetKinematicTarget(const glm::vec3& targetPosition, const glm::vec3& targetRotation) const
+	{
+		if (!IsKinematic())
+		{
+			FROST_CORE_WARN("Trying to set kinematic target for a non-kinematic actor.");
+			return;
+		}
+
+		physx::PxRigidDynamic* actor = m_RigidActor->is<physx::PxRigidDynamic>();
+		FROST_ASSERT_INTERNAL(actor);
+		actor->setKinematicTarget(PhysXUtils::ToPhysXTransform(targetPosition, targetRotation));
+	}
+
 	void PhysXActor::SetKinematic(bool isKinematic)
 	{
 		if (!IsDynamic())
@@ -275,25 +331,30 @@ namespace Frost
 
 	void PhysXActor::AddCollider(BoxColliderComponent& collider, Entity entity, const glm::vec3& offset)
 	{
-		m_Colliders.push_back(Ref<PhysX::BoxColliderShape>::Create(collider, *this, entity, collider.Offset));
+		collider.ColliderHandle = Ref<PhysX::BoxColliderShape>::Create(collider, *this, entity, collider.Offset);
+		m_Colliders.push_back(collider.ColliderHandle);
 	}
 
 	void PhysXActor::AddCollider(SphereColliderComponent& collider, Entity entity, const glm::vec3& offset)
 	{
-		m_Colliders.push_back(Ref<PhysX::SphereColliderShape>::Create(collider, *this, entity, collider.Offset));
+		collider.ColliderHandle = Ref<PhysX::SphereColliderShape>::Create(collider, *this, entity, collider.Offset);
+		m_Colliders.push_back(collider.ColliderHandle);
 	}
 
 	void PhysXActor::AddCollider(CapsuleColliderComponent& collider, Entity entity, const glm::vec3& offset)
 	{
-		m_Colliders.push_back(Ref<PhysX::CapsuleColliderShape>::Create(collider, *this, entity, collider.Offset));
+		collider.ColliderHandle = Ref<PhysX::CapsuleColliderShape>::Create(collider, *this, entity, collider.Offset);
+		m_Colliders.push_back(collider.ColliderHandle);
 	}
 
 	void PhysXActor::AddCollider(MeshColliderComponent& collider, Entity entity, const glm::vec3& offset)
 	{
-		if(collider.IsConvex)
-			m_Colliders.push_back(Ref<PhysX::ConvexMeshShape>::Create(collider, *this, entity, offset));
+		if (collider.IsConvex)
+			collider.ColliderHandle = Ref<PhysX::ConvexMeshShape>::Create(collider, *this, entity, offset);
 		else
-			m_Colliders.push_back(Ref<PhysX::TriangleMeshShape>::Create(collider, *this, entity, offset));
+			collider.ColliderHandle = Ref<PhysX::TriangleMeshShape>::Create(collider, *this, entity, offset);
+
+		m_Colliders.push_back(collider.ColliderHandle);
 	}
 
 	void PhysXActor::CreateRigidActor()
@@ -330,9 +391,13 @@ namespace Frost
 			SetGravityDisabled(m_RigidBodyData.DisableGravity);
 
 			m_RigidActor->is<physx::PxRigidDynamic>()->setSolverIterationCounts(settings.SolverIterations, settings.SolverVelocityIterations);
-			m_RigidActor->is<physx::PxRigidDynamic>()->setRigidBodyFlag(physx::PxRigidBodyFlag::eENABLE_CCD, m_RigidBodyData.CollisionDetection == RigidBodyComponent::CollisionDetectionType::Continuous);
-			m_RigidActor->is<physx::PxRigidDynamic>()->setRigidBodyFlag(physx::PxRigidBodyFlag::eENABLE_SPECULATIVE_CCD, m_RigidBodyData.CollisionDetection == RigidBodyComponent::CollisionDetectionType::ContinuousSpeculative);
+			m_RigidActor->is<physx::PxRigidDynamic>()->setRigidBodyFlag(physx::PxRigidBodyFlag::eENABLE_CCD, m_RigidBodyData.CollisionDetection == CollisionDetectionType::Continuous);
+			m_RigidActor->is<physx::PxRigidDynamic>()->setRigidBodyFlag(physx::PxRigidBodyFlag::eENABLE_SPECULATIVE_CCD, m_RigidBodyData.CollisionDetection == CollisionDetectionType::ContinuousSpeculative);
 		}
+
+		if (!PhysicsLayerManager::IsLayerValid(m_RigidBodyData.Layer))
+			m_RigidBodyData.Layer = 0;
+		
 
 		if (m_Entity.HasComponent<BoxColliderComponent>())
 			AddCollider(m_Entity.GetComponent<BoxColliderComponent>(), m_Entity);
@@ -367,6 +432,7 @@ namespace Frost
 		}
 
 		SetMass(m_RigidBodyData.Mass);
+		SetSimulationData(m_RigidBodyData.Layer);
 
 		m_RigidActor->userData = this;
 	}

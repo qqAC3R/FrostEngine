@@ -1,6 +1,9 @@
 #include "frostpch.h"
 #include "PhysXContactListener.h"
 
+#include "Frost/Physics/PhysicsActor.h"
+#include "Frost/Script/ScriptEngine.h"
+
 namespace Frost
 {
 	void PhysXContactListener::onConstraintBreak(physx::PxConstraintInfo* constraints, physx::PxU32 count)
@@ -14,8 +17,8 @@ namespace Frost
 		for (uint32_t i = 0; i < count; i++)
 		{
 			physx::PxActor& physxActor = *actors[i];
-			//Ref<PhysicsActor> actor = (PhysicsActor*)physxActor.userData;
-			//HZ_CORE_INFO("PhysX Actor waking up: ID: {0}, Name: {1}", actor->GetEntity().GetUUID(), actor->GetEntity().GetComponent<TagComponent>().Tag);
+			PhysicsActor* actor = (PhysicsActor*)physxActor.userData;
+			FROST_CORE_INFO("PhysX Actor waking up: ID: {0}, Name: {1}", actor->GetEntity().GetUUID(), actor->GetEntity().GetComponent<TagComponent>().Tag);
 		}
 	}
 
@@ -24,14 +27,13 @@ namespace Frost
 		for (uint32_t i = 0; i < count; i++)
 		{
 			physx::PxActor& physxActor = *actors[i];
-			//Ref<PhysicsActor> actor = (PhysicsActor*)physxActor.userData;
-			//HZ_CORE_INFO("PhysX Actor going to sleep: ID: {0}, Name: {1}", actor->GetEntity().GetUUID(), actor->GetEntity().GetComponent<TagComponent>().Tag);
+			PhysicsActor* actor = (PhysicsActor*)physxActor.userData;
+			FROST_CORE_INFO("PhysX Actor going to sleep: ID: {0}, Name: {1}", actor->GetEntity().GetUUID(), actor->GetEntity().GetComponent<TagComponent>().Tag);
 		}
 	}
 
 	void PhysXContactListener::onContact(const physx::PxContactPairHeader& pairHeader, const physx::PxContactPair* pairs, physx::PxU32 nbPairs)
 	{
-#if 0
 		if (!ScriptEngine::GetCurrentSceneContext()->IsPlaying())
 			return;
 
@@ -41,8 +43,8 @@ namespace Frost
 		if (removedActorA || removedActorB)
 			return;
 
-		Ref<PhysicsActor> actorA = (PhysicsActor*)pairHeader.actors[0]->userData;
-		Ref<PhysicsActor> actorB = (PhysicsActor*)pairHeader.actors[1]->userData;
+		PhysicsActor* actorA = (PhysicsActor*)pairHeader.actors[0]->userData;
+		PhysicsActor* actorB = (PhysicsActor*)pairHeader.actors[1]->userData;
 
 		if (!actorA || !actorB)
 			return;
@@ -64,12 +66,10 @@ namespace Frost
 			if (actorBScriptModuleValid)
 				ScriptEngine::OnCollisionEnd(actorB->GetEntity(), actorA->GetEntity());
 		}
-#endif
 	}
 
 	void PhysXContactListener::onTrigger(physx::PxTriggerPair* pairs, physx::PxU32 count)
 	{
-#if 0
 		if (!ScriptEngine::GetCurrentSceneContext()->IsPlaying())
 			return;
 
@@ -78,8 +78,8 @@ namespace Frost
 			if (pairs[i].flags & (physx::PxTriggerPairFlag::eREMOVED_SHAPE_TRIGGER | physx::PxTriggerPairFlag::eREMOVED_SHAPE_OTHER))
 				continue;
 
-			Ref<PhysicsActor> triggerActor = (PhysicsActor*)pairs[i].triggerActor->userData;
-			Ref<PhysicsActor> otherActor = (PhysicsActor*)pairs[i].otherActor->userData;
+			PhysicsActor* triggerActor = (PhysicsActor*)pairs[i].triggerActor->userData;
+			PhysicsActor* otherActor = (PhysicsActor*)pairs[i].otherActor->userData;
 
 			if (!triggerActor || !otherActor)
 				continue;
@@ -102,7 +102,6 @@ namespace Frost
 					ScriptEngine::OnTriggerEnd(otherActor->GetEntity(), triggerActor->GetEntity());
 			}
 		}
-#endif
 	}
 
 	void PhysXContactListener::onAdvance(const physx::PxRigidBody* const* bodyBuffer, const physx::PxTransform* poseBuffer, const physx::PxU32 count)

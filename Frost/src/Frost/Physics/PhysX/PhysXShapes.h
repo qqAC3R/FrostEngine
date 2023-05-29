@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Frost/EntitySystem/Components.h"
-
 #include "Frost/Physics/PhysicsShapes.h"
 #include "Frost/Physics/PhysicsActor.h"
 #include "PhysXUtils.h"
+
+#include "Frost/EntitySystem/Components.h"
 
 namespace Frost
 {
@@ -23,8 +23,9 @@ namespace Frost::PhysX
 		// TODO: Physics Materials
 		//void SetMaterial(AssetHandle material);
 
-		// TODO: Add layers
-		//virtual void SetFilterData(const physx::PxFilterData& filterData) override;
+		void SetSize(const glm::vec3& transformScale, const glm::vec3& size);
+
+		virtual void SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType) override;
 
 		virtual const glm::vec3& GetOffset() const override { return m_Component.Offset; }
 		virtual void SetOffset(const glm::vec3& offset) override;
@@ -32,7 +33,6 @@ namespace Frost::PhysX
 		virtual bool IsTrigger() const override { return m_Component.IsTrigger; }
 		virtual void SetTrigger(bool isTrigger) override;
 
-		//void DetachFromActor(physx::PxRigidActor* actor);
 		virtual void DetachFromActor(Ref<PhysicsActor> actor) override;
 
 	private:
@@ -52,8 +52,9 @@ namespace Frost::PhysX
 		// TODO: Physics Materials
 		//void SetMaterial(AssetHandle material);
 
-		// TODO: Add layers
-		//virtual void SetFilterData(const physx::PxFilterData& filterData) override;
+		void SetRadius(const glm::vec3& transformScale, float radius);
+
+		virtual void SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType) override;
 
 		virtual const glm::vec3& GetOffset() const override { return m_Component.Offset; }
 		virtual void SetOffset(const glm::vec3& offset) override;
@@ -61,7 +62,6 @@ namespace Frost::PhysX
 		virtual bool IsTrigger() const override { return m_Component.IsTrigger; }
 		virtual void SetTrigger(bool isTrigger) override;
 
-		//void DetachFromActor(physx::PxRigidActor* actor);
 		virtual void DetachFromActor(Ref<PhysicsActor> actor) override;
 
 	private:
@@ -80,8 +80,10 @@ namespace Frost::PhysX
 		// TODO: Physics Materials
 		//void SetMaterial(AssetHandle material);
 
-		// TODO: Add layers
-		//virtual void SetFilterData(const physx::PxFilterData& filterData) override;
+		void SetRadius(const glm::vec3& transformScale, float radius);
+		void SetHeight(const glm::vec3& transformScale, float height);
+
+		virtual void SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType) override;
 
 		virtual const glm::vec3& GetOffset() const override { return m_Component.Offset; }
 		virtual void SetOffset(const glm::vec3& offset) override;
@@ -89,7 +91,6 @@ namespace Frost::PhysX
 		virtual bool IsTrigger() const override { return m_Component.IsTrigger; }
 		virtual void SetTrigger(bool isTrigger) override;
 
-		//void DetachFromActor(physx::PxRigidActor* actor);
 		virtual void DetachFromActor(Ref<PhysicsActor> actor) override;
 
 	private:
@@ -110,8 +111,7 @@ namespace Frost::PhysX
 		// TODO: Physics Materials
 		//void SetMaterial(AssetHandle material);
 
-		// TODO: Add layers
-		//virtual void SetFilterData(const physx::PxFilterData& filterData) override;
+		virtual void SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType) override;
 
 		// TODO?
 		virtual const glm::vec3& GetOffset() const override { return glm::vec3(0.0f); }
@@ -120,7 +120,6 @@ namespace Frost::PhysX
 		virtual bool IsTrigger() const override { return m_Component.IsTrigger; }
 		virtual void SetTrigger(bool isTrigger) override;
 
-		//void DetachFromActor(physx::PxRigidActor* actor);
 		virtual void DetachFromActor(Ref<PhysicsActor> actor) override;
 
 	private:
@@ -140,8 +139,7 @@ namespace Frost::PhysX
 		// TODO: Physics Materials
 		//void SetMaterial(AssetHandle material);
 
-		// TODO: Add layers
-		//virtual void SetFilterData(const physx::PxFilterData& filterData) override;
+		virtual void SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType) override;
 
 		// TODO?
 		virtual const glm::vec3& GetOffset() const override { return glm::vec3(0.0f); }
@@ -150,7 +148,6 @@ namespace Frost::PhysX
 		virtual bool IsTrigger() const override { return m_Component.IsTrigger; }
 		virtual void SetTrigger(bool isTrigger) override;
 
-		//void DetachFromActor(physx::PxRigidActor* actor);
 		virtual void DetachFromActor(Ref<PhysicsActor> actor) override;
 
 	private:

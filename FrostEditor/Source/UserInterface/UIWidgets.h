@@ -4,6 +4,8 @@
 
 namespace Frost
 {
+	class Entity;
+
 	class UserInterface
 	{
 	public:
@@ -21,6 +23,9 @@ namespace Frost
 
 		static void CheckBox(const std::string& label, bool& value);
 
+		static bool InputText(const std::string& label, const char* buffer);
+
+		static bool PropertyEntityReference(const char* label, Entity& entity);
 	};
 
 }

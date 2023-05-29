@@ -8,6 +8,7 @@
 
 namespace Frost::PhysX
 {
+	// TODO: Add physics material system
 	static physx::PxMaterial* CreatePhysicsMaterial()
 	{
 		return PhysXInternal::GetPhysXHandle().createMaterial(0.6f, 0.6f, 0.6f);
@@ -30,12 +31,11 @@ namespace Frost::PhysX
 			geometry, 
 			*m_Material
 		);
+		//m_Shape->setGeometry(PhysXUtils::ToPhysXTransform(offset + m_Component.Offset, glm::vec3(0.0f)));
 
 		m_Shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, !m_Component.IsTrigger);
 		m_Shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, m_Component.IsTrigger);
-		//m_Shape->setLocalPose(PhysXUtils::ToPhysXTransform(glm::translate(glm::mat4(1.0f), m_Component.Offset)));
 		m_Shape->setLocalPose(PhysXUtils::ToPhysXTransform(offset + m_Component.Offset, glm::vec3(0.0f)));
-
 	}
 
 	BoxColliderShape::~BoxColliderShape()
@@ -57,11 +57,30 @@ namespace Frost::PhysX
 		m_Component.IsTrigger = isTrigger;
 	}
 
+	void BoxColliderShape::SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType)
+	{
+		physx::PxFilterData filterData;
+		filterData.word0 = layerInfo.BitValue;
+		filterData.word1 = layerInfo.CollidesWith;
+		filterData.word2 = (uint32_t)collisionType;
+
+		m_Shape->setSimulationFilterData(filterData);
+	}
+
 	void BoxColliderShape::DetachFromActor(Ref<PhysicsActor> actor)
 	{
 		actor.As<PhysXActor>()->GetPhysXActor()->detachShape(*m_Shape);
 	}
 
+	void BoxColliderShape::SetSize(const glm::vec3& transformScale, const glm::vec3& size)
+	{
+		glm::vec3 colliderSize = transformScale * size;
+		physx::PxBoxGeometry geometry = physx::PxBoxGeometry(colliderSize.x / 2.0f, colliderSize.y / 2.0f, colliderSize.z / 2.0f);
+
+		m_Shape->setGeometry(geometry);
+
+		m_Component.Size = size;
+	}
 
 
 
@@ -102,11 +121,30 @@ namespace Frost::PhysX
 		m_Component.IsTrigger = isTrigger;
 	}
 
+	void SphereColliderShape::SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType)
+	{
+		physx::PxFilterData filterData;
+		filterData.word0 = layerInfo.BitValue;
+		filterData.word1 = layerInfo.CollidesWith;
+		filterData.word2 = (uint32_t)collisionType;
+
+		m_Shape->setSimulationFilterData(filterData);
+	}
+
 	void SphereColliderShape::DetachFromActor(Ref<PhysicsActor> actor)
 	{
 		actor.As<PhysXActor>()->GetPhysXActor()->detachShape(*m_Shape);
 	}
 
+	void SphereColliderShape::SetRadius(const glm::vec3& transformScale, float radius)
+	{
+		float largestComponent = glm::max(transformScale.x, glm::max(transformScale.y, transformScale.z));
+		physx::PxSphereGeometry geometry = physx::PxSphereGeometry(largestComponent * radius);
+
+		m_Shape->setGeometry(geometry);
+
+		m_Component.Radius = radius;
+	}
 
 
 
@@ -121,7 +159,6 @@ namespace Frost::PhysX
 
 		auto& actorScale = entity.Transform().Scale;
 		float radiusScale = glm::max(actorScale.x, actorScale.z);
-
 
 		physx::PxCapsuleGeometry geometry = physx::PxCapsuleGeometry(m_Component.Radius * radiusScale, (m_Component.Height / 2.0f) * actorScale.y);
 		m_Shape = physx::PxRigidActorExt::createExclusiveShape(*actor.GetPhysXActor(), geometry, *m_Material);
@@ -149,11 +186,40 @@ namespace Frost::PhysX
 		m_Component.IsTrigger = isTrigger;
 	}
 
+	void CapsuleColliderShape::SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType)
+	{
+		physx::PxFilterData filterData;
+		filterData.word0 = layerInfo.BitValue;
+		filterData.word1 = layerInfo.CollidesWith;
+		filterData.word2 = (uint32_t)collisionType;
+
+		m_Shape->setSimulationFilterData(filterData);
+	}
+
 	void CapsuleColliderShape::DetachFromActor(Ref<PhysicsActor> actor)
 	{
 		actor.As<PhysXActor>()->GetPhysXActor()->detachShape(*m_Shape);
 	}
 
+	void CapsuleColliderShape::SetRadius(const glm::vec3& transformScale, float radius)
+	{
+		float radiusScale = glm::max(transformScale.x, transformScale.z);
+		physx::PxCapsuleGeometry geometry = physx::PxCapsuleGeometry(radius * radiusScale, (m_Component.Height / 2.0f) * transformScale.y);
+
+		m_Shape->setGeometry(geometry);
+
+		m_Component.Radius = radius;
+	}
+
+	void CapsuleColliderShape::SetHeight(const glm::vec3& transformScale, float height)
+	{
+		float radiusScale = glm::max(transformScale.x, transformScale.z);
+		physx::PxCapsuleGeometry geometry = physx::PxCapsuleGeometry(m_Component.Radius * radiusScale, (height / 2.0f) * transformScale.y);
+
+		m_Shape->setGeometry(geometry);
+
+		m_Component.Height = height;
+	}
 
 
 
@@ -224,6 +290,17 @@ namespace Frost::PhysX
 		m_Component.IsTrigger = isTrigger;
 	}
 
+	void ConvexMeshShape::SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType)
+	{
+		physx::PxFilterData filterData;
+		filterData.word0 = layerInfo.BitValue;
+		filterData.word1 = layerInfo.CollidesWith;
+		filterData.word2 = (uint32_t)collisionType;
+
+		for (auto shape : m_Shapes)
+			shape->setSimulationFilterData(filterData);
+	}
+
 	void ConvexMeshShape::DetachFromActor(Ref<PhysicsActor> actor)
 	{
 		for (auto shape : m_Shapes)
@@ -231,6 +308,7 @@ namespace Frost::PhysX
 
 		m_Shapes.clear();
 	}
+
 
 
 
@@ -298,6 +376,17 @@ namespace Frost::PhysX
 		m_Component.IsTrigger = isTrigger;
 	}
 
+	void TriangleMeshShape::SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType)
+	{
+		physx::PxFilterData filterData;
+		filterData.word0 = layerInfo.BitValue;
+		filterData.word1 = layerInfo.CollidesWith;
+		filterData.word2 = (uint32_t)collisionType;
+
+		for (auto shape : m_Shapes)
+			shape->setSimulationFilterData(filterData);
+	}
+
 	void TriangleMeshShape::DetachFromActor(Ref<PhysicsActor> actor)
 	{
 		for (auto shape : m_Shapes)
@@ -305,5 +394,4 @@ namespace Frost::PhysX
 
 		m_Shapes.clear();
 	}
-
 }

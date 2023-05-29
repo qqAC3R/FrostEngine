@@ -6,15 +6,21 @@
 #include "Frost/EntitySystem/Components.h"
 
 #include "Frost/Physics/PhysicsEngine.h"
+#include "Frost/Script/ScriptEngine.h"
 
 #include "Frost/Math/Math.h"
 
 namespace Frost
 {
 
+	Scene::Scene()
+	{
+		//m_Registry.on_construct<ScriptComponent>().connect<&Scene::OnScriptComponentConstruct>(this);
+		//m_Registry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptComponentDestroy>(this);
+	}
+
 	Scene::~Scene()
 	{
-
 	}
 
 	Entity Scene::CreateEntity(const std::string name)
@@ -83,6 +89,7 @@ namespace Frost
 
 	void Scene::Update(Timestep ts)
 	{
+
 		UpdateSkyLight(ts);
 		UpdateMeshComponents(ts);
 		UpdateAnimationControllers(ts);
@@ -93,13 +100,20 @@ namespace Frost
 		UpdateCloudVolumes(ts);
 
 		UpdateSceneCameras(ts);
+
+
 		//UpdatePhysicsDebugMeshes(ts);
 	}
 
 	void Scene::UpdateRuntime(Timestep ts)
 	{
+		// C# Scripting Part
+		UpdateCSharpApplication(ts);
+
+		// Physics Part
 		PhysicsEngine::Simulate(ts);
 
+		// Rendering Part
 		UpdateSkyLight(ts);
 		UpdateMeshComponents(ts);
 		UpdateAnimationControllers(ts);
@@ -109,18 +123,65 @@ namespace Frost
 		UpdateBoxFogVolumes(ts);
 		UpdateCloudVolumes(ts);
 
+		UpdateChildrenTransforms(ts);
+
 		//UpdatePhysicsDebugMeshes(ts);
 	}
 
-	void Scene::OnPhysicsSimulationStart()
+	void Scene::OnRuntimeStart()
 	{
+		FROST_CORE_TRACE("==========RunTimeSTART==========");
+
+		m_IsScenePlaying = true;
+
+		// Initalizing the physics engine firstly
 		PhysicsEngine::CreateScene();
 		PhysicsEngine::CreateActors(this);
+
+
+		// Initializing the script engine
+		ScriptEngine::SetSceneContext(this);
+		auto view = m_Registry.view<ScriptComponent>();
+		for (auto entity : view)
+		{
+			Entity e = { entity, this };
+			if (ScriptEngine::ModuleExists(e.GetComponent<ScriptComponent>().ModuleName))
+			{
+				ScriptEngine::InitScriptEntity(e);
+				ScriptEngine::InstantiateEntityClass(e);
+			}
+		}
+
+		for (auto entity : view)
+		{
+			Entity e = { entity, this };
+			if (ScriptEngine::ModuleExists(e.GetComponent<ScriptComponent>().ModuleName))
+			{
+				ScriptEngine::OnCreateEntity(e);
+			}
+		}
 	}
 
-	void Scene::OnPhysicsSimulationEnd()
+	void Scene::OnRuntimeEnd()
 	{
 		PhysicsEngine::DeleteScene();
+
+		auto view = m_Registry.view<ScriptComponent>();
+		for (auto entity : view)
+		{
+			Entity e = { entity, this };
+			if (ScriptEngine::ModuleExists(e.GetComponent<ScriptComponent>().ModuleName))
+			{
+				ScriptEngine::OnDestroyEntity(e);
+				//ScriptEngine::ShutdownScriptEntity(e, e.GetComponent<ScriptComponent>().ModuleName);
+			}
+		}
+
+		ScriptEngine::ShutdownScene(this);
+
+		m_IsScenePlaying = false;
+
+		FROST_CORE_TRACE("==========RunTimeEND==========");
 	}
 
 	const glm::mat4& Scene::GetTransformMatFromEntityAndParent(Entity entity)
@@ -132,6 +193,15 @@ namespace Frost
 			transform = GetTransformMatFromEntityAndParent(parent);
 
 		return transform * entity.GetComponent<TransformComponent>().GetTransform();
+	}
+
+	TransformComponent Scene::GetTransformFromEntityAndParent(Entity entity)
+	{
+		glm::mat4 transform = GetTransformMatFromEntityAndParent(entity);
+		TransformComponent transformComponent;
+		Math::DecomposeTransform(transform, transformComponent.Translation, transformComponent.Rotation, transformComponent.Scale);
+
+		return transformComponent;
 	}
 
 	void Scene::ConvertEntityToParentTransform(Entity entity)
@@ -161,6 +231,18 @@ namespace Frost
 		return Entity{};
 	}
 
+	Entity Scene::FindEntityByTag(const std::string& tag)
+	{
+		auto view = m_Registry.view<TagComponent>();
+		for (auto entity : view)
+		{
+			const auto& tagComponent = view.get<TagComponent>(entity).Tag;
+			if (tagComponent == tag)
+				return Entity(entity, this);
+		}
+		return Entity{};
+	}
+
 	CameraComponent* Scene::GetPrimaryCamera()
 	{
 		auto group = m_Registry.group<CameraComponent>(entt::get<TransformComponent>);
@@ -169,11 +251,17 @@ namespace Frost
 			auto [cameraComponent, transformComponent] = group.get<CameraComponent, TransformComponent>(entity);
 			if (cameraComponent.Primary)
 			{
-				cameraComponent.Camera->SetTransform(transformComponent.GetTransform());
+				glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+				cameraComponent.Camera->SetTransform(transform);
 				return &cameraComponent;
 			}
 		}
 		return nullptr;
+	}
+
+	Entity Scene::GetEntityByUUID(UUID uuid)
+	{
+		return m_EntityIDMap[uuid];
 	}
 
 	void Scene::UpdateSkyLight(Timestep ts)
@@ -369,7 +457,21 @@ namespace Frost
 				}
 
 			}
+		}
 
+		if (selectedEntity.HasComponent<FogBoxVolumeComponent>())
+		{
+			FogBoxVolumeComponent& fogBoxVolumeComponent = selectedEntity.GetComponent<FogBoxVolumeComponent>();
+
+			glm::mat4 transform = GetTransformMatFromEntityAndParent(selectedEntity);
+			glm::vec3 translation, rotation, scale;
+			Math::DecomposeTransform(transform, translation, rotation, scale);
+
+			// Rescale by 2 the transform for the debug mesh to fit in the bounds of the fog box
+			glm::mat4 rotationMat = glm::toMat4(glm::quat(glm::radians(rotation)));
+			transform = glm::translate(glm::mat4(1.0f), translation) * rotationMat * glm::scale(glm::mat4(1.0f), 2.0f * scale);
+
+			Renderer::SubmitWireframeMesh(Mesh::GetDefaultMeshes().Cube, transform, glm::vec4(0.3f, 0.6f, 0.9f, 1.0f), 2.0f);
 		}
 	}
 
@@ -427,8 +529,46 @@ namespace Frost
 				}
 
 			}
+		}
+	}
+
+	void Scene::UpdateCSharpApplication(Timestep ts)
+	{
+		auto view = m_Registry.view<ScriptComponent>();
+		for (auto entity : view)
+		{
+			Entity e = { entity, this };
+			if (ScriptEngine::ModuleExists(e.GetComponent<ScriptComponent>().ModuleName))
+			{
+				ScriptEngine::OnUpdateEntity(e, ts);
+			}
+		}
+
+		for (auto&& fn : m_PostUpdateQueue)
+			fn();
+		m_PostUpdateQueue.clear();
+	}
+
+	void Scene::UpdateChildrenTransforms(Timestep ts)
+	{
+		auto group = m_Registry.group<ParentChildComponent>(entt::get<TransformComponent>);
+		for (auto& entity : group)
+		{
+			Entity e = { entity, this };
+			Entity parent = FindEntityByUUID(e.GetParent());
+
+			if (!parent)
+				continue;
+
+			//ConvertEntityToParentTransform(e);
+			//
+			//TransformComponent& transform = e.GetComponent<TransformComponent>();
+			//glm::mat4 parentTransform = GetTransformMatFromEntityAndParent(parent);
+			//
+			//glm::mat4 localTransform = glm::inverse(parentTransform) * transform.GetTransform();
 
 		}
+
 	}
 
 	void Scene::DestroyEntity(Entity entity)
@@ -484,6 +624,11 @@ namespace Frost
 		child.GetComponent<ParentChildComponent>().ParentID = 0;
 	}
 
+	void Scene::SubmitToDestroyEntity(Entity entity)
+	{
+		SubmitPostUpdateFunc([entity]() { entity.m_Scene->DestroyEntity(entity); });
+	}
+
 	template<typename T>
 	static void CopyComponent(entt::registry& dstRegistry, entt::registry& srcRegistry, const std::unordered_map<UUID, entt::entity>& enttMap)
 	{
@@ -527,6 +672,7 @@ namespace Frost
 		CopyComponent<SphereColliderComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<CapsuleColliderComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<MeshColliderComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<ScriptComponent>(target->m_Registry, m_Registry, enttMap);
 
 		// Sort IdComponent by by entity handle (which is essentially the order in which they were created)
 		// This ensures a consistent ordering when iterating IdComponent (for example: when rendering scene hierarchy panel)

@@ -150,7 +150,7 @@ namespace Frost
 		// Add the white texture as the default texture for the bindless residency
 		VulkanBindlessAllocator::AddTextureCustomSlot(
 			Renderer::GetWhiteLUT(),
-			VulkanBindlessAllocator::GetWhiteTextureID()
+			BindlessAllocator::GetWhiteTextureID()
 		);
 
 		/// Init scene render passes

@@ -773,6 +773,7 @@ namespace Frost
 				case ImageFormat::R32I:             return VK_FORMAT_R32_UINT;
 				case ImageFormat::RG32F:			return VK_FORMAT_R32G32_SFLOAT;
 				case ImageFormat::RGBA8:            return VK_FORMAT_R8G8B8A8_UNORM;
+				case ImageFormat::RGBA_BC7:         return VK_FORMAT_BC7_UNORM_BLOCK;
 				case ImageFormat::RGBA16F:          return VK_FORMAT_R16G16B16A16_SFLOAT;
 				case ImageFormat::RGBA16UNORM:      return VK_FORMAT_R16G16B16A16_UNORM;
 				case ImageFormat::RGBA32F:          return VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -911,6 +912,7 @@ namespace Frost
 		{
 			switch (imageFormat)
 			{
+				case ImageFormat::RGBA_BC7:  return width * height * sizeof(float);
 				case ImageFormat::RGBA8:     return width * height * sizeof(float);
 				case ImageFormat::RGBA16F:   return width * height * sizeof(float) * 2;
 				case ImageFormat::RGBA32F:   return width * height * sizeof(float) * 4;

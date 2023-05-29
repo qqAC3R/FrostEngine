@@ -1,11 +1,13 @@
 #pragma once
 
-#include "Frost/Physics/PhysicsActor.h"
-
-#include <glm/glm.hpp>
+#include "Frost/Physics/PhysicsLayer.h"
+#include "Frost/Physics/PhysicsSettings.h"
 
 namespace Frost
 {
+	// Foward declaration
+	class PhysicsActor;
+
 	enum class ColliderType
 	{
 		Box, Sphere, Capsule, ConvexMesh, TriangleMesh
@@ -28,7 +30,7 @@ namespace Frost
 		virtual bool IsTrigger() const = 0;
 		virtual void SetTrigger(bool isTrigger) = 0;
 
-		//virtual void SetFilterData(const physx::PxFilterData& filterData) = 0;
+		virtual void SetFilterData(const PhysicsLayer& layerInfo, CollisionDetectionType collisionType) = 0;
 
 		virtual void DetachFromActor(Ref<PhysicsActor> actor) = 0;
 

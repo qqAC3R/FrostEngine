@@ -1,24 +1,20 @@
 #include "frostpch.h"
 #include "SceneSerializer.h"
 
-#include "Frost/Platform/Vulkan/VulkanBindlessAllocator.h"
+#include "Frost/Renderer/BindlessAllocator.h"
 #include "Frost/Renderer/Renderer.h"
 
 #include "Frost/Physics/PhysX/CookingFactory.h"
+
+#include "Frost/Script/ScriptEngine.h"
 
 #include "Entity.h"
 
 namespace Frost
 {
-	static std::string GetNameFromFilepath(const std::string& filepath)
-	{
-		auto lastSlash = filepath.find_last_of("/\\");
-		lastSlash = lastSlash == std::string::npos ? 0 : lastSlash + 1;
-		auto lastDot = filepath.rfind(".");
-		auto count = lastDot == std::string::npos ? filepath.size() - lastSlash : lastDot - lastSlash;
-
-		return filepath.substr(lastSlash, count);
-	}
+	static std::string GetNameFromFilepath(const std::string& filepath);
+	static std::string GetNameFromFieldType(FieldType type);
+	static FieldType GetFieldTypeFromName(const std::string& fieldTypeStr);
 
 	SceneSerializer::SceneSerializer(const Ref<Scene>& scene)
 		: m_Scene(scene)
@@ -179,6 +175,13 @@ namespace Frost
 			entityOut["RigidBodyComponent"]["AngularDrag"] = rigidBodyComponent.AngularDrag;
 			entityOut["RigidBodyComponent"]["DisableGravity"] = rigidBodyComponent.DisableGravity;
 			entityOut["RigidBodyComponent"]["IsKinematic"] = rigidBodyComponent.IsKinematic;
+			entityOut["RigidBodyComponent"]["Layer"] = rigidBodyComponent.Layer;
+			entityOut["RigidBodyComponent"]["LockPositionX"] = rigidBodyComponent.LockPositionX;
+			entityOut["RigidBodyComponent"]["LockPositionY"] = rigidBodyComponent.LockPositionY;
+			entityOut["RigidBodyComponent"]["LockPositionZ"] = rigidBodyComponent.LockPositionZ;
+			entityOut["RigidBodyComponent"]["LockRotationX"] = rigidBodyComponent.LockRotationX;
+			entityOut["RigidBodyComponent"]["LockRotationY"] = rigidBodyComponent.LockRotationY;
+			entityOut["RigidBodyComponent"]["LockRotationZ"] = rigidBodyComponent.LockRotationZ;
 		}
 
 		if (entity.HasComponent<BoxColliderComponent>())
@@ -285,6 +288,68 @@ namespace Frost
 			entityOut["CameraComponent"]["NearClip"] = cameraComponent.Camera->GetNearClip();
 			entityOut["CameraComponent"]["FarClip"] = cameraComponent.Camera->GetFarClip();
 			entityOut["CameraComponent"]["Primary"] = cameraComponent.Primary;
+		}
+
+		if (entity.HasComponent<ScriptComponent>())
+		{
+			ScriptComponent& scriptComponent = entity.GetComponent<ScriptComponent>();
+
+			entityOut["ScriptComponent"]["ModuleName"] = scriptComponent.ModuleName;
+
+			const HashMap<std::string, PublicField>& fieldMap = scriptComponent.ModuleFieldMap[scriptComponent.ModuleName];
+			for (auto& [fieldName, field] : fieldMap)
+			{
+				FieldType fieldType = field.Type;
+
+				nlohmann::ordered_json jsonPublicField = nlohmann::ordered_json();
+
+				jsonPublicField["FieldName"] = fieldName;
+				jsonPublicField["Type"] = GetNameFromFieldType(fieldType);
+
+				switch (fieldType)
+				{
+					case FieldType::Float:           jsonPublicField["Value"] = field.GetStoredValue<float>(); break;
+					case FieldType::Int:             jsonPublicField["Value"] = field.GetStoredValue<int32_t>(); break;
+					case FieldType::UnsignedInt:     jsonPublicField["Value"] = field.GetStoredValue<uint32_t>(); break;
+					case FieldType::String:          jsonPublicField["Value"] = field.GetStoredValue<const std::string&>(); break;
+					case FieldType::Vec2:
+					{
+						glm::vec2 fieldVec2 = field.GetStoredValue<glm::vec2>();
+						nlohmann::json jsonFieldVec2 = { fieldVec2.x, fieldVec2.y };
+						jsonPublicField["Value"] = jsonFieldVec2;
+						break;
+					}
+					case FieldType::Vec3:
+					{
+						glm::vec3 fieldVec3 = field.GetStoredValue<glm::vec3>();
+						nlohmann::json jsonFieldVec3 = { fieldVec3.x, fieldVec3.y, fieldVec3.z };
+						jsonPublicField["Value"] = jsonFieldVec3;
+						break;
+					}
+					case FieldType::Vec4:
+					{
+						glm::vec4 fieldVec4 = field.GetStoredValue<glm::vec4>();
+						nlohmann::json jsonFieldVec4 = { fieldVec4.x, fieldVec4.y, fieldVec4.z, fieldVec4.z };
+						jsonPublicField["Value"] = jsonFieldVec4;
+						break;
+					}
+					case FieldType::ClassReference: break;// TODO: Not sure if storing a class reference would even make sense, because eventually the reference will differ
+					case FieldType::Asset: break; // TODO: Add assets (prefabs in our case)
+
+					case FieldType::Entity:
+					{
+						UUID entityUUID = field.GetStoredValue<UUID>();
+						jsonPublicField["Value"] = entityUUID.Get();
+						break;
+					}
+
+					case FieldType::None:
+					default: FROST_ASSERT_MSG("Field Type is not valid!");
+				}
+
+				entityOut["ScriptComponent"]["PublicFields"].push_back(jsonPublicField);
+			}
+
 		}
 
 		
@@ -428,7 +493,7 @@ namespace Frost
 							mesh->m_Textures[textureId] = albedoTexture;
 							mesh->m_TexturesFilepaths[i].AlbedoFilepath = albedoTextureFilepath;
 
-							VulkanBindlessAllocator::AddTextureCustomSlot(albedoTexture, textureId);
+							BindlessAllocator::AddTextureCustomSlot(albedoTexture, textureId);
 						}
 						else
 						{
@@ -437,7 +502,7 @@ namespace Frost
 							uint32_t textureId = mesh->m_TextureAllocatorSlots[albedoTextureIndex];
 							mesh->m_Textures[textureId] = whiteTexture;
 
-							VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
+							BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 						}
 					}
 					else
@@ -445,7 +510,7 @@ namespace Frost
 						uint32_t textureId = mesh->m_TextureAllocatorSlots[albedoTextureIndex];
 						mesh->m_Textures[textureId] = whiteTexture;
 
-						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
+						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 
 
@@ -462,7 +527,7 @@ namespace Frost
 							mesh->m_Textures[textureId] = normalTexture;
 							mesh->m_TexturesFilepaths[i].NormalMapFilepath = normalTextureFilepath;
 
-							VulkanBindlessAllocator::AddTextureCustomSlot(normalTexture, textureId);
+							BindlessAllocator::AddTextureCustomSlot(normalTexture, textureId);
 						}
 						else
 						{
@@ -471,7 +536,7 @@ namespace Frost
 							uint32_t textureId = mesh->m_TextureAllocatorSlots[normalMapTextureIndex];
 							mesh->m_Textures[textureId] = whiteTexture;
 
-							VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
+							BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 						}
 					}
 					else
@@ -479,7 +544,7 @@ namespace Frost
 						uint32_t textureId = mesh->m_TextureAllocatorSlots[normalMapTextureIndex];
 						mesh->m_Textures[textureId] = whiteTexture;
 
-						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
+						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 
 					// Roughness texture
@@ -495,7 +560,7 @@ namespace Frost
 							mesh->m_Textures[textureId] = roughnessTexture;
 							mesh->m_TexturesFilepaths[i].RoughnessMapFilepath = roughnessTextureFilepath;
 
-							VulkanBindlessAllocator::AddTextureCustomSlot(roughnessTexture, textureId);
+							BindlessAllocator::AddTextureCustomSlot(roughnessTexture, textureId);
 						}
 						else
 						{
@@ -504,7 +569,7 @@ namespace Frost
 							uint32_t textureId = mesh->m_TextureAllocatorSlots[roughnessTextureIndex];
 							mesh->m_Textures[textureId] = whiteTexture;
 
-							VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
+							BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 						}
 					}
 					else
@@ -512,7 +577,7 @@ namespace Frost
 						uint32_t textureId = mesh->m_TextureAllocatorSlots[roughnessTextureIndex];
 						mesh->m_Textures[textureId] = whiteTexture;
 
-						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
+						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 
 					// Metalness texture
@@ -528,7 +593,7 @@ namespace Frost
 							mesh->m_Textures[textureId] = metalnessTexture;
 							mesh->m_TexturesFilepaths[i].MetalnessMapFilepath = metalnessTextureFilepath;
 
-							VulkanBindlessAllocator::AddTextureCustomSlot(metalnessTexture, textureId);
+							BindlessAllocator::AddTextureCustomSlot(metalnessTexture, textureId);
 						}
 						else
 						{
@@ -537,7 +602,7 @@ namespace Frost
 							uint32_t textureId = mesh->m_TextureAllocatorSlots[metalnessTextureIndex];
 							mesh->m_Textures[textureId] = whiteTexture;
 
-							VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
+							BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 						}
 					}
 					else
@@ -545,7 +610,7 @@ namespace Frost
 						uint32_t textureId = mesh->m_TextureAllocatorSlots[metalnessTextureIndex];
 						mesh->m_Textures[textureId] = whiteTexture;
 
-						VulkanBindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
+						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
 					}
 				}
 			}
@@ -615,6 +680,13 @@ namespace Frost
 				rigidBodyComponent.AngularDrag = rigidBodyIn["AngularDrag"];
 				rigidBodyComponent.DisableGravity = rigidBodyIn["DisableGravity"];
 				rigidBodyComponent.IsKinematic = rigidBodyIn["IsKinematic"];
+				rigidBodyComponent.Layer = rigidBodyIn["Layer"];
+				rigidBodyComponent.LockPositionX = rigidBodyIn["LockPositionX"];
+				rigidBodyComponent.LockPositionY = rigidBodyIn["LockPositionY"];
+				rigidBodyComponent.LockPositionZ = rigidBodyIn["LockPositionZ"];
+				rigidBodyComponent.LockRotationX = rigidBodyIn["LockRotationX"];
+				rigidBodyComponent.LockRotationY = rigidBodyIn["LockRotationY"];
+				rigidBodyComponent.LockRotationZ = rigidBodyIn["LockRotationZ"];
 			}
 
 			// Box Collider Component
@@ -761,11 +833,118 @@ namespace Frost
 				cameraComponent.Primary = entity["CameraComponent"]["Primary"];
 			}
 
+			if (!entity["ScriptComponent"].is_null())
+			{
+				ScriptComponent& scriptComponent = ent.AddComponent<ScriptComponent>();
+
+				scriptComponent.ModuleName = entity["ScriptComponent"]["ModuleName"];
+				auto& fieldMap = scriptComponent.ModuleFieldMap[scriptComponent.ModuleName];
+				
+				ScriptEngine::InitScriptEntity(ent);
+				ScriptEngine::InstantiateEntityClass(ent);
+
+				uint32_t publicFieldsSize = entity["ScriptComponent"]["PublicFields"].size();
+				for (uint32_t i = 0; i < publicFieldsSize; i++)
+				{
+					nlohmann::json publicFieldJson = entity["ScriptComponent"]["PublicFields"][i];
+
+					if (fieldMap.find(publicFieldJson["FieldName"]) != fieldMap.end())
+					{
+						PublicField& publicField = fieldMap[publicFieldJson["FieldName"]];
+
+						FieldType publicFieldType = GetFieldTypeFromName(publicFieldJson["Type"]);
+
+						switch (publicFieldType)
+						{
+							case FieldType::Float:           publicField.SetStoredValue<float>(publicFieldJson["Value"]); break;
+							case FieldType::Int:             publicField.SetStoredValue<int32_t>(publicFieldJson["Value"]); break;
+							case FieldType::UnsignedInt:     publicField.SetStoredValue<uint32_t>(publicFieldJson["Value"]); break;
+							case FieldType::String:          publicField.SetStoredValue<const std::string&>(publicFieldJson["Value"]); break;
+							case FieldType::Vec2:
+							{
+								publicField.SetStoredValue<glm::vec2>({ publicFieldJson["Value"][0], publicFieldJson["Value"][1] });
+								break;
+							}
+							case FieldType::Vec3:
+							{
+								publicField.SetStoredValue<glm::vec3>({ publicFieldJson["Value"][0], publicFieldJson["Value"][1], publicFieldJson["Value"][2] });
+								break;
+							}
+							case FieldType::Vec4:
+							{
+								publicField.SetStoredValue<glm::vec4>({ publicFieldJson["Value"][0], publicFieldJson["Value"][1], publicFieldJson["Value"][2], publicFieldJson["Value"][3] });
+								break;
+							}
+							case FieldType::ClassReference: break;// TODO: Not sure if storing a class reference would even make sense, because eventually the reference will differ
+							case FieldType::Asset: break; // TODO: Add assets (prefabs in our case)
+
+							case FieldType::Entity:
+							{
+								publicField.SetStoredValue<UUID>(UUID(publicFieldJson["Value"]));
+								break;
+							}
+
+							case FieldType::None:
+							default: FROST_ASSERT_MSG("Field Type is not valid!");
+						}
+					}
+
+				}
+			}
+
 
 		}
 
 		return false;
 	}
 
+	static std::string GetNameFromFilepath(const std::string& filepath)
+	{
+		auto lastSlash = filepath.find_last_of("/\\");
+		lastSlash = lastSlash == std::string::npos ? 0 : lastSlash + 1;
+		auto lastDot = filepath.rfind(".");
+		auto count = lastDot == std::string::npos ? filepath.size() - lastSlash : lastDot - lastSlash;
+
+		return filepath.substr(lastSlash, count);
+	}
+
+
+	static std::string GetNameFromFieldType(FieldType type)
+	{
+		switch (type)
+		{
+			case FieldType::Float: return "Float";
+			case FieldType::Int: return "Int";
+			case FieldType::UnsignedInt: return "UnsignedInt";
+			case FieldType::String: return "String";
+			case FieldType::Vec2: return "Vec2";
+			case FieldType::Vec3: return "Vec3";
+			case FieldType::Vec4: return "Vec4";
+			case FieldType::ClassReference: return "ClassReference";
+			case FieldType::Asset: return "Asset";
+			case FieldType::Entity: return "Entity";
+
+			case FieldType::None: FROST_ASSERT_MSG("Field Type is not valid!");
+			default: FROST_ASSERT_MSG("Field Type is not valid!");
+		}
+		return "";
+	}
+
+	static FieldType GetFieldTypeFromName(const std::string& fieldTypeStr)
+	{
+		if     (fieldTypeStr == "Float" )           return FieldType::Float;
+		else if(fieldTypeStr == "Int" )             return FieldType::Int;
+		else if(fieldTypeStr == "UnsignedInt" )     return FieldType::UnsignedInt;
+		else if(fieldTypeStr == "String" )          return FieldType::String;
+		else if(fieldTypeStr == "Vec2" )            return FieldType::Vec2;
+		else if(fieldTypeStr == "Vec3" )            return FieldType::Vec3;
+		else if(fieldTypeStr == "Vec4" )            return FieldType::Vec4;
+		else if(fieldTypeStr == "ClassReference" )  return FieldType::ClassReference;
+		else if(fieldTypeStr == "Asset" )           return FieldType::Asset;
+		else if(fieldTypeStr == "Entity" )          return FieldType::Entity;
+		else FROST_ASSERT_MSG("Field Type is not valid!");
+
+		return FieldType::None;
+	}
 
 }

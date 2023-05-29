@@ -70,7 +70,7 @@ void main()
 			// If alpha channel was 1, then we shouldn't add it to the texture because the coord is part of the entity itself, and not the edge
 			if(u_PushConstant.SelectedEntityID != entityId)
 			{
-				result.rgb += (gaussianBlurredTex.rgb) * cos(u_PushConstant.CosTime * 10.0);// * cos(u_PushConstant.CosTime);
+				result.rgb += (gaussianBlurredTex.rgb) * max((1.0 - pow(cos(u_PushConstant.CosTime * 3.0), 4)), 0.4);// * cos(u_PushConstant.CosTime);
 				//result.rgb = (gaussianBlurredTex.rgb);// * cos(u_PushConstant.CosTime);
 				//result.a = 1.0;
 			}

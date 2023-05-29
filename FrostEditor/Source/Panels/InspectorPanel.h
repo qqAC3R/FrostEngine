@@ -6,11 +6,12 @@
 
 namespace Frost
 {
+	class EditorLayer;
 
 	class InspectorPanel : public Panel
 	{
 	public:
-		InspectorPanel();
+		InspectorPanel(EditorLayer* editorLayer);
 		virtual ~InspectorPanel() = default;
 
 		virtual void Init(void* initArgs) override;
@@ -27,6 +28,7 @@ namespace Frost
 	private:
 		void DrawComponents(Entity& entity);
 	private:
+		EditorLayer* m_Context = nullptr;
 		Ref<SceneHierarchyPanel> m_SceneHierarchy = nullptr;
 		std::string m_PanelNameImGui;
 

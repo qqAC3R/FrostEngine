@@ -7,6 +7,7 @@
 
 namespace Frost
 {
+	class ColliderShape;
 
 	class PhysicsActor
 	{
@@ -14,6 +15,8 @@ namespace Frost
 		virtual ~PhysicsActor() {}
 
 		static Ref<PhysicsActor> Create(Entity entity);
+
+		virtual void SetSimulationData(uint32_t layerId) = 0;
 
 		virtual glm::vec3 GetTranslation() const = 0;
 		virtual void SetTranslation(const glm::vec3& translation, bool autowake = true) = 0;
@@ -27,7 +30,6 @@ namespace Frost
 
 		virtual float GetMass() const = 0;
 		virtual void SetMass(float mass) = 0;
-
 
 		virtual void AddForce(const glm::vec3& force, ForceMode forceMode) = 0;
 		virtual void AddTorque(const glm::vec3& torque, ForceMode forceMode) = 0;
@@ -44,6 +46,10 @@ namespace Frost
 
 		virtual void SetLinearDrag(float drag) const = 0;
 		virtual void SetAngularDrag(float drag) const = 0;
+
+		virtual glm::vec3 GetKinematicTargetPosition() const = 0;
+		virtual glm::vec3 GetKinematicTargetRotation() const = 0;
+		virtual void SetKinematicTarget(const glm::vec3& targetPosition, const glm::vec3& targetRotation) const = 0;
 
 		virtual bool IsKinematic() const = 0;
 		virtual void SetKinematic(bool isKinematic) = 0;
@@ -62,12 +68,13 @@ namespace Frost
 		virtual Entity GetEntity() const = 0;
 		virtual const TransformComponent& GetTransform() const = 0;
 
-		void AddCollider(BoxColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
-#if 0
-		void AddCollider(SphereColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
-		void AddCollider(CapsuleColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
-		void AddCollider(MeshColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f));
-#endif
+		virtual void AddCollider(BoxColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f)) = 0;
+		virtual void AddCollider(SphereColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f)) = 0;
+		virtual void AddCollider(CapsuleColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f)) = 0;
+		virtual void AddCollider(MeshColliderComponent& collider, Entity entity, const glm::vec3& offset = glm::vec3(0.0f)) = 0;
+
+		virtual const Vector<Ref<ColliderShape>>& GetColliders() const = 0;
+		virtual Vector<Ref<ColliderShape>>& GetColliders() = 0;
 
 		virtual void* GetInternalAPIActor() const = 0;
 

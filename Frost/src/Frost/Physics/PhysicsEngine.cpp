@@ -2,6 +2,7 @@
 #include "PhysicsEngine.h"
 
 #include "Frost/Physics/PhysX/PhysXInternal.h"
+#include "PhysicsLayer.h"
 
 namespace Frost
 {
@@ -14,6 +15,8 @@ namespace Frost
 	{
 		// TODO: API Choice?
 		PhysXInternal::Initialize();
+		PhysicsLayerManager::AddLayer("Default");
+		//PhysicsLayerManager::AddLayer("Layer1", false);
 	}
 
 	void PhysicsEngine::ShutDown()

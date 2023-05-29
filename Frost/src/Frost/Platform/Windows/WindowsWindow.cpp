@@ -26,6 +26,7 @@ namespace Frost
 	WindowsWindow::WindowsWindow(const WindowProps& props)
 	{
 		Init(props);
+		SetAppIcon();
 	}
 
 	WindowsWindow::~WindowsWindow()
@@ -41,6 +42,11 @@ namespace Frost
 	void WindowsWindow::EnableCursour()
 	{
 		glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	}
+
+	void WindowsWindow::HideCursour()
+	{
+		glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 	}
 
 	void WindowsWindow::DisableCursour()
@@ -157,7 +163,6 @@ namespace Frost
 
 		m_Context = GraphicsContext::Create(m_Window);
 		m_Context->Init();
-
 
 		// Set GLFW Callbacks
 		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, int width, int height)

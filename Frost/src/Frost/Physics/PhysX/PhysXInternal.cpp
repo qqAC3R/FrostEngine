@@ -97,7 +97,6 @@ namespace Frost
 		physx::PxPairFlags& pairFlags, const void* constantBlock, physx::PxU32 constantBlockSize
 	)
 	{
-#if 0
 		if (physx::PxFilterObjectIsTrigger(attributes0) || physx::PxFilterObjectIsTrigger(attributes1))
 		{
 			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT;
@@ -106,7 +105,7 @@ namespace Frost
 
 		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT;
 
-		if (filterData0.word2 == (uint32_t)RigidBodyComponent::CollisionDetectionType::Continuous || filterData1.word2 == (uint32_t)RigidBodyComponent::CollisionDetectionType::Continuous)
+		if (filterData0.word2 == (uint32_t)CollisionDetectionType::Continuous || filterData1.word2 == (uint32_t)CollisionDetectionType::Continuous)
 		{
 			pairFlags |= physx::PxPairFlag::eDETECT_DISCRETE_CONTACT;
 			pairFlags |= physx::PxPairFlag::eDETECT_CCD_CONTACT;
@@ -120,13 +119,6 @@ namespace Frost
 		}
 
 		return physx::PxFilterFlag::eSUPPRESS;
-#endif
-
-		pairFlags = physx::PxPairFlag::eSOLVE_CONTACT;
-		pairFlags |= physx::PxPairFlag::eDETECT_DISCRETE_CONTACT;
-		pairFlags |= physx::PxPairFlag::eDETECT_CCD_CONTACT;
-		return physx::PxFilterFlags();
-
 	}
 
 	void PhysicsErrorCallback::reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line)

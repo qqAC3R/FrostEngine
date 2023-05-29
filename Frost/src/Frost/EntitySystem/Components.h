@@ -4,6 +4,8 @@
 #include "Frost/Core/UUID.h"
 #include "Frost/Renderer/Mesh.h"
 #include "Frost/Renderer/RuntimeCamera.h"
+#include "Frost/Script/ScriptModuleField.h"
+#include "Frost/Physics/PhysicsShapes.h"
 
 // Math
 #include <glm/glm.hpp>
@@ -11,6 +13,9 @@
 
 namespace Frost
 {
+	// Forward declaration
+	//class ColliderShape;
+
 	struct IDComponent
 	{
 		IDComponent() = default;
@@ -86,6 +91,8 @@ namespace Frost
 
 	struct AnimationComponent
 	{
+		AnimationComponent() = default;
+
 		AnimationComponent(const MeshComponent* mesh)
 			: Controller(CreateRef<AnimationController>()), MeshComponentPtr(mesh)
 		{}
@@ -200,14 +207,15 @@ namespace Frost
 	struct RigidBodyComponent
 	{
 		enum class Type { Static, Dynamic };
-		enum class CollisionDetectionType : uint32_t { Discrete, Continuous, ContinuousSpeculative };
+		//enum class CollisionDetectionType : uint32_t { Discrete, Continuous, ContinuousSpeculative };
+
 		Type BodyType = Type::Dynamic;
 		float Mass = 1.0f;
 		float LinearDrag = 0.01f;
 		float AngularDrag = 0.05f;
 		bool DisableGravity = false;
 		bool IsKinematic = false;
-		//uint32_t Layer = 0;
+		uint32_t Layer = 0;
 		CollisionDetectionType CollisionDetection = CollisionDetectionType::Discrete;
 
 		bool LockPositionX = false;
@@ -228,6 +236,10 @@ namespace Frost
 		bool IsTrigger = false;
 		//AssetHandle Material; // TODO: Physics material system?
 
+		// Collider handle is used to manipulate the internal collider of the physics engine during runtime in the script engine
+		// Currently we don't have any other method of obtaning the collider handle, apart from this one
+		Ref<ColliderShape> ColliderHandle;
+
 		// The mesh that will be drawn in the editor to show the collision bounds
 		Ref<Mesh> DebugMesh;
 
@@ -246,6 +258,10 @@ namespace Frost
 		// The mesh that will be drawn in the editor to show the collision bounds
 		Ref<Mesh> DebugMesh;
 
+		// Collider handle is used to manipulate the internal collider of the physics engine during runtime in the script engine
+		// Currently we don't have any other method of obtaning the collider handle, apart from this one
+		Ref<ColliderShape> ColliderHandle;
+
 		SphereColliderComponent()
 			: DebugMesh(Mesh::GetDefaultMeshes().Sphere) {}
 		SphereColliderComponent(const SphereColliderComponent& other) = default;
@@ -262,6 +278,10 @@ namespace Frost
 		// The mesh that will be drawn in the editor to show the collision bounds
 		Ref<Mesh> DebugMesh;
 
+		// Collider handle is used to manipulate the internal collider of the physics engine during runtime in the script engine
+		// Currently we don't have any other method of obtaning the collider handle, apart from this one
+		Ref<ColliderShape> ColliderHandle;
+
 		CapsuleColliderComponent()
 			: DebugMesh(Mesh::GetDefaultMeshes().Capsule) {}
 		CapsuleColliderComponent(const CapsuleColliderComponent& other) = default;
@@ -269,16 +289,16 @@ namespace Frost
 
 	struct MeshColliderComponent
 	{
-		//AssetHandle CollisionMesh;
-		Vector<Ref<Mesh>> ProcessedMeshes;
-		Ref<Mesh> CollisionMesh = nullptr;
+		Vector<Ref<Mesh>> ProcessedMeshes; // Debug Mesh
+		Ref<Mesh> CollisionMesh = nullptr; // Mesh
 		bool IsConvex = false;
 		bool IsTrigger = false;
 		bool OverrideMesh = false; // TODO: What to do with this?
 		//AssetHandle Material;
 
-		// TODO: Add debug mesh?
-		//Ref<Mesh> DebugMesh;
+		// Collider handle is used to manipulate the internal collider of the physics engine during runtime in the script engine
+		// Currently we don't have any other method of obtaning the collider handle, apart from this one
+		Ref<ColliderShape> ColliderHandle;
 
 		MeshColliderComponent() = default;
 		MeshColliderComponent(const MeshColliderComponent& other) = default;
@@ -288,7 +308,17 @@ namespace Frost
 			CollisionMesh = nullptr;
 			ProcessedMeshes.clear();
 		}
+	};
 
+	struct ScriptComponent
+	{
+		std::string ModuleName;
+		ScriptModuleFieldMap ModuleFieldMap;
+
+		ScriptComponent() = default;
+		ScriptComponent(const ScriptComponent& other) = default;
+		ScriptComponent(const std::string& moduleName)
+			: ModuleName(moduleName) {}
 	};
 
 }

@@ -8,6 +8,8 @@
 
 #include <stb_image.h>
 
+//#include <CMP/compressonator.h>
+
 namespace Frost
 {
 	/////////////////////////////////////////////////////
@@ -20,22 +22,22 @@ namespace Frost
 		int width, height, channels;
 		ImageFormat imageFormat;
 
-		void* textureData = nullptr;
-
 		if (stbi_is_hdr(filepath.c_str()))
 		{
 			stbi_set_flip_vertically_on_load(false);
-			textureData = (void*)stbi_loadf(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+			m_TextureData.Data = (void*)stbi_loadf(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+			m_TextureData.Size = width * height * 4 * sizeof(float);
 			imageFormat = ImageFormat::RGBA32F;
 		}
 		else
 		{
 			stbi_set_flip_vertically_on_load(true);
-			textureData = (void*)stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+			m_TextureData.Data = (void*)stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+			m_TextureData.Size = width * height * 4;
 			imageFormat = ImageFormat::RGBA8;
 		}
 
-		if (textureData == nullptr)
+		if (m_TextureData.Data == nullptr)
 		{
 			FROST_CORE_WARN("Texture with filepath '{0}' hasn't been found", filepath);
 			m_IsLoaded = false;
@@ -46,9 +48,18 @@ namespace Frost
 			m_IsLoaded = true;
 		}
 
+
+		bool isTrue = m_TextureSpecification.Format == ImageFormat::RGBA_BC7;
+
 		m_Width = width;
 		m_Height = height;
 		m_TextureSpecification.Format = imageFormat;
+
+		//if (m_TextureSpecification.Format != ImageFormat::RGBA_BC7)
+		//	m_TextureSpecification.Format = imageFormat;
+		//else
+		//	imageFormat = m_TextureSpecification.Format;
+
 		if (textureSpec.UseMips)
 			m_MipMapLevels = Utils::CalculateMipMapLevels(width, height);
 
@@ -56,17 +67,171 @@ namespace Frost
 		imageSpec.Width = width;
 		imageSpec.Height = height;
 		imageSpec.UseMipChain = textureSpec.UseMips;
-		imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
-		imageSpec.Sampler.SamplerWrap = ImageWrap::Repeat;
+		imageSpec.Sampler.SamplerFilter = textureSpec.Sampler.SamplerFilter;
+		imageSpec.Sampler.SamplerWrap = textureSpec.Sampler.SamplerWrap;
 		imageSpec.Usage = textureSpec.Usage;
 		imageSpec.Format = imageFormat;
-		m_Image = Image2D::Create(imageSpec, textureData);
+		m_Image = Image2D::Create(imageSpec, m_TextureData.Data);
 
 		Ref<VulkanImage2D> vulkanImage = m_Image.As<VulkanImage2D>();
 		m_DescriptorInfo[DescriptorImageType::Sampled] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
 		m_DescriptorInfo[DescriptorImageType::Storage] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
 
-		stbi_image_free(textureData);
+#if 0
+		if (isTrue)
+		{
+
+			///////////////////////////////////////////////////////////////////////
+			CMP_MipSet MipSetIn;
+			memset(&MipSetIn, 0, sizeof(CMP_MipSet));
+			auto cmp_status = CMP_LoadTexture(filepath.c_str(), &MipSetIn);
+			if (cmp_status != CMP_OK)
+			{
+				FROST_CORE_ERROR("Error %d: Loading source file!\n", cmp_status);
+			}
+
+			//----------------------------------------------------------------------
+			// generate mipmap level for the source image, if not already generated
+			//----------------------------------------------------------------------
+			if (MipSetIn.m_nMipLevels <= 1)
+			{
+				CMP_INT requestLevel = 10; // Request 10 miplevels for the source image
+
+				//------------------------------------------------------------------------
+				// Checks what the minimum image size will be for the requested mip levels
+				// if the request is too large, a adjusted minimum size will be returned
+				//------------------------------------------------------------------------
+				CMP_INT nMinSize = CMP_CalcMinMipSize(MipSetIn.m_nHeight, MipSetIn.m_nWidth, 10);
+
+				//--------------------------------------------------------------
+				// now that the minimum size is known, generate the miplevels
+				// users can set any requested minumum size to use. The correct
+				// miplevels will be set acordingly.
+				//--------------------------------------------------------------
+				CMP_GenerateMIPLevels(&MipSetIn, nMinSize);
+			}
+
+			//==========================
+			// Set Compression Options
+			//==========================
+			KernelOptions   kernel_options;
+			memset(&kernel_options, 0, sizeof(KernelOptions));
+
+			float fQuality = 0.05f;
+			CMP_FORMAT destFormat = CMP_FORMAT_BC7;
+
+			kernel_options.format = destFormat;   // Set the format to process
+			kernel_options.fquality = fQuality;     // Set the quality of the result
+			kernel_options.threads = 0;            // Auto setting
+
+			//--------------------------------------------------------------
+			// Setup a results buffer for the processed file,
+			// the content will be set after the source texture is processed
+			// in the call to CMP_ProcessTexture()
+			//--------------------------------------------------------------
+			CMP_MipSet MipSetCmp;
+			memset(&MipSetCmp, 0, sizeof(CMP_MipSet));
+
+			//===============================================
+			// Compress the texture using Framework Lib
+			//===============================================
+			cmp_status = CMP_ProcessTexture(&MipSetIn, &MipSetCmp, kernel_options, nullptr);
+			if (cmp_status != CMP_OK)
+			{
+				FROST_CORE_ERROR("Texture couldn't be compressed. Message: {0}", cmp_status);
+			}
+
+			FROST_CORE_INFO(MipSetCmp.dwDataSize);
+
+
+			CMP_FreeMipSet(&MipSetIn);
+			CMP_FreeMipSet(&MipSetCmp);
+		}
+#endif
+	}
+
+	VulkanTexture2D::VulkanTexture2D(uint32_t width, uint32_t height, const TextureSpecification& textureSpec)
+	{
+		m_Width = width;
+		m_Height = height;
+		if (textureSpec.UseMips)
+			m_MipMapLevels = Utils::CalculateMipMapLevels(width, height);
+
+		ImageSpecification imageSpec{};
+		imageSpec.Width = width;
+		imageSpec.Height = height;
+		imageSpec.UseMipChain = textureSpec.UseMips;
+		imageSpec.Sampler.SamplerFilter = textureSpec.Sampler.SamplerFilter;
+		imageSpec.Sampler.SamplerWrap = textureSpec.Sampler.SamplerWrap;
+		imageSpec.Usage = textureSpec.Usage;
+		imageSpec.Format = textureSpec.Format;
+		m_Image = Image2D::Create(imageSpec);
+
+		Ref<VulkanImage2D> vulkanImage = m_Image.As<VulkanImage2D>();
+		m_DescriptorInfo[DescriptorImageType::Sampled] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
+		m_DescriptorInfo[DescriptorImageType::Storage] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
+
+		m_IsLoaded = false;
+
+		m_TextureData.Allocate(width * height * sizeof(glm::vec4) / 4.0f);
+	}
+
+	void VulkanTexture2D::SubmitDataToGPU()
+	{
+		Ref<VulkanImage2D> vulkanImage = m_Image.As<VulkanImage2D>();
+		VkImageLayout newImageLayout = Utils::GetImageLayout(m_TextureSpecification.Usage);
+
+		uint32_t imageSize = Utils::CalculateImageBufferSize(m_Width, m_Height, m_TextureSpecification.Format);
+
+		// Making a staging buffer to copy the data
+		VkBuffer stagingBuffer;
+		VulkanMemoryInfo stagingBufferMemory;
+		VulkanAllocator::AllocateBuffer(imageSize, { BufferUsage::TransferSrc }, MemoryUsage::CPU_TO_GPU, stagingBuffer, stagingBufferMemory);
+
+		// Copying the data
+		void* copyData;
+		VulkanAllocator::BindBuffer(stagingBuffer, stagingBufferMemory, &copyData);
+		memcpy(copyData, m_TextureData.Data, static_cast<size_t>(imageSize));
+		VulkanAllocator::UnbindBuffer(stagingBufferMemory);
+
+
+		// Recording a temporary commandbuffer for transitioning
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
+
+		// Changing the layout for copying the staging buffer to the image
+		vulkanImage->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+
+		Utils::CopyBufferToImage(cmdBuf,
+			stagingBuffer,
+			vulkanImage->GetVulkanImage(),
+			m_Width,
+			m_Height,
+			1
+		);
+
+
+		// Generating mip maps if the mip count is higher than 1, else just transition to user's input `VkImageLayout`
+		auto srcPipelineStageMask = Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		auto dstPipelineStageMask = Utils::GetPipelineStageFlagsFromLayout(newImageLayout);
+		vulkanImage ->TransitionLayout(cmdBuf, newImageLayout, srcPipelineStageMask, dstPipelineStageMask);
+
+		// Ending the temporary commandbuffer for transitioning
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
+
+		VulkanAllocator::DeleteBuffer(stagingBuffer, stagingBufferMemory);
+
+		m_IsLoaded = true;
+	}
+
+	void VulkanTexture2D::SetToWriteableBuffer(void* data)
+	{
+		memcpy(m_TextureData.Data, data, m_TextureData.Size);
+	}
+
+	Buffer VulkanTexture2D::GetWritableBuffer()
+	{
+		return m_TextureData;
 	}
 
 	void VulkanTexture2D::GenerateMipMaps()
@@ -80,9 +245,15 @@ namespace Frost
 
 	void VulkanTexture2D::Destroy()
 	{
-		if (m_IsLoaded)
+		if (m_Image)
 		{
 			m_Image->Destroy();
+		}
+
+		if (m_TextureData.Data != nullptr)
+		{
+			// Free the CPU memory allocated for the texture
+			free(m_TextureData.Data);
 		}
 	}
 

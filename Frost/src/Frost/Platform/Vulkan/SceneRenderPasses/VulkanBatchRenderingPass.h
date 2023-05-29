@@ -50,6 +50,7 @@ namespace Frost
 
 		// ------------ On Click Select Entity ----------------
 		void SelectEntityInitData(uint32_t width, uint32_t height);
+		void SelectEntityUpdate(const RenderQueue& renderQueue);
 		//void SelectEntityUpdate(const RenderQueue& renderQueue);
 		// ------------------------------------------------------
 
@@ -148,7 +149,7 @@ namespace Frost
 
 		struct GlowSelectedEntityPushConstant
 		{
-			glm::vec4 SelectedEntityColor = glm::vec4(0.3, 0.3, 0.8, 1.0f);
+			glm::vec4 SelectedEntityColor = glm::vec4(0.9f, 0.3f, 0.0f, 1.0f);
 			uint32_t SelectedEntityID;
 			uint32_t FilterMode;
 			float CosTime;

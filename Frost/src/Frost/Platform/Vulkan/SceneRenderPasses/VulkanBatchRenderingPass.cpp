@@ -301,7 +301,7 @@ namespace Frost
 		m_Data->QuadVertexBuffer[currentFrameIndex]->SetData(m_Data->QuadCount * 4 * sizeof(QuadVertex), m_Data->QuadVertexBufferBase);
 
 		BatchRendererUpdate(renderQueue);
-
+		SelectEntityUpdate(renderQueue);
 	}
 
 	void VulkanBatchRenderingPass::BatchRendererUpdate(const RenderQueue& renderQueue)
@@ -405,7 +405,7 @@ namespace Frost
 		}
 		else
 		{
-			textureSlot = VulkanBindlessAllocator::GetWhiteTextureID();
+			textureSlot = BindlessAllocator::GetWhiteTextureID();
 		}
 
 		glm::vec3 camRightWS = {
@@ -528,37 +528,68 @@ namespace Frost
 		m_Data->GridVertexBuffer->Bind();
 		m_Data->GridIndexBuffer->Bind();
 
-		m_GridPushConstant.WorldSpaceMatrix = renderQueue.m_Camera->GetViewProjectionVK() * glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));;
+		m_GridPushConstant.WorldSpaceMatrix = renderQueue.m_Camera->GetViewProjectionVK() * glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(m_GridPushConstant.GridScale));
 		renderGridPipeline->BindVulkanPushConstant("u_PushConstant", &m_GridPushConstant);
 
 		vkCmdDrawIndexed(cmdBuf, 6, 1, 0, 0, 0);
 	}
 
-	uint32_t VulkanBatchRenderingPass::ReadPixelFromTextureEntityID(uint32_t x, uint32_t y)
+	void VulkanBatchRenderingPass::SelectEntityUpdate(const RenderQueue& renderQueue)
 	{
-		// Recording a temporary commandbuffer for transitioning
-		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
-
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 
 		Ref<VulkanImage2D> entityIDTexture_GeometryPass = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(4, currentFrameIndex).As<VulkanImage2D>();
-		Ref<VulkanImage2D> entityIDTexture_CPU = m_Data->EntityIDTexture_CPU[0].As<VulkanImage2D>();
+		Ref<VulkanImage2D> entityIDTexture_CPU = m_Data->EntityIDTexture_CPU[currentFrameIndex].As<VulkanImage2D>();
+
+		entityIDTexture_CPU->CopyImage(cmdBuf, entityIDTexture_GeometryPass.As<Image2D>());
+	}
+
+	uint32_t VulkanBatchRenderingPass::ReadPixelFromTextureEntityID(uint32_t x, uint32_t y)
+	{
+#if 0
+		// Recording a temporary commandbuffer for transitioning
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
+		//VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+
+		//uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+
+		Ref<VulkanImage2D> entityIDTexture_GeometryPass = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(4, currentFrameIndex).As<VulkanImage2D>();
+		Ref<VulkanImage2D> entityIDTexture_CPU = m_Data->EntityIDTexture_CPU[currentFrameIndex].As<VulkanImage2D>();
 
 		//entityIDTexture_GeometryPass->TransitionLayout(cmdBuf, entityIDTexture_GeometryPass->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
 		entityIDTexture_CPU->CopyImage(cmdBuf, entityIDTexture_GeometryPass.As<Image2D>());
+#endif
 
+
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+
+		Ref<VulkanImage2D> entityIDTexture_GeometryPass = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(4, currentFrameIndex).As<VulkanImage2D>();
+		Ref<VulkanImage2D> entityIDTexture_CPU = m_Data->EntityIDTexture_CPU[currentFrameIndex].As<VulkanImage2D>();
+
+		// Get layout of the image (including row pitch)
+		VkImageSubresource subResource{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
+		VkSubresourceLayout subResourceLayout;
+		vkGetImageSubresourceLayout(device, entityIDTexture_CPU->GetVulkanImage(), &subResource, &subResourceLayout);
 
 		entityIDTexture_CPU->MapMemory((void**)&m_Data->TextureDataCPU);
 		uint32_t* data = (uint32_t*)m_Data->TextureDataCPU;
+		data += subResourceLayout.offset;
 
 		uint32_t result = data[
-			y * m_Data->ViewportSize.x + x
+			(y * (subResourceLayout.rowPitch / sizeof(uint32_t))) + x
 		];
 		entityIDTexture_CPU->UnMapMemory();
 
+#if 0
 		// Ending the temporary commandbuffer for transitioning
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
+#endif
 
 		return result;
 	}
@@ -612,7 +643,7 @@ namespace Frost
 
 		vulkanDescriptor->Bind(cmdBuf, m_Data->GlowSelectedEntityPipeline);
 
-		m_GlowSelectedEntityPushConstant.CosTime = 0.0f;
+		//m_GlowSelectedEntityPushConstant.CosTime = 0.0f;
 		m_GlowSelectedEntityPushConstant.FilterMode = 1.0f;
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_GlowSelectedEntityPushConstant);
 

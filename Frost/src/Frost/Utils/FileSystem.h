@@ -17,6 +17,8 @@ namespace Frost
 		static bool MoveFile(const std::filesystem::path& filepath, const std::filesystem::path& dest);
 		static bool IsDirectory(const std::filesystem::path& filepath);
 
+		static std::filesystem::file_time_type GetLastWriteTime(const std::string& filepath);
+
 		static bool Move(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath);
 		static bool Rename(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath);
 		static bool RenameFilename(const std::filesystem::path& oldFilepath, const std::string& newName);

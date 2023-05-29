@@ -10,12 +10,15 @@
 #include "IconsFontAwesome.hpp"
 
 #include "Frost/Physics/PhysX/CookingFactory.h"
+#include "Frost/Physics/PhysicsLayer.h"
+#include "Frost/Script/ScriptEngine.h"
+#include "EditorLayer.h"
 
 namespace Frost
 {
 
-	InspectorPanel::InspectorPanel()
-		: m_PanelNameImGui(ICON_PAINT_BRUSH + std::string(" Inspector"))
+	InspectorPanel::InspectorPanel(EditorLayer* editorLayer)
+		: m_PanelNameImGui(ICON_PAINT_BRUSH + std::string(" Inspector")), m_Context(editorLayer)
 	{
 
 	}
@@ -29,7 +32,7 @@ namespace Frost
 		if (!m_Visibility)
 			return;
 
-		
+
 		if (ImGui::Begin(m_PanelNameImGui.c_str(), &m_Visibility))
 		{
 			Entity& entity = m_SceneHierarchy->GetSelectedEntity();
@@ -39,12 +42,14 @@ namespace Frost
 			}
 		}
 		ImGui::End();
+
 	}
 
 	template<typename T, typename UIFunction>
 	static void DrawComponent(const std::string& name, Entity entity, UIFunction uiFunction)
 	{
 		const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
+
 		if (entity.HasComponent<T>())
 		{
 			auto& component = entity.GetComponent<T>();
@@ -303,6 +308,17 @@ namespace Frost
 					FROST_CORE_WARN("This entity already has the Cloud Volume Component!");
 			}
 
+			ImGui::Separator();
+
+			// Script component
+			if (ImGui::MenuItem("Script Component"))
+			{
+				if (!selectedEntity.HasComponent<ScriptComponent>())
+					selectedEntity.AddComponent<ScriptComponent>();
+				else
+					FROST_CORE_WARN("This entity already has the Script Component!");
+			}
+
 			
 
 			ImGui::EndPopup();
@@ -396,6 +412,7 @@ namespace Frost
 						activeAnimationName = activeAnimation->GetName();
 					}
 
+					ImGui::PushItemWidth(-1);
 					if (ImGui::BeginCombo("##animator", activeAnimationName.c_str()))
 					{
 						if (ImGui::Selectable("-"))
@@ -426,6 +443,7 @@ namespace Frost
 							if (activeAnimationName != "-")
 								component.Controller->StopAnimation();
 
+						ImGui::PushItemWidth(-1);
 						ImGui::SliderFloat("##time_slider", component.Controller->GetAnimationTime(), 0.0f, 1.0f);
 					}
 					
@@ -473,6 +491,7 @@ namespace Frost
 					ImGui::Text("Radiance");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DrawVec3ColorEdit("", component.Color);
 
 					ImGui::PopID();
@@ -485,6 +504,7 @@ namespace Frost
 					ImGui::Text("Intensity");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Intensity, 0.055f);
 
 					ImGui::PopID();
@@ -498,6 +518,7 @@ namespace Frost
 					ImGui::Text("Radius");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Radius, 0.055f);
 
 					ImGui::PopID();
@@ -510,6 +531,7 @@ namespace Frost
 					ImGui::Text("Falloff");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Falloff, 0.055f);
 
 					ImGui::PopID();
@@ -534,6 +556,7 @@ namespace Frost
 					ImGui::Text("Radiance");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DrawVec3ColorEdit("", component.Color);
 
 					ImGui::PopID();
@@ -546,6 +569,7 @@ namespace Frost
 					ImGui::Text("Intensity");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Intensity, 0.055f);
 
 					ImGui::PopID();
@@ -559,6 +583,7 @@ namespace Frost
 					ImGui::Text("Size");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Size, 0.01f, 0.0f, 1.0f);
 
 					ImGui::PopID();
@@ -573,6 +598,7 @@ namespace Frost
 					ImGui::Text("Volume Density");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.VolumeDensity, 0.01f, 0.0f, 1.0f);
 
 					ImGui::PopID();
@@ -585,6 +611,7 @@ namespace Frost
 					ImGui::Text("Volume Absorption");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Absorption, 0.01f, 0.0f, 100.0f);
 
 					ImGui::PopID();
@@ -597,6 +624,7 @@ namespace Frost
 					ImGui::Text("Phase Function");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Phase, 0.01f, -1.0f, 1.0f);
 
 					ImGui::PopID();
@@ -622,6 +650,7 @@ namespace Frost
 					ImGui::Text("Radiance");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DrawVec3ColorEdit("", component.Radiance);
 
 					ImGui::PopID();
@@ -634,6 +663,7 @@ namespace Frost
 					ImGui::Text("Intensity");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Intensity, 0.055f, 0.0f, 1000.0f);
 
 					ImGui::PopID();
@@ -647,6 +677,7 @@ namespace Frost
 					ImGui::Text("Radius");
 				
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Radius, 0.055f, 0.0f, 1000.0f);
 				
 					ImGui::PopID();
@@ -693,7 +724,7 @@ namespace Frost
 				const float width = ImGui::GetWindowWidth();
 				const float combo_width = width * 0.5f;
 
-
+				ImGui::PushItemWidth(-1);
 				if (ImGui::BeginCombo("##rigidbodytypecombo", componentBodyType.c_str()))
 				{
 
@@ -714,11 +745,7 @@ namespace Frost
 					ImGui::EndCombo();
 				}
 
-				
-
 				ImGui::PopID();
-
-
 
 				ImGui::EndTable();
 			}
@@ -738,6 +765,7 @@ namespace Frost
 						ImGui::Text("Mass");
 
 						ImGui::TableNextColumn();
+						ImGui::PushItemWidth(-1);
 						UserInterface::DragFloat("", component.Mass, 0.3f, 0.0f, 1000000.0f);
 
 						ImGui::PopID();
@@ -750,6 +778,7 @@ namespace Frost
 						ImGui::Text("Linear Drag");
 
 						ImGui::TableNextColumn();
+						ImGui::PushItemWidth(-1);
 						UserInterface::DragFloat("", component.LinearDrag, 0.1f, 0.0f, 1000.0f);
 
 						ImGui::PopID();
@@ -762,6 +791,7 @@ namespace Frost
 						ImGui::Text("Angular Drag");
 
 						ImGui::TableNextColumn();
+						ImGui::PushItemWidth(-1);
 						UserInterface::DragFloat("", component.AngularDrag, 0.1f, 0.0f, 1000.0f);
 
 						ImGui::PopID();
@@ -802,7 +832,7 @@ namespace Frost
 							ImGui::PushID(5);
 
 							ImGui::TableNextColumn();
-							ImGui::Text("Axis X");
+							ImGui::Text("Lock Position X");
 
 							ImGui::TableNextColumn();
 							ImGui::Checkbox("", &component.LockPositionX);
@@ -814,7 +844,7 @@ namespace Frost
 							ImGui::PushID(6);
 
 							ImGui::TableNextColumn();
-							ImGui::Text("Axis Y");
+							ImGui::Text("Lock Position Y");
 
 							ImGui::TableNextColumn();
 							ImGui::Checkbox("", &component.LockPositionY);
@@ -826,10 +856,46 @@ namespace Frost
 							ImGui::PushID(7);
 
 							ImGui::TableNextColumn();
-							ImGui::Text("Axis Z");
+							ImGui::Text("Lock Position Z");
 
 							ImGui::TableNextColumn();
 							ImGui::Checkbox("", &component.LockPositionZ);
+
+							ImGui::PopID();
+						}
+
+						{
+							ImGui::PushID(8);
+
+							ImGui::TableNextColumn();
+							ImGui::Text("Lock Rotation X");
+
+							ImGui::TableNextColumn();
+							ImGui::Checkbox("", &component.LockRotationX);
+
+							ImGui::PopID();
+						}
+
+						{
+							ImGui::PushID(9);
+
+							ImGui::TableNextColumn();
+							ImGui::Text("Lock Rotation Y");
+
+							ImGui::TableNextColumn();
+							ImGui::Checkbox("", &component.LockRotationY);
+
+							ImGui::PopID();
+						}
+
+						{
+							ImGui::PushID(10);
+
+							ImGui::TableNextColumn();
+							ImGui::Text("Lock Rotation Z");
+
+							ImGui::TableNextColumn();
+							ImGui::Checkbox("", &component.LockRotationZ);
 
 							ImGui::PopID();
 						}
@@ -839,6 +905,37 @@ namespace Frost
 					ImGui::TreePop();
 				}
 			}
+
+			// Layer has been removed, set to Default layer
+			if (!PhysicsLayerManager::IsLayerValid(component.Layer))
+				component.Layer = 0;
+			const PhysicsLayer& currentLayer = PhysicsLayerManager::GetLayer(component.Layer);
+
+			ImGui::TableNextColumn();
+			ImGui::Text("Layer");
+
+			ImGui::SameLine();
+
+			ImGui::PushItemWidth(-1);
+			if (ImGui::BeginCombo("##layertypecombo", currentLayer.Name.c_str()))
+			{
+				int layerCount = PhysicsLayerManager::GetLayerCount();
+				const auto& layerNames = PhysicsLayerManager::GetLayerNames();
+
+				for (const auto& layerName : layerNames)
+				{
+					bool isSelected = currentLayer.Name ==  layerName;
+
+					if (ImGui::Selectable(layerName.c_str(), isSelected))
+					{
+						component.Layer = PhysicsLayerManager::GetLayer(layerName).LayerID;
+					}
+				}
+
+				ImGui::EndCombo();
+			}
+
+
 			
 
 			ImGui::PopStyleVar();
@@ -861,7 +958,8 @@ namespace Frost
 					ImGui::Text("Size");
 
 					ImGui::TableNextColumn();
-					UserInterface::DrawVec3CoordsEdit("", component.Size);
+					ImGui::PushItemWidth(-1);
+					ImGui::DragFloat3("##boxColliderSize", &component.Size.x, 0.1, -1000.0f, 1000.0f);
 
 					ImGui::PopID();
 				}
@@ -873,6 +971,7 @@ namespace Frost
 					ImGui::Text("Is Trigger");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::CheckBox("", component.IsTrigger);
 
 					ImGui::PopID();
@@ -885,7 +984,8 @@ namespace Frost
 					ImGui::Text("Offset");
 
 					ImGui::TableNextColumn();
-					ImGui::DragFloat3("", &component.Offset.x, 0.1f, -1000.0f, 1000.0f);
+					ImGui::PushItemWidth(-1);
+					ImGui::DragFloat3("##boxColliderOffset", &component.Offset.x, 0.1f, -1000.0f, 1000.0f);
 
 					ImGui::PopID();
 				}
@@ -910,6 +1010,7 @@ namespace Frost
 					ImGui::Text("Radius");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Radius, 0.1f, 0.0f, 1000.0f);
 
 					ImGui::PopID();
@@ -922,6 +1023,7 @@ namespace Frost
 					ImGui::Text("Is Trigger");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::CheckBox("", component.IsTrigger);
 
 					ImGui::PopID();
@@ -934,6 +1036,7 @@ namespace Frost
 					ImGui::Text("Offset");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					ImGui::DragFloat3("", &component.Offset.x, 0.1f, -1000.0f, 1000.0f);
 
 					ImGui::PopID();
@@ -960,6 +1063,7 @@ namespace Frost
 					ImGui::Text("Radius");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Radius, 0.1f, 0.0f, 1000.0f);
 
 					ImGui::PopID();
@@ -972,6 +1076,7 @@ namespace Frost
 					ImGui::Text("Height");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Height, 0.1f, 0.0f, 1000.0f);
 
 					ImGui::PopID();
@@ -984,6 +1089,7 @@ namespace Frost
 					ImGui::Text("Is Trigger");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::CheckBox("", component.IsTrigger);
 
 					ImGui::PopID();
@@ -996,6 +1102,7 @@ namespace Frost
 					ImGui::Text("Offset");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					ImGui::DragFloat3("", &component.Offset.x, 0.1f, -1000.0f, 1000.0f);
 
 					ImGui::PopID();
@@ -1028,7 +1135,7 @@ namespace Frost
 				const float width = ImGui::GetWindowWidth();
 				const float combo_width = width * 0.5f;
 
-
+				ImGui::PushItemWidth(-1);
 				if (ImGui::BeginCombo("##meshcollidertypecombo", componentBodyType.c_str()))
 				{
 
@@ -1089,6 +1196,7 @@ namespace Frost
 					ImGui::Text("Mie Scattering");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DrawVec3ColorEdit("", component.MieScattering);
 
 					ImGui::PopID();
@@ -1102,6 +1210,7 @@ namespace Frost
 					ImGui::Text("Density");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Density, 0.01f, 0.005f, 10.0f);
 
 					ImGui::PopID();
@@ -1114,6 +1223,7 @@ namespace Frost
 					ImGui::Text("Emission");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DrawVec3ColorEdit("", component.Emission);
 
 					ImGui::PopID();
@@ -1127,6 +1237,7 @@ namespace Frost
 					ImGui::Text("Phase");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.PhaseValue, 0.01f, 0.0f, 1.0f);
 
 					ImGui::PopID();
@@ -1139,6 +1250,7 @@ namespace Frost
 					ImGui::Text("Absorption");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Absorption, 0.01f, 0.0f, 100.0f);
 
 					ImGui::PopID();
@@ -1162,6 +1274,7 @@ namespace Frost
 					ImGui::Text("Scattering");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DrawVec3ColorEdit("", component.Scattering);
 
 					ImGui::PopID();
@@ -1174,6 +1287,7 @@ namespace Frost
 					ImGui::Text("Phase Function");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.PhaseFunction, 0.1f, 0.0f, 1.0f);
 
 					ImGui::PopID();
@@ -1186,6 +1300,7 @@ namespace Frost
 					ImGui::Text("Cloud Absorption");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.CloudAbsorption, 0.1f, 0.0f, 10.0f);
 
 					ImGui::PopID();
@@ -1198,6 +1313,7 @@ namespace Frost
 					ImGui::Text("Sun Absorption");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.SunAbsorption, 0.1f, 0.0f, 10.0f);
 
 					ImGui::PopID();
@@ -1210,6 +1326,7 @@ namespace Frost
 					ImGui::Text("Density");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Density, 0.01f, 0.005f, 1000.0f);
 
 					ImGui::PopID();
@@ -1224,6 +1341,7 @@ namespace Frost
 					ImGui::Text("Cloud Scale");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.CloudScale, 0.01f, 0.005f, 1000.0f);
 
 					ImGui::PopID();
@@ -1236,6 +1354,7 @@ namespace Frost
 					ImGui::Text("Density Offset");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.DensityOffset, 0.1f, 0.0f, 1000.0f);
 
 					ImGui::PopID();
@@ -1248,6 +1367,7 @@ namespace Frost
 					ImGui::Text("Detail Offset");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.DetailOffset, 0.1f, 0.0f, 10.0f);
 
 					ImGui::PopID();
@@ -1283,6 +1403,7 @@ namespace Frost
 					ImGui::Text("FOV");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					if (ImGui::DragFloat("", &component.Camera->GetCameraFOV(), 0.1f, 0.0f, 180.0f))
 						component.Camera->RecalculateProjectionMatrix();
 
@@ -1296,6 +1417,7 @@ namespace Frost
 					ImGui::Text("Near Clip");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					if (ImGui::DragFloat("", &component.Camera->GetNearClip(), 0.01f, 0.0f, 1.0f))
 						component.Camera->RecalculateProjectionMatrix();
 
@@ -1309,12 +1431,270 @@ namespace Frost
 					ImGui::Text("Far Clip");
 
 					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
 					if (ImGui::DragFloat("", &component.Camera->GetFarClip(), 2.0f, 1.0f, 10000.0f))
 						component.Camera->RecalculateProjectionMatrix();
 
 					ImGui::PopID();
 				}
 
+				ImGui::EndTable();
+			}
+			ImGui::PopStyleVar();
+		});
+
+		DrawComponent<ScriptComponent>("SCRIPT COMPONENT", entity, [&, entity](auto& component)
+		{
+
+			constexpr ImGuiTableFlags flags{ ImGuiTableFlags_SizingMask_ };
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+
+			bool isError = !ScriptEngine::ModuleExists(component.ModuleName);
+			bool isRuntime = m_Context->m_SceneState == SceneState::Play;
+
+
+			if (ImGui::BeginTable("ScriptProperties", 2, flags))
+			{
+				{
+					ImGui::PushID(1);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Module Name");
+
+					if (!isError)
+					{
+						ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 0.8f, 0.2f, 1.0f));
+					}
+					else
+					{
+						ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+
+					}
+
+					ImGui::TableNextColumn();
+					char buffer[256];
+					memset(buffer, 0, sizeof(buffer));
+					std::strncpy(buffer, component.ModuleName.c_str(), sizeof(buffer));
+					ImGui::SetNextItemWidth(-1.0f);
+					bool action = ImGui::InputText("##Tag", buffer, sizeof(buffer));
+
+					
+					ImGui::PopStyleColor();
+
+
+					if (action)
+					{
+						if (!isError)
+						{
+							isError = true;
+							ScriptEngine::ShutdownScriptEntity(entity, component.ModuleName);
+						}
+
+						if (ScriptEngine::ModuleExists(std::string(buffer)))
+						{
+							FROST_CORE_INFO("New module found! Old one: {0}, New one: {1}", component.ModuleName, std::string(buffer));
+
+							component.ModuleName = std::string(buffer);
+
+							if (isRuntime)
+							{
+								// In case it is run time, we need to create the entity
+								ScriptEngine::InstantiateEntityClass(entity);
+							}
+							else
+							{
+								// In case it is on editor scene, we don't really care about the instance,
+								// we just want to retrieve to values for the public fields
+								UUID entityId = entity.GetComponent<IDComponent>().ID;
+								ScriptEngine::GetEntityInstanceData(entity.GetSceneUUID(), entityId);
+							}
+
+						}
+					}
+					component.ModuleName = std::string(buffer);
+
+					ImGui::PopID();
+				}
+
+				if (!isError)
+				{
+					int32_t pushId = 2;
+
+					UUID entityId = entity.GetComponent<IDComponent>().ID;
+					EntityInstanceData& entityInstanceData = ScriptEngine::GetEntityInstanceData(entity.GetSceneUUID(), entityId);
+					ScriptModuleFieldMap& moduleFieldMap = component.ModuleFieldMap;
+
+					isRuntime = m_Context->m_SceneState == SceneState::Play && entityInstanceData.Instance.IsRuntimeAvailable();
+					
+					if (moduleFieldMap.find(component.ModuleName) != moduleFieldMap.end())
+					{
+						
+							
+						auto& publicFields = moduleFieldMap.at(component.ModuleName);
+						for (auto& [name, field] : publicFields)
+						{
+							ImGui::PushID(pushId);
+
+							ImGui::TableNextColumn();
+							ImGui::Text(name.c_str());
+
+							ImGui::TableNextColumn();
+							ImGui::PushItemWidth(-1.0f);
+							
+							switch (field.Type)
+							{
+								case FieldType::Int:
+								{
+									int32_t value = isRuntime ?
+										field.GetRuntimeValue<int32_t>(entityInstanceData.Instance) :
+										field.GetStoredValue<int32_t>();
+
+									
+									//ImGui::PushItemWidth(-1.0f);
+
+									if (ImGui::DragInt("##dragInt", &value, 1.0f, INT_MIN, INT_MAX))
+									{
+										if (isRuntime)
+											field.SetRuntimeValue(entityInstanceData.Instance, value);
+										else
+											field.SetStoredValue(value);
+									}
+									//ImGui::PopItemWidth();
+
+									break;
+								}
+								
+
+								case FieldType::Float:
+								{
+									float value = isRuntime ?
+										field.GetRuntimeValue<float>(entityInstanceData.Instance) :
+										field.GetStoredValue<float>();
+
+									if (ImGui::DragFloat("##dragFloat", &value, 1.0f, FLT_MIN, FLT_MAX))
+									{
+										if (isRuntime)
+											field.SetRuntimeValue(entityInstanceData.Instance, value);
+										else
+											field.SetStoredValue(value);
+									}
+									break;
+
+								}
+
+
+								case FieldType::UnsignedInt:
+								{
+									uint32_t value = isRuntime ?
+										field.GetRuntimeValue<uint32_t>(entityInstanceData.Instance) :
+										field.GetStoredValue<uint32_t>();
+
+									if (ImGui::DragInt("##dragUint", (int32_t*)&value, 1.0f, 0, UINT_MAX))
+									{
+										if (isRuntime)
+											field.SetRuntimeValue(entityInstanceData.Instance, value);
+										else
+											field.SetStoredValue(value);
+									}
+									break;
+								}
+								case FieldType::Vec2:
+								{
+									glm::vec2 value = isRuntime ?
+										field.GetRuntimeValue<glm::vec2>(entityInstanceData.Instance) :
+										field.GetStoredValue<glm::vec2>();
+
+									if (ImGui::DragFloat2("##dragVec2", &value.x, 1.0f, FLT_MIN, FLT_MAX))
+									{
+										if (isRuntime)
+											field.SetRuntimeValue(entityInstanceData.Instance, value);
+										else
+											field.SetStoredValue(value);
+									}
+									break;
+								}
+								case FieldType::Vec3:
+								{
+									glm::vec3 value = isRuntime ?
+										field.GetRuntimeValue<glm::vec3>(entityInstanceData.Instance) :
+										field.GetStoredValue<glm::vec3>();
+
+									if (ImGui::DragFloat3("##dragVec3", &value.x, 1.0f, FLT_MIN, FLT_MAX))
+									{
+										if (isRuntime)
+											field.SetRuntimeValue(entityInstanceData.Instance, value);
+										else
+											field.SetStoredValue(value);
+									}
+									break;
+								}
+								case FieldType::Vec4:
+								{
+									glm::vec4 value = isRuntime ?
+										field.GetRuntimeValue<glm::vec4>(entityInstanceData.Instance) :
+										field.GetStoredValue<glm::vec4>();
+
+									if (ImGui::DragFloat4("##dragVec4", &value.x, 1.0f, FLT_MIN, FLT_MAX))
+									{
+										if (isRuntime)
+											field.SetRuntimeValue(entityInstanceData.Instance, value);
+										else
+											field.SetStoredValue(value);
+									}
+									break;
+								}
+								case FieldType::String:
+								{
+									const std::string& value = isRuntime ? field.GetRuntimeValue<std::string>(entityInstanceData.Instance) : field.GetStoredValue<const std::string&>();
+									char buffer[256];
+									memset(buffer, 0, 256);
+									memcpy(buffer, value.c_str(), value.length());
+									if (ImGui::InputText("##fieldString", buffer, sizeof(buffer)))
+									{
+										if (isRuntime)
+											field.SetRuntimeValue<const std::string&>(entityInstanceData.Instance, buffer);
+										else
+											field.SetStoredValue<const std::string&>(buffer);
+									}
+									break;
+								}
+								case FieldType::Asset:
+								{
+									// TODO: Add assets
+									break;
+								}
+								case FieldType::Entity:
+								{
+									UUID uuid = isRuntime ?
+										field.GetRuntimeValue<UUID>(entityInstanceData.Instance) :
+										field.GetStoredValue<UUID>();
+
+									Entity entity = m_SceneHierarchy->m_SceneContext->FindEntityByUUID(uuid);
+
+									if (UserInterface::PropertyEntityReference("##entityRef", entity))
+									{
+										if (isRuntime)
+											field.SetRuntimeValue<const UUID&>(entityInstanceData.Instance, entity.GetUUID());
+										else
+											field.SetStoredValue(entity.GetUUID());
+									}
+								}
+							}
+
+							ImGui::PopID();
+
+							pushId++;
+
+						}
+						if (publicFields.size() > 0)
+						{
+							ImGui::PopItemWidth();
+						}
+
+					}
+				}
+
+				
 				ImGui::EndTable();
 			}
 			ImGui::PopStyleVar();
