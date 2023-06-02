@@ -327,7 +327,8 @@ namespace Frost
 		if (entityInstance.ScriptClass->OnUpdateMethod)
 		{
 			void* args[] = { &ts };
-			CallMethod(entityInstance.GetInstance(), entityInstance.ScriptClass->OnUpdateMethod, args);
+			if(entityInstance.ScriptClass->OnUpdateMethod)
+				CallMethod(entityInstance.GetInstance(), entityInstance.ScriptClass->OnUpdateMethod, args);
 		}
 	}
 
@@ -344,7 +345,8 @@ namespace Frost
 		if (entityInstance.ScriptClass->OnUpdateMethod)
 		{
 			void* args[] = { &fixedTimeStep };
-			CallMethod(entityInstance.GetInstance(), entityInstance.ScriptClass->OnPhysicsUpdateMethod, args);
+			if(entityInstance.ScriptClass->OnPhysicsUpdateMethod)
+				CallMethod(entityInstance.GetInstance(), entityInstance.ScriptClass->OnPhysicsUpdateMethod, args);
 		}
 	}
 

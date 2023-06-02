@@ -112,15 +112,6 @@ namespace Frost
 		Ref<Mesh> Capsule;
 	};
 
-	/*struct MaterialUniform
-	{
-		glm::vec3 AlbedoColor = glm::vec3(0.8f);
-		float Emission = 0.0f;
-		float Roughness = 0.0f;
-		float Metalness = 0.0f;
-		bool UseNormalMap = false;
-	};*/
-
 	class Mesh
 	{
 	private:

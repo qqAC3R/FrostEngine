@@ -1,161 +1,161 @@
 [
-    {
-        "UUID": 7934149233888653950,
-        "TagComponent": "Directional Light",
-        "ParentChildComponent": {
-            "ParentID": 0,
-            "ChildIDs": null
-        },
-        "TransformComponent": {
-            "Translation": [
-                0.0,
-                1.0,
-                0.0
-            ],
-            "Rotation": [
-                -90.0,
-                0.0,
-                0.0
-            ],
-            "Scale": [
-                1.0,
-                1.0,
-                1.0
-            ]
-        },
-        "DirectionalLightComponent": {
-            "Color": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "Intensity": 3.0,
-            "Size": 1.0,
-            "VolumeDensity": 0.0,
-            "Absorption": 1.0,
-            "Phase": 0.0
-        }
+  {
+    "UUID": 7934149233888653950,
+    "TagComponent": "Directional Light",
+    "ParentChildComponent": {
+      "ParentID": 0,
+      "ChildIDs": null
     },
-    {
-        "UUID": 748470715262557506,
-        "TagComponent": "Cube",
-        "ParentChildComponent": {
-            "ParentID": 0,
-            "ChildIDs": null
-        },
-        "TransformComponent": {
-            "Translation": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "Rotation": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "Scale": [
-                1.0,
-                1.0,
-                1.0
-            ]
-        },
-        "MeshComponent": {
-            "Materials": [
-                {
-                    "AlbedoColor": [
-                        0.800000011920929,
-                        0.800000011920929,
-                        0.800000011920929,
-                        1.0
-                    ],
-                    "AlbedoTextureFilepath": "",
-                    "EmissionValue": 0.0,
-                    "MetalnessTextureFilepath": "",
-                    "MetalnessValue": 0.0,
-                    "NormalMapTextureFilepath": "",
-                    "NormalMapUse": 0,
-                    "RoughnessTextureFilepath": "",
-                    "RoughnessValue": -0.8973665237426758
-                },
-                {
-                    "AlbedoColor": [
-                        1.0,
-                        1.0,
-                        1.0,
-                        1.0
-                    ],
-                    "AlbedoTextureFilepath": "",
-                    "EmissionValue": 0.0,
-                    "MetalnessTextureFilepath": "",
-                    "MetalnessValue": 0.0,
-                    "NormalMapTextureFilepath": "",
-                    "NormalMapUse": 0,
-                    "RoughnessTextureFilepath": "",
-                    "RoughnessValue": 0.9900000095367432
-                }
-            ],
-            "Filepath": "Resources/Meshes/cube.gltf"
-        }
+    "TransformComponent": {
+      "Translation": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "Rotation": [
+        -90.0,
+        0.0,
+        0.0
+      ],
+      "Scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
     },
-    {
-        "UUID": 3338436955305614176,
-        "TagComponent": "Camera",
-        "ParentChildComponent": {
-            "ParentID": 0,
-            "ChildIDs": null
-        },
-        "TransformComponent": {
-            "Translation": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "Rotation": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "Scale": [
-                1.0,
-                1.0,
-                1.0
-            ]
-        },
-        "CameraComponent": {
-            "FOV": 85.0,
-            "NearClip": 0.10000000149011612,
-            "FarClip": 1000.0,
-            "Primary": true
-        },
-        "ScriptComponent": {
-            "ModuleName": "Frost.Player",
-            "PublicFields": [
-                {
-                    "FieldName": "m_CameraOffset",
-                    "Type": "Vec3",
-                    "Value": [
-                        0.0,
-                        1.0,
-                        3.0
-                    ]
-                },
-                {
-                    "FieldName": "m_VarStr",
-                    "Type": "String",
-                    "Value": "Hello world!!"
-                },
-                {
-                    "FieldName": "m_CameraFOV",
-                    "Type": "Float",
-                    "Value": 91.0
-                },
-                {
-                    "FieldName": "m_VarProperty",
-                    "Type": "Float",
-                    "Value": 0.0
-                }
-            ]
-        }
+    "DirectionalLightComponent": {
+      "Color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "Intensity": 3.0,
+      "Size": 1.0,
+      "VolumeDensity": 0.0,
+      "Absorption": 1.0,
+      "Phase": 0.0
     }
+  },
+  {
+    "UUID": 748470715262557506,
+    "TagComponent": "Cube",
+    "ParentChildComponent": {
+      "ParentID": 0,
+      "ChildIDs": null
+    },
+    "TransformComponent": {
+      "Translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "Rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "Scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "MeshComponent": {
+      "Materials": [
+        {
+          "AlbedoColor": [
+            0.800000011920929,
+            0.800000011920929,
+            0.800000011920929,
+            1.0
+          ],
+          "AlbedoTextureFilepath": "",
+          "EmissionValue": 0.0,
+          "MetalnessTextureFilepath": "",
+          "MetalnessValue": 0.0,
+          "NormalMapTextureFilepath": "",
+          "NormalMapUse": 0,
+          "RoughnessTextureFilepath": "",
+          "RoughnessValue": -0.8973665237426758
+        },
+        {
+          "AlbedoColor": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "AlbedoTextureFilepath": "",
+          "EmissionValue": 0.0,
+          "MetalnessTextureFilepath": "",
+          "MetalnessValue": 0.0,
+          "NormalMapTextureFilepath": "",
+          "NormalMapUse": 0,
+          "RoughnessTextureFilepath": "",
+          "RoughnessValue": 0.9900000095367432
+        }
+      ],
+      "Filepath": "Resources/Meshes/cube.gltf"
+    }
+  },
+  {
+    "UUID": 3338436955305614176,
+    "TagComponent": "Camera",
+    "ParentChildComponent": {
+      "ParentID": 0,
+      "ChildIDs": null
+    },
+    "TransformComponent": {
+      "Translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "Rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "Scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "CameraComponent": {
+      "FOV": 85.0,
+      "NearClip": 0.10000000149011612,
+      "FarClip": 1000.0,
+      "Primary": true
+    },
+    "ScriptComponent": {
+      "ModuleName": "Frost.Player",
+      "PublicFields": [
+        {
+          "FieldName": "m_CameraOffset",
+          "Type": "Vec3",
+          "Value": [
+            0.0,
+            1.0,
+            3.0
+          ]
+        },
+        {
+          "FieldName": "m_VarStr",
+          "Type": "String",
+          "Value": "Hello world!!"
+        },
+        {
+          "FieldName": "m_CameraFOV",
+          "Type": "Float",
+          "Value": 91.0
+        },
+        {
+          "FieldName": "m_VarProperty",
+          "Type": "Float",
+          "Value": 0.0
+        }
+      ]
+    }
+  }
 ]

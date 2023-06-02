@@ -7,6 +7,8 @@
 #include "Frost/Physics/PhysicsEngine.h"
 #include "Frost/Physics/PhysicsLayer.h"
 
+#include "Frost/Script/ScriptEngine.h"
+
 #include <glm/gtx/compatibility.hpp>
 
 namespace Frost
@@ -326,7 +328,13 @@ namespace Frost
 
 	void PhysXActor::OnFixedUpdate(float fixedDeltaTime)
 	{
-		// TODO: This is linked mostly with the Script Engine
+		if (!m_Entity.HasComponent<ScriptComponent>())
+			return;
+
+		if (!ScriptEngine::ModuleExists(m_Entity.GetComponent<ScriptComponent>().ModuleName))
+			return;
+
+		ScriptEngine::OnPhysicsUpdateEntity(m_Entity, fixedDeltaTime);
 	}
 
 	void PhysXActor::AddCollider(BoxColliderComponent& collider, Entity entity, const glm::vec3& offset)

@@ -9,6 +9,8 @@
 
 #include "UserInterface/ImGuiUtilities.h"
 
+#include "Frost/Project/Project.h"
+
 namespace Frost
 {
 	void TitlebarPanel::Init(void* initArgs)
@@ -48,6 +50,7 @@ namespace Frost
 		const ImVec2 titlebarMin = ImGui::GetCursorScreenPos();
 		const ImVec2 titlebarMax = { ImGui::GetCursorScreenPos().x + ImGui::GetWindowWidth() - windowPadding.y * 2.0f, ImGui::GetCursorScreenPos().y + m_TitlebarHeight };
 
+
 		auto* drawList = ImGui::GetWindowDrawList();
 		drawList->AddRectFilled(titlebarMin, titlebarMax, IM_COL32(31, 36, 43, 255));
 
@@ -64,7 +67,35 @@ namespace Frost
 		// Draw Minimze/Maximize/Close buttons
 		RenderButtons();
 
+		// Draw a bar to show the name of the project
+		RenderProjectTitleBar();
+
 		m_MenuBarFunction = {};
+	}
+
+	
+
+	void TitlebarPanel::RenderProjectTitleBar()
+	{
+		ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+		const ImVec2 windowPadding = ImGui::GetCurrentWindow()->WindowPadding;
+
+		float buttonRounding = 7.0;
+
+		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - 280.0f - windowPadding.x, -buttonRounding));
+
+		// Button transparent Style
+		ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, buttonRounding);
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+		ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(15, 16, 20, 255));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(15, 16, 20, 255));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(15, 16, 20, 255));
+
+		ImGui::Button(Project::GetProjectName().c_str(), { 150, 40 });
+
+		ImGui::PopStyleVar(3);
+		ImGui::PopStyleColor(3);
 	}
 
 	void TitlebarPanel::RenderButtons()

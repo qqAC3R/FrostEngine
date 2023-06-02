@@ -23,6 +23,8 @@ namespace Frost
 	private:
 		void RenderTitleBar();
 
+		void RenderProjectTitleBar();
+
 		void RenderButtons();
 		void RenderMenuBar();
 		void RenderEngineLogo();

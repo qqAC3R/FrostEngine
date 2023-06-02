@@ -1,6 +1,8 @@
 #include "frostpch.h"
 #include "CookingFactory.h"
 
+#include "Frost/Project/Project.h"
+
 #include "PhysXInternal.h"
 #include "Frost/Utils/FileSystem.h"
 #include "PhysXUtils.h"
@@ -50,7 +52,7 @@ namespace Frost
 	{
 		static std::filesystem::path GetCacheDirectory()
 		{
-			return std::filesystem::path("Resources/Cache/Colliders");
+			return Project::GetProjectDirectory() / std::filesystem::path("Resources/Cache/Colliders");
 		}
 
 		static void CreateCacheDirectoryIfNeeded()

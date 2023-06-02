@@ -57,7 +57,7 @@ namespace Frost
 
         protected virtual void OnCreate() { }
         protected virtual void OnUpdate(float deltaTime) { }
-        protected virtual void OnPhysicsUpdate() { }
+        protected virtual void OnPhysicsUpdate(float deltaTime) { }
         protected virtual void OnDestroy() { }
 
         public Entity Parent

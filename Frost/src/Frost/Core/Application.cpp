@@ -7,6 +7,8 @@
 #include "Frost/Physics/PhysicsEngine.h"
 #include "Frost/Script/ScriptEngine.h"
 
+#include "Frost/Project/Project.h"
+
 #include "Frost/Core/Input.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
 #include "Frost/Utils/Timer.h"
@@ -16,7 +18,7 @@
 namespace Frost
 {
 	Application* Application::s_Instance = nullptr;
-	std::string Application::m_ApplicationVersion = "0.5.0a";
+	std::string Application::m_ApplicationVersion = "0.6.0a";
 
 	Application::Application()
 	{
@@ -35,10 +37,15 @@ namespace Frost
 		Renderer::Init();
 		PhysicsEngine::Initialize();
 		ScriptEngine::Init("Resources/Scripts/FrostScriptCore.dll");
+
+		Ref<Project> project = Project::Deserialize("D:\\Visual Studio\\FrostEngine\\master\\FrostEditor\\SandboxProject\\Sandbox.fproj");
+		Project::SetActive(project);
+		Application::Get().GetWindow().SetWindowProjectName(Project::GetProjectName());
 	}
 
 	Application::~Application()
 	{
+		Project::SetActive(nullptr);
 		for (Layer* layer : m_LayerStack)
 		{
 			layer->OnDetach();

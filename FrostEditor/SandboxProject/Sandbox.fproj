@@ -1,0 +1,8 @@
+{
+    "AssetDirectory": "Assets",
+    "AssetRegistryPath": "Assets/Registry",
+    "ScriptModulePath": "Assets/Scripts/Binaries/Sandbox.dll",
+    "DefaultNamespace": "Frost",
+    "StartScene": "Assets/Scenes/.Default.fsc",
+    "ReloadAssemblyOnPlay": false
+}

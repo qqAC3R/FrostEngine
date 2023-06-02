@@ -37,9 +37,6 @@ namespace Frost
 
 	void EditorLayer::OnAttach()
 	{
-		Application::Get().GetWindow().SetWindowProjectName("Untilted scene");
-		ScriptEngine::LoadAppAssembly("SandboxProject/Assets/Scripts/Binaries/Sandbox.dll");
-
 		m_EditorCamera = Ref<EditorCamera>::Create(85.0, 1600.0f / 900.0f, 0.1f, 1000.0f);
 	
 		// Scene initialization
@@ -70,6 +67,10 @@ namespace Frost
 		m_TitlebarPanel = Ref<TitlebarPanel>::Create();
 		m_TitlebarPanel->Init(nullptr);
 
+		
+
+		ScriptEngine::LoadAppAssembly(Project::GetScriptModulePath().string());
+
 #if 0
 		// Default Scene
 		{
@@ -96,7 +97,7 @@ namespace Frost
 #endif
 		SceneSerializer sceneSerializer(m_CurrentScene);
 		sceneSerializer.Deserialize("Resources/Scenes/.Default.fsc");
-		Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
+
 		
 		m_EditorScene = m_CurrentScene;
 		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
@@ -106,7 +107,7 @@ namespace Frost
 	{
 		ScriptEngine::SetSceneContext(m_CurrentScene.Raw());
 
-		ScriptEngine::OnHotReload("SandboxProject/Assets/Scripts/Binaries/Sandbox.dll");
+		ScriptEngine::OnHotReload(Project::GetScriptModulePath().string());
 
 		if (m_SceneState == SceneState::Play)
 		{
@@ -378,7 +379,7 @@ namespace Frost
 		m_EditorScene = Ref<Scene>::Create();
 		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
 		SetCurrentScene(m_EditorScene);
-		Application::Get().GetWindow().SetWindowProjectName("Untilted scene");
+		//Application::Get().GetWindow().SetWindowProjectName("Untilted scene");
 	}
 
 	void EditorLayer::SaveSceneAs()
@@ -391,7 +392,7 @@ namespace Frost
 		{
 			SceneSerializer sceneSerializer(m_EditorScene);
 			sceneSerializer.Serialize(filepath);
-			Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
+			//Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
 		}
 	}
 
@@ -406,7 +407,7 @@ namespace Frost
 			NewScene();
 			SceneSerializer sceneSerializer(m_CurrentScene);
 			sceneSerializer.Deserialize(filepath);
-			Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
+			//Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
 
 			m_EditorScene = m_CurrentScene;
 			m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
@@ -423,7 +424,7 @@ namespace Frost
 
 		// Reload
 		//ScriptEngine::ReloadAssembly("SandboxProject/Assets/Scripts/Binaries/Sandbox.dll");
-		ScriptEngine::LoadAppAssembly("SandboxProject/Assets/Scripts/Binaries/Sandbox.dll");
+		ScriptEngine::LoadAppAssembly(Project::GetScriptModulePath().string());
 
 		m_RuntimeScene->OnRuntimeStart();
 

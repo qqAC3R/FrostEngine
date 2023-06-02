@@ -15,8 +15,8 @@ namespace Frost
         }
         protected override void OnUpdate(float deltaTime)
         {
-            //this.Translation = ActorEntity.Translation + m_CameraOffset;
-            this.Rotation = new Vector3(this.Rotation.X, 0.0f, this.Rotation.Z);
+            this.Translation = ActorEntity.Translation + m_CameraOffset;
+            //this.Rotation = new Vector3(this.Rotation.X, 0.0f, this.Rotation.Z);
         }
 
         protected override void OnDestroy()

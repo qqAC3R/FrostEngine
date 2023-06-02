@@ -6,6 +6,8 @@
 #include "Frost/Core/Layer.h"
 #include "Frost/Core/Log.h"
 
+#include "Frost/Project/Project.h"
+
 #include "Frost/Core/Timestep.h"
 #include "Frost/Utils/PlatformUtils.h"
 #include "Frost/Utils/Timer.h"
