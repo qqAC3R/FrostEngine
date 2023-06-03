@@ -59,6 +59,13 @@ namespace Frost
 										/ s_ActiveProject->GetConfig().AssetRegistryPath;
 		}
 
+		static std::filesystem::path GetAssetRegistryFilePath()
+		{
+			FROST_ASSERT_INTERNAL(s_ActiveProject);
+			return std::filesystem::path(s_ActiveProject->GetConfig().ProjectDirectory)
+				/ s_ActiveProject->GetConfig().AssetRegistryPath / "AssetRegistry.freg";
+		}
+
 		static std::filesystem::path GetScriptModulePath()
 		{
 			FROST_ASSERT_INTERNAL(s_ActiveProject);

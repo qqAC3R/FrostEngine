@@ -1,6 +1,7 @@
 #include "frostpch.h"
 #include "Project.h"
 
+#include "Frost/Asset/AssetManager.h"
 #include "Frost/Utils/FileSystem.h"
 
 #include <json/nlohmann/json.hpp>
@@ -19,17 +20,13 @@ namespace Frost
 	{
 		if (s_ActiveProject)
 		{
-			// TODO: Asset Manager
-			//AssetManager::Shutdown();
 			s_ActiveProject->Serialize();
+			AssetManager::Shutdown();
 		}
 
 		s_ActiveProject = project;
 		if (s_ActiveProject)
-		{
-			// TODO: Asset Manager
-			//AssetManager::Init();
-		}
+			AssetManager::Init();
 	}
 
 	static std::string GetNameFromFilepath(const std::string& filepath)
