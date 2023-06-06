@@ -35,7 +35,7 @@ namespace Frost
 			{
 				if (m_SelectedSubmesh != UINT32_MAX)
 				{
-					const Submesh& selectedSubmesh = selectedEntityMesh.Mesh->GetSubMeshes()[m_SelectedSubmesh];
+					const Submesh& selectedSubmesh = selectedEntityMesh.Mesh->GetMeshAsset()->GetSubMeshes()[m_SelectedSubmesh];
 					m_SelectedMaterialIndex = selectedSubmesh.MaterialIndex;
 				}
 
@@ -82,6 +82,7 @@ namespace Frost
 		//ImGui::End();
 
 
+#if 0
 		ImGui::Begin("Material Editor");
 		if (m_SelectedEntity && m_SelectedEntity.HasComponent<MeshComponent>())
 		{
@@ -91,15 +92,15 @@ namespace Frost
 			{
 
 				// Draw the selected material editor
-				DataStorage& materialData = selectedEntityMesh.Mesh->GetMaterialData(m_SelectedMaterialIndex);
+				Ref<DataStorage> materialData = selectedEntityMesh.Mesh->GetMaterialData(m_SelectedMaterialIndex);
 
 				// Textures
-				uint32_t albedoTextureID = materialData.Get<uint32_t>("AlbedoTexture");
-				uint32_t roughnessTextureID = materialData.Get<uint32_t>("RoughnessTexture");
-				uint32_t metalnessTextureID = materialData.Get<uint32_t>("MetalnessTexture");
-				uint32_t normalTextureID = materialData.Get<uint32_t>("NormalTexture");
+				uint32_t albedoTextureID = materialData->Get<uint32_t>("AlbedoTexture");
+				uint32_t roughnessTextureID = materialData->Get<uint32_t>("RoughnessTexture");
+				uint32_t metalnessTextureID = materialData->Get<uint32_t>("MetalnessTexture");
+				uint32_t normalTextureID = materialData->Get<uint32_t>("NormalTexture");
 
-				uint32_t& useNormalMap = materialData.Get<uint32_t>("UseNormalMap");
+				uint32_t& useNormalMap = materialData->Get<uint32_t>("UseNormalMap");
 
 				// PBR values
 				{
@@ -140,7 +141,7 @@ namespace Frost
 					uint32_t startPosX = ImGui::GetCursorPosX();
 					uint32_t startPosY = ImGui::GetCursorPosY();
 
-					glm::vec3& albedoColor = materialData.Get<glm::vec3>("AlbedoColor");
+					glm::vec3& albedoColor = materialData->Get<glm::vec3>("AlbedoColor");
 					UserInterface::DrawVec3ColorEdit("", albedoColor);
 
 					ImGui::SetCursorPosX(startPosX);
@@ -151,7 +152,7 @@ namespace Frost
 					ImGui::SetCursorPosX(startPosX);
 					ImGui::SetCursorPosY(startPosY + 45);
 
-					float& emission = materialData.Get<float>("EmissionFactor");
+					float& emission = materialData->Get<float>("EmissionFactor");
 					UserInterface::DragFloat(" ", emission, 0.1f, 0.0f, 1000.0f);
 				}
 
@@ -187,7 +188,7 @@ namespace Frost
 					ImGui::PopID();
 
 					ImGui::SameLine(0.0f, 5.0f);
-					float& roughness = materialData.Get<float>("RoughnessFactor");
+					float& roughness = materialData->Get<float>("RoughnessFactor");
 					UserInterface::SliderFloat("  ", roughness, 0.0f, 1.0f);
 				}
 
@@ -224,7 +225,7 @@ namespace Frost
 
 
 					ImGui::SameLine(0.0f, 5.0f);
-					float& metalness = materialData.Get<float>("MetalnessFactor");
+					float& metalness = materialData->Get<float>("MetalnessFactor");
 					UserInterface::SliderFloat("   ", metalness, 0.0f, 1.0f);
 
 				}
@@ -271,7 +272,7 @@ namespace Frost
 			}
 		}
 		ImGui::End();
-
+#endif
 	}
 
 	void MaterialEditor::Shutdown()

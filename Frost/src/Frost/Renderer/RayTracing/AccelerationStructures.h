@@ -6,7 +6,7 @@ namespace Frost
 {
 	class VertexBuffer;
 	class IndexBuffer;
-	class Mesh;
+	class MeshAsset;
 	struct Submesh;
 
 	struct MeshASInfo
@@ -39,7 +39,7 @@ namespace Frost
 		virtual ~TopLevelAccelertionStructure() {}
 		virtual void Destroy() = 0;
 
-		virtual void UpdateAccelerationStructure(Vector<std::pair<Ref<Mesh>, glm::mat4>>& meshes) = 0;
+		virtual void UpdateAccelerationStructure(Vector<std::pair<Ref<MeshAsset>, glm::mat4>>& meshes) = 0;
 
 		static Ref<TopLevelAccelertionStructure> Create();
 	};

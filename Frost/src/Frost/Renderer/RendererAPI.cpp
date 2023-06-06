@@ -44,7 +44,7 @@ namespace Frost
 		data.Transform = transform;
 		data.EntityID = entityID;
 
-		m_SubmeshCount += mesh->GetSubMeshes().size();
+		m_SubmeshCount += mesh->GetMeshAsset()->GetSubMeshes().size();
 	}
 
 	void RenderQueue::AddWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth)

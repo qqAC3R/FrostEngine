@@ -148,10 +148,10 @@ namespace Frost
 			SetRuntimeValue_Internal(entityInstance, value);
 		}
 
-#if 0
 		void SetStoredValueRaw(void* src);
 		void* GetStoredValueRaw() { return m_StoredValueBuffer; }
 
+#if 0
 		void SetRuntimeValueRaw(EntityInstance& entityInstance, void* src);
 		void GetRuntimeValueRaw(EntityInstance& entityInstance);
 #endif
@@ -160,6 +160,7 @@ namespace Frost
 		MonoClassField* m_MonoClassField = nullptr;
 		MonoProperty* m_MonoProperty = nullptr;
 		uint8_t* m_StoredValueBuffer = nullptr;
+		std::string m_StoredString = "";
 
 		uint8_t* AllocateBuffer(FieldType type);
 
@@ -177,9 +178,6 @@ namespace Frost
 
 
 		friend class ScriptEngine;
-
-		// This is supposed to copy the string from mono_property_get_value and keep it alive
-		static HashMap<std::string, std::string> s_PublicFieldStringValue;
 	};
 
 	using ScriptModuleFieldMap = HashMap<std::string, HashMap<std::string, PublicField>>;

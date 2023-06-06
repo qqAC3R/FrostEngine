@@ -65,7 +65,7 @@ namespace Frost
 
 
 
-	Animation::Animation(const aiAnimation* animation, Mesh* mesh)
+	Animation::Animation(const aiAnimation* animation, MeshAsset* mesh)
 	{
 		m_Name = animation->mName.C_Str();
 		m_Skeleton = mesh->m_Skeleton;

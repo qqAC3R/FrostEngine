@@ -190,7 +190,7 @@ namespace Frost
 
 			if (entityMeshComponent.Mesh)
 			{
-				entityHasSubmeshes = entityMeshComponent.Mesh->GetSubMeshes().size() >= 1 ? true : false;
+				entityHasSubmeshes = entityMeshComponent.Mesh->GetMeshAsset()->GetSubMeshes().size() >= 1 ? true : false;
 			}
 		}
 
@@ -284,7 +284,7 @@ namespace Frost
 
 				if (entityMeshComponent.Mesh)
 				{
-					const Vector<Submesh>& submeshes = entityMeshComponent.Mesh->GetSubMeshes();
+					const Vector<Submesh>& submeshes = entityMeshComponent.Mesh->GetMeshAsset()->GetSubMeshes();
 
 					uint32_t i = 0;
 					uint32_t randomNumber = 0;

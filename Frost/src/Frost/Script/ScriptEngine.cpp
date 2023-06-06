@@ -240,16 +240,24 @@ namespace Frost
 		return true;
 	}
 
+	bool s_FileTimeStapFirstTime = true;
 	static std::filesystem::file_time_type s_FileTimestamp;
 
 	void ScriptEngine::OnHotReload(const std::string& path)
 	{
 		auto currentTimeStamp = FileSystem::GetLastWriteTime(path);
+
+		if (s_FileTimeStapFirstTime)
+		{
+			s_FileTimestamp = currentTimeStamp;
+			s_FileTimeStapFirstTime = false;
+		}
+
 		if (s_FileTimestamp != currentTimeStamp)
 		{
+			FROST_CORE_TRACE("Engine has detected a change in script assembly! The assembly has been reloaded!");
 			LoadAppAssembly(path);
 			s_FileTimestamp = currentTimeStamp;
-			FROST_CORE_TRACE("Engine has detected a change in script assembly! The assembly has been reloaded!");
 		}
 	}
 
@@ -647,6 +655,8 @@ namespace Frost
 #endif
 
 		{
+			//FROST_CORE_WARN("Shut down entity with script module {0}", moduleName);
+
 			ScriptComponent& scriptComponent = entity.GetComponent<ScriptComponent>();
 			ScriptModuleFieldMap& moduleFieldMap = scriptComponent.ModuleFieldMap;
 			if (moduleFieldMap.find(moduleName) != moduleFieldMap.end())
@@ -720,6 +730,53 @@ namespace Frost
 			auto& publicFields = moduleFieldMap.at(moduleName);
 			for (auto& [name, field] : publicFields)
 				field.CopyStoredValueToRuntime(entityInstance);
+		}
+	}
+
+	void ScriptEngine::CopyEntityScriptData(Scene* dstScene, Scene* srcScene)
+	{
+		//FROST_ASSERT_INTERNAL(bool(s_EntityInstanceMap.find(dstScene->GetUUID()) != s_EntityInstanceMap.end()));
+		FROST_ASSERT_INTERNAL(bool(s_EntityInstanceMap.find(srcScene->GetUUID()) != s_EntityInstanceMap.end()));
+
+		auto& srcEntityInstanceMap = s_EntityInstanceMap.at(srcScene->GetUUID());
+
+
+		Vector<UUID> deletedEntityIDs;
+		for (auto& [entityID, entityInstanceData] : srcEntityInstanceMap)
+		{
+			Entity srcEntity = srcScene->GetEntityByUUID(entityID);
+
+			if (srcEntity.HasComponent<ScriptComponent>())
+			{
+				auto& srcModuleFieldMap = srcEntity.GetComponent<ScriptComponent>().ModuleFieldMap;
+
+				for (auto& [moduleName, srcFieldMap] : srcModuleFieldMap)
+				{
+
+					Entity dstEntity = srcScene->GetEntityByUUID(entityID);
+					auto& dstModuleFieldMap = srcEntity.GetComponent<ScriptComponent>().ModuleFieldMap;
+
+					for (auto& [fieldName, field] : srcFieldMap)
+					{
+						FROST_ASSERT_INTERNAL(bool(dstModuleFieldMap.find(moduleName) != dstModuleFieldMap.end()));
+						auto& dstFieldMap = dstModuleFieldMap.at(moduleName);
+						FROST_ASSERT_INTERNAL(bool(dstFieldMap.find(fieldName) != dstFieldMap.end()));
+
+						//dstFieldMap.at(fieldName).SetStoredValueRaw(field.m_StoredValueBuffer);
+					}
+				}
+			}
+			else
+			{
+				// If the entity doesn't have the ScriptComponent anymore, we should delete it from the EntityInstanceMap
+				deletedEntityIDs.push_back(entityID);
+				//srcEntityInstanceMap.erase(entityID);
+			}
+		}
+
+		for (auto& deletedEntityID : deletedEntityIDs)
+		{
+			srcEntityInstanceMap.erase(deletedEntityID);
 		}
 	}
 

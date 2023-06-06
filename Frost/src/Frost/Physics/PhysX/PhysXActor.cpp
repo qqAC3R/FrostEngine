@@ -426,7 +426,7 @@ namespace Frost
 			}
 			else
 			{
-				Ref<Mesh> collisionMesh = m_Entity.GetComponent<MeshComponent>().Mesh;
+				Ref<MeshAsset> collisionMesh = m_Entity.GetComponent<MeshComponent>().Mesh->GetMeshAsset();
 				if (!collisionMesh->IsAnimated())
 				{
 					meshColliderComponent.CollisionMesh = collisionMesh;

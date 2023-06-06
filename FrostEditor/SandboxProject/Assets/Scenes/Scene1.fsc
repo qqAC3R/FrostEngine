@@ -37,6 +37,40 @@
         }
     },
     {
+        "UUID": 748470715262557506,
+        "TagComponent": "Cube",
+        "ParentChildComponent": {
+            "ParentID": 0,
+            "ChildIDs": null
+        },
+        "TransformComponent": {
+            "Translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "Rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "Scale": [
+                5.25,
+                5.25,
+                5.25
+            ]
+        },
+        "MeshComponent": {
+            "Materials": [
+                {
+                    "AssetID": 0,
+                    "MaterialIndex": 0
+                }
+            ],
+            "Filepath": "Meshes/Torus.fbx"
+        }
+    },
+    {
         "UUID": 3338436955305614176,
         "TagComponent": "Camera",
         "ParentChildComponent": {
@@ -94,40 +128,6 @@
                     "Value": 0.0
                 }
             ]
-        }
-    },
-    {
-        "UUID": 8504030237949768071,
-        "TagComponent": "Mesh",
-        "ParentChildComponent": {
-            "ParentID": 0,
-            "ChildIDs": null
-        },
-        "TransformComponent": {
-            "Translation": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "Rotation": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "Scale": [
-                1.0,
-                1.0,
-                1.0
-            ]
-        },
-        "MeshComponent": {
-            "Materials": [
-                {
-                    "AssetID": 0,
-                    "MaterialIndex": 0
-                }
-            ],
-            "Filepath": "Meshes/Cube.fbx"
         }
     }
 ]

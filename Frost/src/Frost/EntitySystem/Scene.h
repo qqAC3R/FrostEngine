@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Frost/Asset/Asset.h"
 #include "Frost/Core/UUID.h"
 #include "Frost/Renderer/EditorCamera.h"
 #include <entt.hpp>
@@ -11,10 +12,10 @@ namespace Frost
 	struct TransformComponent;
 	using EntityMap = HashMap<UUID, Entity>;
 
-	class Scene
+	class Scene : public Asset
 	{
 	public:
-		Scene();
+		Scene(); // Constructor which basically does nothing
 		virtual ~Scene();
 
 		void Update(Timestep ts);
@@ -41,6 +42,9 @@ namespace Frost
 		entt::registry& GetRegistry() { return m_Registry; }
 		const entt::registry& GetRegistry() const { return m_Registry; }
 		UUID GetUUID() const { return m_SceneID; }
+
+		static AssetType GetStaticType() { return AssetType::Scene; }
+		virtual AssetType GetAssetType() const override { return AssetType::Scene; }
 
 		CameraComponent* GetPrimaryCamera();
 		bool IsPlaying() const { return m_IsScenePlaying; }

@@ -285,7 +285,7 @@ namespace Frost
 		{
 			// Get the mesh
 			auto mesh = renderQueue.m_Data[i].Mesh;
-			const Vector<Submesh>& submeshes = mesh->GetSubMeshes();
+			const Vector<Submesh>& submeshes = mesh->GetMeshAsset()->GetSubMeshes();
 
 			// Instanced data for submeshes
 			//SubmeshInstanced submeshInstanced{};
@@ -348,7 +348,7 @@ namespace Frost
 			for (uint32_t k = 0; k < mesh->GetMaterialCount(); k++)
 			{
 				// Setting up the material data into a storage buffer
-				DataStorage& materialData = mesh->GetMaterialData(k);
+				Ref<DataStorage> materialData = mesh->GetMaterialAsset(k)->GetMaterialInternalData();
 
 #if 0
 				// Textures
@@ -369,7 +369,9 @@ namespace Frost
 				//m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write((void*)&instData, sizeof(MaterialData), materialDataOffset);
 #endif
 
-				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write((void*)materialData, sizeof(MaterialData), materialDataOffset);
+				DataStorage* dataStorage = materialData.Raw();
+				//void* ptr = (void*)dataStorage;
+				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write(dataStorage->GetBufferData(), sizeof(MaterialData), materialDataOffset);
 
 				materialDataOffset += sizeof(MaterialData);
 			}
@@ -466,7 +468,7 @@ namespace Frost
 			auto mesh = renderQueue.m_Data[meshIndex].Mesh;
 
 			// Bind the index buffer
-			mesh->GetIndexBuffer()->Bind();
+			mesh->GetMeshAsset()->GetIndexBuffer()->Bind();
 
 			// Bind the vertex buffer (only the instanced one, since for the "per vertex" one, we are using BDAs
 			auto vulkanVertexBufferInstanced = mesh->GetVertexBufferInstanced(currentFrameIndex).As<VulkanBufferDevice>();
@@ -478,7 +480,7 @@ namespace Frost
 			// Set the transform matrix and model matrix of the submesh into a constant buffer
 			
 			m_GeometryPushConstant.MaterialIndex = indirectMeshData[i].MaterialOffset;
-			m_GeometryPushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
+			m_GeometryPushConstant.VertexBufferBDA = mesh->GetMeshAsset()->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 			m_GeometryPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 			m_GeometryPushConstant.IsAnimated = static_cast<uint32_t>(mesh->IsAnimated());
 			m_GeometryPushConstant.EntityID = renderQueue.m_Data[meshIndex].EntityID;

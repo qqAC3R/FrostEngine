@@ -39,9 +39,12 @@ namespace Frost
 	{
 		m_EditorCamera = Ref<EditorCamera>::Create(85.0, 1600.0f / 900.0f, 0.1f, 1000.0f);
 	
+		ScriptEngine::LoadAppAssembly(Project::GetScriptModulePath().string());
+
 		// Scene initialization
-		m_EditorScene = Ref<Scene>::Create();
-		m_CurrentScene = m_EditorScene;
+		m_EditorScene = AssetManager::LoadAsset<Scene>("Scenes/.Default.fsc");
+		SetCurrentScene(m_EditorScene);
+
 
 		// Scene Hierarchy Panel initialization
 		m_SceneHierarchyPanel = Ref<SceneHierarchyPanel>::Create();
@@ -69,7 +72,6 @@ namespace Frost
 
 		
 
-		ScriptEngine::LoadAppAssembly(Project::GetScriptModulePath().string());
 
 #if 0
 		// Default Scene
@@ -95,11 +97,10 @@ namespace Frost
 			scriptComponent.ModuleName = "Frost.Player";
 		}
 #endif
-		SceneSerializer sceneSerializer(m_CurrentScene);
-		sceneSerializer.Deserialize("Resources/Scenes/.Default.fsc");
-
+		//SceneSerializer sceneSerializer(m_CurrentScene);
+		//SceneSerializer::DeserializeScene(Project::GetAssetDirectory().string() + "/Scenes/.Default.fsc", m_CurrentScene);
 		
-		m_EditorScene = m_CurrentScene;
+
 		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
 	}
 
@@ -376,6 +377,8 @@ namespace Frost
 	{
 		if (m_SceneState == SceneState::Play) return;
 
+		AssetManager::RemoveAssetFromMemory(m_EditorScene->Handle);
+
 		m_EditorScene = Ref<Scene>::Create();
 		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
 		SetCurrentScene(m_EditorScene);
@@ -390,8 +393,17 @@ namespace Frost
 
 		if (!filepath.empty())
 		{
-			SceneSerializer sceneSerializer(m_EditorScene);
-			sceneSerializer.Serialize(filepath);
+			// TODO: When saving the scene, we should set it the active scene to the new saved one, instead of leaving it to the old one
+			// So for instance, if we have a scene `Scene1.fsc` and then save as `Scene2.fsc`, even if the engine saved it,
+			// it still remains open at `Scene1.fcs` instead of `Scene2.fsc`
+			SceneSerializer::SerializeScene(filepath, m_EditorScene);
+
+			//AssetManager::CopyAssetToFilePath(m_EditorScene, filepath);
+			//AssetManager::RemoveAssetFromMemory(m_EditorScene.Handle)
+			
+			//SceneSerializer sceneSerializer(m_EditorScene);
+			//sceneSerializer.Serialize(filepath);
+			
 			//Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
 		}
 	}
@@ -404,9 +416,12 @@ namespace Frost
 
 		if (!filepath.empty())
 		{
+			//AssetManager::RemoveAssetFromMemory(m_EditorScene->Handle);
+
 			NewScene();
-			SceneSerializer sceneSerializer(m_CurrentScene);
-			sceneSerializer.Deserialize(filepath);
+		
+			m_CurrentScene = AssetManager::LoadAsset<Scene>(filepath);
+
 			//Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
 
 			m_EditorScene = m_CurrentScene;
@@ -423,8 +438,7 @@ namespace Frost
 		m_SceneHierarchyPanel->SetSceneContext(m_RuntimeScene);
 
 		// Reload
-		//ScriptEngine::ReloadAssembly("SandboxProject/Assets/Scripts/Binaries/Sandbox.dll");
-		ScriptEngine::LoadAppAssembly(Project::GetScriptModulePath().string());
+		//ScriptEngine::LoadAppAssembly(Project::GetScriptModulePath().string());
 
 		m_RuntimeScene->OnRuntimeStart();
 

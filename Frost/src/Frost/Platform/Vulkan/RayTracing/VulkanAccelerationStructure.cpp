@@ -300,7 +300,7 @@ namespace Frost
 		Destroy();
 	}
 
-	void VulkanTopLevelAccelertionStructure::UpdateAccelerationStructure(Vector<std::pair<Ref<Mesh>, glm::mat4>>& meshes)
+	void VulkanTopLevelAccelertionStructure::UpdateAccelerationStructure(Vector<std::pair<Ref<MeshAsset>, glm::mat4>>& meshes)
 	{
 		uint32_t blasIndex = 0;
 		VkDeviceAddress deviceAddressTemp{};

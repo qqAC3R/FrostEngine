@@ -14,9 +14,6 @@
 namespace Frost
 {
 
-	HashMap<std::string, std::string> PublicField::s_PublicFieldStringValue;
-
-
 	PublicField::PublicField(const std::string& name, const std::string& typeName, FieldType type, bool isReadOnly)
 		: Name(name), TypeName(typeName), Type(type), IsReadOnly(isReadOnly)
 	{
@@ -34,7 +31,25 @@ namespace Frost
 		}
 		else
 		{
-			m_StoredValueBuffer = other.m_StoredValueBuffer;
+			//uint32_t size = (*(std::string*)other.m_StoredValueBuffer).size();
+			//
+			//m_StoredValueBuffer = AllocateBuffer(Type);
+			//
+			//SetStoredValueRaw(other.m_StoredValueBuffer);
+
+			m_StoredString = (*(std::string*)other.m_StoredValueBuffer);
+			//const std::string& storedStr = m_StoredString;
+
+			m_StoredValueBuffer = (uint8_t*)&m_StoredString;
+			
+			//(*(std::string*)m_StoredValueBuffer).assign(storedStr);
+
+
+			//m_StoredValueBuffer = other.m_StoredValueBuffer;
+			//(*(std::string*)m_StoredValueBuffer).assign(*(std::string*)other.m_StoredValueBuffer);
+
+			//m_StoredValueBuffer = AllocateBuffer()
+			//strcpy((char*)m_StoredValueBuffer, (const char*)other.m_StoredValueBuffer);
 		}
 
 		m_MonoClassField = other.m_MonoClassField;
@@ -55,6 +70,14 @@ namespace Frost
 		other.m_MonoProperty = nullptr;
 		if (Type != FieldType::String)
 			other.m_StoredValueBuffer = nullptr;
+		else
+		{
+			m_StoredString = (*(std::string*)other.m_StoredValueBuffer);
+			m_StoredValueBuffer = (uint8_t*)&m_StoredString;
+
+			other.m_StoredString = "";
+			other.m_StoredValueBuffer = nullptr;
+		}
 	}
 
 	PublicField::~PublicField()
@@ -65,7 +88,7 @@ namespace Frost
 		}
 		else
 		{
-			s_PublicFieldStringValue.erase(Name);
+			//FROST_CORE_WARN("Deleted string! Value: {0}", m_StoredString);
 		}
 
 	}
@@ -127,15 +150,15 @@ namespace Frost
 			if (m_MonoProperty)
 			{
 				MonoString* str = (MonoString*)mono_property_get_value(m_MonoProperty, entityInstance.GetInstance(), nullptr, nullptr);
-				s_PublicFieldStringValue[Name] = mono_string_to_utf8(str);
-				m_StoredValueBuffer = (uint8_t*)&s_PublicFieldStringValue[Name];
+				m_StoredString = mono_string_to_utf8(str);
+				m_StoredValueBuffer = (uint8_t*)&m_StoredString;
 			}
 			else
 			{
 				MonoString* str;
 				mono_field_get_value(entityInstance.GetInstance(), m_MonoClassField, &str);
-				s_PublicFieldStringValue[Name] = mono_string_to_utf8(str);
-				m_StoredValueBuffer = (uint8_t*)&s_PublicFieldStringValue[Name];
+				m_StoredString = mono_string_to_utf8(str);
+				m_StoredValueBuffer = (uint8_t*)&m_StoredString;
 			}
 		}
 		else
@@ -154,12 +177,16 @@ namespace Frost
 
 	}
 
-#if 0
 	void PublicField::SetStoredValueRaw(void* src)
 	{
+		if (IsReadOnly)
+			return;
 
+		uint32_t size = GetFieldSize(Type);
+		memcpy(m_StoredValueBuffer, src, size);
 	}
 
+#if 0
 	void PublicField::SetRuntimeValueRaw(EntityInstance& entityInstance, void* src)
 	{
 

@@ -150,7 +150,7 @@ namespace Frost
 		return result;
 	}
 
-	CookingResult CookingFactory::CookConvexMesh(const Ref<Mesh>& mesh, Vector<MeshColliderData>& outdata)
+	CookingResult CookingFactory::CookConvexMesh(const Ref<MeshAsset>& mesh, Vector<MeshColliderData>& outdata)
 	{
 		const auto& vertices = mesh->GetVertices();
 		const auto& indices = mesh->GetIndices();
@@ -188,7 +188,7 @@ namespace Frost
 		return CookingResult::Success;
 	}
 
-	CookingResult CookingFactory::CookTriangleMesh(const Ref<Mesh>& mesh, Vector<MeshColliderData>& outdata)
+	CookingResult CookingFactory::CookTriangleMesh(const Ref<MeshAsset>& mesh, Vector<MeshColliderData>& outdata)
 	{
 		const auto& vertices = mesh->GetVertices();
 		const auto& indices = mesh->GetIndices();
@@ -306,7 +306,7 @@ namespace Frost
 			trimesh->release();
 		}
 
-		Ref<Mesh> mesh = Ref<Mesh>::Create(vertices, indices, colliderData.Transform);
+		Ref<MeshAsset> mesh = Ref<MeshAsset>::Create(vertices, indices, colliderData.Transform);
 		component.ProcessedMeshes.push_back(mesh);
 	}
 

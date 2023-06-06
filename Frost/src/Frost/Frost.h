@@ -8,6 +8,8 @@
 
 #include "Frost/Project/Project.h"
 
+#include "Frost/Asset/AssetManager.h"
+
 #include "Frost/Core/Timestep.h"
 #include "Frost/Utils/PlatformUtils.h"
 #include "Frost/Utils/Timer.h"
@@ -19,7 +21,7 @@
 #include "Frost/EntitySystem/Scene.h"
 #include "Frost/EntitySystem/Entity.h"
 #include "Frost/EntitySystem/Components.h"
-#include "Frost/EntitySystem/SceneSerializer.h"
+#include "Frost/Asset/Serializers/SceneSerializer.h"
 /* ------------------------------------------------------ */
 
 

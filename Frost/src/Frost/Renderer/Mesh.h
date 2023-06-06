@@ -1,6 +1,8 @@
 #pragma once
 
-#include "Frost/Renderer/Texture.h"
+#include "Frost/Asset/Asset.h"
+
+#include "Frost/Renderer/MaterialAsset.h"
 #include "Frost/Renderer/Material.h"
 #include "Frost/Renderer/Animation.h"
 #include "Frost/Renderer/Buffers/IndexBuffer.h"
@@ -107,26 +109,27 @@ namespace Frost
 	// Here we should keep the meshes that are loaded once with the engine
 	struct DefaultMeshStorage
 	{
-		Ref<Mesh> Cube;
-		Ref<Mesh> Sphere;
-		Ref<Mesh> Capsule;
+		Ref<MeshAsset> Cube;
+		Ref<MeshAsset> Sphere;
+		Ref<MeshAsset> Capsule;
 	};
 
-	class Mesh
+	class MeshAsset : public Asset
 	{
 	private:
 		// The constructor is private for several reasons, firstly beacuse here we pass some custom settings for the mesh to be built,
 		// and that should be done only internally. The user shouldn't access any of that, instead there is the `Load` function which just requires the filepath
 		struct MeshBuildSettings;
-		Mesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings = {});
-		Mesh(const Vector<Vertex>& vertices, const Vector<Index>& indices, const glm::mat4& transform);
+		MeshAsset(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings = {});
+		MeshAsset(const Vector<Vertex>& vertices, const Vector<Index>& indices, const glm::mat4& transform);
 	public:
-		virtual ~Mesh();
+		MeshAsset() = default; // Constructor which basically does nothing
+		virtual ~MeshAsset();
 
 		Ref<VertexBuffer> GetVertexBuffer() const { return m_VertexBuffer; }
-		Ref<BufferDevice> GetVertexBufferInstanced(uint32_t index) const { return m_VertexBufferInstanced[index]; }
+		///A Ref<BufferDevice> GetVertexBufferInstanced(uint32_t index) const { return m_VertexBufferInstanced[index]; }
 		Ref<IndexBuffer> GetIndexBuffer() const { return m_IndexBuffer; }
-		Ref<UniformBuffer> GetBoneUniformBuffer(uint32_t currentFrameIndex) const { return m_BoneTransformsUniformBuffer[currentFrameIndex]; }
+		///A Ref<UniformBuffer> GetBoneUniformBuffer(uint32_t currentFrameIndex) const { return m_BoneTransformsUniformBuffer[currentFrameIndex]; }
 		
 		Vector<Vertex>& GetVertices() { return m_Vertices; }
 		const Vector<Vertex>& GetVertices() const { return m_Vertices; }
@@ -137,15 +140,21 @@ namespace Frost
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
 		const Vector<Ref<Animation>>& GetAnimations() const { return m_Animations; }
 
-		Buffer& GetVertexBufferInstanced_CPU(uint32_t index) { return m_VertexBufferInstanced_CPU[index]; }
-		void UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex);
+		const Vector<std::string>& GetMaterialNames() const { return m_MaterialNames; }
+
+
+		static AssetType GetStaticType() { return AssetType::MeshAsset; }
+		virtual AssetType GetAssetType() const override { return AssetType::MeshAsset; }
+
+		///A Buffer& GetVertexBufferInstanced_CPU(uint32_t index) { return m_VertexBufferInstanced_CPU[index]; }
+		///A void UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex);
 		//void Update(float deltaTime);
-		void UpdateBoneTransformMatrices(const ozz::vector<ozz::math::Float4x4>& modelSpaceMatrices);
+		///A void UpdateBoneTransformMatrices(const ozz::vector<ozz::math::Float4x4>& modelSpaceMatrices);
 
-		uint32_t GetMaterialCount() { return (uint32_t)m_MaterialData.size(); }
-		DataStorage& GetMaterialData(uint32_t materialIndex) { return m_MaterialData[materialIndex]; }
+		///A uint32_t GetMaterialCount() { return (uint32_t)m_MaterialData.size(); }
+		///A DataStorage& GetMaterialData(uint32_t materialIndex) { return m_MaterialData[materialIndex]; }
 
-		Ref<Texture2D> GetTexture(uint32_t textureId) { return m_Textures[textureId]; }
+		///A Ref<Texture2D> GetTexture(uint32_t textureId) { return m_Textures[textureId]; }
 
 		MaterialInstance& GetMaterial() { return m_Material; } // TODO: Remove this
 		const MaterialInstance& GetMaterial() const { return m_Material; } // TODO: Remove this
@@ -157,21 +166,21 @@ namespace Frost
 		bool IsAnimated() const { return m_IsAnimated; }
 		const std::string& GetFilepath() const { return m_Filepath; }
 
-		void SetNewTexture(uint32_t textureId, Ref<Texture2D> texture);
+		///A void SetNewTexture(uint32_t textureId, Ref<Texture2D> texture);
 
 		static const DefaultMeshStorage& GetDefaultMeshes();
-		static Ref<Mesh> Load(const std::string& filepath, MaterialInstance material = {});
+		static Ref<MeshAsset> Load(const std::string& filepath, MaterialInstance material = {});
 	private:
 		void TraverseNodes(aiNode* node, const glm::mat4& parentTransform = glm::mat4(1.0f), uint32_t level = 0);
 
-		static Ref<Mesh> LoadCustomMesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings = {});
+		static Ref<MeshAsset> LoadCustomMesh(const std::string& filepath, MaterialInstance material, MeshBuildSettings meshBuildSettings = {});
 
 		static void InitDefaultMeshes();
 		static void DestroyDefaultMeshes();
 	private:
 		std::string m_Filepath;
-		bool m_IsLoaded;
-		bool m_IsAnimated;
+		bool m_IsLoaded = false;
+		bool m_IsAnimated = false;
 		
 		// Assimp import helpers
 		Scope<Assimp::Importer> m_Importer;
@@ -188,8 +197,8 @@ namespace Frost
 		Vector<BoneInfo> m_BoneInfo;
 		Ref<MeshSkeleton> m_Skeleton;
 		Vector<Ref<Animation>> m_Animations;
-		Vector<Ref<UniformBuffer>> m_BoneTransformsUniformBuffer;
-		Vector<glm::mat4> m_BoneTransforms;
+		//Vector<Ref<UniformBuffer>> m_BoneTransformsUniformBuffer;
+		//Vector<glm::mat4> m_BoneTransforms;
 		
 
 		// Vertex and Index GPU buffers 
@@ -197,21 +206,29 @@ namespace Frost
 		Ref<IndexBuffer> m_IndexBuffer;
 
 		// For GPU Driven Renderer
-		Vector<Buffer> m_VertexBufferInstanced_CPU;       
-		Vector<Ref<BufferDevice>> m_VertexBufferInstanced;
+		//Vector<Buffer> m_VertexBufferInstanced_CPU;
+		//Vector<Ref<BufferDevice>> m_VertexBufferInstanced;
 
-		// Textures, stored in a ID fashioned way, so it is easier to be supported by the bindless renderer design
-		HashMap<uint32_t, Ref<Texture2D>> m_Textures;
-		HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots; // Bindless
+
+		// Currently, those materials/textures are read only,
+		// however in the `Mesh` class all the values and textures are copied into a new buffer
+		// and from there on the user can change the values.
+		// But those variables remain the same for the entirety of the application's runtime
+		// NOTE: Textures, stored in a ID fashioned way, so it is easier to be supported by the bindless renderer design
+		//HashMap<uint32_t, Ref<Texture2D>> m_Textures;
+		Vector<Ref<Texture2D>> m_TexturesList;
+		//HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots; // Bindless
 		Vector<DataStorage> m_MaterialData; // Bindless data
+		Vector<std::string> m_MaterialNames;
 
+		// TODO: We won't need this anymore because we will use Material Assets
 		struct TextureMaterialFilepaths;
 		Vector<TextureMaterialFilepaths> m_TexturesFilepaths;
 
 
 		// Acceleration structure + custom index buffer (Ray Tracing)
 		Ref<BottomLevelAccelerationStructure> m_AccelerationStructure;
-		Ref<IndexBuffer> m_SubmeshIndexBuffers; // Same index buffer, but all grouped into a single mesh
+		Ref<IndexBuffer> m_SubmeshIndexBuffers; // Same index buffer, but all grouped into a single mesh (for RT)
 
 		struct TextureMaterialFilepaths
 		{
@@ -235,6 +252,56 @@ namespace Frost
 		friend class CookingFactory;
 		friend class Renderer;
 		friend struct MaterialMeshPointer;
-		friend class Ref<Mesh>;
+		friend class Ref<MeshAsset>;
+		friend class Mesh;
+	};
+
+	class Mesh
+	{
+	public:
+		explicit Mesh(Ref<MeshAsset> meshAsset);
+		virtual ~Mesh();
+
+		Ref<BufferDevice> GetVertexBufferInstanced(uint32_t index) const { return m_VertexBufferInstanced[index]; }
+		Buffer& GetVertexBufferInstanced_CPU(uint32_t index) { return m_VertexBufferInstanced_CPU[index]; }
+
+		void UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex);
+		void UpdateBoneTransformMatrices(const ozz::vector<ozz::math::Float4x4>& modelSpaceMatrices);
+
+		Ref<UniformBuffer> GetBoneUniformBuffer(uint32_t currentFrameIndex) const { return m_BoneTransformsUniformBuffer[currentFrameIndex]; }
+
+		bool IsLoaded() const { return m_MeshAsset->IsLoaded(); }
+		bool IsAnimated() const { return m_MeshAsset->IsAnimated(); }
+		//const std::string& GetFilepath() const { return m_Filepath; }
+
+		const Ref<MeshAsset>& GetMeshAsset() const { return m_MeshAsset; }
+
+		uint32_t GetMaterialCount() { return (uint32_t)m_MaterialAssets.size(); }
+		Ref<MaterialAsset> GetMaterialAsset(uint32_t materialIndex) { return m_MaterialAssets[materialIndex]; }
+
+		void SetNewTexture(uint32_t materialIndex, uint32_t textureId, Ref<Texture2D> texture);
+		Ref<Texture2D> GetTexture(uint32_t materialIndex, uint32_t textureId) { return m_MaterialAssets[materialIndex]->GetTextureById(textureId); }
+
+		void SetMaterialByAsset(uint32_t index, Ref<MaterialAsset> materialAsset);
+
+	private:
+		Ref<MeshAsset> m_MeshAsset;
+		
+		// Textures, stored in a ID fashioned way, so it is easier to be supported by the bindless renderer design
+		//HashMap<uint32_t, Ref<Texture2D>> m_Textures;
+		//HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots; // Bindless
+		//Vector<Ref<DataStorage>> m_MaterialData; // Bindless data
+		Vector<Ref<MaterialAsset>> m_MaterialAssets;
+
+		// For animations
+		Vector<Ref<UniformBuffer>> m_BoneTransformsUniformBuffer;
+		Vector<glm::mat4> m_BoneTransforms;
+
+		// For GPU Driven Renderer
+		Vector<Buffer> m_VertexBufferInstanced_CPU;
+		Vector<Ref<BufferDevice>> m_VertexBufferInstanced;
+
+
+		friend struct MaterialMeshPointer;
 	};
 }

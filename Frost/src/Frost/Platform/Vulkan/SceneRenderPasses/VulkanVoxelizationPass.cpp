@@ -434,7 +434,9 @@ namespace Frost
 		{
 			// Get the mesh
 			auto mesh = renderQueue.m_Data[i].Mesh;
-			const Vector<Submesh>& submeshes = mesh->GetSubMeshes();
+			const Vector<Submesh>& submeshes = mesh->GetMeshAsset()->GetSubMeshes();
+
+			//if (mesh->IsAnimated()) continue;
 
 			// Count how many meshes were submitted (for calculating offsets)
 			uint32_t submittedSubmeshes = 0;
@@ -537,7 +539,7 @@ namespace Frost
 			auto mesh = renderQueue.m_Data[meshIndex].Mesh;
 
 			// Bind the index buffer
-			mesh->GetIndexBuffer()->Bind();
+			mesh->GetMeshAsset()->GetIndexBuffer()->Bind();
 
 			// Bind the vertex buffer (only the instanced one, since for the "per vertex" one, we are using BDAs
 			auto vulkanVertexBufferInstanced = mesh->GetVertexBufferInstanced(currentFrameIndex).As<VulkanBufferDevice>();
@@ -549,7 +551,7 @@ namespace Frost
 			// Set the transform matrix and model matrix of the submesh into a constant buffer
 			m_VoxelizationPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 			m_VoxelizationPushConstant.MaterialIndex = s_Voxelization_MeshIndirectData[i].MaterialOffset;
-			m_VoxelizationPushConstant.VertexBufferBDA = mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
+			m_VoxelizationPushConstant.VertexBufferBDA = mesh->GetMeshAsset()->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_VoxelizationPushConstant);
 
 			uint32_t submeshCount = meshData.SubmeshCount;

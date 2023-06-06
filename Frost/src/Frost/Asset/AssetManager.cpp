@@ -19,9 +19,42 @@ namespace Frost
 		//ReloadAssets();
 	}
 
+	static void DeleteAllAssetsByType(HashMap<AssetHandle, Ref<Asset>>& loadedAssets, AssetType type)
+	{
+		Vector<std::function<void()>> lateFunction;
+
+		for (auto& [handle, asset] : loadedAssets)
+		{
+			if (asset->GetAssetType() == type)
+			{
+				AssetHandle assetHandle = handle;
+				lateFunction.push_back([&, assetHandle]()
+				{
+					loadedAssets.erase(assetHandle);
+				});
+			}
+		}
+
+		for (auto& func : lateFunction)
+			func();
+
+	}
+
 	void AssetManager::Shutdown()
 	{
 		WriteRegistryToFile();
+
+		// NOTE:
+		// In order to not have any errors while trying to clear all assets in one go, we have to delete them in a fashioned order (from big to small):
+		// Firstly comes the biggest asset of all: Scene (why? because they own quite everything -> MeshAssets, etc... so thats why)
+		// After that: Mesh Assets (why? they might own Materials and Textures, so they go second)
+		// After that: Materials (why? because materials might contain some Textures)
+		// After that: Textures and EnvMaps (here the order doesn't matter that much)
+		DeleteAllAssetsByType(s_LoadedAssets, AssetType::Scene);
+		DeleteAllAssetsByType(s_LoadedAssets, AssetType::MeshAsset);
+		DeleteAllAssetsByType(s_LoadedAssets, AssetType::Material);
+		//DeleteAllAssetsByType(s_LoadedAssets, AssetType::Texture); // Doesn't matter the order so much
+		//DeleteAllAssetsByType(s_LoadedAssets, AssetType::EnvMap);  // Doesn't matter the order so much
 
 		s_LoadedAssets.clear();
 		s_AssetRegistry.Clear();
@@ -35,7 +68,7 @@ namespace Frost
 		if (!FileSystem::Exists(assetRegistryPath))
 			return;
 
-		std::ifstream stream(assetRegistryPath);
+		std::ifstream stream(Project::GetAssetRegistryFilePath());
 
 		if (!stream.is_open())
 		{
@@ -80,22 +113,6 @@ namespace Frost
 		}
 
 		FROST_CORE_INFO("[AssetManager] Loaded {0} asset entries", s_AssetRegistry.Count());
-
-		/*
-		[
-			{
-				"Handle": 12312413432523,
-				"FilePath": "Mesh/Cube.fbx",
-				"Type": "MeshAsset",
-			},
-
-			{
-				"Handle": 46238946723452,
-				"FilePath": "Materials/BlueMat.fmat",
-				"Type": "Material",
-			},
-		]
-		*/
 	}
 
 	void AssetManager::WriteRegistryToFile()
@@ -188,9 +205,18 @@ namespace Frost
 	std::filesystem::path AssetManager::GetRelativePath(const std::filesystem::path& filepath)
 	{
 		std::string temp = filepath.string();
-		if (temp.find(Project::GetActive()->GetAssetDirectory().string()) != std::string::npos)
-			return std::filesystem::relative(filepath, Project::GetActive()->GetAssetDirectory());
+		if (temp.find(Project::GetAssetDirectory().string()) != std::string::npos)
+		{
+			return std::filesystem::relative(filepath, Project::GetAssetDirectory());
+		}
 		return filepath;
+	}
+
+	std::string AssetManager::GetRelativePathString(const std::filesystem::path& filepath)
+	{
+		std::string temp = GetRelativePath(filepath).string();
+		std::replace(temp.begin(), temp.end(), '\\', '/');
+		return temp;
 	}
 
 }

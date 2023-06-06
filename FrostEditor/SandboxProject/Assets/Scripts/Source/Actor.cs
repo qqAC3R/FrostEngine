@@ -45,7 +45,7 @@ namespace Frost
             // https://catlikecoding.com/unity/tutorials/movement/orbit-camera/
 
 
-#if false
+#if true
             if (Translation == m_LastPosition)
             {
                 Children[0].GetComponent<AnimationComponent>().SetActiveAnimation(m_Animations[2]);
@@ -67,28 +67,28 @@ namespace Frost
             {
                 GetComponent<RigidBodyComponent>().AddForce(new Vector3(0, 0, -m_MovementForce * deltaTime), ForceMode.Force);
 
-                //m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, new Vector3(90.0f, 180.0f, 0), 0.1f);
-                m_MeshChild.Rotation = new Vector3(90.0f, 180.0f, 0);
+                m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, new Vector3(90.0f, 180.0f, 0), 0.1f);
+                //m_MeshChild.Rotation = new Vector3(90.0f, 180.0f, 0);
             }
             if(Input.IsKeyPressed(KeyCode.D))
             {
                 GetComponent<RigidBodyComponent>().AddForce(new Vector3(0, 0, m_MovementForce * deltaTime), ForceMode.Force);
-                //m_MeshChild.Rotation = Vector3.Lerp(Children[0].Rotation, new Vector3(90.0f, 0.0f, 0), 0.1f);
-                m_MeshChild.Rotation = new Vector3(90.0f, 0.0f, 0);
+                m_MeshChild.Rotation = Vector3.Lerp(Children[0].Rotation, new Vector3(90.0f, 0.0f, 0), 0.1f);
+                //m_MeshChild.Rotation = new Vector3(90.0f, 0.0f, 0);
             }
             if (Input.IsKeyPressed(KeyCode.S))
             {
                 GetComponent<RigidBodyComponent>().AddForce(new Vector3(-m_MovementForce * deltaTime, 0, 0), ForceMode.Force);
-                //m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, new Vector3(90.0f, 270.0f, 0), 0.1f);
-                m_MeshChild.Rotation = new Vector3(90.0f, 270.0f, 0);
+                m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, new Vector3(90.0f, 270.0f, 0), 0.1f);
+                //m_MeshChild.Rotation = new Vector3(90.0f, 270.0f, 0);
             }
             if (Input.IsKeyPressed(KeyCode.W))
             {
                 GetComponent<RigidBodyComponent>().AddForce(new Vector3(m_MovementForce * deltaTime, 0, 0), ForceMode.Force);
-                //m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, new Vector3(90.0f, 90.0f, 0), 0.1f);
-                Vector3 t = m_MeshChild.Rotation;
+                m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, new Vector3(90.0f, 90.0f, 0), 0.1f);
+                //Vector3 t = m_MeshChild.Rotation;
                 //m_MeshChild.Rotation = new Vector3(90.0f, 90.0f, 0);
-                m_MeshChild.Rotation = new Vector3(90.0f, t.X, 0);
+                //m_MeshChild.Rotation = new Vector3(90.0f, t.X, 0);
             }
 
             if (Input.IsKeyPressed(KeyCode.Space))

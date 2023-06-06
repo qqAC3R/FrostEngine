@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Frost/Core/Buffer.h"
+#include "Frost/Asset/Asset.h"
 #include "Frost/Renderer/Image.h"
 
 namespace Frost
@@ -13,7 +14,7 @@ namespace Frost
 		bool UseMips = false;
 	};
 
-	class Texture
+	class Texture : public Asset
 	{
 	public:
 		virtual ~Texture() {}
@@ -40,6 +41,9 @@ namespace Frost
 		virtual Buffer GetWritableBuffer() = 0; // CPU Buffer
 		virtual void SetToWriteableBuffer(void* data) = 0; // CPU Buffer
 		virtual void SubmitDataToGPU() = 0;
+
+		static AssetType GetStaticType() { return AssetType::Texture; }
+		virtual AssetType GetAssetType() const override { return AssetType::Texture; }
 
 		static Ref<Texture2D> Create(const std::string& filepath, TextureSpecification textureSpec = {});
 		static Ref<Texture2D> Create(uint32_t width, uint32_t height, TextureSpecification textureSpec = {});

@@ -241,10 +241,10 @@ namespace Frost
 		Ref<ColliderShape> ColliderHandle;
 
 		// The mesh that will be drawn in the editor to show the collision bounds
-		Ref<Mesh> DebugMesh;
+		Ref<MeshAsset> DebugMesh;
 
 		BoxColliderComponent()
-			: DebugMesh(Mesh::GetDefaultMeshes().Cube) {}
+			: DebugMesh(MeshAsset::GetDefaultMeshes().Cube) {}
 		BoxColliderComponent(const BoxColliderComponent & other) = default;
 	};
 
@@ -256,14 +256,14 @@ namespace Frost
 		//AssetHandle Material; // TODO: Physics material system?
 
 		// The mesh that will be drawn in the editor to show the collision bounds
-		Ref<Mesh> DebugMesh;
+		Ref<MeshAsset> DebugMesh;
 
 		// Collider handle is used to manipulate the internal collider of the physics engine during runtime in the script engine
 		// Currently we don't have any other method of obtaning the collider handle, apart from this one
 		Ref<ColliderShape> ColliderHandle;
 
 		SphereColliderComponent()
-			: DebugMesh(Mesh::GetDefaultMeshes().Sphere) {}
+			: DebugMesh(MeshAsset::GetDefaultMeshes().Sphere) {}
 		SphereColliderComponent(const SphereColliderComponent& other) = default;
 	};
 
@@ -276,21 +276,21 @@ namespace Frost
 		//AssetHandle Material;  // TODO: Physics material system?
 
 		// The mesh that will be drawn in the editor to show the collision bounds
-		Ref<Mesh> DebugMesh;
+		Ref<MeshAsset> DebugMesh;
 
 		// Collider handle is used to manipulate the internal collider of the physics engine during runtime in the script engine
 		// Currently we don't have any other method of obtaning the collider handle, apart from this one
 		Ref<ColliderShape> ColliderHandle;
 
 		CapsuleColliderComponent()
-			: DebugMesh(Mesh::GetDefaultMeshes().Capsule) {}
+			: DebugMesh(MeshAsset::GetDefaultMeshes().Capsule) {}
 		CapsuleColliderComponent(const CapsuleColliderComponent& other) = default;
 	};
 
 	struct MeshColliderComponent
 	{
-		Vector<Ref<Mesh>> ProcessedMeshes; // Debug Mesh
-		Ref<Mesh> CollisionMesh = nullptr; // Mesh
+		Vector<Ref<MeshAsset>> ProcessedMeshes; // Debug Mesh
+		Ref<MeshAsset> CollisionMesh = nullptr; // Mesh
 		bool IsConvex = false;
 		bool IsTrigger = false;
 		bool OverrideMesh = false; // TODO: What to do with this?

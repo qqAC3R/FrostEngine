@@ -410,60 +410,51 @@ namespace ScriptInternalCalls
 
 	void RendererScript::Material::GetAbledoColor(MaterialMeshPointer* material, glm::vec3* outAlbedo)
 	{
-		//Ref<DataStorage>& instance = *material;
-		//*outAlbedo = instance->Get<glm::vec3>("AlbedoColor");
-		*outAlbedo = material->InternalMaterial->Get<glm::vec3>("AlbedoColor");
+		//*outAlbedo = material->InternalMaterial->Get<glm::vec3>("AlbedoColor");
+		*outAlbedo = glm::vec3(material->InternalMaterial->GetAlbedoColor());
 	}
 
 	void RendererScript::Material::SetAbledoColor(MaterialMeshPointer* material, glm::vec3* inAlbedo)
 	{
-		//Ref<DataStorage>& instance = *material;
-		//instance->Set<glm::vec3>("AlbedoColor", *inAlbedo);
-		material->InternalMaterial->Set<glm::vec3>("AlbedoColor", *inAlbedo);
+		//material->InternalMaterial->Set<glm::vec3>("AlbedoColor", *inAlbedo);
+		material->InternalMaterial->SetAlbedoColor(glm::vec4(*inAlbedo, 1.0f));
 	}
 
 	void RendererScript::Material::GetMetalness(MaterialMeshPointer* material, float outMetalness)
 	{
-		//Ref<DataStorage>& instance = *material;
-		//outMetalness = instance->Get<float>("MetalnessFactor");
-		outMetalness = material->InternalMaterial->Get<float>("MetalnessFactor");
+		//outMetalness = material->InternalMaterial->Get<float>("MetalnessFactor");
+		outMetalness = material->InternalMaterial->GetMetalness();
 	}
 
 	void RendererScript::Material::SetMetalness(MaterialMeshPointer* material, float inMetalness)
 	{
-		//Ref<DataStorage>& instance = *material;
 		inMetalness = glm::clamp(inMetalness, 0.0f, 1.0f); // Clamp the values, so we avoid some weird artifacts/shader crashes
-		//instance->Set<float>("MetalnessFactor", inMetalness);
-		material->InternalMaterial->Set<float>("MetalnessFactor", inMetalness);
+		//material->InternalMaterial->Set<float>("MetalnessFactor", inMetalness);
+		material->InternalMaterial->SetMetalness(inMetalness);
 	}
 
 	void RendererScript::Material::GetRoughness(MaterialMeshPointer* material, float outRoughness)
 	{
-		//Ref<DataStorage>& instance = *material;
-		//outRoughness = instance->Get<float>("RoughnessFactor");
-		outRoughness = material->InternalMaterial->Get<float>("RoughnessFactor");
+		outRoughness = material->InternalMaterial->GetRoughness();
 	}
 
 	void RendererScript::Material::SetRoughness(MaterialMeshPointer* material, float inRoughness)
 	{
-		//Ref<DataStorage>& instance = *material;
 		inRoughness = glm::clamp(inRoughness, 0.0f, 1.0f); // Clamp the values, so we avoid some weird artifacts/shader crashes
-		//instance->Set<float>("RoughnessFactor", inRoughness);
-		material->InternalMaterial->Set<float>("RoughnessFactor", inRoughness);
+		//material->InternalMaterial->Set<float>("RoughnessFactor", inRoughness);
+		material->InternalMaterial->SetRoughness(inRoughness);
 	}
 
 	void RendererScript::Material::GetEmission(MaterialMeshPointer* material, float outEmission)
 	{
-		//Ref<DataStorage>& instance = *material;
-		//outEmission = instance->Get<float>("EmissionFactor");
-		outEmission = material->InternalMaterial->Get<float>("EmissionFactor");
+		//outEmission = material->InternalMaterial->Get<float>("EmissionFactor");
+		outEmission = material->InternalMaterial->GetEmission();
 	}
 
 	void RendererScript::Material::SetEmission(MaterialMeshPointer* material, float inEmission)
 	{
-		//Ref<DataStorage>& instance = *material;
-		//instance->Set<float>("EmissionFactor", inEmission);
-		material->InternalMaterial->Set<float>("EmissionFactor", inEmission);
+		//material->InternalMaterial->Set<float>("EmissionFactor", inEmission);
+		material->InternalMaterial->SetEmission(inEmission);
 	}
 
 	void* RendererScript::Material::GetTextureByString(MaterialMeshPointer* material, MonoString* textureType)
@@ -471,13 +462,17 @@ namespace ScriptInternalCalls
 		//Ref<DataStorage>& instance = *material;
 		std::string textureTypeName = mono_string_to_utf8(textureType);
 
-		uint32_t textureId = 0;
-		if      (textureTypeName == "Albedo")    { textureId = material->InternalMaterial->Get<uint32_t>("AlbedoTexture"); }
-		else if (textureTypeName == "Roughness") { textureId = material->InternalMaterial->Get<uint32_t>("RoughnessTexture"); }
-		else if (textureTypeName == "Metalness") { textureId = material->InternalMaterial->Get<uint32_t>("MetalnessTexture"); }
-		else if (textureTypeName == "Normal")    { textureId = material->InternalMaterial->Get<uint32_t>("NormalTexture"); }
+		//uint32_t textureId = 0;
+		Ref<Texture2D> texture = nullptr;
+		if      (textureTypeName == "Albedo")    { texture = material->InternalMaterial->GetAlbedoMap(); }
+		else if (textureTypeName == "Roughness") { texture = material->InternalMaterial->GetRoughnessMap(); }
+		else if (textureTypeName == "Metalness") { texture = material->InternalMaterial->GetMetalnessMap(); }
+		else if (textureTypeName == "Normal")    { texture = material->InternalMaterial->GetNormalMap(); }
 
-		return new Texture2DPointer(m_TextureSlots[textureId].AsRef<Texture2D>());
+		return new Texture2DPointer(texture);
+
+		//return new Texture2DPointer(m_TextureSlots[textureId].AsRef<Texture2D>());
+
 		//return new Ref<Texture2D>(m_TextureSlots[textureId].Raw());
 		//return m_TextureSlots[textureId].AsRef<Texture2D>();
 	}
@@ -487,16 +482,18 @@ namespace ScriptInternalCalls
 		std::string textureTypeName = mono_string_to_utf8(textureType);
 
 		uint32_t textureId = 0;
-		if (textureTypeName == "Albedo") { textureId = material->InternalMaterial->Get<uint32_t>("AlbedoTexture"); }
-		else if (textureTypeName == "Roughness") { textureId = material->InternalMaterial->Get<uint32_t>("RoughnessTexture"); }
-		else if (textureTypeName == "Metalness") { textureId = material->InternalMaterial->Get<uint32_t>("MetalnessTexture"); }
-		else if (textureTypeName == "Normal") { textureId = material->InternalMaterial->Get<uint32_t>("NormalTexture"); }
+		if (textureTypeName == "Albedo")         { material->InternalMaterial->SetAlbedoMap(inTexturePtr->Texture); }
+		else if (textureTypeName == "Roughness") { material->InternalMaterial->SetRoughnessMap(inTexturePtr->Texture); }
+		else if (textureTypeName == "Metalness") { material->InternalMaterial->SetMetalnessMap(inTexturePtr->Texture); }
+		else if (textureTypeName == "Normal")    { material->InternalMaterial->SetNormalMap(inTexturePtr->Texture); }
 
+#if 0
 		if (inTexturePtr->Texture)
 		{
 			BindlessAllocator::AddTextureCustomSlot(inTexturePtr->Texture, textureId);
 			material->GetMeshTextureTable()[textureId] = inTexturePtr->Texture;
 		}
+#endif
 	}
 
 	void* Components::Mesh::GetMeshPtr(uint64_t entityID)
@@ -569,7 +566,7 @@ namespace ScriptInternalCalls
 			{
 				//return new Ref<Frost::DataStorage>(&mesh->GetMaterialData(index));
 				//return &mesh->GetMaterialData(index);
-				return new MaterialMeshPointer(mesh, &mesh->GetMaterialData(index));
+				return new MaterialMeshPointer(mesh, mesh->GetMaterialAsset(index));
 			}
 		}
 
@@ -580,7 +577,7 @@ namespace ScriptInternalCalls
 	void* RendererScript::Mesh::Constructor(MonoString* filepath)
 	{
 		std::string filepathStr = mono_string_to_utf8(filepath);
-		Ref<Frost::Mesh> mesh = Frost::Mesh::Load(filepathStr);
+		Ref<Frost::MeshAsset> mesh = Frost::MeshAsset::Load(filepathStr);
 		return new MeshPointer(mesh);
 	}
 
@@ -599,7 +596,7 @@ namespace ScriptInternalCalls
 		auto mesh = _this->Mesh;
 		if (index < mesh->GetMaterialCount())
 		{
-			return new MaterialMeshPointer(mesh, &mesh->GetMaterialData(index));
+			return new MaterialMeshPointer(mesh, mesh->GetMaterialAsset(index));
 		}
 
 		FROST_ASSERT_MSG("Material not found!");
@@ -1760,7 +1757,7 @@ namespace ScriptInternalCalls
 
 		Entity entity = entityMap.at(entityID);
 		auto& animationComponent = entity.GetComponent<AnimationComponent>();
-		const Vector<Ref<Frost::Animation>>& animations = animationComponent.MeshComponentPtr->Mesh->GetAnimations();
+		const Vector<Ref<Frost::Animation>>& animations = animationComponent.MeshComponentPtr->Mesh->GetMeshAsset()->GetAnimations();
 
 		MonoArray* animationsMonoArray = mono_array_new(mono_domain_get(), mono_get_string_class(), animations.size());
 
@@ -1784,7 +1781,7 @@ namespace ScriptInternalCalls
 
 		Entity entity = entityMap.at(entityID);
 		auto& animationComponent = entity.GetComponent<AnimationComponent>();
-		const Vector<Ref<Frost::Animation>>& animations = animationComponent.MeshComponentPtr->Mesh->GetAnimations();
+		const Vector<Ref<Frost::Animation>>& animations = animationComponent.MeshComponentPtr->Mesh->GetMeshAsset()->GetAnimations();
 
 		std::string activeAnimationName = mono_string_to_utf8(animationName);
 

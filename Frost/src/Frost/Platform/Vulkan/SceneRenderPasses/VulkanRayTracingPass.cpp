@@ -125,7 +125,7 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 
-		Vector<std::pair<Ref<Mesh>, glm::mat4>> meshes;
+		Vector<std::pair<Ref<MeshAsset>, glm::mat4>> meshes;
 		Vector<uint64_t> vertexBufferPointers;
 		Vector<uint64_t> indexBufferPointers;
 		Vector<InstanceInfo> transformBufferPointers;
@@ -148,10 +148,10 @@ namespace Frost
 			if (!isCulled)
 			{
 				meshes.push_back(std::make_pair(mesh.Mesh, mesh.Transform));
-				vertexBufferPointers.push_back(mesh.Mesh->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress());
-				indexBufferPointers.push_back(mesh.Mesh->GetSubmeshIndexBuffer().As<VulkanIndexBuffer>()->GetVulkanBufferAddress());
+				vertexBufferPointers.push_back(mesh.Mesh->GetMeshAsset()->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress());
+				indexBufferPointers.push_back(mesh.Mesh->GetMeshAsset()->GetSubmeshIndexBuffer().As<VulkanIndexBuffer>()->GetVulkanBufferAddress());
 
-				Ref<VulkanBottomLevelAccelerationStructure> blas = mesh.Mesh->GetAccelerationStructure().As<VulkanBottomLevelAccelerationStructure>();
+				Ref<VulkanBottomLevelAccelerationStructure> blas = mesh.Mesh->GetMeshAsset()->GetAccelerationStructure().As<VulkanBottomLevelAccelerationStructure>();
 
 				// Write into the scene buffers
 				uint32_t submeshOffsetBufferSize = blas->m_GeometryOffset.size() * sizeof(uint32_t);
@@ -171,7 +171,7 @@ namespace Frost
 				else
 				{
 					auto oldMesh = renderQueue.m_Data[i - 1];
-					Ref<VulkanBottomLevelAccelerationStructure> oldBlas = oldMesh.Mesh->GetAccelerationStructure().As<VulkanBottomLevelAccelerationStructure>();
+					Ref<VulkanBottomLevelAccelerationStructure> oldBlas = oldMesh.Mesh->GetMeshAsset()->GetAccelerationStructure().As<VulkanBottomLevelAccelerationStructure>();
 
 					// Getting the last submesh count
 					uint32_t lastSubmeshCount = m_Data->SceneGeometrySubmeshCount[currentFrameIndex].HostBuffer.Read<uint32_t>(subMeshCount_offset - sizeof(uint32_t));
@@ -189,10 +189,10 @@ namespace Frost
 				InstanceInfo instanceInfo{};
 				instanceInfo.Transform = mesh.Transform;
 				instanceInfo.InverseTransform = glm::inverse(mesh.Transform);
-				instanceInfo.Albedo = mesh.Mesh->GetMaterial().ambient;
-				instanceInfo.Emittance = mesh.Mesh->GetMaterial().emission;
-				instanceInfo.Roughness = mesh.Mesh->GetMaterial().roughness;
-				instanceInfo.RefractionIndex = mesh.Mesh->GetMaterial().ior;
+				instanceInfo.Albedo = mesh.Mesh->GetMeshAsset()->GetMaterial().ambient;
+				instanceInfo.Emittance = mesh.Mesh->GetMeshAsset()->GetMaterial().emission;
+				instanceInfo.Roughness = mesh.Mesh->GetMeshAsset()->GetMaterial().roughness;
+				instanceInfo.RefractionIndex = mesh.Mesh->GetMeshAsset()->GetMaterial().ior;
 
 				transformBufferPointers.push_back(instanceInfo);
 			}

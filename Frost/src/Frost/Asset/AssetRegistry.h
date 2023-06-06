@@ -20,6 +20,9 @@ namespace Frost
 		size_t Remove(const std::filesystem::path& path);
 		void Clear();
 
+		// true - found // false - not found
+		bool Find(const std::filesystem::path& path) const { return m_AssetRegistry.find(path) != m_AssetRegistry.end(); }
+
 		// Iterators
 		HashMap<std::filesystem::path, AssetMetadata>::iterator begin() { return m_AssetRegistry.begin(); }
 		HashMap<std::filesystem::path, AssetMetadata>::iterator end() { return m_AssetRegistry.end(); }

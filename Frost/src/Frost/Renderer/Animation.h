@@ -31,7 +31,7 @@ namespace math
 
 namespace Frost
 {
-	class Mesh;
+	class MeshAsset;
 
 	class MeshSkeleton
 	{
@@ -50,7 +50,7 @@ namespace Frost
 	class Animation
 	{
 	public:
-		Animation(const aiAnimation* animation, Mesh* mesh);
+		Animation(const aiAnimation* animation, MeshAsset* mesh);
 		virtual ~Animation();
 
 		const std::string& GetName() const { return m_Name; }
@@ -108,7 +108,7 @@ namespace Frost
 		bool m_AnimationPlaying = true;
 
 		// TODO: TEMP
-		friend class Mesh;
+		friend class MeshAsset;
 	};
 
 }

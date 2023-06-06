@@ -104,6 +104,8 @@ namespace Frost
 
 		static void InstantiateEntityClass(Entity entity);
 
+		static void CopyEntityScriptData(Scene* dstScene, Scene* srcScene);
+
 		static EntityInstanceMap& GetEntityInstanceMap();
 		static EntityInstanceData& GetEntityInstanceData(UUID sceneID, UUID entityID);
 

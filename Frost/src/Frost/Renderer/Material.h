@@ -99,6 +99,7 @@ namespace Frost
 			m_Buffer.Write((void*)&data, sizeof(T), bufferSpecs.Offset);
 		}
 
+		void* GetBufferData() { return m_Buffer.Data; }
 		operator void* () { return m_Buffer.Data; }
 	public:
 		struct BufferSpecification

@@ -127,7 +127,7 @@ namespace Frost
 		s_Data->m_NoiseLut = Texture2D::Create("Resources/LUT/Noise.png", textureSpec);
 
 		InitEditorIcons();
-		Mesh::InitDefaultMeshes();
+		MeshAsset::InitDefaultMeshes();
 
 		// Environment cubemaps
 		s_Data->m_Environment = SceneEnvironment::Create();
@@ -141,7 +141,7 @@ namespace Frost
 	void Renderer::ShutDown()
 	{
 		s_RendererAPI->ShutDown();
-		Mesh::DestroyDefaultMeshes();
+		MeshAsset::DestroyDefaultMeshes();
 		delete s_CommandQueue;
 		delete s_Data;
 	}

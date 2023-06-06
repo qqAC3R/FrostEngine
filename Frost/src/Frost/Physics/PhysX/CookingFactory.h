@@ -30,8 +30,8 @@ namespace Frost
 
 		static CookingResult CookMesh(MeshColliderComponent& component, bool invalidateOld = false, Vector<MeshColliderData>& outData = Vector<MeshColliderData>());
 
-		static CookingResult CookConvexMesh(const Ref<Mesh>& mesh, Vector<MeshColliderData>& outdata);
-		static CookingResult CookTriangleMesh(const Ref<Mesh>& mesh, Vector<MeshColliderData>& outdata);
+		static CookingResult CookConvexMesh(const Ref<MeshAsset>& mesh, Vector<MeshColliderData>& outdata);
+		static CookingResult CookTriangleMesh(const Ref<MeshAsset>& mesh, Vector<MeshColliderData>& outdata);
 
 	private:
 		// TODO: Add support for generating debug meshes (currently the Mesh class doesn't have a constructor for passing vertices and indices)

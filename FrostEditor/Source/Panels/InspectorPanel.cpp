@@ -1,6 +1,8 @@
 #include "frostpch.h"
 #include "InspectorPanel.h"
 
+#include "Frost/Asset/AssetManager.h"
+#include "Frost/Renderer/MaterialAsset.h"
 #include "Frost/Renderer/Renderer.h"
 
 #include "UserInterface/UIWidgets.h"
@@ -266,7 +268,7 @@ namespace Frost
 						{
 							if (!meshComponent.Mesh->IsAnimated())
 							{
-								meshColliderComponent.CollisionMesh = meshComponent.Mesh;
+								meshColliderComponent.CollisionMesh = meshComponent.Mesh->GetMeshAsset();
 								CookingResult result = CookingFactory::CookMesh(meshColliderComponent, false);
 							}
 							else
@@ -359,7 +361,8 @@ namespace Frost
 			{
 				if (component.Mesh->IsLoaded())
 				{
-					meshFilepath = component.Mesh->GetFilepath();
+					meshFilepath = AssetManager::GetRelativePathString(component.Mesh->GetMeshAsset()->GetFilepath());
+					
 				}
 			}
 
@@ -367,7 +370,15 @@ namespace Frost
 			std::string path = UserInterface::DrawFilePath("File Path", meshFilepath, "fbx");
 			if (!path.empty())
 			{
-				component.Mesh = Mesh::Load(path);
+				//component.Mesh = MeshAsset::Load(path);
+#if 0
+				Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(path);
+				if(!meshAsset)
+					meshAsset = AssetManager::CreateNewAsset<MeshAsset>(path);
+
+#endif
+				Ref<MeshAsset> meshAsset = AssetManager::GetOrLoadAsset<MeshAsset>(path);
+				component.Mesh = Ref<Mesh>::Create(meshAsset);
 
 				if (meshColliderComponent != nullptr)
 				{
@@ -393,6 +404,131 @@ namespace Frost
 					animationComponent->Controller->SetActiveAnimation(nullptr);
 				}
 			}
+
+			if (component.Mesh.Raw() != nullptr)
+			{
+
+				if (component.Mesh->IsLoaded())
+				{
+
+					uint32_t materialCount = component.Mesh->GetMaterialCount();
+
+					const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap;
+
+					const char* treeNodeName = "MeshMaterials";
+					bool open = ImGui::TreeNodeEx((void*)treeNodeName, treeNodeFlags, "Materials");
+
+					if (open)
+					{
+						ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+						constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
+						if (ImGui::BeginTable("MeshMaterialsTable", 2, flags))
+						{
+							for (uint32_t materialIndex = 0; materialIndex < materialCount; materialIndex++)
+							{
+								ImGui::PushID(materialIndex);
+
+								ImGui::TableNextColumn();
+								std::string materialIndexStr = "Material [" + std::to_string(materialIndex) + "]";
+								ImGui::Text(materialIndexStr.c_str());
+
+								ImGui::TableNextColumn();
+								std::string materialName = component.Mesh->GetMeshAsset()->GetMaterialNames()[materialIndex];
+								if (materialName.empty())
+									materialName = "Default";
+								if (component.Mesh->GetMaterialAsset(materialIndex)->Handle != 0)
+								{
+									ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 25.0f, 20.0f });
+									ImGui::SameLine();
+									ImGui::Button("X", {20.0f, 20.0f});
+								}
+								else
+								{
+									ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+								}
+
+
+								// Opening a new Material
+								if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && ImGui::IsItemHovered())
+								{
+									std::string materialPath = FileDialogs::OpenFile("");
+									if (!materialPath.empty())
+									{
+										Ref<MaterialAsset> materialAsset = AssetManager::GetOrLoadAsset<MaterialAsset>(materialPath);
+										Ref<Mesh> mesh = component.Mesh;
+
+										mesh->SetMaterialByAsset(materialIndex, materialAsset);
+									}
+								}
+
+								// Saving Material
+								if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsItemHovered())
+								{
+									ImGui::OpenPopup("SaveMaterial");
+								}
+
+								if (ImGui::BeginPopup("SaveMaterial"))
+								{
+									if (ImGui::MenuItem("Save As"))
+									{
+										std::string materialPath = FileDialogs::SaveFile("");
+
+										if (!materialPath.empty())
+										{
+											Ref<MaterialAsset> materialAsset = AssetManager::GetOrLoadAsset<MaterialAsset>(materialPath);
+											if(!materialAsset)
+												materialAsset = AssetManager::CreateNewAsset<MaterialAsset>(materialPath);
+
+											Ref<Mesh> mesh = component.Mesh;
+
+											// Draw the selected material editor
+											Ref<DataStorage> materialData = mesh->GetMaterialAsset(materialIndex)->GetMaterialInternalData();
+
+											uint32_t albedoTextureID = materialData->Get<uint32_t>("AlbedoTexture");
+											uint32_t roughnessTextureID = materialData->Get<uint32_t>("RoughnessTexture");
+											uint32_t metalnessTextureID = materialData->Get<uint32_t>("MetalnessTexture");
+											uint32_t normalTextureID = materialData->Get<uint32_t>("NormalTexture");
+
+											materialAsset->SetAlbedoMap(mesh->GetTexture(materialIndex, albedoTextureID));
+											materialAsset->SetRoughnessMap(mesh->GetTexture(materialIndex, roughnessTextureID));
+											materialAsset->SetMetalnessMap(mesh->GetTexture(materialIndex, metalnessTextureID));
+											materialAsset->SetNormalMap(mesh->GetTexture(materialIndex, normalTextureID));
+
+											uint32_t useNormalMap = materialData->Get<uint32_t>("UseNormalMap");
+											materialAsset->SetUseNormalMap(useNormalMap);
+
+											const glm::vec4& albedoColor = materialData->Get<glm::vec4>("AlbedoColor");
+											materialAsset->SetAlbedoColor(albedoColor);
+
+											float roughness = materialData->Get<float>("RoughnessFactor");
+											materialAsset->SetRoughness(roughness);
+
+											float metalness = materialData->Get<float>("MetalnessFactor");
+											materialAsset->SetMetalness(metalness);
+
+											float emission = materialData->Get<float>("EmissionFactor");
+											materialAsset->SetEmission(emission);
+
+											AssetManager::RemoveAssetFromMemory(materialAsset->Handle);
+										}
+									}
+									ImGui::EndPopup();
+								}
+
+
+								ImGui::PopID();
+							}
+
+							ImGui::EndTable();
+						}
+						ImGui::TreePop();
+
+						ImGui::PopStyleVar();
+					}
+
+				}
+
+			}
 		});
 
 		DrawComponent<AnimationComponent>("ANIMATION CONTROLLER", entity, [](auto& component)
@@ -403,7 +539,7 @@ namespace Frost
 				const Mesh* mesh = component.MeshComponentPtr->Mesh.Raw();
 				if (mesh->IsAnimated())
 				{
-					const Vector<Ref<Animation>>& animations = mesh->GetAnimations();
+					const Vector<Ref<Animation>>& animations = mesh->GetMeshAsset()->GetAnimations();
 					Ref<Animation> activeAnimation = component.Controller->GetActiveAnimation();
 
 					std::string activeAnimationName = "-";

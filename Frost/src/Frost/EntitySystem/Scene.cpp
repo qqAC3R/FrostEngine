@@ -1,6 +1,8 @@
 #include "frostpch.h"
 #include "Scene.h"
 
+#include "Frost/Asset/AssetManager.h"
+
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/EntitySystem/Entity.h"
 #include "Frost/EntitySystem/Components.h"
@@ -21,6 +23,22 @@ namespace Frost
 
 	Scene::~Scene()
 	{
+#if 0
+		m_Registry.each([&](auto entity)
+		{
+			Entity ent = { entity, this };
+			if(ent.HasComponent<MeshComponent>())
+			{
+				MeshComponent& meshComponent = ent.GetComponent<MeshComponent>();
+				if (meshComponent.IsMeshValid())
+				{
+					AssetHandle assetHandle = meshComponent.Mesh->GetMeshAsset()->Handle;
+					meshComponent.Mesh = nullptr;
+					AssetManager::RemoveAssetFromMemory(assetHandle);
+				}
+			}
+		});
+#endif
 	}
 
 	Entity Scene::CreateEntity(const std::string name)
@@ -471,7 +489,7 @@ namespace Frost
 			glm::mat4 rotationMat = glm::toMat4(glm::quat(glm::radians(rotation)));
 			transform = glm::translate(glm::mat4(1.0f), translation) * rotationMat * glm::scale(glm::mat4(1.0f), 2.0f * scale);
 
-			Renderer::SubmitWireframeMesh(Mesh::GetDefaultMeshes().Cube, transform, glm::vec4(0.3f, 0.6f, 0.9f, 1.0f), 2.0f);
+			Renderer::SubmitWireframeMesh(MeshAsset::GetDefaultMeshes().Cube, transform, glm::vec4(0.3f, 0.6f, 0.9f, 1.0f), 2.0f);
 		}
 	}
 
@@ -673,6 +691,33 @@ namespace Frost
 		CopyComponent<CapsuleColliderComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<MeshColliderComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<ScriptComponent>(target->m_Registry, m_Registry, enttMap);
+
+		//const auto& entityInstanceMap = ScriptEngine::GetEntityInstanceMap();
+		//if (entityInstanceMap.find(this->GetUUID()) != entityInstanceMap.end())
+		//	ScriptEngine::CopyEntityScriptData(target.Raw(), this);
+
+#if 0
+		target->m_Registry.each([&](auto entity)
+		{
+				Entity ent = { entity, target.Raw()};
+				if (ent.HasComponent<ScriptComponent>())
+				{
+					ScriptComponent& scriptComponent = ent.GetComponent<ScriptComponent>();
+					auto& moduleFieldMaps = scriptComponent.ModuleFieldMap;
+					for (auto& [moduleName, moduleFieldMap] : moduleFieldMaps)
+					{
+						for (auto& [fieldName, fieldMap] : moduleFieldMap)
+						{
+							if (fieldMap.Type == FieldType::String)
+							{
+								std::string storedValueStr = fieldMap.GetStoredValue<std::string>();
+								fieldMap.SetStoredValue<std::string>(storedValueStr);
+							}
+						}
+					}
+				}
+		});
+#endif
 
 		// Sort IdComponent by by entity handle (which is essentially the order in which they were created)
 		// This ensures a consistent ordering when iterating IdComponent (for example: when rendering scene hierarchy panel)

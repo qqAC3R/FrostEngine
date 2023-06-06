@@ -140,7 +140,7 @@ namespace Frost
 
 		struct RenderWireframeData
 		{
-			Ref<Mesh> Mesh = nullptr;
+			Ref<MeshAsset> Mesh = nullptr;
 			glm::mat4 Transform{};
 			glm::vec4 Color;
 			float LineWidth = 1.0f;

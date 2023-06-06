@@ -492,7 +492,7 @@ namespace Frost
 
 
 			// Get the mesh
-			const Ref<Mesh>& mesh = renderQueue.m_WireframeRenderData[i].Mesh;
+			const Ref<MeshAsset>& mesh = renderQueue.m_WireframeRenderData[i].Mesh;
 
 			if (!mesh) continue;
 

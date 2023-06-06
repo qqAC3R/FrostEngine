@@ -24,24 +24,19 @@ namespace Frost
 	// TODO: Change those naming schemes, it's so fucking horrible to look at them
 	struct MaterialMeshPointer
 	{
-		MaterialMeshPointer(Ref<Mesh> mesh, DataStorage* material)
+		MaterialMeshPointer(Ref<MeshAsset> mesh, Ref<MaterialAsset> material)
 			: Mesh(mesh), InternalMaterial(material) {}
 
 		~MaterialMeshPointer() {}
-		
-		HashMap<uint32_t, Ref<Texture2D>>& GetMeshTextureTable()
-		{
-			return Mesh->m_Textures;
-		}
 
 		Ref<Mesh> Mesh;
-		DataStorage* InternalMaterial;
+		Ref<MaterialAsset> InternalMaterial;
 	};
 
 	// TODO: Change those naming schemes, it's so fucking horrible to look at them
 	struct MeshPointer
 	{
-		MeshPointer(Ref<Mesh> mesh)
+		MeshPointer(Ref<MeshAsset> mesh)
 			: Mesh(mesh) {}
 
 		~MeshPointer() {}

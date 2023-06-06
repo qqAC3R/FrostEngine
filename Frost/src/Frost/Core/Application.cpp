@@ -45,11 +45,11 @@ namespace Frost
 
 	Application::~Application()
 	{
-		Project::SetActive(nullptr);
 		for (Layer* layer : m_LayerStack)
 		{
 			layer->OnDetach();
 		}
+		Project::SetActive(nullptr);
 		ScriptEngine::ShutDown();
 		PhysicsEngine::ShutDown();
 		Renderer::ShutDown();
