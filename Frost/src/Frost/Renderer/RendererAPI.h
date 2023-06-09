@@ -48,6 +48,7 @@ namespace Frost
 		virtual void SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth) = 0;
 
 		virtual uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y) = 0;
+		virtual uint32_t GetCurrentFrameIndex() = 0;
 		virtual void SetEditorActiveEntity(uint32_t selectedEntityId) = 0;
 
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const = 0;

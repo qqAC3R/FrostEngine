@@ -28,7 +28,8 @@ namespace Frost
 	private:
 
 		void ShadowDepthInitData();
-		void ShadowDepthUpdate(const RenderQueue& renderQueue);
+		//void ShadowDepthUpdate(const RenderQueue& renderQueue);
+		void ShadowDepthUpdateInstancing(const RenderQueue& renderQueue);
 
 		void ShadowComputeInitData(uint32_t width, uint32_t height);
 		void ShadowComputeUpdate(const RenderQueue& renderQueue);
@@ -38,6 +39,13 @@ namespace Frost
 
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
+
+		struct MeshInstancedVertexBuffer // `MeshInstancedVertexBuffer` For Shadow Pass
+		{
+			glm::mat4 ModelSpaceMatrix;
+			glm::mat4 WorldSpaceMatrix;
+			uint64_t BoneInformationBDA;
+		};
 
 		struct InternalData
 		{
@@ -51,7 +59,10 @@ namespace Frost
 			Vector<Ref<Image2D>> ShadowComputeTexture;
 
 
-			Vector<HeapBlock> IndirectVoxelCmdBuffer;
+			Vector<HeapBlock> IndirectShadowCmdBuffer;
+
+			// Global Instaced Vertex Buffer
+			Vector<HeapBlock> GlobalInstancedVertexBuffer;
 
 			glm::mat4 CascadeViewProjMatrix[SHADOW_MAP_CASCADE_COUNT];
 			glm::vec4 CascadeDepthSplit;
@@ -64,8 +75,6 @@ namespace Frost
 		{
 			glm::mat4 ViewProjectionMatrix;
 			uint64_t VertexBufferBDA;
-			uint64_t BoneInformationBDA;
-			uint32_t CascadeIndex;
 			uint32_t IsAnimated = 0;
 		};
 		PushConstantData m_PushConstant;

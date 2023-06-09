@@ -1153,6 +1153,7 @@ namespace Frost
 #endif
 	}
 
+#if 0
 	void Mesh::UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex)
 	{
 		// Instanced data for submeshes
@@ -1181,9 +1182,12 @@ namespace Frost
 			m_BoneTransformsUniformBuffer[currentFrameIndex]->SetData(m_BoneTransforms.data());
 		}
 	}
+#endif
 
 	void Mesh::UpdateBoneTransformMatrices(const ozz::vector<ozz::math::Float4x4>& modelSpaceMatrices)
 	{
+		uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+
 		if (m_MeshAsset->IsAnimated())
 		{
 			if (modelSpaceMatrices.empty() || modelSpaceMatrices.size() < m_MeshAsset->m_BoneInfo.size())
@@ -1199,6 +1203,11 @@ namespace Frost
 					m_BoneTransforms[i] = Mat4FromFloat4x4(modelSpaceMatrices[jointIndex]) * m_MeshAsset->m_BoneInfo[i].InverseBindPose;
 				}
 			}
+		}
+
+		if (m_MeshAsset->IsAnimated())
+		{
+			m_BoneTransformsUniformBuffer[currentFrameIndex]->SetData(m_BoneTransforms.data());
 		}
 	}
 

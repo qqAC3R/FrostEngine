@@ -23,6 +23,7 @@ namespace Frost
 			case ShaderDataType::Int3:      return VK_FORMAT_R32G32B32_SINT;
 			case ShaderDataType::Int4:      return VK_FORMAT_R32G32B32A32_SINT;
 			case ShaderDataType::UInt:      return VK_FORMAT_R32_UINT;
+			case ShaderDataType::UInt64:    return VK_FORMAT_R64_UINT;
 			case ShaderDataType::Bool:      return VK_FORMAT_R32_UINT;
 		}
 

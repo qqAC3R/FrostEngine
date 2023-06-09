@@ -397,6 +397,11 @@ namespace Frost
 		return s_Data->SceneRenderPasses->GetRenderPass<VulkanBatchRenderingPass>()->ReadPixelFromTextureEntityID(x, y);
 	}
 
+	uint32_t VulkanRenderer::GetCurrentFrameIndex()
+	{
+		return VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+	}
+
 	void VulkanRenderer::SetEditorActiveEntity(uint32_t selectedEntityId)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();

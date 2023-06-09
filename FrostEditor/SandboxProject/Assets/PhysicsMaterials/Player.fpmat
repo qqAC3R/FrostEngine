@@ -1,5 +1,5 @@
 {
-    "StaticFriction": 6.0,
-    "DynamicFriction": 6.0,
-    "Bounciness": 0.6499999761581421
+    "StaticFriction": 0.800000011920929,
+    "DynamicFriction": 1.0399999618530273,
+    "Bounciness": 0.2800000011920929
 }

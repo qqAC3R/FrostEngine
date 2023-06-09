@@ -7,6 +7,7 @@
 // Instanced vertex buffer
 layout(location = 0) in mat4 a_ModelSpaceMatrix;
 layout(location = 4) in mat4 a_WorldSpaceMatrix;
+layout(location = 8) in uint64_t a_BoneInformationBDA;
 
 struct Vertex
 {
@@ -41,8 +42,6 @@ layout(push_constant) uniform Constants
 {
 	mat4 LightViewProjectionMatrix;
 	uint64_t VertexBufferBDA;
-	uint64_t BoneInformationBDA;
-	uint MaterialIndex;
 	uint IsAnimated;
 } u_PushConstant;
 
@@ -56,7 +55,7 @@ void main()
 	if(u_PushConstant.IsAnimated  == 1)
 	{
 		AnimatedVertices animatedVerticies = AnimatedVertices(u_PushConstant.VertexBufferBDA);
-		MeshBoneInformation boneInfo = MeshBoneInformation(u_PushConstant.BoneInformationBDA);
+		MeshBoneInformation boneInfo = MeshBoneInformation(a_BoneInformationBDA);
 		AnimatedVertex vertex = animatedVerticies.v[gl_VertexIndex];
 
 		position = vertex.Position;

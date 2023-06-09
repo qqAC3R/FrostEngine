@@ -97,6 +97,7 @@ namespace Frost
 		static void SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.0f), float lineWidth = 1.0f);
 
 		static uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y);
+		static uint32_t GetCurrentFrameIndex();
 		static void SetEditorActiveEntity(uint32_t selectedEntityId);
 
 		// We must request a function returning a texture, instead of texture,

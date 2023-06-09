@@ -99,6 +99,7 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SceneGrid.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EntityGlow.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/LineDetection.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirectInstancedBindless.glsl");
 		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolution.glsl");
 
 		
@@ -202,6 +203,11 @@ namespace Frost
 	uint32_t Renderer::ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y)
 	{
 		return s_RendererAPI->ReadPixelFromFramebufferEntityID(x, y);
+	}
+
+	uint32_t Renderer::GetCurrentFrameIndex()
+	{
+		return s_RendererAPI->GetCurrentFrameIndex();
 	}
 
 	void Renderer::SetEditorActiveEntity(uint32_t selectedEntityId)

@@ -140,9 +140,6 @@ namespace Frost
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
 		const Vector<Ref<Animation>>& GetAnimations() const { return m_Animations; }
 
-		//const Vector<std::string>& GetMaterialNames() const { return m_MaterialNames; }
-
-
 		static AssetType GetStaticType() { return AssetType::MeshAsset; }
 		virtual AssetType GetAssetType() const override { return AssetType::MeshAsset; }
 
@@ -258,7 +255,6 @@ namespace Frost
 		Ref<BufferDevice> GetVertexBufferInstanced(uint32_t index) const { return m_VertexBufferInstanced[index]; }
 		Buffer& GetVertexBufferInstanced_CPU(uint32_t index) { return m_VertexBufferInstanced_CPU[index]; }
 
-		void UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex);
 		void UpdateBoneTransformMatrices(const ozz::vector<ozz::math::Float4x4>& modelSpaceMatrices);
 
 		Ref<UniformBuffer> GetBoneUniformBuffer(uint32_t currentFrameIndex) const { return m_BoneTransformsUniformBuffer[currentFrameIndex]; }
@@ -269,7 +265,7 @@ namespace Frost
 
 		const Ref<MeshAsset>& GetMeshAsset() const { return m_MeshAsset; }
 
-		uint32_t GetMaterialCount() { return (uint32_t)m_MaterialAssets.size(); }
+		uint32_t GetMaterialCount() const { return (uint32_t)m_MaterialAssets.size(); }
 		Ref<MaterialAsset> GetMaterialAsset(uint32_t materialIndex) { return m_MaterialAssets[materialIndex]; }
 		void SetMaterialAssetToDefault(uint32_t materialIndex);
 

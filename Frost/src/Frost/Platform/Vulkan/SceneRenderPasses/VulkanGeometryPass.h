@@ -10,6 +10,7 @@
 namespace Frost
 {
 
+#if 1
 	struct IndirectMeshData
 	{
 		IndirectMeshData() = default;
@@ -29,6 +30,24 @@ namespace Frost
 		uint32_t MaterialOffset;
 
 		AssetHandle MeshAssetHandle;
+	};
+#endif
+
+	struct NewIndirectMeshData
+	{
+		NewIndirectMeshData() = default;
+
+		uint32_t CmdOffset;          /// DONE
+
+		uint32_t TotalMeshOffset;    /// DONE // Same as `TotalSubmeshCount` however with the added Offset from the previous mesh
+		uint32_t SubmeshCount;       /// DONE   // Reponsible for Submesh Count (without instances) and for the Indirect Command Numbers
+		uint32_t InstanceCount;      /// DONE
+		uint32_t TotalSubmeshCount;  /// DONE // SubmeshCount * InstanceCount
+
+		uint32_t MaterialCount;	     /// DONE
+		uint32_t MaterialOffset;     /// DONE
+
+		AssetHandle MeshAssetHandle; /// DONE
 	};
 
 	class VulkanGeometryPass : public SceneRenderPass
@@ -52,9 +71,10 @@ namespace Frost
 	private:
 		// -------------------- Geometry Pass ------------------------
 		void GeometryDataInit(uint32_t width, uint32_t height);
-		void GeometryPrepareIndirectData(const RenderQueue& renderQueue);
+		//void GeometryPrepareIndirectData(const RenderQueue& renderQueue);
 		void GeometryPrepareIndirectDataWithInstacing(const RenderQueue& renderQueue);
-		void GeometryUpdate(const RenderQueue& renderQueue, const Vector<IndirectMeshData>& indirectMeshData);
+		//void GeometryUpdate(const RenderQueue& renderQueue, const Vector<IndirectMeshData>& indirectMeshData);
+		void GeometryUpdateWithInstancing(const RenderQueue& renderQueue);
 		// -----------------------------------------------------------
 
 		// ------------------- Occlusion Culling ---------------------
@@ -99,6 +119,15 @@ namespace Frost
 			float Padding2;
 		};
 
+		struct MeshInstancedVertexBuffer // `MeshInstancedVertexBuffer` For Geometry Pass
+		{
+			glm::mat4 ModelSpaceMatrix;
+			glm::mat4 WorldSpaceMatrix;
+			uint32_t MaterialIndexOffset;
+			uint32_t EntityID;
+			uint64_t BoneInformationBDA;
+		};
+
 		struct InternalData
 		{
 			// Geometry pass
@@ -122,16 +151,16 @@ namespace Frost
 			// Indirect drawing
 			Vector<HeapBlock> IndirectCmdBuffer;
 			Vector<HeapBlock> MaterialSpecs;
+
+			// Global Instaced Vertex Buffer
+			Vector<HeapBlock> GlobalInstancedVertexBuffer;
 		};
 
 		struct PushConstant
 		{
 			glm::mat4 ViewMatrix;
 			uint64_t VertexBufferBDA;
-			uint64_t BoneInformationBDA;
-			uint32_t MaterialIndex;
 			uint32_t IsAnimated = 0;
-			uint32_t EntityID;
 		} m_GeometryPushConstant;
 
 		InternalData* m_Data;

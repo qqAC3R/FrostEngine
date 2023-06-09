@@ -34,6 +34,7 @@ namespace Frost
 		virtual void SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth) override;
 
 		virtual uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y) override;
+		virtual uint32_t GetCurrentFrameIndex() override;
 		virtual void SetEditorActiveEntity(uint32_t selectedEntityId) override;
 
 		virtual void Resize(uint32_t width, uint32_t height) override;

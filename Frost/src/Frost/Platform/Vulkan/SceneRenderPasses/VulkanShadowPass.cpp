@@ -2,6 +2,7 @@
 #include "VulkanShadowPass.h"
 
 #include "Frost/Core/Application.h"
+#include "Frost/Asset/AssetManager.h"
 
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanRenderer.h"
@@ -38,16 +39,27 @@ namespace Frost
 
 		m_Data->ShadowDepthShader = Renderer::GetShaderLibrary()->Get("ShadowDepthPass");
 		m_Data->ShadowComputeShader = Renderer::GetShaderLibrary()->Get("ShadowCompute");
-		
+
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 
-		m_Data->IndirectVoxelCmdBuffer.resize(framesInFlight);
-		for (auto& indirectCmdBuffer : m_Data->IndirectVoxelCmdBuffer)
+		m_Data->IndirectShadowCmdBuffer.resize(framesInFlight);
+		for (auto& indirectCmdBuffer : m_Data->IndirectShadowCmdBuffer)
 		{
 			// Allocating a heap block
 			indirectCmdBuffer.DeviceBuffer = BufferDevice::Create(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes, { BufferUsage::Storage, BufferUsage::Indirect });
 			indirectCmdBuffer.HostBuffer.Allocate(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes);
+		}
+
+		/// Global Instaced Vertex Buffer
+		m_Data->GlobalInstancedVertexBuffer.resize(framesInFlight);
+		for (uint32_t i = 0; i < m_Data->GlobalInstancedVertexBuffer.size(); i++)
+		{
+			auto& instancdVertexBuffer = m_Data->GlobalInstancedVertexBuffer[i];
+
+			// Allocating a heap block
+			instancdVertexBuffer.DeviceBuffer = BufferDevice::Create(sizeof(MeshInstancedVertexBuffer) * maxCountMeshes, { BufferUsage::Vertex });
+			instancdVertexBuffer.HostBuffer.Allocate(sizeof(MeshInstancedVertexBuffer) * maxCountMeshes);
 		}
 
 		ShadowDepthInitData();
@@ -76,8 +88,9 @@ namespace Frost
 
 
 		BufferLayout bufferLayout = {
-			{ "a_ModelSpaceMatrix",  ShaderDataType::Mat4 },
-			{ "a_WorldSpaceMatrix",  ShaderDataType::Mat4 },
+			{ "a_ModelSpaceMatrix",           ShaderDataType::Mat4   },
+			{ "a_WorldSpaceMatrix",           ShaderDataType::Mat4   },
+			{ "a_BoneInformationBDA",         ShaderDataType::UInt64 }
 		};
 		bufferLayout.m_InputType = InputType::Instanced;
 
@@ -97,7 +110,7 @@ namespace Frost
 
 		ComputePipeline::CreateInfo pipelineCreateInfo{};
 		pipelineCreateInfo.Shader = m_Data->ShadowComputeShader;
-		if(!m_Data->ShadowComputePipeline)
+		if (!m_Data->ShadowComputePipeline)
 			m_Data->ShadowComputePipeline = ComputePipeline::Create(pipelineCreateInfo);
 
 		m_Data->ShadowComputeTexture.resize(framesInFlight);
@@ -116,7 +129,7 @@ namespace Frost
 		m_Data->ShadowComputeDescriptor.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
-			if(!m_Data->ShadowComputeDescriptor[i])
+			if (!m_Data->ShadowComputeDescriptor[i])
 				m_Data->ShadowComputeDescriptor[i] = Material::Create(m_Data->ShadowComputeShader, "ShaderCompute");
 
 			Ref<VulkanMaterial> vulkanDescriptor = m_Data->ShadowComputeDescriptor[i].As<VulkanMaterial>();
@@ -145,7 +158,8 @@ namespace Frost
 		UpdateCascades(renderQueue);
 
 		VulkanRenderer::BeginTimeStampPass("Shadow Pass (Cascades)");
-		ShadowDepthUpdate(renderQueue);
+		//ShadowDepthUpdate(renderQueue);
+		ShadowDepthUpdateInstancing(renderQueue);
 		VulkanRenderer::EndTimeStampPass("Shadow Pass (Cascades)");
 
 		VulkanRenderer::BeginTimeStampPass("Shadow Pass (Compute)");
@@ -153,8 +167,9 @@ namespace Frost
 		VulkanRenderer::EndTimeStampPass("Shadow Pass (Compute)");
 	}
 
-	static Vector<IndirectMeshData> s_ShadowDepth_MeshIndirectData; // Made a static variable, to not allocate new data everyframe
 
+
+#if 0
 	void VulkanShadowPass::ShadowDepthUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
@@ -163,7 +178,7 @@ namespace Frost
 		Ref<VulkanRenderPass> vulkanRenderPass = m_Data->ShadowDepthRenderPass.As<VulkanRenderPass>();
 		Ref<VulkanPipeline> vulkanPipeline = m_Data->ShadowDepthPipeline.As<VulkanPipeline>();
 
-		
+
 		// Get the needed matricies from the camera
 		glm::mat4 projectionMatrix = renderQueue.CameraProjectionMatrix;
 		projectionMatrix[1][1] *= -1; // GLM uses opengl style of rendering, where the y coordonate is inverted
@@ -297,7 +312,7 @@ namespace Frost
 				VkDeviceSize deviceSize[1] = { 0 };
 				vkCmdBindVertexBuffers(cmdBuf, 0, 1, &vertexBufferInstanced, deviceSize);
 
-				 
+
 				// Set the transform matrix and model matrix of the submesh into a constant buffer
 				m_PushConstant.VertexBufferBDA = mesh->GetMeshAsset()->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 				m_PushConstant.CascadeIndex = 0;
@@ -308,7 +323,7 @@ namespace Frost
 					m_PushConstant.BoneInformationBDA = mesh->GetBoneUniformBuffer(currentFrameIndex).As<VulkanUniformBuffer>()->GetVulkanBufferAddress();
 				else
 					m_PushConstant.BoneInformationBDA = 0;
-				
+
 				vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_PushConstant);
 
 				uint32_t submeshCount = meshData.SubmeshCount;
@@ -318,6 +333,228 @@ namespace Frost
 
 			vulkanRenderPass->Unbind();
 		}
+	}
+#endif
+
+	struct MeshInstanceListShadowPass // This is reponsible for grouping all the mesh instances into one array
+	{
+		Mesh* Mesh;
+		glm::mat4 Transform;
+	};
+
+	// This is reponsible for grouping all the mesh instances into one array
+	// Declaring it here to not allocate a new hashmap every frame
+	static HashMap<AssetHandle, Vector<MeshInstanceListShadowPass>> s_GroupedMeshesCached;
+	static Vector<NewIndirectMeshData> s_ShadowDepthMeshIndirectData; // Made a static variable, to not allocate new data everyframe
+
+	void VulkanShadowPass::ShadowDepthUpdateInstancing(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		Ref<VulkanRenderPass> vulkanRenderPass = m_Data->ShadowDepthRenderPass.As<VulkanRenderPass>();
+		Ref<VulkanPipeline> vulkanPipeline = m_Data->ShadowDepthPipeline.As<VulkanPipeline>();
+
+		// Get the needed matricies from the camera
+		glm::mat4 projectionMatrix = renderQueue.CameraProjectionMatrix;
+		projectionMatrix[1][1] *= -1; // GLM uses opengl style of rendering, where the y coordonate is inverted
+		glm::mat4 viewProjectionMatrix = projectionMatrix * renderQueue.CameraViewMatrix;
+
+		/*
+			Each mesh might have a set of submeshes which are sent to render individualy.
+			We dont need them when we render them indirectly (because the gpu renders all the submeshes automatically - `multidraw`),
+			instead we just need to know the `start index` of every mesh in the `VkDrawIndexedIndirectCommand` buffer.
+			(TODO: This explanation is outdated, now we are using `instanced indirect multidraw rendering` :D)
+		*/
+		s_ShadowDepthMeshIndirectData.clear();
+		s_GroupedMeshesCached.clear();
+
+
+		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
+		{
+			// Get the mesh
+			auto mesh = renderQueue.m_Data[i].Mesh;
+			s_GroupedMeshesCached[mesh->GetMeshAsset()->Handle].push_back({ mesh.Raw(), renderQueue.m_Data[i].Transform});
+		}
+
+
+		// `Indirect draw commands` offset
+		uint64_t indirectCmdsOffset = 0;
+
+		// `Instance data` offset.
+		uint64_t materialDataOffset = 0;
+
+		// `Instance data` offset.
+		uint64_t instanceVertexOffset = 0;
+
+		for (auto& [handle, groupedMeshes] : s_GroupedMeshesCached)
+		{
+			NewIndirectMeshData* currentIndirectMeshData;
+			NewIndirectMeshData* lastIndirectMeshData = nullptr;
+			if (s_ShadowDepthMeshIndirectData.size() > 0)
+				lastIndirectMeshData = &s_ShadowDepthMeshIndirectData[s_ShadowDepthMeshIndirectData.size() - 1];
+
+			// If we are submitting the first mesh, we don't need any offset
+			currentIndirectMeshData = &s_ShadowDepthMeshIndirectData.emplace_back();
+
+			Ref<MeshAsset> meshAsset = groupedMeshes[0].Mesh->GetMeshAsset();
+			const Vector<Submesh>& submeshes = meshAsset->GetSubMeshes();
+
+			currentIndirectMeshData->MeshAssetHandle = meshAsset->Handle;
+			currentIndirectMeshData->InstanceCount = groupedMeshes.size();
+			currentIndirectMeshData->SubmeshCount = submeshes.size();
+			currentIndirectMeshData->TotalSubmeshCount = currentIndirectMeshData->SubmeshCount * currentIndirectMeshData->InstanceCount;
+			currentIndirectMeshData->MaterialCount = groupedMeshes[0].Mesh->GetMaterialCount();
+
+			currentIndirectMeshData->CmdOffset = indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand);
+
+			currentIndirectMeshData->MaterialOffset = 0;
+			currentIndirectMeshData->TotalMeshOffset = 0;
+			if (s_ShadowDepthMeshIndirectData.size() > 1)
+			{
+				currentIndirectMeshData->MaterialOffset = lastIndirectMeshData->MaterialOffset + (lastIndirectMeshData->MaterialCount * lastIndirectMeshData->InstanceCount);
+				currentIndirectMeshData->TotalMeshOffset = lastIndirectMeshData->TotalMeshOffset + (lastIndirectMeshData->SubmeshCount * lastIndirectMeshData->InstanceCount);
+			}
+
+
+			// Set up the instanced vertex buffer (per submesh, per instance)
+			for (uint32_t submeshIndex = 0; submeshIndex < submeshes.size(); submeshIndex++)
+			{
+				MeshInstancedVertexBuffer meshInstancedVertexBuffer{};
+				uint32_t meshInstanceNr = 0;
+				for (auto& meshInstance : groupedMeshes)
+				{
+					glm::mat4 modelMatrix = meshInstance.Transform * submeshes[submeshIndex].Transform;
+
+
+					// Adding the neccesary Matricies for the shader
+					meshInstancedVertexBuffer.ModelSpaceMatrix = modelMatrix;
+					meshInstancedVertexBuffer.WorldSpaceMatrix = viewProjectionMatrix * modelMatrix;
+					/////////////////////////////////////////////////////
+
+					// Other stuff
+					if (meshInstance.Mesh->IsAnimated())
+						meshInstancedVertexBuffer.BoneInformationBDA = meshInstance.Mesh->GetBoneUniformBuffer(currentFrameIndex).As<VulkanUniformBuffer>()->GetVulkanBufferAddress();
+					else
+						meshInstancedVertexBuffer.BoneInformationBDA = 0;
+					/////////////////////////////////////////////////////
+
+					m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].HostBuffer.Write((void*)&meshInstancedVertexBuffer, sizeof(MeshInstancedVertexBuffer), instanceVertexOffset);
+					instanceVertexOffset += sizeof(MeshInstancedVertexBuffer);
+
+					meshInstanceNr++;
+				}
+			}
+
+			for (uint32_t submeshIndex = 0; submeshIndex < submeshes.size(); submeshIndex++)
+			{
+				const Submesh& submesh = submeshes[submeshIndex];
+
+				// Submit the submesh into the cpu buffer
+				VkDrawIndexedIndirectCommand indirectCmdBuf{};
+				indirectCmdBuf.firstIndex = submesh.BaseIndex;
+				indirectCmdBuf.indexCount = submesh.IndexCount;
+				indirectCmdBuf.vertexOffset = submesh.BaseVertex;
+
+				indirectCmdBuf.instanceCount = groupedMeshes.size();
+
+				if (lastIndirectMeshData)
+				{
+					indirectCmdBuf.firstInstance = currentIndirectMeshData->TotalMeshOffset;
+				}
+				else
+				{
+					indirectCmdBuf.firstInstance = 0;
+				}
+
+				m_Data->IndirectShadowCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
+				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
+			}
+		}
+		// Sending the data into the gpu buffer
+		// Indirect draw commands
+		auto vulkanIndirectCmdBuffer = m_Data->IndirectShadowCmdBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		void* indirectCmdsPointer = m_Data->IndirectShadowCmdBuffer[currentFrameIndex].HostBuffer.Data;
+		vulkanIndirectCmdBuffer->SetData(indirectCmdsOffset, indirectCmdsPointer);
+
+		// Global Instanced Vertex Buffer data
+		auto vulkanInstancedVertexBuffer = m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		void* instancedVertexBufferPointer = m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].HostBuffer.Data;
+		vulkanInstancedVertexBuffer->SetData(instanceVertexOffset, instancedVertexBufferPointer);
+
+
+
+		// Bind the pipeline
+		vulkanPipeline->Bind();
+
+		// Bind the renderpass
+		for (uint32_t i = 0; i < 4; i++)
+		{
+
+			VkClearValue clearValue{};
+			clearValue.depthStencil = { 1.0f, 0 };
+
+			VkRenderPassBeginInfo renderPassInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+			renderPassInfo.renderPass = vulkanRenderPass->GetVulkanRenderPass();
+			renderPassInfo.framebuffer = (VkFramebuffer)vulkanRenderPass->GetFramebuffer(currentFrameIndex)->GetFramebufferHandle();
+			renderPassInfo.renderArea.offset = { (int32_t)m_Data->MinResCascade[i].x, (int32_t)m_Data->MinResCascade[i].y };
+			renderPassInfo.renderArea.extent = { (uint32_t)m_Data->MaxResCascade[i].x, (uint32_t)m_Data->MaxResCascade[i].y };
+			renderPassInfo.clearValueCount = 1;
+			renderPassInfo.pClearValues = &clearValue;
+			vkCmdBeginRenderPass(cmdBuf, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+
+			// Set the viewport and scrissors
+			VkViewport viewport{};
+			viewport.x = m_Data->MinResCascade[i].x;
+			viewport.y = m_Data->MinResCascade[i].y;
+			viewport.width = (float)m_Data->MaxResCascade[i].x;
+			viewport.height = (float)m_Data->MaxResCascade[i].y;
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
+			vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
+
+			VkRect2D scissor{};
+			scissor.offset = { (int32_t)m_Data->MinResCascade[i].x, (int32_t)m_Data->MinResCascade[i].y };
+			scissor.extent = { (uint32_t)m_Data->MaxResCascade[i].x, (uint32_t)m_Data->MaxResCascade[i].y };
+			vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
+
+			// Binding the global instanced vertex buffer only once
+			auto vulkanVertexBufferInstanced = m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+			VkBuffer vertexBufferInstanced = vulkanVertexBufferInstanced->GetVulkanBuffer();
+			VkDeviceSize deviceSize[1] = { 0 };
+			vkCmdBindVertexBuffers(cmdBuf, 0, 1, &vertexBufferInstanced, deviceSize);
+
+
+			// Sending the indirect draw commands to the command buffer
+			for (uint32_t j = 0; j < s_ShadowDepthMeshIndirectData.size(); j++)
+			{
+				auto& indirectPerMeshData = s_ShadowDepthMeshIndirectData[j];
+
+				// Get the mesh
+				const AssetMetadata& assetMetadata = AssetManager::GetMetadata(indirectPerMeshData.MeshAssetHandle);
+				Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(assetMetadata.FilePath.string());
+
+				// Bind the index buffer
+				meshAsset->GetIndexBuffer()->Bind();
+
+
+				// Set the transform matrix and model matrix of the submesh into a constant buffer
+				m_PushConstant.VertexBufferBDA = meshAsset->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
+				m_PushConstant.ViewProjectionMatrix = m_Data->CascadeViewProjMatrix[i];
+				m_PushConstant.IsAnimated = static_cast<uint32_t>(meshAsset->IsAnimated());
+
+				vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_PushConstant);
+
+				uint32_t submeshCount = indirectPerMeshData.SubmeshCount;
+				uint32_t offset = indirectPerMeshData.CmdOffset * sizeof(VkDrawIndexedIndirectCommand);
+				vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
+			}
+
+			vulkanRenderPass->Unbind();
+		}
+
+
 	}
 
 	void VulkanShadowPass::ShadowComputeUpdate(const RenderQueue& renderQueue)
@@ -348,10 +585,10 @@ namespace Frost
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
 
-		uint32_t groupX = static_cast<uint32_t>(std::ceil((width  / 1.0f) / 32.0f));
+		uint32_t groupX = static_cast<uint32_t>(std::ceil((width / 1.0f) / 32.0f));
 		uint32_t groupY = static_cast<uint32_t>(std::ceil((height / 1.0f) / 32.0f));
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
-		
+
 		// Barrier
 		Ref<VulkanImage2D> vulkanTexture = m_Data->ShadowComputeTexture[currentFrameIndex].As<VulkanImage2D>();
 		vulkanTexture->TransitionLayout(cmdBuf, vulkanTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
@@ -476,10 +713,10 @@ namespace Frost
 	{
 		uint32_t shadowTextureRes = Renderer::GetRendererConfig().ShadowTextureResolution;
 
-		m_Data->MinResCascade[0] = { 0.0f            , 0.0f             };
+		m_Data->MinResCascade[0] = { 0.0f            , 0.0f };
 		m_Data->MaxResCascade[0] = { shadowTextureRes, shadowTextureRes };
 
-		m_Data->MinResCascade[1] = { shadowTextureRes , 0                };
+		m_Data->MinResCascade[1] = { shadowTextureRes , 0 };
 		m_Data->MaxResCascade[1] = { shadowTextureRes , shadowTextureRes };
 
 		m_Data->MinResCascade[2] = { 0               , shadowTextureRes };
