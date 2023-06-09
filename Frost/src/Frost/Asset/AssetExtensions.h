@@ -10,7 +10,7 @@ namespace Frost
 		{ ".fsc",  AssetType::Scene },
 		{ ".fmat",  AssetType::Material },
 		{ ".fprefab",  AssetType::Material },
-		{ ".fpm",  AssetType::PhysicsMat },
+		{ ".fpmat",  AssetType::PhysicsMat },
 
 		// Meshes
 		{ ".fbx",  AssetType::MeshAsset },

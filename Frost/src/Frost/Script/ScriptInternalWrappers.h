@@ -24,24 +24,23 @@ namespace Frost
 	// TODO: Change those naming schemes, it's so fucking horrible to look at them
 	struct MaterialMeshPointer
 	{
-		MaterialMeshPointer(Ref<MeshAsset> mesh, Ref<MaterialAsset> material)
-			: Mesh(mesh), InternalMaterial(material) {}
+		MaterialMeshPointer(Ref<MaterialAsset> material)
+			: InternalMaterial(material) {}
 
 		~MaterialMeshPointer() {}
 
-		Ref<Mesh> Mesh;
 		Ref<MaterialAsset> InternalMaterial;
 	};
 
 	// TODO: Change those naming schemes, it's so fucking horrible to look at them
 	struct MeshPointer
 	{
-		MeshPointer(Ref<MeshAsset> mesh)
+		MeshPointer(Ref<Frost::Mesh> mesh)
 			: Mesh(mesh) {}
 
 		~MeshPointer() {}
 
-		Ref<Mesh> Mesh;
+		Ref<Frost::Mesh> Mesh;
 	};
 
 	// Forward declaration
@@ -249,7 +248,7 @@ namespace Frost { namespace ScriptInternalCalls
 		namespace Mesh
 		{
 			void* GetMeshPtr(uint64_t entityID);
-			void SetMesh(uint64_t entityID, MaterialMeshPointer* meshPtr);
+			void SetMesh(uint64_t entityID, MeshPointer* meshPtr);
 
 			bool HasMaterial(uint64_t entityID, int index);
 			void* GetMaterial(uint64_t entityID, int index);
@@ -257,14 +256,6 @@ namespace Frost { namespace ScriptInternalCalls
 
 		namespace Animation
 		{
-#if 0
-			[MethodImpl(MethodImplOptions.InternalCall)]
-			internal static extern string[] GetAnimations_Native(ulong entityID);
-
-			[MethodImpl(MethodImplOptions.InternalCall)]
-			internal static extern void SetActiveAnimation_Native(ulong entityID, string animationName);
-#endif
-
 			MonoArray* GetAnimations(uint64_t entityID);
 			void SetActiveAnimation(uint64_t entityID, MonoString* animationName);
 		}

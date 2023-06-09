@@ -57,15 +57,14 @@ namespace Frost
 		void SetTextureById(uint32_t textureId, Ref<Texture2D> texture);
 		Ref<DataStorage> GetMaterialInternalData() { return m_MaterialData; }
 
+		const std::string& GetMaterialName() const { return m_MaterialName; }
+		void SetMaterialName(const std::string& materiaName) { m_MaterialName = materiaName; }
+
 		static AssetType GetStaticType() { return AssetType::Material; }
 		virtual AssetType GetAssetType() const override { return GetStaticType(); }
 	private:
 		Ref<DataStorage> m_MaterialData;
-		//glm::vec4 m_AlbedoColor = { 1.0f, 1.0f, 1.0f, 1.0f };
-		//float m_Metalness = 0.0f;
-		//float m_Roughness = 0.2f;
-		//float m_Emission = 0.0f;
-		//uint32_t m_UseNormalMap = 0;
+		std::string m_MaterialName;
 
 		Vector<uint32_t> m_TextureAllocatorSlots; // Bindless
 

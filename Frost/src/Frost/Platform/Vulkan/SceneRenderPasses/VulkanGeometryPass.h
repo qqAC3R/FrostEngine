@@ -17,12 +17,18 @@ namespace Frost
 			: SubmeshOffset(submeshOffset), SubmeshCount(SubmeshCount), MeshIndex(meshIndex), MaterialCount(materialCount), MaterialOffset(materialOffset)
 		{}
 
+		IndirectMeshData(uint32_t submeshOffset, uint32_t SubmeshCount, uint32_t meshIndex, uint32_t materialCount, uint32_t materialOffset, AssetHandle meshAssetHandle)
+			: SubmeshOffset(submeshOffset), SubmeshCount(SubmeshCount), MeshIndex(meshIndex), MaterialCount(materialCount), MaterialOffset(materialOffset), MeshAssetHandle(meshAssetHandle)
+		{}
+
 		uint32_t SubmeshOffset; // Offset of the last submeshes (used for indirect drawing)
 		uint32_t SubmeshCount; // How many submeshes were actually submitted (we are doing culling)
 		uint32_t MeshIndex; // The index from the render queue
 
 		uint32_t MaterialCount;
 		uint32_t MaterialOffset;
+
+		AssetHandle MeshAssetHandle;
 	};
 
 	class VulkanGeometryPass : public SceneRenderPass
@@ -47,6 +53,7 @@ namespace Frost
 		// -------------------- Geometry Pass ------------------------
 		void GeometryDataInit(uint32_t width, uint32_t height);
 		void GeometryPrepareIndirectData(const RenderQueue& renderQueue);
+		void GeometryPrepareIndirectDataWithInstacing(const RenderQueue& renderQueue);
 		void GeometryUpdate(const RenderQueue& renderQueue, const Vector<IndirectMeshData>& indirectMeshData);
 		// -----------------------------------------------------------
 

@@ -374,7 +374,6 @@ namespace Frost
 		{
 			//m_Textures.reserve(scene->mNumMaterials);
 			m_TexturesList.resize(scene->mNumMaterials * 4);
-			m_TexturesFilepaths.resize(scene->mNumMaterials);
 			m_MaterialData.resize(scene->mNumMaterials);
 			m_MaterialNames.resize(scene->mNumMaterials);
 
@@ -465,6 +464,7 @@ namespace Frost
 					auto parentPath = path.parent_path();
 					parentPath /= std::string(aiTexPath.data);
 					std::string texturePath = parentPath.string();
+					std::replace(texturePath.begin(), texturePath.end(), '/', '\\'); // This is the standart rule of paths in this engine
 
 					TextureSpecification textureSpec{};
 					textureSpec.Format = ImageFormat::RGBA8;
@@ -496,6 +496,7 @@ namespace Frost
 					auto parentPath = path.parent_path();
 					parentPath /= std::string(aiTexPath.data);
 					std::string texturePath = parentPath.string();
+					std::replace(texturePath.begin(), texturePath.end(), '/', '\\'); // This is the standart rule of paths in this engine
 
 					TextureSpecification textureSpec{};
 					textureSpec.Format = ImageFormat::RGBA8;
@@ -531,6 +532,7 @@ namespace Frost
 					auto parentPath = path.parent_path();
 					parentPath /= std::string(aiTexPath.data);
 					std::string texturePath = parentPath.string();
+					std::replace(texturePath.begin(), texturePath.end(), '/', '\\'); // This is the standart rule of paths in this engine
 
 					TextureSpecification textureSpec{};
 					textureSpec.Format = ImageFormat::RGBA8;
@@ -569,6 +571,7 @@ namespace Frost
 							auto parentPath = path.parent_path();
 							parentPath /= std::string(aiTexPath.data);
 							std::string texturePath = parentPath.string();
+							std::replace(texturePath.begin(), texturePath.end(), '/', '\\'); // This is the standart rule of paths in this engine
 
 							TextureSpecification textureSpec{};
 							textureSpec.Format = ImageFormat::RGBA8;
@@ -949,6 +952,12 @@ namespace Frost
 			m_MaterialAssets[i] = Ref<MaterialAsset>::Create();
 			Ref<MaterialAsset> materialAsset = m_MaterialAssets[i];
 
+			std::string materialName = m_MeshAsset->m_MaterialNames[i];
+			if (!materialName.empty())
+				materialAsset->SetMaterialName(m_MeshAsset->m_MaterialNames[i]);
+			else
+				materialAsset->SetMaterialName("Default");
+
 			materialAsset->SetAlbedoColor(m_MeshAsset->m_MaterialData[i].Get<glm::vec4>("AlbedoColor"));
 			materialAsset->SetEmission(m_MeshAsset->m_MaterialData[i].Get<float>("EmissionFactor"));
 			materialAsset->SetRoughness(m_MeshAsset->m_MaterialData[i].Get<float>("RoughnessFactor"));
@@ -1070,7 +1079,7 @@ namespace Frost
 				{ BufferUsage::Vertex }
 			);
 
-			m_VertexBufferInstanced_CPU[i].Allocate(submeshCount * sizeof(SubmeshInstanced) + 1);
+			m_VertexBufferInstanced_CPU[i].Allocate(submeshCount * sizeof(SubmeshInstanced));
 		}
 
 
@@ -1103,6 +1112,30 @@ namespace Frost
 		BindlessAllocator::AddTextureCustomSlot(m_Textures[metalnessTextureIndex], metalnessTextureIndex);
 		BindlessAllocator::AddTextureCustomSlot(m_Textures[normalMapTextureIndex], normalMapTextureIndex);
 #endif
+	}
+
+	void Mesh::SetMaterialAssetToDefault(uint32_t materialIndex)
+	{
+		m_MaterialAssets[materialIndex] = Ref<MaterialAsset>::Create();
+		Ref<MaterialAsset> materialAsset = m_MaterialAssets[materialIndex];
+
+		materialAsset->SetAlbedoColor(m_MeshAsset->m_MaterialData[materialIndex].Get<glm::vec4>("AlbedoColor"));
+		materialAsset->SetEmission(m_MeshAsset->m_MaterialData[materialIndex].Get<float>("EmissionFactor"));
+		materialAsset->SetRoughness(m_MeshAsset->m_MaterialData[materialIndex].Get<float>("RoughnessFactor"));
+		materialAsset->SetMetalness(m_MeshAsset->m_MaterialData[materialIndex].Get<float>("MetalnessFactor"));
+		materialAsset->SetUseNormalMap(m_MeshAsset->m_MaterialData[materialIndex].Get<uint32_t>("UseNormalMap"));
+
+		// Each mesh has 4 textures, and se we allocated numMaterials * 4 texture slots.
+		uint32_t albedoTextureIndex = (materialIndex * 4) + 0;
+		uint32_t roughnessTextureIndex = (materialIndex * 4) + 1;
+		uint32_t metalnessTextureIndex = (materialIndex * 4) + 2;
+		uint32_t normalMapTextureIndex = (materialIndex * 4) + 3;
+
+		materialAsset->SetAlbedoMap(m_MeshAsset->m_TexturesList[albedoTextureIndex]);
+		materialAsset->SetRoughnessMap(m_MeshAsset->m_TexturesList[roughnessTextureIndex]);
+		materialAsset->SetMetalnessMap(m_MeshAsset->m_TexturesList[metalnessTextureIndex]);
+		materialAsset->SetNormalMap(m_MeshAsset->m_TexturesList[normalMapTextureIndex]);
+
 	}
 
 	void Mesh::SetNewTexture(uint32_t materialIndex, uint32_t textureId, Ref<Texture2D> texture)

@@ -31,9 +31,6 @@ namespace Frost
 
 	void SceneSerializer::SerializeScene(const std::string& filepath, Ref<Scene> scene)
 	{
-		std::ofstream istream(filepath);
-		istream.clear();
-
 		nlohmann::ordered_json out = nlohmann::ordered_json();
 
 		// This loop is in reversed order (because this is how the entt libraries handles each loop)
@@ -50,8 +47,9 @@ namespace Frost
 			SerializeEntity(out, entities[i]);
 		}
 
+		std::ofstream istream(filepath);
+		istream.clear();
 		istream << out.dump(4);
-
  		istream.close();
 	}
 
@@ -122,36 +120,6 @@ namespace Frost
 				}
 
 			}
-#if 0
-			if (mesh)
-			{
-				meshFilepath = mesh->GetFilepath();
-				for (uint32_t k = 0; k < mesh->GetMaterialCount(); k++)
-				{
-					// Setting up the material data into a storage buffer
-					DataStorage& materialData = mesh->GetMaterialData(k);
-
-					glm::vec4 albedoColor = materialData.Get<glm::vec4>("AlbedoColor");
-
-					nlohmann::json material = nlohmann::json();
-					material["AlbedoTextureFilepath"] = mesh->m_TexturesFilepaths[k].AlbedoFilepath;
-					material["AlbedoColor"] = { albedoColor.r, albedoColor.g, albedoColor.b, albedoColor.a };
-
-					material["NormalMapTextureFilepath"] = mesh->m_TexturesFilepaths[k].NormalMapFilepath;
-					material["NormalMapUse"] = materialData.Get<uint32_t>("UseNormalMap");
-
-					material["RoughnessTextureFilepath"] = mesh->m_TexturesFilepaths[k].RoughnessMapFilepath;
-					material["RoughnessValue"] = materialData.Get<float>("RoughnessFactor");
-
-					material["MetalnessTextureFilepath"] = mesh->m_TexturesFilepaths[k].MetalnessMapFilepath;
-					material["MetalnessValue"] = materialData.Get<float>("MetalnessFactor");
-
-					material["EmissionValue"] = materialData.Get<float>("EmissionFactor");
-
-					materials.push_back(material);
-				}
-			}
-#endif
 
 			entityOut["MeshComponent"]["Materials"] = materials;
 			entityOut["MeshComponent"]["Filepath"] = meshFilepath;
@@ -218,6 +186,7 @@ namespace Frost
 			entityOut["BoxColliderComponent"]["Size"] = { boxColliderComponent.Size.x, boxColliderComponent.Size.y, boxColliderComponent.Size.z };
 			entityOut["BoxColliderComponent"]["Offset"] = { boxColliderComponent.Offset.x, boxColliderComponent.Offset.y, boxColliderComponent.Offset.z };
 			entityOut["BoxColliderComponent"]["IsTrigger"] = boxColliderComponent.IsTrigger;
+			entityOut["BoxColliderComponent"]["MaterialAssetID"] = boxColliderComponent.MaterialHandle ? boxColliderComponent.MaterialHandle->Handle.Get() : 0;
 		}
 
 		if (entity.HasComponent<SphereColliderComponent>())
@@ -227,6 +196,7 @@ namespace Frost
 			entityOut["SphereColliderComponent"]["Radius"] = sphereColliderComponent.Radius;
 			entityOut["SphereColliderComponent"]["Offset"] = { sphereColliderComponent.Offset.x, sphereColliderComponent.Offset.y, sphereColliderComponent.Offset.z };
 			entityOut["SphereColliderComponent"]["IsTrigger"] = sphereColliderComponent.IsTrigger;
+			entityOut["SphereColliderComponent"]["MaterialAssetID"] = sphereColliderComponent.MaterialHandle ? sphereColliderComponent.MaterialHandle->Handle.Get() : 0;
 		}
 
 		if (entity.HasComponent<CapsuleColliderComponent>())
@@ -237,6 +207,7 @@ namespace Frost
 			entityOut["CapsuleColliderComponent"]["Height"] = capsuleColliderComponent.Height;
 			entityOut["CapsuleColliderComponent"]["Offset"] = { capsuleColliderComponent.Offset.x, capsuleColliderComponent.Offset.y, capsuleColliderComponent.Offset.z };
 			entityOut["CapsuleColliderComponent"]["IsTrigger"] = capsuleColliderComponent.IsTrigger;
+			entityOut["CapsuleColliderComponent"]["MaterialAssetID"] = capsuleColliderComponent.MaterialHandle ? capsuleColliderComponent.MaterialHandle->Handle.Get() : 0;
 		}
 
 		if (entity.HasComponent<MeshColliderComponent>())
@@ -245,6 +216,7 @@ namespace Frost
 
 			entityOut["MeshColliderComponent"]["IsConvex"] = meshColliderComponent.IsConvex;
 			entityOut["MeshColliderComponent"]["IsTrigger"] = meshColliderComponent.IsTrigger;
+			entityOut["MeshColliderComponent"]["MaterialAssetID"] = meshColliderComponent.MaterialHandle ? meshColliderComponent.MaterialHandle->Handle.Get() : 0;
 		}
 
 		if (entity.HasComponent<DirectionalLightComponent>())
@@ -441,9 +413,6 @@ namespace Frost
 			{
 				MeshComponent& meshComponent = ent.AddComponent<MeshComponent>();
 
-				//Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(entity["MeshComponent"]["Filepath"]);
-				//if (!meshAsset)
-				//	meshAsset = AssetManager::CreateNewAsset<MeshAsset>(entity["MeshComponent"]["Filepath"]);
 				Ref<MeshAsset> meshAsset = AssetManager::GetOrLoadAsset<MeshAsset>(entity["MeshComponent"]["Filepath"]);
 				if (meshAsset)
 				{
@@ -475,205 +444,6 @@ namespace Frost
 				{
 					FROST_CORE_ERROR("Mesh Asset with filepath '{0}' and UUID {1} not found in the Asset Registry!", entity["MeshComponent"]["Filepath"], meshAsset->Handle);
 				}
-
-#if 0
-				MeshAsset::MeshBuildSettings meshBuildSettings{};
-				meshBuildSettings.LoadMaterials = false;
-				meshComponent.Mesh = MeshAsset::LoadCustomMesh(entity["MeshComponent"]["Filepath"], MaterialInstance(), meshBuildSettings);
-
-				Ref<MeshAsset> mesh = meshComponent.Mesh;
-				Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
-				
-
-				uint32_t materialCount = entity["MeshComponent"]["Materials"].size();
-
-				mesh->m_Textures.reserve(materialCount);
-				mesh->m_TexturesFilepaths.resize(materialCount);
-				mesh->m_MaterialData.resize(materialCount);
-				for (uint32_t i = 0; i < materialCount; i++)
-				{
-					nlohmann::json materialsIn = entity["MeshComponent"]["Materials"][i];
-
-					// Albedo -         vec4        (16 bytes)
-					// Roughness -      float       (4 bytes)
-					// Metalness -      float       (4 bytes)
-					// Emission -       float       (4 bytes)
-					// UseNormalMap -   uint32_t    (4 bytes)
-					// Texture IDs -    4 uint32_t  (16 bytes)
-					mesh->m_MaterialData[i].Allocate(48);
-
-					std::vector<float> albedo = materialsIn["AlbedoColor"];
-					glm::vec4 albedoColor = { albedo[0], albedo[1], albedo[2], albedo[3] };
-
-					// Fill up the data in the correct order for us to copy it later
-					DataStorage& materialData = mesh->m_MaterialData[i];
-					materialData.Add<glm::vec4>("AlbedoColor", albedoColor);
-					materialData.Add<float>("EmissionFactor",  materialsIn["EmissionValue"]);
-					materialData.Add<float>("RoughnessFactor", materialsIn["RoughnessValue"]);
-					materialData.Add<float>("MetalnessFactor", materialsIn["MetalnessValue"]);
-
-					materialData.Add<uint32_t>("UseNormalMap", materialsIn["NormalMapUse"]);
-
-					materialData.Add("AlbedoTexture", 0);
-					materialData.Add("RoughnessTexture", 0);
-					materialData.Add("MetalnessTexture", 0);
-					materialData.Add("NormalTexture", 0);
-
-					// Each mesh has 4 textures, and se we allocated numMaterials * 4 texture slots.
-					uint32_t albedoTextureIndex =    (i * 4) + 0;
-					uint32_t roughnessTextureIndex = (i * 4) + 1;
-					uint32_t metalnessTextureIndex = (i * 4) + 2;
-					uint32_t normalMapTextureIndex = (i * 4) + 3;
-
-					materialData.Set("AlbedoTexture", mesh->m_TextureAllocatorSlots[albedoTextureIndex]);
-					materialData.Set("NormalTexture", mesh->m_TextureAllocatorSlots[normalMapTextureIndex]);
-					materialData.Set("RoughnessTexture", mesh->m_TextureAllocatorSlots[roughnessTextureIndex]);
-					materialData.Set("MetalnessTexture", mesh->m_TextureAllocatorSlots[metalnessTextureIndex]);
-
-
-					// Creating the materials
-					std::string albedoTextureFilepath = materialsIn["AlbedoTextureFilepath"];
-					std::string normalTextureFilepath = materialsIn["NormalMapTextureFilepath"];
-					std::string roughnessTextureFilepath = materialsIn["RoughnessTextureFilepath"];
-					std::string metalnessTextureFilepath = materialsIn["MetalnessTextureFilepath"];
-
-					// Albedo texture
-					if (albedoTextureFilepath != "")
-					{
-						TextureSpecification textureSpec{};
-						textureSpec.Format = ImageFormat::RGBA8;
-						textureSpec.Usage = ImageUsage::ReadOnly;
-						textureSpec.UseMips = true;
-						Ref<Texture2D> albedoTexture = Texture2D::Create(albedoTextureFilepath, textureSpec);
-						if (albedoTexture->Loaded())
-						{
-							albedoTexture->GenerateMipMaps();
-
-							uint32_t textureId = mesh->m_TextureAllocatorSlots[albedoTextureIndex];
-							mesh->m_Textures[textureId] = albedoTexture;
-							mesh->m_TexturesFilepaths[i].AlbedoFilepath = albedoTextureFilepath;
-
-							BindlessAllocator::AddTextureCustomSlot(albedoTexture, textureId);
-						}
-						else
-						{
-							FROST_CORE_ERROR("Couldn't load albedo texture: {0}", albedoTextureFilepath);
-
-							uint32_t textureId = mesh->m_TextureAllocatorSlots[albedoTextureIndex];
-							mesh->m_Textures[textureId] = whiteTexture;
-
-							BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-						}
-					}
-					else
-					{
-						uint32_t textureId = mesh->m_TextureAllocatorSlots[albedoTextureIndex];
-						mesh->m_Textures[textureId] = whiteTexture;
-
-						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-					}
-
-
-					// Normal texture
-					if (normalTextureFilepath != "")
-					{
-						TextureSpecification textureSpec{};
-						textureSpec.Format = ImageFormat::RGBA8;
-						textureSpec.Usage = ImageUsage::ReadOnly;
-						Ref<Texture2D> normalTexture = Texture2D::Create(normalTextureFilepath, textureSpec);
-						if (normalTexture->Loaded())
-						{
-							uint32_t textureId = mesh->m_TextureAllocatorSlots[normalMapTextureIndex];
-							mesh->m_Textures[textureId] = normalTexture;
-							mesh->m_TexturesFilepaths[i].NormalMapFilepath = normalTextureFilepath;
-
-							BindlessAllocator::AddTextureCustomSlot(normalTexture, textureId);
-						}
-						else
-						{
-							FROST_CORE_ERROR("Couldn't load normal texture: {0}", normalTextureFilepath);
-
-							uint32_t textureId = mesh->m_TextureAllocatorSlots[normalMapTextureIndex];
-							mesh->m_Textures[textureId] = whiteTexture;
-
-							BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-						}
-					}
-					else
-					{
-						uint32_t textureId = mesh->m_TextureAllocatorSlots[normalMapTextureIndex];
-						mesh->m_Textures[textureId] = whiteTexture;
-
-						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-					}
-
-					// Roughness texture
-					if (roughnessTextureFilepath != "")
-					{
-						TextureSpecification textureSpec{};
-						textureSpec.Format = ImageFormat::RGBA8;
-						textureSpec.Usage = ImageUsage::ReadOnly;
-						Ref<Texture2D> roughnessTexture = Texture2D::Create(roughnessTextureFilepath, textureSpec);
-						if (roughnessTexture->Loaded())
-						{
-							uint32_t textureId = mesh->m_TextureAllocatorSlots[roughnessTextureIndex];
-							mesh->m_Textures[textureId] = roughnessTexture;
-							mesh->m_TexturesFilepaths[i].RoughnessMapFilepath = roughnessTextureFilepath;
-
-							BindlessAllocator::AddTextureCustomSlot(roughnessTexture, textureId);
-						}
-						else
-						{
-							FROST_CORE_ERROR("Couldn't load roughness texture: {0}", roughnessTextureFilepath);
-
-							uint32_t textureId = mesh->m_TextureAllocatorSlots[roughnessTextureIndex];
-							mesh->m_Textures[textureId] = whiteTexture;
-
-							BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-						}
-					}
-					else
-					{
-						uint32_t textureId = mesh->m_TextureAllocatorSlots[roughnessTextureIndex];
-						mesh->m_Textures[textureId] = whiteTexture;
-
-						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-					}
-
-					// Metalness texture
-					if (metalnessTextureFilepath != "")
-					{
-						TextureSpecification textureSpec{};
-						textureSpec.Format = ImageFormat::RGBA8;
-						textureSpec.Usage = ImageUsage::ReadOnly;
-						Ref<Texture2D> metalnessTexture = Texture2D::Create(metalnessTextureFilepath, textureSpec);
-						if (metalnessTexture->Loaded())
-						{
-							uint32_t textureId = mesh->m_TextureAllocatorSlots[metalnessTextureIndex];
-							mesh->m_Textures[textureId] = metalnessTexture;
-							mesh->m_TexturesFilepaths[i].MetalnessMapFilepath = metalnessTextureFilepath;
-
-							BindlessAllocator::AddTextureCustomSlot(metalnessTexture, textureId);
-						}
-						else
-						{
-							FROST_CORE_ERROR("Couldn't load roughness texture: {0}", metalnessTextureFilepath);
-
-							uint32_t textureId = mesh->m_TextureAllocatorSlots[metalnessTextureIndex];
-							mesh->m_Textures[textureId] = whiteTexture;
-
-							BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-						}
-					}
-					else
-					{
-						uint32_t textureId = mesh->m_TextureAllocatorSlots[metalnessTextureIndex];
-						mesh->m_Textures[textureId] = whiteTexture;
-
-						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-					}
-				}
-#endif
 			}
 
 			// Animation Component
@@ -756,10 +526,28 @@ namespace Frost
 				BoxColliderComponent& boxColliderComponent = ent.AddComponent<BoxColliderComponent>();
 				nlohmann::json boxColliderIn = entity["BoxColliderComponent"];
 
+				boxColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
 				boxColliderComponent.Size = { boxColliderIn["Size"][0], boxColliderIn["Size"][1], boxColliderIn["Size"][2] };
 				boxColliderComponent.Offset = { boxColliderIn["Offset"][0], boxColliderIn["Offset"][1], boxColliderIn["Offset"][2] };
 				boxColliderComponent.IsTrigger = boxColliderIn["IsTrigger"];
-				//boxColliderComponent.DebugMesh = Renderer::GetDefaultMeshes().Cube;
+
+				UUID materialAssetId = UUID(boxColliderIn["MaterialAssetID"]);
+				if (materialAssetId != 0)
+				{
+					const AssetMetadata& materialAssetMetadata = AssetManager::GetMetadata(materialAssetId);
+					Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(materialAssetMetadata.FilePath.string());
+
+					if (physicsMaterialAsset)
+					{
+						boxColliderComponent.MaterialHandle = physicsMaterialAsset;
+					}
+					else
+					{
+						FROST_CORE_ERROR("Physics Material with UUID {0} not found in the Asset Registry!", materialAssetId.Get());
+					}
+				}
+
+				
 			}
 
 			// Sphere Collider Component
@@ -768,9 +556,26 @@ namespace Frost
 				SphereColliderComponent& sphereColliderComponent = ent.AddComponent<SphereColliderComponent>();
 				nlohmann::json sphereColliderIn = entity["SphereColliderComponent"];
 
+				sphereColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
 				sphereColliderComponent.Radius = sphereColliderIn["Radius"];
 				sphereColliderComponent.Offset = { sphereColliderIn["Offset"][0], sphereColliderIn["Offset"][1], sphereColliderIn["Offset"][2] };
 				sphereColliderComponent.IsTrigger = sphereColliderIn["IsTrigger"];
+
+				UUID materialAssetId = UUID(sphereColliderIn["MaterialAssetID"]);
+				if (materialAssetId != 0)
+				{
+					const AssetMetadata& materialAssetMetadata = AssetManager::GetMetadata(materialAssetId);
+					Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(materialAssetMetadata.FilePath.string());
+
+					if (physicsMaterialAsset)
+					{
+						sphereColliderComponent.MaterialHandle = physicsMaterialAsset;
+					}
+					else
+					{
+						FROST_CORE_ERROR("Physics Material with UUID {0} not found in the Asset Registry!", materialAssetId.Get());
+					}
+				}
 			}
 
 			// Capsule Collider Component
@@ -779,10 +584,27 @@ namespace Frost
 				CapsuleColliderComponent& capsuleColliderComponent = ent.AddComponent<CapsuleColliderComponent>();
 				nlohmann::json capsuleColliderIn = entity["CapsuleColliderComponent"];
 
+				capsuleColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
 				capsuleColliderComponent.Radius = capsuleColliderIn["Radius"];
 				capsuleColliderComponent.Height = capsuleColliderIn["Height"];
 				capsuleColliderComponent.Offset = { capsuleColliderIn["Offset"][0], capsuleColliderIn["Offset"][1], capsuleColliderIn["Offset"][2] };
 				capsuleColliderComponent.IsTrigger = capsuleColliderIn["IsTrigger"];
+
+				UUID materialAssetId = UUID(capsuleColliderIn["MaterialAssetID"]);
+				if (materialAssetId != 0)
+				{
+					const AssetMetadata& materialAssetMetadata = AssetManager::GetMetadata(materialAssetId);
+					Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(materialAssetMetadata.FilePath.string());
+
+					if (physicsMaterialAsset)
+					{
+						capsuleColliderComponent.MaterialHandle = physicsMaterialAsset;
+					}
+					else
+					{
+						FROST_CORE_ERROR("Physics Material with UUID {0} not found in the Asset Registry!", materialAssetId.Get());
+					}
+				}
 			}
 
 			// Mesh Collider Component
@@ -791,6 +613,7 @@ namespace Frost
 				MeshColliderComponent& meshColliderComponent = ent.AddComponent<MeshColliderComponent>();
 				nlohmann::json meshColliderIn = entity["MeshColliderComponent"];
 
+				meshColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
 				meshColliderComponent.IsConvex = meshColliderIn["IsConvex"];
 				meshColliderComponent.IsTrigger = meshColliderIn["IsTrigger"];
 
@@ -810,6 +633,22 @@ namespace Frost
 							meshColliderComponent.ResetMesh();
 							FROST_CORE_WARN("[SceneSerializer] Mesh Colliders don't support dynamic meshes!");
 						}
+					}
+				}
+
+				UUID materialAssetId = UUID(meshColliderIn["MaterialAssetID"]);
+				if (materialAssetId != 0)
+				{
+					const AssetMetadata& materialAssetMetadata = AssetManager::GetMetadata(materialAssetId);
+					Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(materialAssetMetadata.FilePath.string());
+
+					if (physicsMaterialAsset)
+					{
+						meshColliderComponent.MaterialHandle = physicsMaterialAsset;
+					}
+					else
+					{
+						FROST_CORE_ERROR("Physics Material with UUID {0} not found in the Asset Registry!", materialAssetId.Get());
 					}
 				}
 			}
@@ -936,7 +775,7 @@ namespace Frost
 								publicField.SetStoredValue<glm::vec4>({ publicFieldJson["Value"][0], publicFieldJson["Value"][1], publicFieldJson["Value"][2], publicFieldJson["Value"][3] });
 								break;
 							}
-							case FieldType::ClassReference: break;// TODO: Not sure if storing a class reference would even make sense, because eventually the reference will differ
+							case FieldType::ClassReference: break;// TODO: Not sure if storing a class reference would even make any sense, because eventually the pointer address will differ
 							case FieldType::Asset: break; // TODO: Add assets (prefabs in our case)
 
 							case FieldType::Entity:

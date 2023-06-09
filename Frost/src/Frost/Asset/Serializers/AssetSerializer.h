@@ -33,6 +33,14 @@ namespace Frost
 	public:
 		virtual void Serialize(const AssetMetadata& metadata, Ref<Asset> asset) const override {}
 		virtual bool TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const override;
+		virtual Ref<Asset> CreateAssetRef(const AssetMetadata& metadata, void* pNext) const override { return nullptr; } // TODO: ?
+	};
+
+	class PhysicsMaterialSerializer : public AssetSerializer
+	{
+	public:
+		virtual void Serialize(const AssetMetadata& metadata, Ref<Asset> asset) const override;
+		virtual bool TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const override;
 		virtual Ref<Asset> CreateAssetRef(const AssetMetadata& metadata, void* pNext) const override;
 	};
 

@@ -8,6 +8,8 @@
 #include "Panels/MaterialEditor.h"
 #include "Panels/AssetBrowser.h"
 #include "Panels/TitlebarPanel.h"
+#include "Panels/MaterialAssetEditor.h"
+#include "Panels/PhysicsMaterialEditor.h"
 
 namespace Frost
 {
@@ -60,9 +62,15 @@ namespace Frost
 		Ref<SceneHierarchyPanel> m_SceneHierarchyPanel;
 		Ref<InspectorPanel> m_InspectorPanel;
 		Ref<ViewportPanel> m_ViewportPanel;
-		Ref<MaterialEditor> m_MaterialEditor;
+		//Ref<MaterialEditor> m_MaterialEditor;
 		Ref<TitlebarPanel> m_TitlebarPanel;
-		Ref<AssetBrowser> m_AssetBrowser;
+		//Ref<AssetBrowser> m_AssetBrowser;
+		Ref<MaterialAssetEditor> m_MaterialAssetEditor;
+		Ref<PhysicsMaterialEditor> m_PhysicsMaterialEditor;
+
+		bool m_ShowSceneHierarchyPanel = true;
+		bool m_ShowInspectorPanel = true;
+		bool m_ShowRendererDebugger = true;
 
 		// Variables
 		int32_t m_GuizmoMode = -1;

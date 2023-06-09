@@ -2,6 +2,8 @@
 
 #include "Frost/EntitySystem/Entity.h"
 #include "SceneHierarchyPanel.h"
+#include "MaterialAssetEditor.h"
+#include "PhysicsMaterialEditor.h"
 #include "Panel.h"
 
 namespace Frost
@@ -25,11 +27,23 @@ namespace Frost
 			FROST_ASSERT_INTERNAL(scene);
 			m_SceneHierarchy = scene;
 		}
+		void SetMaterialAssetEditor(Ref<MaterialAssetEditor> materialAssetEditor)
+		{
+			FROST_ASSERT_INTERNAL(materialAssetEditor);
+			m_MaterialAssetEditor = materialAssetEditor;
+		}
+		void SetPhysicsMaterialAssetEditor(Ref<MaterialAssetEditor> phyiscsMaterialEditor)
+		{
+			FROST_ASSERT_INTERNAL(phyiscsMaterialEditor);
+			m_PhysicsMaterialEditor = phyiscsMaterialEditor;
+		}
 	private:
 		void DrawComponents(Entity& entity);
 	private:
 		EditorLayer* m_Context = nullptr;
 		Ref<SceneHierarchyPanel> m_SceneHierarchy = nullptr;
+		Ref<MaterialAssetEditor> m_MaterialAssetEditor = nullptr;
+		Ref<PhysicsMaterialEditor> m_PhysicsMaterialEditor = nullptr;
 		std::string m_PanelNameImGui;
 
 		bool m_Visibility = true;

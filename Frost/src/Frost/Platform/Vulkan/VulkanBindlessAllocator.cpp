@@ -188,7 +188,6 @@ namespace Frost
 
 		m_TextureSlots[slot] = nullptr;
 		m_TextureSlots.erase(slot);
-		//m_EmptyTextureSlots.push(slot);
 	}
 
 	void VulkanBindlessAllocator::AddTextureInternal(uint32_t slot, const Ref<Texture2D>& texture2d)

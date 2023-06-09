@@ -6,6 +6,7 @@
 #include "Frost/Renderer/RuntimeCamera.h"
 #include "Frost/Script/ScriptModuleField.h"
 #include "Frost/Physics/PhysicsShapes.h"
+#include "Frost/Physics/PhysicsMaterial.h"
 
 // Math
 #include <glm/glm.hpp>
@@ -13,9 +14,6 @@
 
 namespace Frost
 {
-	// Forward declaration
-	//class ColliderShape;
-
 	struct IDComponent
 	{
 		IDComponent() = default;
@@ -234,7 +232,7 @@ namespace Frost
 		glm::vec3 Size = { 1.0f, 1.0f, 1.0f };
 		glm::vec3 Offset = { 0.0f, 0.0f, 0.0f };
 		bool IsTrigger = false;
-		//AssetHandle Material; // TODO: Physics material system?
+		Ref<PhysicsMaterial> MaterialHandle;
 
 		// Collider handle is used to manipulate the internal collider of the physics engine during runtime in the script engine
 		// Currently we don't have any other method of obtaning the collider handle, apart from this one
@@ -253,7 +251,7 @@ namespace Frost
 		float Radius = 0.5f;
 		glm::vec3 Offset = { 0.0f, 0.0f, 0.0f };
 		bool IsTrigger = false;
-		//AssetHandle Material; // TODO: Physics material system?
+		Ref<PhysicsMaterial> MaterialHandle;
 
 		// The mesh that will be drawn in the editor to show the collision bounds
 		Ref<MeshAsset> DebugMesh;
@@ -273,7 +271,7 @@ namespace Frost
 		float Height = 1.0f;
 		glm::vec3 Offset = { 0.0f, 0.0f, 0.0f };
 		bool IsTrigger = false;
-		//AssetHandle Material;  // TODO: Physics material system?
+		Ref<PhysicsMaterial> MaterialHandle;
 
 		// The mesh that will be drawn in the editor to show the collision bounds
 		Ref<MeshAsset> DebugMesh;
@@ -294,7 +292,7 @@ namespace Frost
 		bool IsConvex = false;
 		bool IsTrigger = false;
 		bool OverrideMesh = false; // TODO: What to do with this?
-		//AssetHandle Material;
+		Ref<PhysicsMaterial> MaterialHandle;
 
 		// Collider handle is used to manipulate the internal collider of the physics engine during runtime in the script engine
 		// Currently we don't have any other method of obtaning the collider handle, apart from this one

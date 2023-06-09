@@ -5,11 +5,13 @@
 #include "Frost/Renderer/Mesh.h"
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/Renderer/MaterialAsset.h"
+#include "Frost/Physics/PhysicsMaterial.h"
 
 #include <json/nlohmann/json.hpp>
 
 namespace Frost
 {
+	static std::string GetNameFromFilepath(const std::string& filepath);
 
 	bool MeshAssetSeralizer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const
 	{
@@ -64,6 +66,7 @@ namespace Frost
 		Ref<MaterialAsset> materialAsset = Ref<MaterialAsset>::Create();
 		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
 		std::string filepath = AssetManager::GetFileSystemPathString(metadata);
+		materialAsset->SetMaterialName(GetNameFromFilepath(filepath));
 
 		std::string content;
 		std::ifstream instream(filepath);
@@ -208,11 +211,8 @@ namespace Frost
 	bool TextureAssetSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const
 	{
 		std::string filepath = AssetManager::GetFileSystemPathString(metadata);
-		TextureSpecification textureSpec = *(TextureSpecification*)pNext;
-		//textureSpec.Format = ImageFormat::RGBA8;
-		//textureSpec.Usage = ImageUsage::ReadOnly; // Technically speaking, all texture assets should be `ReadOnly`
-		//textureSpec.UseMips = false;
 
+		TextureSpecification textureSpec = *(TextureSpecification*)pNext;
 		asset = Texture2D::Create(filepath, textureSpec).As<Asset>();
 
 		if (asset.As<Texture2D>()->Loaded())
@@ -225,23 +225,75 @@ namespace Frost
 		return false;
 	}
 
-	Ref<Asset> TextureAssetSerializer::CreateAssetRef(const AssetMetadata& metadata, void* pNext) const
+	void PhysicsMaterialSerializer::Serialize(const AssetMetadata& metadata, Ref<Asset> asset) const
 	{
-#if 0
 		std::string filepath = AssetManager::GetFileSystemPathString(metadata);
-		TextureSpecification textureSpec = *(TextureSpecification*)pNext;
 
-		Ref<Texture2D> textureAsset = Texture2D::Create(filepath, textureSpec);
+		std::ofstream istream(filepath);
+		istream.clear();
 
-		if (textureAsset->Loaded())
-		{
-			textureAsset->SetFlag(AssetFlag::None);
-			return textureAsset;
-		}
+		nlohmann::ordered_json out = nlohmann::ordered_json();
 
-		return nullptr;
-#endif
-		return nullptr;
+		Ref<PhysicsMaterial> physicsMaterial = asset.As<PhysicsMaterial>();
+
+		out["StaticFriction"] = physicsMaterial->StaticFriction;
+		out["DynamicFriction"] = physicsMaterial->DynamicFriction;
+		out["Bounciness"] = physicsMaterial->Bounciness;
+
+		istream << out.dump(4);
+		istream.close();
 	}
 
+	bool PhysicsMaterialSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const
+	{
+		Ref<PhysicsMaterial> physicsMaterial = Ref<PhysicsMaterial>::Create();
+		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
+		std::string filepath = AssetManager::GetFileSystemPathString(metadata);
+		physicsMaterial->m_MaterialName = GetNameFromFilepath(filepath);
+
+		std::string content;
+		std::ifstream instream(filepath);
+
+		if (!instream.is_open())
+		{
+			asset = nullptr;
+			return false;
+		}
+		asset = physicsMaterial.As<Asset>();
+
+		// Get the scene name from filepath
+		instream.seekg(0, std::ios::end);
+		size_t size = instream.tellg();
+		content.resize(size);
+
+		instream.seekg(0, std::ios::beg);
+		instream.read(&content[0], size);
+		instream.close();
+
+		// Parse the json file
+		nlohmann::json in = nlohmann::json::parse(content);
+
+		physicsMaterial->StaticFriction = in["StaticFriction"];
+		physicsMaterial->DynamicFriction = in["DynamicFriction"];
+		physicsMaterial->Bounciness = in["Bounciness"];
+
+		return true;
+	}
+
+	Ref<Asset> PhysicsMaterialSerializer::CreateAssetRef(const AssetMetadata& metadata, void* pNext) const
+	{
+		Ref<PhysicsMaterial> physicsMaterialAsset = Ref<PhysicsMaterial>::Create();
+		physicsMaterialAsset->SetFlag(AssetFlag::None);
+		return physicsMaterialAsset.As<Asset>();
+	}
+
+	static std::string GetNameFromFilepath(const std::string& filepath)
+	{
+		auto lastSlash = filepath.find_last_of("/\\");
+		lastSlash = lastSlash == std::string::npos ? 0 : lastSlash + 1;
+		auto lastDot = filepath.rfind(".");
+		auto count = lastDot == std::string::npos ? filepath.size() - lastSlash : lastDot - lastSlash;
+
+		return filepath.substr(lastSlash, count);
+	}
 }

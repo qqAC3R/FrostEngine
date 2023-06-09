@@ -38,7 +38,7 @@ namespace Frost
 		PhysicsEngine::Initialize();
 		ScriptEngine::Init("Resources/Scripts/FrostScriptCore.dll");
 
-		Ref<Project> project = Project::Deserialize("D:\\Visual Studio\\FrostEngine\\master\\FrostEditor\\SandboxProject\\Sandbox.fproj");
+		Ref<Project> project = Project::Deserialize("D:\\Visual Studio\\FrostEngine\\master\\FrostEditor\\SandboxProject\\Sandbox.fproj"); // Hardcoded currently
 		Project::SetActive(project);
 		Application::Get().GetWindow().SetWindowProjectName(Project::GetProjectName());
 	}

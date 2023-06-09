@@ -13,6 +13,7 @@
 
 #include "Frost/Physics/PhysX/CookingFactory.h"
 #include "Frost/Physics/PhysicsLayer.h"
+#include "Frost/Physics/PhysicsMaterial.h"
 #include "Frost/Script/ScriptEngine.h"
 #include "EditorLayer.h"
 
@@ -354,7 +355,7 @@ namespace Frost
 		{
 			meshColliderComponent = &entity.GetComponent<MeshColliderComponent>();
 		}
-		DrawComponent<MeshComponent>("MESH", entity, [meshColliderComponent, animationComponent](auto& component)
+		DrawComponent<MeshComponent>("MESH", entity, [&, meshColliderComponent, animationComponent](auto& component)
 		{
 			std::string meshFilepath = "";
 			if (component.Mesh.Raw() != nullptr)
@@ -370,13 +371,6 @@ namespace Frost
 			std::string path = UserInterface::DrawFilePath("File Path", meshFilepath, "fbx");
 			if (!path.empty())
 			{
-				//component.Mesh = MeshAsset::Load(path);
-#if 0
-				Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(path);
-				if(!meshAsset)
-					meshAsset = AssetManager::CreateNewAsset<MeshAsset>(path);
-
-#endif
 				Ref<MeshAsset> meshAsset = AssetManager::GetOrLoadAsset<MeshAsset>(path);
 				component.Mesh = Ref<Mesh>::Create(meshAsset);
 
@@ -433,14 +427,13 @@ namespace Frost
 								ImGui::Text(materialIndexStr.c_str());
 
 								ImGui::TableNextColumn();
-								std::string materialName = component.Mesh->GetMeshAsset()->GetMaterialNames()[materialIndex];
+								std::string materialName = component.Mesh->GetMaterialAsset(materialIndex)->GetMaterialName();
 								if (materialName.empty())
 									materialName = "Default";
 								if (component.Mesh->GetMaterialAsset(materialIndex)->Handle != 0)
 								{
-									ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 25.0f, 20.0f });
-									ImGui::SameLine();
-									ImGui::Button("X", {20.0f, 20.0f});
+									// We are setting -38.0f to make some room for the "X" button
+									ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
 								}
 								else
 								{
@@ -469,15 +462,36 @@ namespace Frost
 
 								if (ImGui::BeginPopup("SaveMaterial"))
 								{
+									if (component.Mesh->GetMaterialAsset(materialIndex)->Handle != 0)
+									{
+										if (ImGui::MenuItem("Edit"))
+										{
+											m_MaterialAssetEditor->SetVisibility(true);
+											m_MaterialAssetEditor->SetActiveMaterialAset(component.Mesh->GetMaterialAsset(materialIndex));
+										}
+										if (ImGui::MenuItem("Save"))
+										{
+											AssetImporter::Serialize(component.Mesh->GetMaterialAsset(materialIndex));
+										}
+									}
 									if (ImGui::MenuItem("Save As"))
 									{
 										std::string materialPath = FileDialogs::SaveFile("");
 
 										if (!materialPath.empty())
 										{
-											Ref<MaterialAsset> materialAsset = AssetManager::GetOrLoadAsset<MaterialAsset>(materialPath);
-											if(!materialAsset)
-												materialAsset = AssetManager::CreateNewAsset<MaterialAsset>(materialPath);
+											bool isAssetAlreadyLoaded = true;
+											// Check if the material asset is loaded
+											Ref<MaterialAsset> materialAsset = AssetManager::GetAsset<MaterialAsset>(materialPath);
+											if (!materialAsset)
+											{
+												// If it is not, then load (or if it doesn't exist, create it) and set `isAssetAlreadyLoaded` to false
+												materialAsset = AssetManager::LoadAsset<MaterialAsset>(materialPath);
+
+												if(!materialAsset)
+													materialAsset = AssetManager::CreateNewAsset<MaterialAsset>(materialPath);
+												isAssetAlreadyLoaded = false;
+											}
 
 											Ref<Mesh> mesh = component.Mesh;
 
@@ -509,10 +523,38 @@ namespace Frost
 											float emission = materialData->Get<float>("EmissionFactor");
 											materialAsset->SetEmission(emission);
 
-											AssetManager::RemoveAssetFromMemory(materialAsset->Handle);
+											if (!isAssetAlreadyLoaded)
+											{
+												// If the material asset doesn't exist (or not loaded in the engine), then we are temporarily creating one.
+												// The only purpose of using `CreateNewAsset` is to register the asset into the registry file.
+												// After that we delete the asset.
+												AssetManager::RemoveAssetFromMemory(materialAsset->Handle);
+											}
+											else
+											{
+												// If the asset is already loaded, we have to set it to the current material's parameters (already has been done)
+												// and seralize the material asset
+												AssetImporter::Serialize(materialAsset);
+											}
 										}
+
 									}
+
+
+
+
+
 									ImGui::EndPopup();
+								}
+
+								// If the material asset is not default, there should be an option to delete it and set it to the default
+								if (component.Mesh->GetMaterialAsset(materialIndex)->Handle != 0)
+								{
+									ImGui::SameLine();
+									if (ImGui::Button("X", { 25.0f, 20.0f }))
+									{
+										component.Mesh->SetMaterialAssetToDefault(materialIndex);
+									}
 								}
 
 
@@ -1087,8 +1129,132 @@ namespace Frost
 			if (ImGui::BeginTable("BoxColliderComponent", 2, flags))
 			{
 
+				// Physics Material Editor
 				{
 					ImGui::PushID(0);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Physics Material");
+
+					ImGui::TableNextColumn();
+					std::string materialName = "Default";
+
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle.Get() != 0)
+							materialName = component.MaterialHandle->m_MaterialName;
+					}
+
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle.Get() != 0)
+						{
+							// We are setting -38.0f to make some room for the "X" button
+							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
+						}
+					}
+					else
+					{
+						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+					}
+
+					// Opening a new Material
+					if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && ImGui::IsItemHovered())
+					{
+						std::string materialPath = FileDialogs::OpenFile("");
+						if (!materialPath.empty())
+						{
+							Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(materialPath);
+							component.MaterialHandle = physicsMaterialAsset;
+						}
+					}
+
+					// Saving Material
+					if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsItemHovered())
+					{
+						ImGui::OpenPopup("SavePhysicsMaterial");
+					}
+
+					if (ImGui::BeginPopup("SavePhysicsMaterial"))
+					{
+						if (component.MaterialHandle)
+						{
+							if (component.MaterialHandle->Handle != 0)
+							{
+								if (ImGui::MenuItem("Edit"))
+								{
+									m_PhysicsMaterialEditor->SetVisibility(true);
+									m_PhysicsMaterialEditor->SetActiveMaterialAset(component.MaterialHandle);
+								}
+								if (ImGui::MenuItem("Save"))
+								{
+									AssetImporter::Serialize(component.MaterialHandle);
+								}
+							}
+						}
+						if (ImGui::MenuItem("Save As"))
+						{
+							std::string materialPath = FileDialogs::SaveFile("");
+
+							if (!materialPath.empty())
+							{
+								bool isAssetAlreadyLoaded = true;
+								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetAsset<PhysicsMaterial>(materialPath);
+								if (!physicsMaterialAsset)
+								{
+									// We are temporarily creating (or loading) a physics material asset.
+									// The only purpose of using `LoadAsset` or `CreateNewAsset` is to register the asset into the registry file and set the parameters.
+									// After that we serialize and delete the asset from memory.
+									physicsMaterialAsset = AssetManager::LoadAsset<PhysicsMaterial>(materialPath);
+									if (!physicsMaterialAsset)
+										physicsMaterialAsset = AssetManager::CreateNewAsset<PhysicsMaterial>(materialPath);
+
+									isAssetAlreadyLoaded = false;
+								}
+
+								// If the component has already a valid asset, we have to set to the current physics material's parameters
+								if (component.MaterialHandle)
+								{
+									physicsMaterialAsset->StaticFriction = component.MaterialHandle->StaticFriction;
+									physicsMaterialAsset->DynamicFriction = component.MaterialHandle->DynamicFriction;
+									physicsMaterialAsset->Bounciness = component.MaterialHandle->Bounciness;
+								}
+								else
+								{
+									// Creating a new temporary phyiscs material to just retrieve the default parameters
+									Ref<PhysicsMaterial> physicsMaterialTemporay = Ref<PhysicsMaterial>::Create();
+									physicsMaterialAsset->StaticFriction = physicsMaterialTemporay->StaticFriction;
+									physicsMaterialAsset->DynamicFriction = physicsMaterialTemporay->DynamicFriction;
+									physicsMaterialAsset->Bounciness = physicsMaterialTemporay->Bounciness;
+								}
+
+								AssetImporter::Serialize(physicsMaterialAsset);
+
+								if(!isAssetAlreadyLoaded)
+									AssetManager::RemoveAssetFromMemory(physicsMaterialAsset->Handle);
+							}
+						}
+						ImGui::EndPopup();
+					}
+
+					// If the physics material asset is not default, there should be an option to delete it and set it to the default
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle != 0)
+						{
+							ImGui::SameLine();
+							if (ImGui::Button("X", { 25.0f, 20.0f }))
+							{
+								component.MaterialHandle = nullptr;
+							}
+						}
+					}
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(1);
 
 					ImGui::TableNextColumn();
 					ImGui::Text("Size");
@@ -1101,7 +1267,7 @@ namespace Frost
 				}
 
 				{
-					ImGui::PushID(1);
+					ImGui::PushID(2);
 
 					ImGui::TableNextColumn();
 					ImGui::Text("Is Trigger");
@@ -1114,7 +1280,7 @@ namespace Frost
 				}
 
 				{
-					ImGui::PushID(2);
+					ImGui::PushID(3);
 
 					ImGui::TableNextColumn();
 					ImGui::Text("Offset");
@@ -1139,15 +1305,126 @@ namespace Frost
 			if (ImGui::BeginTable("SphereColliderComponent", 2, flags))
 			{
 
+				// Physics Material Editor
 				{
 					ImGui::PushID(0);
 
 					ImGui::TableNextColumn();
-					ImGui::Text("Radius");
+					ImGui::Text("Physics Material");
 
 					ImGui::TableNextColumn();
-					ImGui::PushItemWidth(-1);
-					UserInterface::DragFloat("", component.Radius, 0.1f, 0.0f, 1000.0f);
+					std::string materialName = "Default";
+
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle.Get() != 0)
+							materialName = component.MaterialHandle->m_MaterialName;
+					}
+
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle.Get() != 0)
+						{
+							// We are setting -38.0f to make some room for the "X" button
+							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
+						}
+					}
+					else
+					{
+						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+					}
+
+					// Opening a new Material
+					if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && ImGui::IsItemHovered())
+					{
+						std::string materialPath = FileDialogs::OpenFile("");
+						if (!materialPath.empty())
+						{
+							Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(materialPath);
+							component.MaterialHandle = physicsMaterialAsset;
+						}
+					}
+
+					// Saving Material
+					if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsItemHovered())
+					{
+						ImGui::OpenPopup("SavePhysicsMaterial");
+					}
+
+					if (ImGui::BeginPopup("SavePhysicsMaterial"))
+					{
+						if (component.MaterialHandle)
+						{
+							if (component.MaterialHandle->Handle != 0)
+							{
+								if (ImGui::MenuItem("Edit"))
+								{
+									m_PhysicsMaterialEditor->SetVisibility(true);
+									m_PhysicsMaterialEditor->SetActiveMaterialAset(component.MaterialHandle);
+								}
+								if (ImGui::MenuItem("Save"))
+								{
+									AssetImporter::Serialize(component.MaterialHandle);
+								}
+							}
+						}
+						if (ImGui::MenuItem("Save As"))
+						{
+							std::string materialPath = FileDialogs::SaveFile("");
+
+							if (!materialPath.empty())
+							{
+								bool isAssetAlreadyLoaded = true;
+								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetAsset<PhysicsMaterial>(materialPath);
+								if (!physicsMaterialAsset)
+								{
+									// We are temporarily creating (or loading) a physics material asset.
+									// The only purpose of using `LoadAsset` or `CreateNewAsset` is to register the asset into the registry file and set the parameters.
+									// After that we serialize and delete the asset from memory.
+									physicsMaterialAsset = AssetManager::LoadAsset<PhysicsMaterial>(materialPath);
+									if (!physicsMaterialAsset)
+										physicsMaterialAsset = AssetManager::CreateNewAsset<PhysicsMaterial>(materialPath);
+
+									isAssetAlreadyLoaded = false;
+								}
+
+								// If the component has already a valid asset, we have to set to the current physics material's parameters
+								if (component.MaterialHandle)
+								{
+									physicsMaterialAsset->StaticFriction = component.MaterialHandle->StaticFriction;
+									physicsMaterialAsset->DynamicFriction = component.MaterialHandle->DynamicFriction;
+									physicsMaterialAsset->Bounciness = component.MaterialHandle->Bounciness;
+								}
+								else
+								{
+									// Creating a new temporary phyiscs material to just retrieve the default parameters
+									Ref<PhysicsMaterial> physicsMaterialTemporay = Ref<PhysicsMaterial>::Create();
+									physicsMaterialAsset->StaticFriction = physicsMaterialTemporay->StaticFriction;
+									physicsMaterialAsset->DynamicFriction = physicsMaterialTemporay->DynamicFriction;
+									physicsMaterialAsset->Bounciness = physicsMaterialTemporay->Bounciness;
+								}
+
+								AssetImporter::Serialize(physicsMaterialAsset);
+
+								if (!isAssetAlreadyLoaded)
+									AssetManager::RemoveAssetFromMemory(physicsMaterialAsset->Handle);
+							}
+						}
+						ImGui::EndPopup();
+					}
+
+					// If the physics material asset is not default, there should be an option to delete it and set it to the default
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle != 0)
+						{
+							ImGui::SameLine();
+							if (ImGui::Button("X", { 25.0f, 20.0f }))
+							{
+								component.MaterialHandle = nullptr;
+							}
+						}
+					}
 
 					ImGui::PopID();
 				}
@@ -1156,64 +1433,11 @@ namespace Frost
 					ImGui::PushID(1);
 
 					ImGui::TableNextColumn();
-					ImGui::Text("Is Trigger");
-
-					ImGui::TableNextColumn();
-					ImGui::PushItemWidth(-1);
-					UserInterface::CheckBox("", component.IsTrigger);
-
-					ImGui::PopID();
-				}
-
-				{
-					ImGui::PushID(2);
-
-					ImGui::TableNextColumn();
-					ImGui::Text("Offset");
-
-					ImGui::TableNextColumn();
-					ImGui::PushItemWidth(-1);
-					ImGui::DragFloat3("", &component.Offset.x, 0.1f, -1000.0f, 1000.0f);
-
-					ImGui::PopID();
-				}
-
-				ImGui::EndTable();
-			}
-
-			ImGui::PopStyleVar();
-		});
-
-
-		DrawComponent<CapsuleColliderComponent>("CAPSULE COLLIDER", entity, [&](auto& component)
-		{
-			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
-			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
-			if (ImGui::BeginTable("CapsuleColliderComponent", 2, flags))
-			{
-
-				{
-					ImGui::PushID(0);
-
-					ImGui::TableNextColumn();
 					ImGui::Text("Radius");
 
 					ImGui::TableNextColumn();
 					ImGui::PushItemWidth(-1);
 					UserInterface::DragFloat("", component.Radius, 0.1f, 0.0f, 1000.0f);
-
-					ImGui::PopID();
-				}
-
-				{
-					ImGui::PushID(1);
-
-					ImGui::TableNextColumn();
-					ImGui::Text("Height");
-
-					ImGui::TableNextColumn();
-					ImGui::PushItemWidth(-1);
-					UserInterface::DragFloat("", component.Height, 0.1f, 0.0f, 1000.0f);
 
 					ImGui::PopID();
 				}
@@ -1250,13 +1474,328 @@ namespace Frost
 			ImGui::PopStyleVar();
 		});
 
+
+		DrawComponent<CapsuleColliderComponent>("CAPSULE COLLIDER", entity, [&](auto& component)
+		{
+			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+			if (ImGui::BeginTable("CapsuleColliderComponent", 2, flags))
+			{
+
+				// Physics Material Editor
+				{
+					ImGui::PushID(0);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Physics Material");
+
+					ImGui::TableNextColumn();
+					std::string materialName = "Default";
+
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle.Get() != 0)
+							materialName = component.MaterialHandle->m_MaterialName;
+					}
+
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle.Get() != 0)
+						{
+							// We are setting -38.0f to make some room for the "X" button
+							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
+						}
+					}
+					else
+					{
+						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+					}
+
+					// Opening a new Material
+					if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && ImGui::IsItemHovered())
+					{
+						std::string materialPath = FileDialogs::OpenFile("");
+						if (!materialPath.empty())
+						{
+							Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(materialPath);
+							component.MaterialHandle = physicsMaterialAsset;
+						}
+					}
+
+					// Saving Material
+					if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsItemHovered())
+					{
+						ImGui::OpenPopup("SavePhysicsMaterial");
+					}
+
+					if (ImGui::BeginPopup("SavePhysicsMaterial"))
+					{
+						if (component.MaterialHandle)
+						{
+							if (component.MaterialHandle->Handle != 0)
+							{
+								if (ImGui::MenuItem("Edit"))
+								{
+									m_PhysicsMaterialEditor->SetVisibility(true);
+									m_PhysicsMaterialEditor->SetActiveMaterialAset(component.MaterialHandle);
+								}
+								if (ImGui::MenuItem("Save"))
+								{
+									AssetImporter::Serialize(component.MaterialHandle);
+								}
+							}
+						}
+						if (ImGui::MenuItem("Save As"))
+						{
+							std::string materialPath = FileDialogs::SaveFile("");
+
+							if (!materialPath.empty())
+							{
+								bool isAssetAlreadyLoaded = true;
+								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetAsset<PhysicsMaterial>(materialPath);
+								if (!physicsMaterialAsset)
+								{
+									// We are temporarily creating (or loading) a physics material asset.
+									// The only purpose of using `LoadAsset` or `CreateNewAsset` is to register the asset into the registry file and set the parameters.
+									// After that we serialize and delete the asset from memory.
+									physicsMaterialAsset = AssetManager::LoadAsset<PhysicsMaterial>(materialPath);
+									if (!physicsMaterialAsset)
+										physicsMaterialAsset = AssetManager::CreateNewAsset<PhysicsMaterial>(materialPath);
+
+									isAssetAlreadyLoaded = false;
+								}
+
+								// If the component has already a valid asset, we have to set to the current physics material's parameters
+								if (component.MaterialHandle)
+								{
+									physicsMaterialAsset->StaticFriction = component.MaterialHandle->StaticFriction;
+									physicsMaterialAsset->DynamicFriction = component.MaterialHandle->DynamicFriction;
+									physicsMaterialAsset->Bounciness = component.MaterialHandle->Bounciness;
+								}
+								else
+								{
+									// Creating a new temporary phyiscs material to just retrieve the default parameters
+									Ref<PhysicsMaterial> physicsMaterialTemporay = Ref<PhysicsMaterial>::Create();
+									physicsMaterialAsset->StaticFriction = physicsMaterialTemporay->StaticFriction;
+									physicsMaterialAsset->DynamicFriction = physicsMaterialTemporay->DynamicFriction;
+									physicsMaterialAsset->Bounciness = physicsMaterialTemporay->Bounciness;
+								}
+
+								AssetImporter::Serialize(physicsMaterialAsset);
+
+								if (!isAssetAlreadyLoaded)
+									AssetManager::RemoveAssetFromMemory(physicsMaterialAsset->Handle);
+							}
+						}
+						ImGui::EndPopup();
+					}
+
+					// If the physics material asset is not default, there should be an option to delete it and set it to the default
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle != 0)
+						{
+							ImGui::SameLine();
+							if (ImGui::Button("X", { 25.0f, 20.0f }))
+							{
+								component.MaterialHandle = nullptr;
+							}
+						}
+					}
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(1);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Radius");
+
+					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
+					UserInterface::DragFloat("", component.Radius, 0.1f, 0.0f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(2);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Height");
+
+					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
+					UserInterface::DragFloat("", component.Height, 0.1f, 0.0f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(3);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Is Trigger");
+
+					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
+					UserInterface::CheckBox("", component.IsTrigger);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(4);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Offset");
+
+					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
+					ImGui::DragFloat3("", &component.Offset.x, 0.1f, -1000.0f, 1000.0f);
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+
+			ImGui::PopStyleVar();
+		});
+
 		DrawComponent<MeshColliderComponent>("MESH COLLIDER", entity, [&](auto& component)
 		{
 			constexpr ImGuiTableFlags flags{};
 			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
 			if (ImGui::BeginTable("MeshColliderProperties", 1, flags))
 			{
-				ImGui::PushID(0);
+
+				// Physics Material Editor
+				{
+					ImGui::PushID(0);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Physics Material");
+
+					ImGui::TableNextColumn();
+					std::string materialName = "Default";
+
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle.Get() != 0)
+							materialName = component.MaterialHandle->m_MaterialName;
+					}
+
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle.Get() != 0)
+						{
+							// We are setting -38.0f to make some room for the "X" button
+							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
+						}
+					}
+					else
+					{
+						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+					}
+
+					// Opening a new Material
+					if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && ImGui::IsItemHovered())
+					{
+						std::string materialPath = FileDialogs::OpenFile("");
+						if (!materialPath.empty())
+						{
+							Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(materialPath);
+							component.MaterialHandle = physicsMaterialAsset;
+						}
+					}
+
+					// Saving Material
+					if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsItemHovered())
+					{
+						ImGui::OpenPopup("SavePhysicsMaterial");
+					}
+
+					if (ImGui::BeginPopup("SavePhysicsMaterial"))
+					{
+						if (component.MaterialHandle)
+						{
+							if (component.MaterialHandle->Handle != 0)
+							{
+								if (ImGui::MenuItem("Edit"))
+								{
+									m_PhysicsMaterialEditor->SetVisibility(true);
+									m_PhysicsMaterialEditor->SetActiveMaterialAset(component.MaterialHandle);
+								}
+								if (ImGui::MenuItem("Save"))
+								{
+									AssetImporter::Serialize(component.MaterialHandle);
+								}
+							}
+						}
+						if (ImGui::MenuItem("Save As"))
+						{
+							std::string materialPath = FileDialogs::SaveFile("");
+
+							if (!materialPath.empty())
+							{
+								bool isAssetAlreadyLoaded = true;
+								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetAsset<PhysicsMaterial>(materialPath);
+								if (!physicsMaterialAsset)
+								{
+									// We are temporarily creating (or loading) a physics material asset.
+									// The only purpose of using `LoadAsset` or `CreateNewAsset` is to register the asset into the registry file and set the parameters.
+									// After that we serialize and delete the asset from memory.
+									physicsMaterialAsset = AssetManager::LoadAsset<PhysicsMaterial>(materialPath);
+									if (!physicsMaterialAsset)
+										physicsMaterialAsset = AssetManager::CreateNewAsset<PhysicsMaterial>(materialPath);
+
+									isAssetAlreadyLoaded = false;
+								}
+
+								// If the component has already a valid asset, we have to set to the current physics material's parameters
+								if (component.MaterialHandle)
+								{
+									physicsMaterialAsset->StaticFriction = component.MaterialHandle->StaticFriction;
+									physicsMaterialAsset->DynamicFriction = component.MaterialHandle->DynamicFriction;
+									physicsMaterialAsset->Bounciness = component.MaterialHandle->Bounciness;
+								}
+								else
+								{
+									// Creating a new temporary phyiscs material to just retrieve the default parameters
+									Ref<PhysicsMaterial> physicsMaterialTemporay = Ref<PhysicsMaterial>::Create();
+									physicsMaterialAsset->StaticFriction = physicsMaterialTemporay->StaticFriction;
+									physicsMaterialAsset->DynamicFriction = physicsMaterialTemporay->DynamicFriction;
+									physicsMaterialAsset->Bounciness = physicsMaterialTemporay->Bounciness;
+								}
+
+								AssetImporter::Serialize(physicsMaterialAsset);
+
+								if (!isAssetAlreadyLoaded)
+									AssetManager::RemoveAssetFromMemory(physicsMaterialAsset->Handle);
+							}
+						}
+						ImGui::EndPopup();
+					}
+
+					// If the physics material asset is not default, there should be an option to delete it and set it to the default
+					if (component.MaterialHandle)
+					{
+						if (component.MaterialHandle->Handle != 0)
+						{
+							ImGui::SameLine();
+							if (ImGui::Button("X", { 25.0f, 20.0f }))
+							{
+								component.MaterialHandle = nullptr;
+							}
+						}
+					}
+
+					ImGui::PopID();
+				}
+
+				ImGui::PushID(1);
 
 				std::string componentBodyType = "Triangle";
 				if (component.IsConvex)
@@ -1301,7 +1840,7 @@ namespace Frost
 			{
 
 				{
-					ImGui::PushID(1);
+					ImGui::PushID(2);
 
 					ImGui::TableNextColumn();
 					ImGui::Text("Is Trigger");

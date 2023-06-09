@@ -51,21 +51,34 @@ namespace Frost
 		m_SceneHierarchyPanel->Init(nullptr);
 		m_SceneHierarchyPanel->SetSceneContext(m_CurrentScene);
 
+		// Material Asset Editor initialization
+		m_MaterialAssetEditor = Ref<MaterialAssetEditor>::Create();
+		m_MaterialAssetEditor->Init(nullptr);
+		m_MaterialAssetEditor->SetVisibility(false);
+
+		// Phyisics Material Editor initialization
+		m_PhysicsMaterialEditor = Ref<PhysicsMaterialEditor>::Create();
+		m_PhysicsMaterialEditor->Init(nullptr);
+		m_PhysicsMaterialEditor->SetVisibility(false);
+
 		// Inspector Panel initialization
 		m_InspectorPanel = Ref<InspectorPanel>::Create(this);
 		m_InspectorPanel->Init(nullptr);
 		m_InspectorPanel->SetHierarchy(m_SceneHierarchyPanel);
+		m_InspectorPanel->SetMaterialAssetEditor(m_MaterialAssetEditor);
+		m_InspectorPanel->SetPhysicsMaterialAssetEditor(m_PhysicsMaterialEditor);
 
+		// Viewport Panel initialization
 		m_ViewportPanel = Ref<ViewportPanel>::Create();
 		m_ViewportPanel->Init(nullptr);
 		m_ViewportPanel->SetScenePlayFunction(std::bind(&EditorLayer::OnScenePlay, this));
 		m_ViewportPanel->SetSceneStopFunction(std::bind(&EditorLayer::OnSceneStop, this));
 
-		m_MaterialEditor = Ref<MaterialEditor>::Create();
-		m_MaterialEditor->Init(nullptr);
+		//m_MaterialEditor = Ref<MaterialEditor>::Create();
+		//m_MaterialEditor->Init(nullptr);
 
-		m_AssetBrowser = Ref<AssetBrowser>::Create();
-		m_AssetBrowser->Init(nullptr);
+		//m_AssetBrowser = Ref<AssetBrowser>::Create();
+		//m_AssetBrowser->Init(nullptr);
 
 		m_TitlebarPanel = Ref<TitlebarPanel>::Create();
 		m_TitlebarPanel->Init(nullptr);
@@ -212,12 +225,28 @@ namespace Frost
 					if (ImGui::MenuItem("Physics Collider Visualization", "", &m_EnablePhysicsVisualization))
 					{
 					}
-						
+					ImGui::EndPopup();
+				}
+
+				ImGui::SameLine();
+
+				if (ImGui::Button("View"))
+					ImGui::OpenPopup("ViewPopup");
+				if (ImGui::BeginPopup("ViewPopup"))
+				{
+					ImGui::MenuItem("Scene Hierarchy", "", &m_ShowSceneHierarchyPanel);
+					ImGui::MenuItem("Inspector Panel", "", &m_ShowInspectorPanel);
+					ImGui::MenuItem("Renderer Debugger", "", &m_ShowRendererDebugger);
 
 					ImGui::EndPopup();
 				}
+
 			});
 			m_TitlebarPanel->Render();
+
+			
+			m_SceneHierarchyPanel->SetVisibility(m_ShowSceneHierarchyPanel);
+			m_InspectorPanel->SetVisibility(m_ShowInspectorPanel);
 
 
 			if (opt_fullscreen)
@@ -248,10 +277,8 @@ namespace Frost
 			ImGui::End();
 
 
+			
 
-
-
-			Renderer::RenderDebugger();
 
 			// Scene hierarchy panel rendering
 			m_SceneHierarchyPanel->Render();
@@ -259,14 +286,26 @@ namespace Frost
 			// Inspector panel rendering
 			m_InspectorPanel->Render();
 
-
+#if 0
 			// Material editor rendering
 			m_MaterialEditor->SetActiveEntity(m_SceneHierarchyPanel->GetSelectedEntity());
 			m_MaterialEditor->SetActiveSubmesh(m_SceneHierarchyPanel->GetSelectedEntitySubmesh());
 			m_MaterialEditor->Render();
+#endif
 
+			// Material Asset Editor
+			m_MaterialAssetEditor->Render();
+
+			// Phyiscs Material Asset Editor
+			m_PhysicsMaterialEditor->Render();
+
+#if 0
 			// Asset browser rendering
 			m_AssetBrowser->Render();
+#endif
+			if (m_ShowRendererDebugger)
+				Renderer::RenderDebugger();
+
 
 			// Viewport rendering
 			m_ViewportPanel->BeginRender();

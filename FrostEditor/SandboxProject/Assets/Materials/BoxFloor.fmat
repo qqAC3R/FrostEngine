@@ -1,0 +1,16 @@
+{
+    "AlbedoColor": [
+        0.800000011920929,
+        0.800000011920929,
+        0.800000011920929,
+        1.0
+    ],
+    "RoughnessValue": 1.0,
+    "MetalnessValue": 0.0,
+    "EmissionValue": 0.0,
+    "UseNormalMap": 0,
+    "AlbedoTexture": 0,
+    "NormalTexture": 0,
+    "RoughnessTexture": 0,
+    "MetalnessTexture": 0
+}

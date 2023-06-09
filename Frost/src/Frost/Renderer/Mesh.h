@@ -140,7 +140,7 @@ namespace Frost
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
 		const Vector<Ref<Animation>>& GetAnimations() const { return m_Animations; }
 
-		const Vector<std::string>& GetMaterialNames() const { return m_MaterialNames; }
+		//const Vector<std::string>& GetMaterialNames() const { return m_MaterialNames; }
 
 
 		static AssetType GetStaticType() { return AssetType::MeshAsset; }
@@ -214,17 +214,10 @@ namespace Frost
 		// however in the `Mesh` class all the values and textures are copied into a new buffer
 		// and from there on the user can change the values.
 		// But those variables remain the same for the entirety of the application's runtime
-		// NOTE: Textures, stored in a ID fashioned way, so it is easier to be supported by the bindless renderer design
-		//HashMap<uint32_t, Ref<Texture2D>> m_Textures;
+		// NOTE: Textures are stored in a ID fashioned way, so it is easier to be supported by the bindless renderer design
 		Vector<Ref<Texture2D>> m_TexturesList;
-		//HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots; // Bindless
 		Vector<DataStorage> m_MaterialData; // Bindless data
 		Vector<std::string> m_MaterialNames;
-
-		// TODO: We won't need this anymore because we will use Material Assets
-		struct TextureMaterialFilepaths;
-		Vector<TextureMaterialFilepaths> m_TexturesFilepaths;
-
 
 		// Acceleration structure + custom index buffer (Ray Tracing)
 		Ref<BottomLevelAccelerationStructure> m_AccelerationStructure;
@@ -278,6 +271,7 @@ namespace Frost
 
 		uint32_t GetMaterialCount() { return (uint32_t)m_MaterialAssets.size(); }
 		Ref<MaterialAsset> GetMaterialAsset(uint32_t materialIndex) { return m_MaterialAssets[materialIndex]; }
+		void SetMaterialAssetToDefault(uint32_t materialIndex);
 
 		void SetNewTexture(uint32_t materialIndex, uint32_t textureId, Ref<Texture2D> texture);
 		Ref<Texture2D> GetTexture(uint32_t materialIndex, uint32_t textureId) { return m_MaterialAssets[materialIndex]->GetTextureById(textureId); }

@@ -162,11 +162,8 @@ namespace Frost
 
 			std::ifstream in(cachedPath, std::ios::in | std::ios::binary);
 			
-			//if (in.is_open())
-			if (!isFileChanged) // TODO: Hash the shader source code
+			if (!isFileChanged)
 			{
-				//bool isChanged = IsFiledChanged();
-
 				in.seekg(0, std::ios::end);
 				auto size = in.tellg();
 				in.seekg(0, std::ios::beg);
@@ -401,9 +398,6 @@ namespace Frost
 			fwrite(result.c_str(), sizeof(char), result.size(), f);
 			fclose(f);
 		}
-
-
-
 	}
 
 	void VulkanShader::Destroy()

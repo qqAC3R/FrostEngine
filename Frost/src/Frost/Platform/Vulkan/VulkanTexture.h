@@ -47,6 +47,8 @@ namespace Frost
 		uint32_t m_Height;
 		uint32_t m_MipMapLevels = 1;
 
+		std::string m_Filepath; // Debug purposes
+
 		HashMap<DescriptorImageType, VkDescriptorImageInfo> m_DescriptorInfo;
 		bool m_IsLoaded;
 	};

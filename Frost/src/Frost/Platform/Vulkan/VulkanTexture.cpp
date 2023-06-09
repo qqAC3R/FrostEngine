@@ -16,7 +16,7 @@ namespace Frost
 	// VULKAN TEXTURE 2D
 	/////////////////////////////////////////////////////
 	VulkanTexture2D::VulkanTexture2D(const std::string& filepath, const TextureSpecification& textureSpec)
-		: m_TextureSpecification(textureSpec)
+		: m_TextureSpecification(textureSpec), m_Filepath(filepath)
 	{
 		// Loading the texture
 		int width, height, channels;

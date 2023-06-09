@@ -1,6 +1,9 @@
 #include "frostpch.h"
 #include "PhysXShapes.h"
 
+#include "Frost/Asset/AssetManager.h"
+#include "Frost/Physics/PhysicsMaterial.h"
+
 #include "Frost/Math/Math.h"
 #include "PhysXInternal.h"
 #include "PhysXActor.h"
@@ -8,10 +11,15 @@
 
 namespace Frost::PhysX
 {
-	// TODO: Add physics material system
-	static physx::PxMaterial* CreatePhysicsMaterial()
+	static physx::PxMaterial* CreatePhysicsMaterial(Ref<PhysicsMaterial> physicsMaterialAsset)
 	{
-		return PhysXInternal::GetPhysXHandle().createMaterial(0.6f, 0.6f, 0.6f);
+		if (!physicsMaterialAsset)
+		{
+			// Creating a new temporary phyiscs material to just retrieve the default parameters
+			Ref<PhysicsMaterial> physicsMaterialTemporay = Ref<PhysicsMaterial>::Create();
+			return PhysXInternal::GetPhysXHandle().createMaterial(physicsMaterialTemporay->StaticFriction, physicsMaterialTemporay->DynamicFriction, physicsMaterialTemporay->Bounciness);
+		}
+		return PhysXInternal::GetPhysXHandle().createMaterial(physicsMaterialAsset->StaticFriction, physicsMaterialAsset->DynamicFriction, physicsMaterialAsset->Bounciness);
 	}
 
 	BoxColliderShape::BoxColliderShape(BoxColliderComponent& component,
@@ -20,8 +28,7 @@ namespace Frost::PhysX
 		const glm::vec3& offset)
 		: ColliderShape(ColliderType::Box), m_Component(component)
 	{
-
-		m_Material = CreatePhysicsMaterial();
+		m_Material = CreatePhysicsMaterial(component.MaterialHandle);
 
 		glm::vec3 colliderSize = entity.Transform().Scale * m_Component.Size;
 		physx::PxBoxGeometry geometry = physx::PxBoxGeometry(colliderSize.x / 2.0f, colliderSize.y / 2.0f, colliderSize.z / 2.0f);
@@ -90,7 +97,7 @@ namespace Frost::PhysX
 		const glm::vec3& offset)
 		: ColliderShape(ColliderType::Sphere), m_Component(component)
 	{
-		m_Material = CreatePhysicsMaterial();
+		m_Material = CreatePhysicsMaterial(component.MaterialHandle);
 
 		auto& actorScale = entity.Transform().Scale;
 		float largestComponent = glm::max(actorScale.x, glm::max(actorScale.y, actorScale.z));
@@ -155,7 +162,7 @@ namespace Frost::PhysX
 		const glm::vec3& offset)
 		: ColliderShape(ColliderType::Capsule), m_Component(component)
 	{
-		m_Material = CreatePhysicsMaterial();
+		m_Material = CreatePhysicsMaterial(component.MaterialHandle);
 
 		auto& actorScale = entity.Transform().Scale;
 		float radiusScale = glm::max(actorScale.x, actorScale.z);
@@ -230,8 +237,7 @@ namespace Frost::PhysX
 	{
 		FROST_ASSERT_INTERNAL(component.IsConvex);
 
-		m_Material = CreatePhysicsMaterial();
-
+		m_Material = CreatePhysicsMaterial(component.MaterialHandle);
 
 		Vector<MeshColliderData> cookedData;
 		cookedData.reserve(component.CollisionMesh->GetSubMeshes().size());
@@ -317,8 +323,7 @@ namespace Frost::PhysX
 	{
 		FROST_ASSERT_INTERNAL(!component.IsConvex);
 
-		m_Material = CreatePhysicsMaterial();
-
+		m_Material = CreatePhysicsMaterial(component.MaterialHandle);
 
 		Vector<MeshColliderData> cookedData;
 		cookedData.reserve(component.CollisionMesh->GetSubMeshes().size());

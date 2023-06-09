@@ -38,7 +38,7 @@ namespace Frost
 			if (!std::is_base_of<Asset, T>::value)
 				FROST_ASSERT_INTERNAL("CreateNewAsset only works for types derived from Asset");
 
-			std::string projectFilepath = AssetManager::GetRelativePath(filepath).string();
+			std::filesystem::path projectFilepath = AssetManager::GetRelativePath(filepath);
 			AssetHandle assetHandle = GetAssetHandleFromFilePath(projectFilepath);
 
 			if (IsAssetHandleValid(assetHandle))
@@ -105,6 +105,7 @@ namespace Frost
 					AssetImporter::Serialize(s_LoadedAssets[asset->Handle]);
 				}
 
+				FROST_CORE_WARN("[AssetManager] (LoadAsset) with filepath: '{0}'", metadata.FilePath.string());
 				WriteRegistryToFile();
 			}
 
@@ -163,6 +164,7 @@ namespace Frost
 					AssetImporter::Serialize(s_LoadedAssets[asset->Handle]);
 				}
 
+				FROST_CORE_WARN("[AssetManager] (CreateNewAsset) with filepath: '{0}'", metadata.FilePath.string());
 				WriteRegistryToFile();
 			}
 

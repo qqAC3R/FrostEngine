@@ -2,17 +2,17 @@
 #include "ScriptInternalWrappers.h"
 
 #include "Frost/Core/Input.h"
+#include "Frost/Asset/AssetManager.h"
 
 #include "ScriptEngine.h"
 #include "Frost/EntitySystem/Scene.h"
 #include "Frost/EntitySystem/Entity.h"
 
-#include "Frost/Physics/PhysicsEngine.h"
 #include "Frost/Renderer/BindlessAllocator.h"
 
+#include "Frost/Physics/PhysicsEngine.h"
 #include "Frost/Physics/PhysicsScene.h"
 #include "Frost/Physics/PhysicsSettings.h"
-
 #include "Frost/Physics/PhysX/PhysXScene.h"
 #include "Frost/Physics/PhysX/PhysXShapes.h"
 
@@ -353,9 +353,8 @@ namespace ScriptInternalCalls
 		textureSpecs.Sampler.SamplerWrap = ImageWrap::Repeat;
 		textureSpecs.Sampler.SamplerFilter = ImageFilter::Linear;
 		
-		auto result = Texture2D::Create(width, height, textureSpecs);
+		auto result = Texture2D::Create(width, height, textureSpecs); // This shouldn't be created by the AssetManager because it is temporary
 		return new Texture2DPointer(result);
-		//return new Ref<Texture2D>(result);
 	}
 
 	void* RendererScript::Texture::Texture2DWithFilepathConstructor(MonoString* filepath)
@@ -366,9 +365,11 @@ namespace ScriptInternalCalls
 		textureSpecs.Sampler.SamplerWrap = ImageWrap::Repeat;
 		textureSpecs.Sampler.SamplerFilter = ImageFilter::Linear;
 
-		auto result = Texture2D::Create(mono_string_to_utf8(filepath), textureSpecs);
+		Ref<Texture2D> result = AssetManager::GetOrLoadAsset<Texture2D>(mono_string_to_utf8(filepath), (void*)&textureSpecs);
+		if(!result)
+			result = AssetManager::CreateNewAsset<Texture2D>(mono_string_to_utf8(filepath), (void*)&textureSpecs);
+
 		return new Texture2DPointer(result);
-		//return new Ref<Texture2D>(result);
 	}
 
 	void RendererScript::Texture::Texture2DDestructor(Texture2DPointer* _this)
@@ -486,14 +487,6 @@ namespace ScriptInternalCalls
 		else if (textureTypeName == "Roughness") { material->InternalMaterial->SetRoughnessMap(inTexturePtr->Texture); }
 		else if (textureTypeName == "Metalness") { material->InternalMaterial->SetMetalnessMap(inTexturePtr->Texture); }
 		else if (textureTypeName == "Normal")    { material->InternalMaterial->SetNormalMap(inTexturePtr->Texture); }
-
-#if 0
-		if (inTexturePtr->Texture)
-		{
-			BindlessAllocator::AddTextureCustomSlot(inTexturePtr->Texture, textureId);
-			material->GetMeshTextureTable()[textureId] = inTexturePtr->Texture;
-		}
-#endif
 	}
 
 	void* Components::Mesh::GetMeshPtr(uint64_t entityID)
@@ -508,14 +501,13 @@ namespace ScriptInternalCalls
 		{
 			auto mesh = entity.GetComponent<Frost::MeshComponent>().Mesh;
 			return new MeshPointer(mesh);
-			//return new Ref<Frost::Mesh>(mesh);
 		}
 
 		FROST_CORE_ERROR("Entity with ID: {0} doesn't have Mesh Component", entityID);
 		return nullptr;
 	}
 
-	void Components::Mesh::SetMesh(uint64_t entityID, MaterialMeshPointer* meshPtr)
+	void Components::Mesh::SetMesh(uint64_t entityID, MeshPointer* meshPtr)
 	{
 		Scene* scene = ScriptEngine::GetCurrentSceneContext();
 		FROST_ASSERT(scene, "No active scene!");
@@ -566,7 +558,7 @@ namespace ScriptInternalCalls
 			{
 				//return new Ref<Frost::DataStorage>(&mesh->GetMaterialData(index));
 				//return &mesh->GetMaterialData(index);
-				return new MaterialMeshPointer(mesh, mesh->GetMaterialAsset(index));
+				return new MaterialMeshPointer(mesh->GetMaterialAsset(index));
 			}
 		}
 
@@ -577,7 +569,13 @@ namespace ScriptInternalCalls
 	void* RendererScript::Mesh::Constructor(MonoString* filepath)
 	{
 		std::string filepathStr = mono_string_to_utf8(filepath);
-		Ref<Frost::MeshAsset> mesh = Frost::MeshAsset::Load(filepathStr);
+
+		//Ref<Frost::MeshAsset> mesh = Frost::MeshAsset::Load(filepathStr);
+		Ref<MeshAsset> meshAsset = AssetManager::GetOrLoadAsset<MeshAsset>(filepathStr);
+		if (!meshAsset)
+			meshAsset = AssetManager::CreateNewAsset<MeshAsset>(filepathStr);
+		Ref<Frost::Mesh> mesh = Ref<Frost::Mesh>::Create(meshAsset);
+
 		return new MeshPointer(mesh);
 	}
 
@@ -596,7 +594,7 @@ namespace ScriptInternalCalls
 		auto mesh = _this->Mesh;
 		if (index < mesh->GetMaterialCount())
 		{
-			return new MaterialMeshPointer(mesh, mesh->GetMaterialAsset(index));
+			return new MaterialMeshPointer(mesh->GetMaterialAsset(index));
 		}
 
 		FROST_ASSERT_MSG("Material not found!");

@@ -245,6 +245,7 @@ namespace Frost
 
 		VulkanRenderer::BeginTimeStampPass("Geometry Pass");
 		GeometryPrepareIndirectData(renderQueue);
+		//GeometryPrepareIndirectDataWithInstacing(renderQueue);
 		GeometryUpdate(renderQueue, s_Geometry_MeshIndirectData);
 		VulkanRenderer::EndTimeStampPass("Geometry Pass");
 	}
@@ -276,8 +277,6 @@ namespace Frost
 		uint32_t meshDataOffset = 0;
 
 		// `Instance data` offset.
-		//  Allocating here the `InstanceData`, because if we allocate it for every submesh in the scene, it will be way more expensive
-		//MaterialData instData{};
 		uint32_t materialDataOffset = 0;
 
 		// Get all the indirect draw commands
@@ -286,10 +285,6 @@ namespace Frost
 			// Get the mesh
 			auto mesh = renderQueue.m_Data[i].Mesh;
 			const Vector<Submesh>& submeshes = mesh->GetMeshAsset()->GetSubMeshes();
-
-			// Instanced data for submeshes
-			//SubmeshInstanced submeshInstanced{};
-			//uint32_t vboInstancedDataOffset = 0;
 
 			// Count how many meshes were submitted (for calculating offsets)
 			uint32_t submittedSubmeshes = 0;
@@ -302,8 +297,6 @@ namespace Frost
 				const Submesh& submesh = submeshes[k];
 
 				glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
-				//glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform;
-
 
 				// TODO: Fix frustum culling
 #if 0
@@ -320,29 +313,17 @@ namespace Frost
 				indirectCmdBuf.vertexOffset = submesh.BaseVertex;
 				m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
 
-
 				// Setting up `Mesh data` for the occlusion culling compute shader
 				meshData.Transform = modelMatrix;
 				meshData.AABB_Min = glm::vec4(submesh.BoundingBox.Min, 1.0f);
 				meshData.AABB_Max = glm::vec4(submesh.BoundingBox.Max, 1.0f);
 				m_Data->MeshSpecs.HostBuffer.Write((void*)&meshData, sizeof(MeshData_OC), meshDataOffset);
 
-				// Submit instanced data into a cpu buffer (which will be later sent to the gpu's instanced vbo)
-				//submeshInstanced.ModelSpaceMatrix = modelMatrix;
-				//submeshInstanced.WorldSpaceMatrix = viewProjectionMatrix * modelMatrix;
-				//mesh->GetVertexBufferInstanced_CPU(currentFrameIndex).Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
-
-
 				// Adding up the offset
 				meshDataOffset += sizeof(MeshData_OC);
 				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
 				submittedSubmeshes += 1;
-				//vboInstancedDataOffset += sizeof(SubmeshInstanced);
 			}
-
-			// Submit instanced data from a cpu buffer to gpu vertex buffer
-			//auto vulkanVBOInstanced = mesh->GetVertexBufferInstanced(currentFrameIndex).As<VulkanBufferDevice>();
-			//vulkanVBOInstanced->SetData(vboInstancedDataOffset, mesh->GetVertexBufferInstanced_CPU(currentFrameIndex).Data);
 
 
 			for (uint32_t k = 0; k < mesh->GetMaterialCount(); k++)
@@ -350,27 +331,7 @@ namespace Frost
 				// Setting up the material data into a storage buffer
 				Ref<DataStorage> materialData = mesh->GetMaterialAsset(k)->GetMaterialInternalData();
 
-#if 0
-				// Textures
-				instData.AlbedoTextureID = materialData.Get<uint32_t>("AlbedoTexture");
-				instData.RoughessTextureID = materialData.Get<uint32_t>("RoughnessTexture");
-				instData.MetalnessTextureID = materialData.Get<uint32_t>("MetalnessTexture");
-				instData.NormalTextureID = materialData.Get<uint32_t>("NormalTexture");
-				
-				instData.UseNormalMap = materialData.Get<uint32_t>("UseNormalMap");
-				
-				// PBR values
-				instData.AlbedoColor = glm::vec4(materialData.Get<glm::vec3>("AlbedoColor"), 1.0f);
-				instData.Roughness = materialData.Get<float>("RoughnessFactor");
-				instData.Metalness = materialData.Get<float>("MetalnessFactor");
-				instData.Emission = materialData.Get<float>("EmissionFactor");
-
-				// The data collected from the mesh, should be written into a cpu buffer, which will later be copied into a storage buffer
-				//m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write((void*)&instData, sizeof(MaterialData), materialDataOffset);
-#endif
-
 				DataStorage* dataStorage = materialData.Raw();
-				//void* ptr = (void*)dataStorage;
 				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write(dataStorage->GetBufferData(), sizeof(MaterialData), materialDataOffset);
 
 				materialDataOffset += sizeof(MaterialData);
@@ -379,7 +340,7 @@ namespace Frost
 			// If we are submitting the first mesh, we don't need any offset
 			if (s_Geometry_MeshIndirectData.size() == 0)
 			{
-				s_Geometry_MeshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0));
+				s_Geometry_MeshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0, mesh->GetMeshAsset()->Handle));
 			}
 			else
 			{
@@ -391,7 +352,14 @@ namespace Frost
 				uint32_t previousMaterialCount = s_Geometry_MeshIndirectData[i - 1].MaterialCount;
 				uint32_t currentMaterialOffset = previousMaterialOffset + previousMaterialCount;
 
-				s_Geometry_MeshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
+				s_Geometry_MeshIndirectData.emplace_back(IndirectMeshData(
+					currentMeshOffset,
+					submeshes.size(),
+					i,
+					mesh->GetMaterialCount(),
+					currentMaterialOffset,
+					mesh->GetMeshAsset()->Handle
+				));
 
 			}
 		}
@@ -407,13 +375,251 @@ namespace Frost
 		void* instanceDataPointer = m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Data;
 		vulkanInstanceDataBuffer->SetData(materialDataOffset, instanceDataPointer);
 
+#if  0
 		// Mesh data (occlusion culling)
 		auto vulkanMeshDataBuffer = m_Data->MeshSpecs.DeviceBuffer.As<VulkanBufferDevice>();
 		void* meshDataPointer = m_Data->MeshSpecs.HostBuffer.Data;
 		vulkanMeshDataBuffer->SetData(meshDataOffset, meshDataPointer);
 
+		OcclusionCullUpdate(renderQueue, indirectCmdsOffset);
+#endif
 
-		//OcclusionCullUpdate(renderQueue, indirectCmdsOffset);
+	}
+
+	void VulkanGeometryPass::GeometryPrepareIndirectDataWithInstacing(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		// Get the needed matricies from the camera
+		glm::mat4 projectionMatrix = renderQueue.CameraProjectionMatrix;
+		projectionMatrix[1][1] *= -1; // GLM uses opengl style of rendering, where the y coordonate is inverted
+		glm::mat4 viewProjectionMatrix = projectionMatrix * renderQueue.CameraViewMatrix;
+
+		/*
+			Each mesh might have a set of submeshes which are sent to render individualy.
+			We dont need them when we render them indirectly (because the gpu renders all the submeshes automatically - `multidraw`),
+			instead we just need to know the `start index` of every mesh in the `VkDrawIndexedIndirectCommand` buffer.
+		*/
+		s_Geometry_MeshIndirectData.clear();
+
+		struct MeshInfoGrouped
+		{
+			Ref<Mesh> Mesh;
+			glm::mat4 Transform;
+			uint32_t MeshIndex;
+		};
+
+		HashMap<AssetHandle, Vector<MeshInfoGrouped>> m_GroupedMeshes;
+		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
+		{
+			// Get the mesh
+			auto mesh = renderQueue.m_Data[i].Mesh;
+			m_GroupedMeshes[mesh->GetMeshAsset()->Handle].push_back({ mesh, renderQueue.m_Data[i].Transform, i });
+		}
+
+
+		// `Indirect draw commands` offset
+		uint64_t indirectCmdsOffset = 0;
+
+		// `Instance data` offset.
+		uint32_t materialDataOffset = 0;
+
+
+
+		for (auto& [handle, meshInfo] : m_GroupedMeshes)
+		{
+			auto mesh = meshInfo[0].Mesh;
+			const Vector<Submesh>& submeshes = mesh->GetMeshAsset()->GetSubMeshes();
+			uint32_t meshIndex = meshInfo[0].MeshIndex;
+
+			for (uint32_t k = 0; k < submeshes.size(); k++)
+			{
+				const Submesh& submesh = submeshes[k];
+
+				//glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
+
+				// Submit the submesh into the cpu buffer
+				VkDrawIndexedIndirectCommand indirectCmdBuf{};
+				indirectCmdBuf.firstIndex = submesh.BaseIndex;
+				indirectCmdBuf.firstInstance = 0;
+				indirectCmdBuf.indexCount = submesh.IndexCount;
+				indirectCmdBuf.instanceCount = meshInfo.size();
+				indirectCmdBuf.vertexOffset = submesh.BaseVertex;
+				m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
+
+				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
+			}
+
+
+			for (uint32_t k = 0; k < mesh->GetMaterialCount(); k++)
+			{
+				// Setting up the material data into a storage buffer
+				Ref<DataStorage> materialData = mesh->GetMaterialAsset(k)->GetMaterialInternalData();
+
+				DataStorage* dataStorage = materialData.Raw();
+				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write(dataStorage->GetBufferData(), sizeof(MaterialData), materialDataOffset);
+
+				materialDataOffset += sizeof(MaterialData);
+			}
+
+			// If we are submitting the first mesh, we don't need any offset
+			if (s_Geometry_MeshIndirectData.size() == 0)
+			{
+				uint32_t meshIndexI = 0; //TODO: Hard coded, not right tho
+				s_Geometry_MeshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), meshIndexI, mesh->GetMaterialCount(), 0, mesh->GetMeshAsset()->Handle));
+			}
+
+
+			{
+				Buffer& instancedVertexBuffer = mesh->GetVertexBufferInstanced_CPU(currentFrameIndex);
+
+				// Instanced data for submeshes
+				SubmeshInstanced submeshInstanced{};
+				uint32_t vboInstancedDataOffset = 0;
+
+				for(uint32_t i = 0; i < meshInfo.size(); i++)
+				{
+					for (auto& submesh : submeshes)
+					{
+						glm::mat4 modelMatrix = meshInfo[i].Transform * submesh.Transform;
+
+						// Submit instanced data into a cpu buffer (which will be later sent to the gpu's instanced vbo)
+						submeshInstanced.ModelSpaceMatrix = modelMatrix;
+						submeshInstanced.WorldSpaceMatrix = viewProjectionMatrix * modelMatrix;
+
+						instancedVertexBuffer.Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
+
+						vboInstancedDataOffset += sizeof(SubmeshInstanced);
+					}
+
+				}
+
+				// Submit instanced data from a cpu buffer to gpu vertex buffer
+				auto vulkanVBOInstanced = mesh->GetVertexBufferInstanced(currentFrameIndex).As<VulkanBufferDevice>();
+				vulkanVBOInstanced->SetData(vboInstancedDataOffset, instancedVertexBuffer.Data);
+			}
+
+#if 0
+			else
+			{
+				uint32_t previousMeshOffset = s_Geometry_MeshIndirectData[i - 1].SubmeshOffset;
+				uint32_t previousMeshCount = s_Geometry_MeshIndirectData[i - 1].SubmeshCount;
+				uint32_t currentMeshOffset = previousMeshOffset + previousMeshCount;
+
+				uint32_t previousMaterialOffset = s_Geometry_MeshIndirectData[i - 1].MaterialOffset;
+				uint32_t previousMaterialCount = s_Geometry_MeshIndirectData[i - 1].MaterialCount;
+				uint32_t currentMaterialOffset = previousMaterialOffset + previousMaterialCount;
+
+				s_Geometry_MeshIndirectData.emplace_back(IndirectMeshData(
+					currentMeshOffset,
+					submeshes.size(),
+					i,
+					mesh->GetMaterialCount(),
+					currentMaterialOffset,
+					mesh->GetMeshAsset()->Handle
+				));
+
+			}
+#endif
+
+		}
+
+
+
+#if 0
+		// Get all the indirect draw commands
+		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
+		{
+			// Get the mesh
+			auto mesh = renderQueue.m_Data[i].Mesh;
+			const Vector<Submesh>& submeshes = mesh->GetMeshAsset()->GetSubMeshes();
+
+			// Count how many meshes were submitted (for calculating offsets)
+			uint32_t submittedSubmeshes = 0;
+
+			mesh->UpdateInstancedVertexBuffer(renderQueue.m_Data[i].Transform, viewProjectionMatrix, currentFrameIndex);
+
+			// Set commands for the submeshes
+			for (uint32_t k = 0; k < submeshes.size(); k++)
+			{
+				const Submesh& submesh = submeshes[k];
+
+				glm::mat4 modelMatrix = renderQueue.m_Data[i].Transform * submesh.Transform;
+
+
+				// Submit the submesh into the cpu buffer
+				VkDrawIndexedIndirectCommand indirectCmdBuf{};
+				indirectCmdBuf.firstIndex = submesh.BaseIndex;
+				indirectCmdBuf.firstInstance = 0;
+				indirectCmdBuf.indexCount = submesh.IndexCount;
+				indirectCmdBuf.instanceCount = 1;
+				indirectCmdBuf.vertexOffset = submesh.BaseVertex;
+				m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
+
+				// Setting up `Mesh data` for the occlusion culling compute shader
+				meshData.Transform = modelMatrix;
+				meshData.AABB_Min = glm::vec4(submesh.BoundingBox.Min, 1.0f);
+				meshData.AABB_Max = glm::vec4(submesh.BoundingBox.Max, 1.0f);
+				m_Data->MeshSpecs.HostBuffer.Write((void*)&meshData, sizeof(MeshData_OC), meshDataOffset);
+
+				// Adding up the offset
+				meshDataOffset += sizeof(MeshData_OC);
+				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
+				submittedSubmeshes += 1;
+			}
+
+
+			for (uint32_t k = 0; k < mesh->GetMaterialCount(); k++)
+			{
+				// Setting up the material data into a storage buffer
+				Ref<DataStorage> materialData = mesh->GetMaterialAsset(k)->GetMaterialInternalData();
+
+				DataStorage* dataStorage = materialData.Raw();
+				m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Write(dataStorage->GetBufferData(), sizeof(MaterialData), materialDataOffset);
+
+				materialDataOffset += sizeof(MaterialData);
+			}
+
+			// If we are submitting the first mesh, we don't need any offset
+			if (s_Geometry_MeshIndirectData.size() == 0)
+			{
+				s_Geometry_MeshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0, mesh->GetMeshAsset()->Handle));
+			}
+			else
+			{
+				uint32_t previousMeshOffset = s_Geometry_MeshIndirectData[i - 1].SubmeshOffset;
+				uint32_t previousMeshCount = s_Geometry_MeshIndirectData[i - 1].SubmeshCount;
+				uint32_t currentMeshOffset = previousMeshOffset + previousMeshCount;
+
+				uint32_t previousMaterialOffset = s_Geometry_MeshIndirectData[i - 1].MaterialOffset;
+				uint32_t previousMaterialCount = s_Geometry_MeshIndirectData[i - 1].MaterialCount;
+				uint32_t currentMaterialOffset = previousMaterialOffset + previousMaterialCount;
+
+				s_Geometry_MeshIndirectData.emplace_back(IndirectMeshData(
+					currentMeshOffset,
+					submeshes.size(),
+					i,
+					mesh->GetMaterialCount(),
+					currentMaterialOffset,
+					mesh->GetMeshAsset()->Handle
+				));
+
+			}
+		}
+#endif
+
+		// Sending the data into the gpu buffer
+		// Indirect draw commands
+		auto vulkanIndirectCmdBuffer = m_Data->IndirectCmdBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		void* indirectCmdsPointer = m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Data;
+		vulkanIndirectCmdBuffer->SetData(indirectCmdsOffset, indirectCmdsPointer);
+
+		// Instance data
+		auto vulkanInstanceDataBuffer = m_Data->MaterialSpecs[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		void* instanceDataPointer = m_Data->MaterialSpecs[currentFrameIndex].HostBuffer.Data;
+		vulkanInstanceDataBuffer->SetData(materialDataOffset, instanceDataPointer);
 
 	}
 
@@ -479,11 +685,13 @@ namespace Frost
 
 			// Set the transform matrix and model matrix of the submesh into a constant buffer
 			
+			 // This information should be excluded from the push constants and put in the global vertex instaced buffer
 			m_GeometryPushConstant.MaterialIndex = indirectMeshData[i].MaterialOffset;
+			m_GeometryPushConstant.EntityID = renderQueue.m_Data[meshIndex].EntityID;
+
 			m_GeometryPushConstant.VertexBufferBDA = mesh->GetMeshAsset()->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 			m_GeometryPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 			m_GeometryPushConstant.IsAnimated = static_cast<uint32_t>(mesh->IsAnimated());
-			m_GeometryPushConstant.EntityID = renderQueue.m_Data[meshIndex].EntityID;
 
 			if(mesh->IsAnimated())
 				m_GeometryPushConstant.BoneInformationBDA = mesh->GetBoneUniformBuffer(currentFrameIndex).As<VulkanUniformBuffer>()->GetVulkanBufferAddress();
