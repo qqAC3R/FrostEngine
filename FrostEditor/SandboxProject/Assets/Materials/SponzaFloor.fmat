@@ -6,7 +6,7 @@
         1.0
     ],
     "RoughnessValue": 0.0,
-    "MetalnessValue": 1.0,
+    "MetalnessValue": 0.5,
     "EmissionValue": 0.0,
     "UseNormalMap": 1,
     "AlbedoTexture": 4891327362358039077,

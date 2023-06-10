@@ -65,6 +65,12 @@ namespace Frost
 		ShadowDepthInitData();
 		ShadowComputeInitData(1600, 900);
 		CalculateCascadeOffsets();
+
+		Renderer::SubmitImageToOutputImageMap("Shadows", [this]() -> Ref<Image2D>
+		{
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			return this->m_Data->ShadowComputeTexture[currentFrameIndex];
+		});
 	}
 
 	void VulkanShadowPass::ShadowDepthInitData()
@@ -136,11 +142,9 @@ namespace Frost
 
 			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
 			Ref<Image2D> viewPositionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(3, i);
-			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
 
 			vulkanDescriptor->Set("u_PositionTexture", positionTexture);
 			vulkanDescriptor->Set("u_ViewPositionTexture", viewPositionTexture);
-			vulkanDescriptor->Set("u_NormalMap", normalTexture);
 			vulkanDescriptor->Set("u_ShadowDepthTexture", m_Data->ShadowDepthRenderPass->GetDepthAttachment(i));
 			vulkanDescriptor->Set("u_ShadowTextureOutput", m_Data->ShadowComputeTexture[i]);
 
@@ -634,44 +638,49 @@ namespace Frost
 		{
 			float splitDist = cascadeSplits[i];
 
-			glm::vec3 frustumCorners[8] = {
-				glm::vec3(-1.0f,  1.0f, -1.0f),
-				glm::vec3(1.0f,  1.0f, -1.0f),
-				glm::vec3(1.0f, -1.0f, -1.0f),
-				glm::vec3(-1.0f, -1.0f, -1.0f),
-				glm::vec3(-1.0f,  1.0f,  1.0f),
-				glm::vec3(1.0f,  1.0f,  1.0f),
-				glm::vec3(1.0f, -1.0f,  1.0f),
-				glm::vec3(-1.0f, -1.0f,  1.0f),
-			};
+			glm::vec4 frustumCorners[8] = {
+                //Near face
+                {1.0f, 1.0f, -1.0f, 1.0f},
+                {-1.0f, 1.0f, -1.0f, 1.0f},
+                {1.0f, -1.0f, -1.0f, 1.0f},
+                {-1.0f, -1.0f, -1.0f, 1.0f},
+
+                //Far face
+                {1.0f, 1.0f, 1.0f, 1.0f},
+                {-1.0f, 1.0f, 1.0f, 1.0f},
+                {1.0f, -1.0f, 1.0f, 1.0f},
+                {-1.0f, -1.0f, 1.0f, 1.0f},
+            };
 
 			// Project frustum corners into world space
-
-			glm::mat4 invCam = glm::inverse(renderQueue.m_Camera->GetViewProjection() * renderQueue.CameraViewMatrix);
-			for (uint32_t i = 0; i < 8; i++)
+			glm::mat4 inverseCamViewProjection = glm::inverse(renderQueue.m_Camera->GetViewProjection());
+			for (glm::vec4& frustumCorner : frustumCorners)
 			{
-				glm::vec4 invCorner = invCam * glm::vec4(frustumCorners[i], 1.0f);
-				frustumCorners[i] = invCorner / invCorner.w;
+				glm::vec4 invCorner = inverseCamViewProjection * frustumCorner;
+				frustumCorner = invCorner / invCorner.w;
 			}
 
 			for (uint32_t i = 0; i < 4; i++)
 			{
-				glm::vec3 dist = frustumCorners[i + 4] - frustumCorners[i];
+				glm::vec4 dist = frustumCorners[i + 4] - frustumCorners[i];
 				frustumCorners[i + 4] = frustumCorners[i] + (dist * splitDist);
 				frustumCorners[i] = frustumCorners[i] + (dist * lastSplitDist);
 			}
 
 			// Get frustum center
 			glm::vec3 frustumCenter = glm::vec3(0.0f);
-			for (uint32_t i = 0; i < 8; i++)
+			for (glm::vec4& frustumCorner : frustumCorners)
 			{
-				frustumCenter += frustumCorners[i];
+				frustumCenter += glm::vec3(frustumCorner);
 			}
 			frustumCenter /= 8.0f;
 
+
+			// Get the minimum and maximum extents
 			float radius = 0.0f;
-			for (uint32_t i = 0; i < 8; i++) {
-				float distance = glm::length(frustumCorners[i] - frustumCenter);
+			for (glm::vec4& frustumCorner : frustumCorners)
+			{
+				float distance = glm::length(glm::vec3(frustumCorner) - frustumCenter);
 				radius = glm::max(radius, distance);
 			}
 			radius = std::ceil(radius * 16.0f) / 16.0f;
@@ -691,6 +700,20 @@ namespace Frost
 
 			// Offset to texel space to avoid shimmering (from https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering)
 			glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
+			glm::vec4 shadowOrigin = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+			shadowOrigin = shadowMatrix * shadowOrigin;
+			float storedW = shadowOrigin.w;
+			shadowOrigin = shadowOrigin * static_cast<float>(shadowTextureRes) / 2.0f;
+			glm::vec4 roundedOrigin = glm::round(shadowOrigin);
+			glm::vec4 roundOffset = roundedOrigin - shadowOrigin;
+			roundOffset = roundOffset * 2.0f / static_cast<float>(shadowTextureRes);
+			roundOffset.z = 0.0f;
+			roundOffset.w = 0.0f;
+			glm::mat4 shadowProj = lightOrthoMatrix;
+			shadowProj[3] += roundOffset;
+			lightOrthoMatrix = shadowProj;
+#if 0
+			glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
 			const float ShadowMapResolution = shadowTextureRes;
 			glm::vec4 shadowOrigin = (shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) * ShadowMapResolution / 2.0f;
 			glm::vec4 roundedOrigin = glm::round(shadowOrigin);
@@ -699,6 +722,7 @@ namespace Frost
 			roundOffset.z = 0.0f;
 			roundOffset.w = 0.0f;
 			lightOrthoMatrix[3] += roundOffset;
+#endif
 
 
 

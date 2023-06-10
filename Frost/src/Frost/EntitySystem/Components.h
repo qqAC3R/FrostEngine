@@ -132,7 +132,7 @@ namespace Frost
 		DirectionalLightComponent() = default;
 
 		glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
-		float Intensity = 3.0f;
+		float Intensity = 1.0f;
 		float Size = 1.0f;
 
 		float VolumeDensity = 0.0f;

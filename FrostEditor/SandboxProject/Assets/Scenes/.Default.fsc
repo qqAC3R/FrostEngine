@@ -10,10 +10,10 @@
             "Translation": [
                 0.0,
                 1.0,
-                0.0
+                5.960464477539063e-08
             ],
             "Rotation": [
-                -90.0,
+                -124.37213134765625,
                 0.0,
                 0.0
             ],
@@ -50,8 +50,8 @@
                 0.0
             ],
             "Rotation": [
-                0.0,
-                0.0,
+                -270.0,
+                8.100000381469727,
                 0.0
             ],
             "Scale": [
@@ -61,44 +61,165 @@
             ]
         },
         "CameraComponent": {
-            "FOV": 85.0,
+            "FOV": 54.900001525878906,
             "NearClip": 0.10000000149011612,
             "FarClip": 1000.0,
             "Primary": true
         },
         "ScriptComponent": {
-            "ModuleName": "Frost.Player",
+            "ModuleName": "Frost.ActorCamera",
             "PublicFields": [
                 {
                     "FieldName": "m_CameraOffset",
                     "Type": "Vec3",
                     "Value": [
-                        0.0,
-                        1.0,
-                        3.0
+                        -7.0,
+                        2.0,
+                        -0.5
                     ]
                 },
                 {
-                    "FieldName": "m_VarStr",
-                    "Type": "String",
-                    "Value": "Hello world!!"
+                    "FieldName": "ActorEntity",
+                    "Type": "Entity",
+                    "Value": 11359700172493278993
                 },
                 {
-                    "FieldName": "m_CameraFOV",
+                    "FieldName": "m_Distance",
                     "Type": "Float",
-                    "Value": 91.0
-                },
-                {
-                    "FieldName": "m_VarProperty",
-                    "Type": "Float",
-                    "Value": 0.0
+                    "Value": 8.0
                 }
             ]
         }
     },
     {
         "UUID": 8504030237949768071,
-        "TagComponent": "Mesh",
+        "TagComponent": "Plane",
+        "ParentChildComponent": {
+            "ParentID": 0,
+            "ChildIDs": null
+        },
+        "TransformComponent": {
+            "Translation": [
+                6.149590015411377,
+                1.055105447769165,
+                1.7689929008483887
+            ],
+            "Rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "Scale": [
+                44.22367858886719,
+                2.049999952316284,
+                28.522127151489258
+            ]
+        },
+        "MeshComponent": {
+            "Materials": [
+                {
+                    "AssetID": 17201238373279583379,
+                    "MaterialIndex": 0
+                }
+            ],
+            "Filepath": "Meshes/Cube.fbx"
+        },
+        "RigidBodyComponent": {
+            "BodyType": "Static",
+            "Mass": 1.0,
+            "LinearDrag": 0.009999999776482582,
+            "AngularDrag": 0.05000000074505806,
+            "DisableGravity": false,
+            "IsKinematic": false,
+            "Layer": 0,
+            "LockPositionX": false,
+            "LockPositionY": false,
+            "LockPositionZ": false,
+            "LockRotationX": false,
+            "LockRotationY": false,
+            "LockRotationZ": false
+        },
+        "BoxColliderComponent": {
+            "Size": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "Offset": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "IsTrigger": false,
+            "MaterialAssetID": 0
+        }
+    },
+    {
+        "UUID": 14111693101387504903,
+        "TagComponent": "Cube",
+        "ParentChildComponent": {
+            "ParentID": 0,
+            "ChildIDs": null
+        },
+        "TransformComponent": {
+            "Translation": [
+                10.397780418395996,
+                5.684874534606934,
+                1.1114329099655151
+            ],
+            "Rotation": [
+                -14.630995750427246,
+                17.102062225341797,
+                -4.390011310577393
+            ],
+            "Scale": [
+                1.1000009775161743,
+                1.099999189376831,
+                1.0999993085861206
+            ]
+        },
+        "MeshComponent": {
+            "Materials": [
+                {
+                    "AssetID": 0,
+                    "MaterialIndex": 0
+                }
+            ],
+            "Filepath": "Meshes/Cube.fbx"
+        },
+        "RigidBodyComponent": {
+            "BodyType": "Dynamic",
+            "Mass": 0.30000001192092896,
+            "LinearDrag": 0.009999999776482582,
+            "AngularDrag": 0.05000000074505806,
+            "DisableGravity": false,
+            "IsKinematic": false,
+            "Layer": 0,
+            "LockPositionX": false,
+            "LockPositionY": false,
+            "LockPositionZ": false,
+            "LockRotationX": false,
+            "LockRotationY": false,
+            "LockRotationZ": false
+        },
+        "BoxColliderComponent": {
+            "Size": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "Offset": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "IsTrigger": false,
+            "MaterialAssetID": 10126155093566448563
+        }
+    },
+    {
+        "UUID": 11359700172493278993,
+        "TagComponent": "Player",
         "ParentChildComponent": {
             "ParentID": 0,
             "ChildIDs": null
@@ -106,8 +227,74 @@
         "TransformComponent": {
             "Translation": [
                 0.0,
-                11.501102447509766,
+                3.630924701690674,
+                -0.39237451553344727
+            ],
+            "Rotation": [
+                0.0,
+                0.0,
                 0.0
+            ],
+            "Scale": [
+                1.559999942779541,
+                1.559999942779541,
+                1.559999942779541
+            ]
+        },
+        "RigidBodyComponent": {
+            "BodyType": "Dynamic",
+            "Mass": 2.0,
+            "LinearDrag": 0.009999999776482582,
+            "AngularDrag": 0.05000000074505806,
+            "DisableGravity": false,
+            "IsKinematic": false,
+            "Layer": 0,
+            "LockPositionX": false,
+            "LockPositionY": false,
+            "LockPositionZ": false,
+            "LockRotationX": true,
+            "LockRotationY": true,
+            "LockRotationZ": true
+        },
+        "CapsuleColliderComponent": {
+            "Radius": 0.5,
+            "Height": 1.0,
+            "Offset": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "IsTrigger": false,
+            "MaterialAssetID": 16512124595606474258
+        },
+        "ScriptComponent": {
+            "ModuleName": "Frost.Actor",
+            "PublicFields": [
+                {
+                    "FieldName": "m_MovementForce",
+                    "Type": "Float",
+                    "Value": 7000.0
+                },
+                {
+                    "FieldName": "m_MeshChild",
+                    "Type": "Entity",
+                    "Value": 10420978217721102904
+                }
+            ]
+        }
+    },
+    {
+        "UUID": 15198818116359902000,
+        "TagComponent": "Point Light",
+        "ParentChildComponent": {
+            "ParentID": 0,
+            "ChildIDs": null
+        },
+        "TransformComponent": {
+            "Translation": [
+                19.965213775634766,
+                4.165013313293457,
+                -1.066266655921936
             ],
             "Rotation": [
                 0.0,
@@ -120,10 +307,82 @@
                 1.0
             ]
         },
+        "PointLightComponent": {
+            "Color": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "Intensity": 6.5,
+            "Radius": 5.034999847412109,
+            "Falloff": 0.0
+        }
+    },
+    {
+        "UUID": 8790008620448185902,
+        "TagComponent": "Light",
+        "ParentChildComponent": {
+            "ParentID": 17871614152960146670,
+            "ChildIDs": null
+        },
+        "TransformComponent": {
+            "Translation": [
+                0.0,
+                0.009904146194458008,
+                0.0
+            ],
+            "Rotation": [
+                0.09565474092960358,
+                0.0,
+                0.0
+            ],
+            "Scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        "RectangularLightComponent": {
+            "Radiance": [
+                0.8039215803146362,
+                0.0,
+                1.0
+            ],
+            "Intensity": 6.929999828338623,
+            "Radius": 10.569999694824219,
+            "TwoSided": false
+        }
+    },
+    {
+        "UUID": 17871614152960146670,
+        "TagComponent": "Area Light",
+        "ParentChildComponent": {
+            "ParentID": 0,
+            "ChildIDs": [
+                8790008620448185902
+            ]
+        },
+        "TransformComponent": {
+            "Translation": [
+                0.2828233242034912,
+                2.305941104888916,
+                6.501838207244873
+            ],
+            "Rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "Scale": [
+                4.654111385345459,
+                7.033790111541748,
+                0.04035197198390961
+            ]
+        },
         "MeshComponent": {
             "Materials": [
                 {
-                    "AssetID": 0,
+                    "AssetID": 16768749447089113101,
                     "MaterialIndex": 0
                 }
             ],

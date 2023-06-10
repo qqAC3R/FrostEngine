@@ -3,12 +3,10 @@
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
-#define SHADOW_MAP_CASCADE_COUNT 4
 
 layout(binding = 0) uniform sampler2D u_ShadowDepthTexture;
 layout(binding = 1) uniform sampler2D u_PositionTexture;
 layout(binding = 2) uniform sampler2D u_ViewPositionTexture;
-layout(binding = 5) uniform sampler2D u_NormalMap;
 layout(binding = 3, rgba8) uniform writeonly image2D u_ShadowTextureOutput;
 
 layout(push_constant) uniform PushConstant
@@ -34,86 +32,33 @@ layout(binding = 4) uniform DirectionaLightData
 	int UsePCSS;
 } u_DirLightData;
 
+#define SHADOW_MAP_CASCADE_COUNT 4
 vec2 s_UV;
+float GLOBAL_BIAS = 0.002;
 float delta = 0.0;
+const float PI = 3.141592;
 
-vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
-{
-	coord = clamp(coord, 0.0f, 1.0f);
-	switch(cascadeIndex)
-	{
-	case 1:
-		return coord * vec2(0.5f);
-	case 2:
-		return vec2(coord.x * 0.5f + 0.5f + delta, coord.y * 0.5f);
-	case 3:
-		return vec2(coord.x * 0.5f, coord.y * 0.5f + 0.5f + delta);
-	case 4:
-		return coord * vec2(0.5f) + vec2(0.5f + delta);
-	}
-}
+const mat4 BIAS_MAT = mat4( 
+	0.5, 0.0, 0.0, 0.0,
+	0.0, 0.5, 0.0, 0.0,
+	0.0, 0.0, 1.0, 0.0,
+	0.5, 0.5, 0.0, 1.0 
+);
 
-float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex)
-{
-	vec2 coords = ComputeShadowCoord(shadowCoords.xy, cascadeIndex);
-	float dist = texture(u_ShadowDepthTexture, coords).r;
-	return dist;
-}
 
-mat4 GetCascadeMatrix(uint cascadeIndex)
-{
-	switch(cascadeIndex)
-	{
-		case 1: return u_DirLightData.LightViewProjMatrix0;
-		case 2: return u_DirLightData.LightViewProjMatrix1;
-		case 3: return u_DirLightData.LightViewProjMatrix2;
-		case 4: return u_DirLightData.LightViewProjMatrix3;
-	}
-}
+vec2 SamplePoisson(int index);
 
-uint GetCascadeIndex(float viewPosZ)
-{
-	uint cascadeIndex = 1;
-	for(uint i = 0; i < SHADOW_MAP_CASCADE_COUNT - 1; ++i) {
-		if(viewPosZ < u_PushConstant.CascadeDepthSplit[i]) {	
-			cascadeIndex = i + 2;
-		}
-	}
-	return cascadeIndex;
-}
+mat4 GetCascadeMatrix(uint cascadeIndex);
+uint GetCascadeIndex(float viewPosZ);
 
-// Fast octahedron normal vector decoding.
-// https://jcgt.org/published/0003/02/01/
-vec2 SignNotZero(vec2 v)
-{
-	return vec2((v.x >= 0.0) ? 1.0 : -1.0, (v.y >= 0.0) ? 1.0 : -1.0);
-}
-vec3 DecodeNormal(vec2 e)
-{
-	vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
-	if (v.z < 0)
-		v.xy = (1.0 - abs(v.yx)) * SignNotZero(v.xy);
-	return normalize(v);
-}
+vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex);
+float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex);
 
-float GetShadowBias()
-{
-	const float MINIMUM_SHADOW_BIAS = 0.005;
-
-	vec3 normal = DecodeNormal(texture(u_NormalMap, s_UV).xy);
-	float bias = max(
-		MINIMUM_SHADOW_BIAS * (1.0 - dot(normal, u_DirLightData.DirectionalLightDir)),
-		MINIMUM_SHADOW_BIAS
-	);
-	
-	return bias;
-}
 
 float HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 {
 	float shadow = 1.0;
-	//float bias = GetShadowBias();
-	float bias = 0.001;
+	float bias = GLOBAL_BIAS;
 
 	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
 	{
@@ -121,10 +66,187 @@ float HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 
 		if (shadowCoord.w >  0 && dist < shadowCoord.z - bias)
 		{
-			shadow = 0.3f;
+			shadow = 0.0f;
 		}
 	}
 	return shadow;
+}
+
+
+
+// Interleaved gradient noise from:
+// http://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare
+float InterleavedGradientNoise(vec2 uvs)
+{
+  const vec3 magic = vec3(0.06711056, 0.00583715, 52.9829189);
+  return fract(magic.z * fract(dot(uvs, magic.xy)));
+}
+
+// Create a rotation matrix with the noise function above.
+mat2 RandomRotation(vec2 uvs)
+{
+  float theta = 2.0 * PI * InterleavedGradientNoise(uvs);
+  float sinTheta = sin(theta);
+  float cosTheta = cos(theta);
+  return mat2(cosTheta, sinTheta, -sinTheta, cosTheta);
+}
+
+float SearchRegionRadiusUV(float zWorld)
+{
+	const float light_zNear = 0.0;
+	const float lightRadiusUV = 0.05;
+	return lightRadiusUV * (zWorld - light_zNear) / zWorld;
+}
+
+int GetSamplesRequiredForCascadeIndex(uint cascadeIndex)
+{
+	switch(cascadeIndex)
+	{
+		case 1: return 64;
+		case 2: return 32;
+		case 3: return 16;
+		case 4: return 8;
+	}
+	return 0;
+}
+
+float FindBlockerDistance(vec4 shadowCoords, uint cascadeIndex, float lightSize)
+{
+	float bias = GLOBAL_BIAS;
+
+	int numBlockerSearchSamples = GetSamplesRequiredForCascadeIndex(cascadeIndex);
+	int blockers = 0;
+	float avgBlockerDistance = 0.0;
+
+	float searchWidth = SearchRegionRadiusUV(shadowCoords.z);
+	for (int i = 0; i < numBlockerSearchSamples; i++)
+	{
+		float z = SampleShadowMap((shadowCoords.xy) + SamplePoisson(i) * searchWidth, cascadeIndex);
+
+		if (z < (shadowCoords.z - bias))
+		{
+			blockers++;
+			avgBlockerDistance += z;
+		}
+	}
+
+	if (blockers > 0)
+		return avgBlockerDistance / float(blockers);
+
+	return -1.0;
+}
+
+float PCFDirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius)
+{
+	float bias = GLOBAL_BIAS;
+	int numPCFSamples = GetSamplesRequiredForCascadeIndex(cascadeIndex);
+
+	mat2 rot = RandomRotation(vec2(gl_GlobalInvocationID.xy));
+	vec2 texelSize = 1.0 / (textureSize(u_ShadowDepthTexture, 0) / 2.0);
+
+	float sum = 0.0;
+	for (int i = 0; i < numPCFSamples; i++)
+	{
+		//vec2 offset = rot * SamplePoisson(i) * uvRadius;
+		vec2 offset = rot * SamplePoisson(i) * uvRadius;
+		float z = SampleShadowMap((shadowCoords.xy) + offset, cascadeIndex);
+		sum += step(shadowCoords.z - bias, z);
+		//sum += shadowCoords.z - bias > z ? 0.0 : 1.0;
+	}
+	return sum / float(numPCFSamples);
+}
+
+float PCSS_SampleShadowTexture(vec4 shadowCoords, uint cascadeIndex, float lightSize)
+{
+	float blockerDistance = FindBlockerDistance(shadowCoords, cascadeIndex, lightSize);
+
+	if(blockerDistance == -1.0) return 1.0; // No occlusion
+
+	float receiverDepth = shadowCoords.z;
+	float penumbraWidth = (receiverDepth - blockerDistance) / blockerDistance;
+	const float NEAR = 0.01;
+	float uvRadius = penumbraWidth * lightSize * NEAR / receiverDepth;
+
+	uvRadius = min(uvRadius, 0.002);
+	return PCFDirectionalLight(shadowCoords, cascadeIndex, uvRadius);
+}
+
+void main()
+{
+	ivec2 globalInvocation = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 imgSize = imageSize(u_ShadowTextureOutput).xy;
+
+	if (any(greaterThanEqual(globalInvocation, imgSize)))
+		return;
+
+	float viewPosZ = texelFetch(u_ViewPositionTexture, globalInvocation, 0).z;
+	uint cascadeIndex = GetCascadeIndex(viewPosZ);
+
+	vec3 position = texelFetch(u_PositionTexture, globalInvocation, 0).rgb;
+	float lightSize = u_DirLightData.DirectionLightSize;
+
+	// Depth compare for shadowing
+	vec4 shadowCoord = (BIAS_MAT * (GetCascadeMatrix(cascadeIndex))) * vec4(position, 1.0);
+	shadowCoord /= shadowCoord.w;
+
+	float shadowFactor = 0.0f;
+	/*
+	if(u_DirLightData.FadeCascades == 1)
+	{
+		
+		float cascadeTransitionFade = u_DirLightData.CascadesFadeFactor;
+
+		float c1 = smoothstep(u_PushConstant.CascadeDepthSplit[1] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[1] - cascadeTransitionFade * 0.5f, viewPosZ);
+		float c2 = smoothstep(u_PushConstant.CascadeDepthSplit[2] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[2] - cascadeTransitionFade * 0.5f, viewPosZ);
+
+		if(c1 > 0.0 && c1 < 1.0)
+		{
+			vec4 shadowCoord1 = (GetCascadeMatrix(1)) * vec4(position, 1.0); shadowCoord1 /= shadowCoord.w;
+			vec4 shadowCoord2 = (GetCascadeMatrix(2)) * vec4(position, 1.0); shadowCoord2 /= shadowCoord.w;
+
+			float shadowFactor1 = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord1, 1, lightSize) : HardShadows_SampleShadowTexture(shadowCoord1, 1);
+			float shadowFactor2 = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord2, 2, lightSize) : HardShadows_SampleShadowTexture(shadowCoord2, 2);
+
+			shadowFactor = mix(shadowFactor1, shadowFactor2, c1);
+		}
+		else if (c2 > 0.0 && c2 < 1.0)
+		{
+			vec4 shadowCoord2 = (GetCascadeMatrix(2)) * vec4(position, 1.0); shadowCoord2 /= shadowCoord.w;
+			vec4 shadowCoord3 = (GetCascadeMatrix(3)) * vec4(position, 1.0); shadowCoord3 /= shadowCoord.w;
+
+			float shadowFactor2 = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord2, 2, lightSize) : HardShadows_SampleShadowTexture(shadowCoord2, 2);
+			float shadowFactor3 = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord3, 3, lightSize) : HardShadows_SampleShadowTexture(shadowCoord3, 3);
+
+			shadowFactor = mix(shadowFactor2, shadowFactor3, c2);
+		}
+		else
+		{
+			shadowFactor = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
+		}
+	}
+	else
+	{
+		shadowFactor = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
+	}
+	*/
+	shadowFactor = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
+
+	
+	vec3 shadow = vec3(clamp(shadowFactor, 0.0f, 1.0f));
+
+
+	if(u_DirLightData.CascadeDebug == 1)
+	{
+		switch(cascadeIndex)
+		{
+			case 1: shadow *= vec3(1.0f, 0.25f, 0.25f); break;
+			case 2: shadow *= vec3(0.25f, 1.0f, 0.25f); break;
+			case 3: shadow *= vec3(0.25f, 0.25f, 1.0f); break;
+			case 4: shadow *= vec3(1.0f, 1.0f, 0.25f);  break;
+		}
+	}
+
+	imageStore(u_ShadowTextureOutput, globalInvocation, vec4(shadow, 1.0f));
 }
 
 
@@ -200,164 +322,49 @@ vec2 SamplePoisson(int index)
 	return PoissonDistribution[index % 64];
 }
 
-float SearchRegionRadiusUV(float zWorld)
+vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex)
 {
-	const float light_zNear = 0.0;
-	const float lightRadiusUV = 0.05;
-	return lightRadiusUV * (zWorld - light_zNear) / zWorld;
+	coord = clamp(coord, 0.0f, 1.0f);
+	switch(cascadeIndex)
+	{
+	case 1:
+		return coord * vec2(0.5f);
+	case 2:
+		return vec2(coord.x * 0.5f + 0.5f + delta, coord.y * 0.5f);
+	case 3:
+		return vec2(coord.x * 0.5f, coord.y * 0.5f + 0.5f + delta);
+	case 4:
+		return coord * vec2(0.5f) + vec2(0.5f + delta);
+	}
 }
 
-int GetSamplesRequiredForCascadeIndex(uint cascadeIndex)
+float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex)
+{
+	vec2 coords = ComputeShadowCoord(shadowCoords.xy, cascadeIndex);
+	float dist = texture(u_ShadowDepthTexture, coords).r;
+	return dist;
+}
+
+mat4 GetCascadeMatrix(uint cascadeIndex)
 {
 	switch(cascadeIndex)
 	{
-		case 1: return 24;
-		case 2: return 16;
-		case 3: return 10;
-		case 4: return 8;
+		case 1: return u_DirLightData.LightViewProjMatrix0;
+		case 2: return u_DirLightData.LightViewProjMatrix1;
+		case 3: return u_DirLightData.LightViewProjMatrix2;
+		case 4: return u_DirLightData.LightViewProjMatrix3;
 	}
-	return 0;
 }
 
-float FindBlockerDistance_DirectionalLight(vec4 shadowCoords, uint cascadeIndex, float lightSize)
+uint GetCascadeIndex(float viewPosZ)
 {
-	//float bias = GetShadowBias();
-	float bias = 0.005;
-
-	int numBlockerSearchSamples = GetSamplesRequiredForCascadeIndex(cascadeIndex);
-	int blockers = 0;
-	float avgBlockerDistance = 0;
-
-	float searchWidth = SearchRegionRadiusUV(shadowCoords.z);
-	for (int i = 0; i < numBlockerSearchSamples; i++)
+	uint cascadeIndex = 1;
+	for(uint i = 0; i < SHADOW_MAP_CASCADE_COUNT - 1; ++i)
 	{
-		float z = SampleShadowMap((shadowCoords.xy) + SamplePoisson(i) * searchWidth, cascadeIndex);
-
-		if (z < (shadowCoords.z - bias))
-		{
-			blockers++;
-			avgBlockerDistance += z;
+		if(viewPosZ < u_PushConstant.CascadeDepthSplit[i])
+		{	
+			cascadeIndex = i + 2;
 		}
 	}
-
-	if (blockers > 0)
-		return avgBlockerDistance / float(blockers);
-
-	return -1;
-}
-
-float PCF_DirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius)
-{
-	//float bias = GetShadowBias();
-	float bias = 0.001;
-	int numPCFSamples = GetSamplesRequiredForCascadeIndex(cascadeIndex);
-
-	float sum = 0;
-	for (int i = 0; i < numPCFSamples; i++)
-	{
-		vec2 offset = SamplePoisson(i) * uvRadius;
-		float z = SampleShadowMap((shadowCoords.xy) + offset, cascadeIndex);
-		sum += step(shadowCoords.z - bias, z);
-	}
-	return sum / float(numPCFSamples);
-}
-
-float PCSS_SampleShadowTexture(vec4 shadowCoords, uint cascadeIndex, float lightSize)
-{
-	float blockerDistance = FindBlockerDistance_DirectionalLight(shadowCoords, cascadeIndex, lightSize);
-
-	if(blockerDistance == -1) return 1.0f; // No occlusion
-
-	float penumbraWidth = (shadowCoords.z - blockerDistance) / blockerDistance;
-	float NEAR = 0.01; // Should this value be tweakable?
-	float uvRadius = penumbraWidth * lightSize * NEAR / shadowCoords.z; // Do we need to divide by shadowCoords.z?
-
-	uvRadius = min(uvRadius, 0.002f);
-	return PCF_DirectionalLight(shadowCoords, cascadeIndex, uvRadius);// * ShadowFade;
-}
-
-const mat4 biasMat = mat4( 
-	0.5, 0.0, 0.0, 0.0,
-	0.0, 0.5, 0.0, 0.0,
-	0.0, 0.0, 1.0, 0.0,
-	0.5, 0.5, 0.0, 1.0 
-);
-
-void main()
-{
-	ivec2 globalInvocation = ivec2(gl_GlobalInvocationID.xy);
-	ivec2 imgSize = imageSize(u_ShadowTextureOutput).xy;
-	vec2 uv = (vec2(globalInvocation) + 0.5.xx) / vec2(imgSize);
-	s_UV = uv;
-
-	if (any(greaterThanEqual(globalInvocation, imgSize)))
-		return;
-
-	float viewPosZ = texelFetch(u_ViewPositionTexture, globalInvocation, 0).z;
-	uint cascadeIndex = GetCascadeIndex(viewPosZ);
-
-	vec3 position = texelFetch(u_PositionTexture, globalInvocation, 0).rgb;
-
-	float lightSize = u_DirLightData.DirectionLightSize;
-
-	// Depth compare for shadowing
-	vec4 shadowCoord = (biasMat * (GetCascadeMatrix(cascadeIndex))) * vec4(position, 1.0);
-	shadowCoord /= shadowCoord.w;
-
-	float shadowFactor = 0.0f;
-	if(u_DirLightData.FadeCascades == 1)
-	{
-		
-		float cascadeTransitionFade = u_DirLightData.CascadesFadeFactor;
-
-		float c1 = smoothstep(u_PushConstant.CascadeDepthSplit[1] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[1] - cascadeTransitionFade * 0.5f, viewPosZ);
-		float c2 = smoothstep(u_PushConstant.CascadeDepthSplit[2] + cascadeTransitionFade * 0.5f, u_PushConstant.CascadeDepthSplit[2] - cascadeTransitionFade * 0.5f, viewPosZ);
-
-		if(c1 > 0.0 && c1 < 1.0)
-		{
-			vec4 shadowCoord1 = (GetCascadeMatrix(1)) * vec4(position, 1.0); shadowCoord1 /= shadowCoord.w;
-			vec4 shadowCoord2 = (GetCascadeMatrix(2)) * vec4(position, 1.0); shadowCoord2 /= shadowCoord.w;
-
-			float shadowFactor1 = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord1, 1, lightSize) : HardShadows_SampleShadowTexture(shadowCoord1, 1);
-			float shadowFactor2 = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord2, 2, lightSize) : HardShadows_SampleShadowTexture(shadowCoord2, 2);
-
-			shadowFactor = mix(shadowFactor1, shadowFactor2, c1);
-		}
-		else if (c2 > 0.0 && c2 < 1.0)
-		{
-			vec4 shadowCoord2 = (GetCascadeMatrix(2)) * vec4(position, 1.0); shadowCoord2 /= shadowCoord.w;
-			vec4 shadowCoord3 = (GetCascadeMatrix(3)) * vec4(position, 1.0); shadowCoord3 /= shadowCoord.w;
-
-			float shadowFactor2 = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord2, 2, lightSize) : HardShadows_SampleShadowTexture(shadowCoord2, 2);
-			float shadowFactor3 = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord3, 3, lightSize) : HardShadows_SampleShadowTexture(shadowCoord3, 3);
-
-			shadowFactor = mix(shadowFactor2, shadowFactor3, c2);
-		}
-		else
-		{
-			shadowFactor = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
-		}
-	}
-	else
-	{
-		shadowFactor = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
-	}
-
-	
-
-	vec3 shadow = vec3(clamp(shadowFactor, 0.3f, 1.0f));
-
-
-	if(u_DirLightData.CascadeDebug == 1)
-	{
-		switch(cascadeIndex)
-		{
-			case 1: shadow *= vec3(1.0f, 0.25f, 0.25f); break;
-			case 2: shadow *= vec3(0.25f, 1.0f, 0.25f); break;
-			case 3: shadow *= vec3(0.25f, 0.25f, 1.0f); break;
-			case 4: shadow *= vec3(1.0f, 1.0f, 0.25f);  break;
-		}
-	}
-
-	imageStore(u_ShadowTextureOutput, globalInvocation, vec4(shadow, 1.0f));
+	return cascadeIndex;
 }

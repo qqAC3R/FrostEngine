@@ -284,6 +284,7 @@ namespace Frost
 		// Updating the push constant data from the renderQueue
 		m_PushConstantData.CameraPosition = glm::vec4(renderQueue.CameraPosition, 1.0f);
 		m_PushConstantData.DirectionalLightDir = renderQueue.m_LightData.DirLight.Direction;
+		m_PushConstantData.DirectionalLightIntensity = renderQueue.m_LightData.DirLight.Specification.Intensity;
 
 		{
 			auto vulkanDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();

@@ -118,6 +118,7 @@ layout(push_constant) uniform PushConstant
 {
     vec4 CameraPosition; // vec4 - camera position + float pointLightCount + lightCullingWorkgroup.x
 	vec3 DirectionalLightDir;
+	float DirectionalLightIntensity;
 	
 	int UseLightHeatMap;
 } u_PushConstant;
@@ -648,17 +649,17 @@ void main()
 	DirectionalLight dirLight;
 	dirLight.Direction = u_PushConstant.DirectionalLightDir;
 	dirLight.Radiance = vec3(1.0f);
-	dirLight.Multiplier = 0.05f;
+	dirLight.Multiplier = u_PushConstant.DirectionalLightIntensity;
 	vec3 Ld = ComputeDirectionalLightContribution(dirLight);
 
 	// Adding up the point light and directional light contribution
-    vec3 result = Lo + Ld;
+    vec3 result = Lo + (Ld * texture(u_ShadowTexture, v_TexCoord).rgb);
 
 	// Adding up the ibl
-	float IBLIntensity = 5.0f;
+	float IBLIntensity = 3.0f;
 	result += ComputeIBLContriubtion() * IBLIntensity;
 
-	result *= texture(u_ShadowTexture, v_TexCoord).rgb;
+	//result *= texture(u_ShadowTexture, v_TexCoord).rgb;
 
 	// Calculating the result with the camera exposure
 	result *= u_UniformBuffer.CameraExposure;

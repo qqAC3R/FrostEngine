@@ -82,6 +82,7 @@ namespace Frost
 		{
 			glm::vec4 CameraPosition;
 			glm::vec3 DirectionalLightDir;
+			float DirectionalLightIntensity;
 			int32_t UseLightHeatMap = 0;
 		};
 		PushConstantData m_PushConstantData;
