@@ -65,7 +65,7 @@ vec3 CalcViewZ(float depth, vec2 uv)
 
 vec4 GetViewPosition(vec2 uv, float currStep)
 {
-	int mipLevel = clamp(int(floor(log2(currStep / PREFETCH_CACHE_SIZE))), 0, NUM_MIP_LEVELS - 1);
+	int mipLevel = clamp(int(floor(log2(currStep / PREFETCH_CACHE_SIZE))), 1, NUM_MIP_LEVELS - 1);
 	
 	vec2 baseSize = vec2(textureSize(u_DepthPyramid, 0));
 	vec2 mipCoord = (uv / baseSize);
@@ -145,7 +145,7 @@ float ComputeHBAO(vec3 vpos, vec3 vnorm, vec3 vdir)
 			
 		// h1
 		{
-			s = GetViewPosition(vec2(gl_GlobalInvocationID.xy) + offset, 0);
+			s = GetViewPosition(vec2(gl_GlobalInvocationID.xy) + offset, currStep);
 			ws = (s.xyz - vpos.xyz);
 
 			ao += ComputeAO(vpos.xyz, vnorm.xyz, s.xyz);
@@ -154,7 +154,7 @@ float ComputeHBAO(vec3 vpos, vec3 vnorm, vec3 vdir)
 
 		// h2
 		{
-			s = GetViewPosition(vec2(gl_GlobalInvocationID.xy) - offset, 0);
+			s = GetViewPosition(vec2(gl_GlobalInvocationID.xy) - offset, currStep);
 			ws = (s.xyz - vpos.xyz);
 
 			ao += ComputeAO(vpos.xyz, vnorm.xyz, s.xyz);
@@ -295,7 +295,8 @@ void main()
 	ivec2 imgSize = imageSize(o_AOTexture).xy;
 	vec2 s_UV = (vec2(loc) + 0.5.xx) / vec2(imgSize);
 	//vec4 vpos = GetViewPosition(loc, 0.0);
-	vec4 vpos = texture(u_ViewPositionTex, s_UV);
+	//vec4 vpos = texture(u_ViewPositionTex, s_UV);
+	vec4 vpos = texelFetch(u_ViewPositionTex, ivec2(gl_GlobalInvocationID.xy), 0);
 	
 	//if (vpos.w == 1.0) {
 	//	imageStore(o_AOTexture, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(1.0f), 1.0f));

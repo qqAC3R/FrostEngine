@@ -66,7 +66,7 @@ float HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 
 		if (shadowCoord.w >  0 && dist < shadowCoord.z - bias)
 		{
-			shadow = 0.0f;
+			shadow = 0.0;
 		}
 	}
 	return shadow;
@@ -98,23 +98,75 @@ float SearchRegionRadiusUV(float zWorld)
 	return lightRadiusUV * (zWorld - light_zNear) / zWorld;
 }
 
-int GetSamplesRequiredForCascadeIndex(uint cascadeIndex)
+int GetRequiredPCFSamplesForCascade(uint cascadeIndex)
 {
 	switch(cascadeIndex)
 	{
-		case 1: return 64;
-		case 2: return 32;
-		case 3: return 16;
-		case 4: return 8;
+		case 1: return 32;
+		case 2: return 16;
+		case 3: return 8;
+		case 4: return 4;
 	}
 	return 0;
+}
+
+int GetRequiredBlockerSamplesForCascade(uint cascadeIndex)
+{
+	switch(cascadeIndex)
+	{
+		case 1: return 48;
+		case 2: return 24;
+		case 3: return 10;
+		case 4: return 6;
+	}
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+float AverageBlockDepth(vec4 projCoords, uint cascadeIndex, float w_light)
+{
+    float blockerSum = 0.0;
+    int blockerCount = 0;
+    
+    //vec2 texelSize = 1.0 / (textureSize(u_ShadowDepthTexture, 0) / 2.0);
+    vec2 texelSize = 1.0 / (textureSize(u_ShadowDepthTexture, 0));
+    
+    float currentDepth = projCoords.z;
+    
+    float search_range = w_light * (currentDepth - 0.05) / currentDepth;
+    if(search_range <= 0.0)
+        return -1.0;
+
+    //int range = int(search_range);
+    
+    int window = 3;
+    for(int i = -window; i < window; i++)
+	{
+        for(int j = -window; j < window; j++)
+		{
+            vec2 shift = vec2(float(i) * 1.0 * search_range / float(window), float(j) * 1.0 * search_range / float(window));
+            
+			float sampleDepth = SampleShadowMap(projCoords.xy + shift * texelSize, uint(cascadeIndex));
+
+            if (sampleDepth < currentDepth)
+			{
+                blockerSum += sampleDepth;
+                blockerCount++;
+            }
+        }
+    }
+    
+    if(blockerCount > 0)
+        return blockerSum / float(blockerCount);
+    else
+        return -1.0; //--> not in shadow~~~~
 }
 
 float FindBlockerDistance(vec4 shadowCoords, uint cascadeIndex, float lightSize)
 {
 	float bias = GLOBAL_BIAS;
 
-	int numBlockerSearchSamples = GetSamplesRequiredForCascadeIndex(cascadeIndex);
+	int numBlockerSearchSamples = GetRequiredBlockerSamplesForCascade(cascadeIndex);
 	int blockers = 0;
 	float avgBlockerDistance = 0.0;
 
@@ -136,29 +188,36 @@ float FindBlockerDistance(vec4 shadowCoords, uint cascadeIndex, float lightSize)
 	return -1.0;
 }
 
-float PCFDirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius)
+float PCFDirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius, float blockerDistance)
 {
 	float bias = GLOBAL_BIAS;
-	int numPCFSamples = GetSamplesRequiredForCascadeIndex(cascadeIndex);
+	//int numPCFSamples = u_DirLightData.UsePCSS == 1 ? 64 : GetRequiredPCFSamplesForCascade(cascadeIndex);
+	int numPCFSamples = 64;
+	int requiredPCFSamples = GetRequiredPCFSamplesForCascade(cascadeIndex);
+	int additionFactor = numPCFSamples / requiredPCFSamples;
 
 	mat2 rot = RandomRotation(vec2(gl_GlobalInvocationID.xy));
 	vec2 texelSize = 1.0 / (textureSize(u_ShadowDepthTexture, 0) / 2.0);
 
 	float sum = 0.0;
-	for (int i = 0; i < numPCFSamples; i++)
+	for (int i = 0; i < numPCFSamples; i += additionFactor)
 	{
-		//vec2 offset = rot * SamplePoisson(i) * uvRadius;
-		vec2 offset = rot * SamplePoisson(i) * uvRadius;
+		vec2 offset;
+		if(cascadeIndex <= 2)
+			offset = (rot * (1.0 - blockerDistance)) * SamplePoisson(i) * uvRadius;
+		else
+			offset = SamplePoisson(i) * uvRadius;
+
 		float z = SampleShadowMap((shadowCoords.xy) + offset, cascadeIndex);
 		sum += step(shadowCoords.z - bias, z);
-		//sum += shadowCoords.z - bias > z ? 0.0 : 1.0;
 	}
-	return sum / float(numPCFSamples);
+	return sum / float(requiredPCFSamples);
 }
 
 float PCSS_SampleShadowTexture(vec4 shadowCoords, uint cascadeIndex, float lightSize)
 {
-	float blockerDistance = FindBlockerDistance(shadowCoords, cascadeIndex, lightSize);
+	//float blockerDistance = FindBlockerDistance(shadowCoords, cascadeIndex, lightSize);
+	float blockerDistance = AverageBlockDepth(shadowCoords, cascadeIndex, lightSize);
 
 	if(blockerDistance == -1.0) return 1.0; // No occlusion
 
@@ -167,8 +226,8 @@ float PCSS_SampleShadowTexture(vec4 shadowCoords, uint cascadeIndex, float light
 	const float NEAR = 0.01;
 	float uvRadius = penumbraWidth * lightSize * NEAR / receiverDepth;
 
-	uvRadius = min(uvRadius, 0.002);
-	return PCFDirectionalLight(shadowCoords, cascadeIndex, uvRadius);
+	//uvRadius = min(uvRadius, 0.002);
+	return PCFDirectionalLight(shadowCoords, cascadeIndex, uvRadius, blockerDistance);
 }
 
 void main()
@@ -230,9 +289,11 @@ void main()
 	}
 	*/
 	shadowFactor = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
+	//shadowFactor = PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize);
 
 	
 	vec3 shadow = vec3(clamp(shadowFactor, 0.0f, 1.0f));
+	//vec3 shadow = vec3(shadowCoord.z);
 
 
 	if(u_DirLightData.CascadeDebug == 1)

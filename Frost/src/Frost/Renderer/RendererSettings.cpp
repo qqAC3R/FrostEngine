@@ -9,7 +9,7 @@ namespace Frost
 		ForwardPlus.UseLightHeatMap = 0;
 
 		// Shadow Pass
-		ShadowPass.CascadeSplitLambda = 0.98f;
+		ShadowPass.CascadeSplitLambda = 0.92f;
 		ShadowPass.CameraFarClip = 1000.0f;
 		ShadowPass.CameraNearClip = 0.05f;
 		ShadowPass.CascadeFarPlaneOffset = 0.0f;
