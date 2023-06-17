@@ -246,6 +246,13 @@ namespace Frost
 		friend class Mesh;
 	};
 
+
+	// Dynamic Submeshes (inspired from UE4)
+	struct SkeletalSubmesh
+	{
+		glm::mat4 Transform;
+	};
+
 	class Mesh
 	{
 	public:
@@ -261,7 +268,8 @@ namespace Frost
 
 		bool IsLoaded() const { return m_MeshAsset->IsLoaded(); }
 		bool IsAnimated() const { return m_MeshAsset->IsAnimated(); }
-		//const std::string& GetFilepath() const { return m_Filepath; }
+
+		const Vector<SkeletalSubmesh>& GetSkeletalSubmeshes() const { return m_Submeshes; }
 
 		const Ref<MeshAsset>& GetMeshAsset() const { return m_MeshAsset; }
 
@@ -273,14 +281,13 @@ namespace Frost
 		Ref<Texture2D> GetTexture(uint32_t materialIndex, uint32_t textureId) { return m_MaterialAssets[materialIndex]->GetTextureById(textureId); }
 
 		void SetMaterialByAsset(uint32_t index, Ref<MaterialAsset> materialAsset);
-
 	private:
 		Ref<MeshAsset> m_MeshAsset;
+
+		// This submesh information should be dynamic, it means you can change the transforms, unlike from the mesh asset which are only read-onlu
+		Vector<SkeletalSubmesh> m_Submeshes;
 		
 		// Textures, stored in a ID fashioned way, so it is easier to be supported by the bindless renderer design
-		//HashMap<uint32_t, Ref<Texture2D>> m_Textures;
-		//HashMap<uint32_t, uint32_t> m_TextureAllocatorSlots; // Bindless
-		//Vector<Ref<DataStorage>> m_MaterialData; // Bindless data
 		Vector<Ref<MaterialAsset>> m_MaterialAssets;
 
 		// For animations

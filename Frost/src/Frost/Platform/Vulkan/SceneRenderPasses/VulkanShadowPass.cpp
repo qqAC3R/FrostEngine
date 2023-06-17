@@ -39,6 +39,7 @@ namespace Frost
 
 		m_Data->ShadowDepthShader = Renderer::GetShaderLibrary()->Get("ShadowDepthPass");
 		m_Data->ShadowComputeShader = Renderer::GetShaderLibrary()->Get("ShadowCompute");
+		m_Data->ShadowComputeDenoiseShader = Renderer::GetShaderLibrary()->Get("SpatialDenoiser");
 
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
@@ -64,12 +65,13 @@ namespace Frost
 
 		ShadowDepthInitData();
 		ShadowComputeInitData(1600, 900);
+		ShadowComputeDenoiseInitData(1600, 900);
 		CalculateCascadeOffsets();
 
 		Renderer::SubmitImageToOutputImageMap("Shadows", [this]() -> Ref<Image2D>
 		{
 			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-			return this->m_Data->ShadowComputeTexture[currentFrameIndex];
+			return this->m_Data->ShadowComputeDenoiseTexture[currentFrameIndex];
 		});
 	}
 
@@ -152,6 +154,44 @@ namespace Frost
 		}
 	}
 
+
+	void VulkanShadowPass::ShadowComputeDenoiseInitData(uint32_t width, uint32_t height)
+	{
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+
+		ComputePipeline::CreateInfo pipelineCreateInfo{};
+		pipelineCreateInfo.Shader = m_Data->ShadowComputeDenoiseShader;
+		if (!m_Data->ShadowComputeDenoisePipeline)
+			m_Data->ShadowComputeDenoisePipeline = ComputePipeline::Create(pipelineCreateInfo);
+
+		m_Data->ShadowComputeDenoiseTexture.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			ImageSpecification imageSpec{};
+			imageSpec.Width = width / 1.0f;
+			imageSpec.Height = height / 1.0f;
+			imageSpec.Format = ImageFormat::RGBA8;
+			imageSpec.Usage = ImageUsage::Storage;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+			m_Data->ShadowComputeDenoiseTexture[i] = Image2D::Create(imageSpec);
+		}
+
+		m_Data->ShadowComputeDenoiseDescriptor.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			if (!m_Data->ShadowComputeDenoiseDescriptor[i])
+				m_Data->ShadowComputeDenoiseDescriptor[i] = Material::Create(m_Data->ShadowComputeDenoiseShader, "ShaderComputeDenoise");
+
+			Ref<VulkanMaterial> vulkanDescriptor = m_Data->ShadowComputeDenoiseDescriptor[i].As<VulkanMaterial>();
+
+			vulkanDescriptor->Set("i_Texture", m_Data->ShadowComputeTexture[i]);
+			vulkanDescriptor->Set("o_Texture", m_Data->ShadowComputeDenoiseTexture[i]);
+
+			vulkanDescriptor->UpdateVulkanDescriptorIfNeeded();
+		}
+	}
+
 	void VulkanShadowPass::InitLate()
 	{
 
@@ -168,6 +208,7 @@ namespace Frost
 
 		VulkanRenderer::BeginTimeStampPass("Shadow Pass (Compute)");
 		ShadowComputeUpdate(renderQueue);
+		ShadowComputeDenoiseUpdate(renderQueue);
 		VulkanRenderer::EndTimeStampPass("Shadow Pass (Compute)");
 	}
 
@@ -374,11 +415,17 @@ namespace Frost
 		s_GroupedMeshesCached.clear();
 
 
+		for (auto& [meshAssetUUID, instanceCount] : renderQueue.m_MeshInstanceCount)
+		{
+			s_GroupedMeshesCached[meshAssetUUID].reserve(instanceCount);
+		}
+
+
 		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
 		{
 			// Get the mesh
 			auto mesh = renderQueue.m_Data[i].Mesh;
-			s_GroupedMeshesCached[mesh->GetMeshAsset()->Handle].push_back({ mesh.Raw(), renderQueue.m_Data[i].Transform});
+			s_GroupedMeshesCached[mesh->GetMeshAsset()->Handle].push_back({ mesh.Raw(), renderQueue.m_Data[i].Transform });
 		}
 
 
@@ -557,8 +604,6 @@ namespace Frost
 
 			vulkanRenderPass->Unbind();
 		}
-
-
 	}
 
 	void VulkanShadowPass::ShadowComputeUpdate(const RenderQueue& renderQueue)
@@ -595,6 +640,30 @@ namespace Frost
 
 		// Barrier
 		Ref<VulkanImage2D> vulkanTexture = m_Data->ShadowComputeTexture[currentFrameIndex].As<VulkanImage2D>();
+		vulkanTexture->TransitionLayout(cmdBuf, vulkanTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	}
+
+	void VulkanShadowPass::ShadowComputeDenoiseUpdate(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		RendererSettings& rendererSpec = Renderer::GetRendererSettings();
+
+		auto vulkanPipeline = m_Data->ShadowComputeDenoisePipeline.As<VulkanComputePipeline>();
+		auto vulkanDescriptor = m_Data->ShadowComputeDenoiseDescriptor[currentFrameIndex].As<VulkanMaterial>();
+
+		vulkanDescriptor->Bind(cmdBuf, m_Data->ShadowComputeDenoisePipeline);
+
+		float width = renderQueue.ViewPortWidth;
+		float height = renderQueue.ViewPortHeight;
+
+		uint32_t groupX = static_cast<uint32_t>(std::ceil((width / 1.0f) / 32.0f));
+		uint32_t groupY = static_cast<uint32_t>(std::ceil((height / 1.0f) / 32.0f));
+		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+
+		// Barrier
+		Ref<VulkanImage2D> vulkanTexture = m_Data->ShadowComputeDenoiseTexture[currentFrameIndex].As<VulkanImage2D>();
 		vulkanTexture->TransitionLayout(cmdBuf, vulkanTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 	}
 
@@ -605,10 +674,10 @@ namespace Frost
 		float cascadeSplits[SHADOW_MAP_CASCADE_COUNT];
 		float shadowTextureRes = Renderer::GetRendererConfig().ShadowTextureResolution;
 
-		//float nearClip = renderQueue.m_Camera.GetNearClip();
-		//float farClip = renderQueue.m_Camera.GetFarClip();
-		float nearClip = rendererSettings.ShadowPass.CameraNearClip;
-		float farClip = rendererSettings.ShadowPass.CameraFarClip;
+		float nearClip = renderQueue.m_Camera->GetNearClip();
+		float farClip = renderQueue.m_Camera->GetFarClip();
+		//float nearClip = rendererSettings.ShadowPass.CameraNearClip;
+		//float farClip = rendererSettings.ShadowPass.CameraFarClip;
 
 		float clipRange = farClip - nearClip;
 
@@ -761,8 +830,8 @@ namespace Frost
 			ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
 
 			ImGui::DragFloat("Cascade Split Factor", &rendererSpec.ShadowPass.CascadeSplitLambda, 0.005f, 0.1f, 1.5f);
-			ImGui::DragFloat("Camera FarClip", &rendererSpec.ShadowPass.CameraFarClip, 10.0f, 0.0f, 10000.0f);
-			ImGui::DragFloat("Camera NearClip", &rendererSpec.ShadowPass.CameraNearClip, 0.05f, 0.05f, 1.0);
+			//ImGui::DragFloat("Camera FarClip", &rendererSpec.ShadowPass.CameraFarClip, 10.0f, 0.0f, 10000.0f);
+			//ImGui::DragFloat("Camera NearClip", &rendererSpec.ShadowPass.CameraNearClip, 0.05f, 0.05f, 1.0);
 			ImGui::DragFloat("Cascade NearPlane Offset", &rendererSpec.ShadowPass.CascadeNearPlaneOffset, 0.5f);
 			ImGui::DragFloat("Cascade FarPlane Offset", &rendererSpec.ShadowPass.CascadeFarPlaneOffset, 0.5f);
 			ImGui::DragFloat("Fade Cascades Factor", &rendererSpec.ShadowPass.CascadesFadeFactor, 0.1f, 0.00f, 10.0f);
@@ -778,6 +847,7 @@ namespace Frost
 	void VulkanShadowPass::OnResize(uint32_t width, uint32_t height)
 	{
 		ShadowComputeInitData(width, height);
+		ShadowComputeDenoiseInitData(width, height);
 	}
 
 	void VulkanShadowPass::OnResizeLate(uint32_t width, uint32_t height)

@@ -8,6 +8,7 @@
 namespace Frost
 {
 	class Entity;
+	class Prefab;
 	struct CameraComponent;
 	struct TransformComponent;
 	using EntityMap = HashMap<UUID, Entity>;
@@ -15,7 +16,7 @@ namespace Frost
 	class Scene : public Asset
 	{
 	public:
-		Scene(); // Constructor which basically does nothing
+		Scene(const std::string& name, bool construct = true); // Constructor which basically does nothing
 		virtual ~Scene();
 
 		void Update(Timestep ts);
@@ -49,9 +50,21 @@ namespace Frost
 		CameraComponent* GetPrimaryCamera();
 		bool IsPlaying() const { return m_IsScenePlaying; }
 
-		Entity GetEntityByUUID(UUID uuid);
+		Entity CreatePrefabEntity(Entity entity, Entity parent, const glm::vec3* translation = nullptr);
+		Entity Instantiate(Ref<Prefab> prefab, const glm::vec3* translation = nullptr);
+
 		const EntityMap& GetEntityMap() const { return m_EntityIDMap; }
 		void CopyTo(Ref<Scene>& target);
+
+		void SetSelectedEntity(Entity entity);
+
+		template<typename T>
+		auto GetAllEntitiesWith()
+		{
+			return m_Registry.view<T>();
+		}
+	public:
+		static Ref<Scene> CreateEmpty();
 	private:
 		void UpdateSkyLight(Timestep ts);
 		void UpdateMeshComponents(Timestep ts);
@@ -66,8 +79,9 @@ namespace Frost
 		void UpdatePhysicsDebugMesh(Entity selectedEntity);
 		void UpdatePhysicsDebugMeshes(Timestep ts);
 		void UpdateCSharpApplication(Timestep ts);
-
-		void UpdateChildrenTransforms(Timestep ts);
+	private:
+		void OnScriptComponentConstruct(entt::registry& registry, entt::entity entity);
+		void OnScriptComponentDestroy(entt::registry& registry, entt::entity entity);
 
 		template<typename Fn>
 		void SubmitPostUpdateFunc(Fn&& func)
@@ -76,16 +90,20 @@ namespace Frost
 		}
 	private:
 		UUID m_SceneID;
-		//entt::entity m_SceneEntity;
 		entt::registry m_Registry;
+		entt::entity m_SelectedEntity = {};
+
+		std::string m_Name;
 		EntityMap m_EntityIDMap;
 
-		std::vector<std::function<void()>> m_PostUpdateQueue;
-
 		bool m_IsScenePlaying = false;
+
+		std::vector<std::function<void()>> m_PostUpdateQueue;
 
 		friend class SceneSerializer;
 		friend class EditorLayer;
 		friend class PhysicsEngine;
+		friend class Prefab;
+		friend class PrefabSerializer;
 	};
 }

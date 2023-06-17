@@ -137,7 +137,7 @@ namespace Frost
 
 			if (!metadata.IsDataLoaded)
 			{
-				// This was mostly created for the MaterialAsset, because we firstly have to search for the data in files
+				// This was mostly created for the MaterialAsset, Prefab, because we firstly have to search for the data in files
 				// If not found, create a new MaterialAsset
 				// In the case of other assets, we try to just reload and thats it
 				asset = AssetImporter::CreateAssetRef(metadata, pNext);

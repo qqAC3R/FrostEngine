@@ -71,6 +71,9 @@ namespace Frost { namespace ScriptInternalCalls
 
 		uint64_t CreateEntity();
 		void DestroyEntity(uint64_t entityID);
+
+		uint64_t Instantiate(uint64_t prefabAssetID);
+		uint64_t InstantiateWithTranslation(uint64_t prefabAssetID, glm::vec3* translation);
 	}
 
 	namespace Input

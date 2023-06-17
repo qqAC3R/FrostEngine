@@ -677,14 +677,8 @@ namespace Frost
 			Vector<Entity> sceneInstanceEntities;
 			for (auto& [entityUuid, entityInstanceData] : sceneInstances)
 			{
-				Entity entity = scene->GetEntityByUUID(entityUuid);
+				Entity entity = scene->FindEntityByUUID(entityUuid);
 				sceneInstanceEntities.push_back(entity);
-				//ScriptComponent& scriptComponent = entity.GetComponent<ScriptComponent>();
-				//
-				//if (ModuleExists(scriptComponent.ModuleName))
-				//{
-				//	//ShutdownScriptEntity(entity, scriptComponent.ModuleName);
-				//}
 			}
 
 			for (auto& entity : sceneInstanceEntities)
@@ -699,6 +693,17 @@ namespace Frost
 		}
 
 		s_EntityInstanceMap.erase(scene->GetUUID());
+	}
+
+	void ScriptEngine::OnScriptComponentDestroyed(UUID sceneID, UUID entityID)
+	{
+		if (s_EntityInstanceMap.find(sceneID) != s_EntityInstanceMap.end())
+		{
+			auto& entityMap = s_EntityInstanceMap.at(sceneID);
+			FROST_ASSERT_INTERNAL(bool(entityMap.find(entityID) != entityMap.end()));
+			if (entityMap.find(entityID) != entityMap.end())
+				entityMap.erase(entityID);
+		}
 	}
 
 	void ScriptEngine::InstantiateEntityClass(Entity entity)
@@ -744,7 +749,7 @@ namespace Frost
 		Vector<UUID> deletedEntityIDs;
 		for (auto& [entityID, entityInstanceData] : srcEntityInstanceMap)
 		{
-			Entity srcEntity = srcScene->GetEntityByUUID(entityID);
+			Entity srcEntity = srcScene->FindEntityByUUID(entityID);
 
 			if (srcEntity.HasComponent<ScriptComponent>())
 			{
@@ -753,7 +758,7 @@ namespace Frost
 				for (auto& [moduleName, srcFieldMap] : srcModuleFieldMap)
 				{
 
-					Entity dstEntity = srcScene->GetEntityByUUID(entityID);
+					Entity dstEntity = srcScene->FindEntityByUUID(entityID);
 					auto& dstModuleFieldMap = srcEntity.GetComponent<ScriptComponent>().ModuleFieldMap;
 
 					for (auto& [fieldName, field] : srcFieldMap)
@@ -976,6 +981,7 @@ namespace Frost
 				char* name = mono_type_get_name(monoType);
 				//if (strcmp(name, "Frost.Prefab") == 0) return FieldType::Asset;
 				if (strcmp(name, "Frost.Entity") == 0) return FieldType::Entity;
+				if (strcmp(name, "Frost.Prefab") == 0) return FieldType::Prefab;
 				return FieldType::ClassReference;
 			}
 			case MONO_TYPE_VALUETYPE:

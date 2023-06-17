@@ -279,12 +279,6 @@ namespace Frost
 		m_PositionDelta += delta * ZoomSpeed() * forwardDir;
 	}
 
-	void EditorCamera::SetViewportSize(uint32_t width, uint32_t height)
-	{
-		Resize((float)width / height);
-		m_ViewportWidth = width; m_ViewportHeight = height;
-	}
-
 	glm::vec3 EditorCamera::GetUpDirection() const
 	{
 		return glm::rotate(GetOrientation(), glm::vec3(0.0f, 1.0f, 0.0f));

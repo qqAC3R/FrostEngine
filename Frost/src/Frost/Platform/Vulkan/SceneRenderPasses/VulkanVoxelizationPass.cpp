@@ -1,6 +1,8 @@
 #include "frostpch.h"
 #include "VulkanVoxelizationPass.h"
 
+#include "Frost/Asset/AssetManager.h"
+
 #include "Frost/Platform/Vulkan/VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanPipeline.h"
 #include "Frost/Platform/Vulkan/VulkanMaterial.h"
@@ -74,8 +76,9 @@ namespace Frost
 
 		// Pipeline
 		BufferLayout bufferLayout = {
-			{ "a_ModelSpaceMatrix",  ShaderDataType::Mat4 },
-			{ "a_WorldSpaceMatrix",  ShaderDataType::Mat4 },
+			{ "a_ModelSpaceMatrix",    ShaderDataType::Mat4 },
+			{ "a_WorldSpaceMatrix",    ShaderDataType::Mat4 },
+			{ "a_MaterialIndexOffset", ShaderDataType::UInt },
 		};
 		bufferLayout.m_InputType = InputType::Instanced;
 
@@ -144,16 +147,24 @@ namespace Frost
 			writeDescriptorSet.dstSet = descriptorSet;
 
 			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-
-
 		}
 
 		m_Data->IndirectVoxelCmdBuffer.resize(framesInFlight);
-		for (auto& indirectCmdBuffer : m_Data->IndirectVoxelCmdBuffer)
+		m_Data->GlobalInstancedVertexBuffer.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
+			auto& indirectCmdBuffer = m_Data->IndirectVoxelCmdBuffer[i];
+
 			// Allocating a heap block
 			indirectCmdBuffer.DeviceBuffer = BufferDevice::Create(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes, { BufferUsage::Storage, BufferUsage::Indirect });
 			indirectCmdBuffer.HostBuffer.Allocate(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes);
+
+
+			auto& instancdVertexBuffer = m_Data->GlobalInstancedVertexBuffer[i];
+
+			// Allocating a heap block
+			instancdVertexBuffer.DeviceBuffer = BufferDevice::Create(sizeof(MeshInstancedVertexBuffer) * maxCountMeshes, { BufferUsage::Vertex });
+			instancdVertexBuffer.HostBuffer.Allocate(sizeof(MeshInstancedVertexBuffer) * maxCountMeshes);
 		}
 	}
 
@@ -218,7 +229,8 @@ namespace Frost
 		if (rendererSettings.VoxelGI.EnableVoxelization)
 		{
 			VulkanRenderer::BeginTimeStampPass("Voxelization Pass");
-			VoxelizationUpdateRendering(renderQueue);
+			//VoxelizationUpdateRendering(renderQueue);
+			VoxelizationUpdateRenderingWithInstancing(renderQueue);
 			VulkanRenderer::EndTimeStampPass("Voxelization Pass");
 
 			VulkanRenderer::BeginTimeStampPass("Voxel Filter Pass");
@@ -402,8 +414,18 @@ namespace Frost
 #endif
 	}
 
-	static Vector<IndirectMeshData> s_Voxelization_MeshIndirectData;
 
+	struct MeshInstanceListVoxelizationPass // This is reponsible for grouping all the mesh instances into one array
+	{
+		Mesh* Mesh; // Getting it as a raw pointer to intefere with the reference count
+		glm::mat4 Transform;
+		uint32_t MeshIndex;
+	};
+
+	static Vector<NewIndirectMeshData> s_VoxelizationMeshIndirectData;
+	static HashMap<AssetHandle, Vector<MeshInstanceListVoxelizationPass>> s_GroupedMeshesCached;
+
+#if 0
 	void VulkanVoxelizationPass::VoxelizationUpdateRendering(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
@@ -424,7 +446,7 @@ namespace Frost
 			We dont need them when we render them indirectly (because the gpu renders all the submeshes automatically - `multidraw`),
 			instead we just need to know the `start index` of every mesh in the `VkDrawIndexedIndirectCommand` buffer.
 		*/
-		s_Voxelization_MeshIndirectData.clear();
+		s_VoxelizationMeshIndirectData.clear();
 
 		// `Indirect draw commands` offsets
 		uint64_t indirectCmdsOffset = 0;
@@ -464,21 +486,21 @@ namespace Frost
 			}
 
 			// If we are submitting the first mesh, we don't need any offset
-			if (s_Voxelization_MeshIndirectData.size() == 0)
+			if (s_VoxelizationMeshIndirectData.size() == 0)
 			{
-				s_Voxelization_MeshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0));
+				s_VoxelizationMeshIndirectData.emplace_back(IndirectMeshData(0, submeshes.size(), i, mesh->GetMaterialCount(), 0));
 			}
 			else
 			{
-				uint32_t previousMeshOffset = s_Voxelization_MeshIndirectData[i - 1].SubmeshOffset;
-				uint32_t previousMeshCount = s_Voxelization_MeshIndirectData[i - 1].SubmeshCount;
+				uint32_t previousMeshOffset = s_VoxelizationMeshIndirectData[i - 1].SubmeshOffset;
+				uint32_t previousMeshCount = s_VoxelizationMeshIndirectData[i - 1].SubmeshCount;
 				uint32_t currentMeshOffset = previousMeshOffset + previousMeshCount;
 
-				uint32_t previousMaterialOffset = s_Voxelization_MeshIndirectData[i - 1].MaterialOffset;
-				uint32_t previousMaterialCount = s_Voxelization_MeshIndirectData[i - 1].MaterialCount;
+				uint32_t previousMaterialOffset = s_VoxelizationMeshIndirectData[i - 1].MaterialOffset;
+				uint32_t previousMaterialCount = s_VoxelizationMeshIndirectData[i - 1].MaterialCount;
 				uint32_t currentMaterialOffset = previousMaterialOffset + previousMaterialCount;
 
-				s_Voxelization_MeshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
+				s_VoxelizationMeshIndirectData.emplace_back(IndirectMeshData(currentMeshOffset, submeshes.size(), i, mesh->GetMaterialCount(), currentMaterialOffset));
 			}
 
 
@@ -530,9 +552,9 @@ namespace Frost
 
 
 		// Sending the indirect draw commands to the command buffer
-		for (uint32_t i = 0; i < s_Voxelization_MeshIndirectData.size(); i++)
+		for (uint32_t i = 0; i < s_VoxelizationMeshIndirectData.size(); i++)
 		{
-			auto& meshData = s_Voxelization_MeshIndirectData[i];
+			auto& meshData = s_VoxelizationMeshIndirectData[i];
 			uint32_t meshIndex = meshData.MeshIndex;
 
 			// Get the mesh
@@ -550,12 +572,226 @@ namespace Frost
 
 			// Set the transform matrix and model matrix of the submesh into a constant buffer
 			m_VoxelizationPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
-			m_VoxelizationPushConstant.MaterialIndex = s_Voxelization_MeshIndirectData[i].MaterialOffset;
+			m_VoxelizationPushConstant.MaterialIndex = s_VoxelizationMeshIndirectData[i].MaterialOffset;
 			m_VoxelizationPushConstant.VertexBufferBDA = mesh->GetMeshAsset()->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
 			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_VoxelizationPushConstant);
 
 			uint32_t submeshCount = meshData.SubmeshCount;
-			uint32_t offset = s_Voxelization_MeshIndirectData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
+			uint32_t offset = s_VoxelizationMeshIndirectData[i].SubmeshOffset * sizeof(VkDrawIndexedIndirectCommand);
+			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
+
+		}
+
+		// End the renderpass
+		m_Data->VoxelizationRenderPass->Unbind();
+	}
+#endif
+
+	void VulkanVoxelizationPass::VoxelizationUpdateRenderingWithInstancing(const RenderQueue& renderQueue)
+	{
+		// Getting all the needed information
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		Ref<Framebuffer> framebuffer = m_Data->VoxelizationRenderPass->GetFramebuffer(currentFrameIndex);
+		Ref<VulkanPipeline> vulkanPipeline = m_Data->VoxelizationPipeline.As<VulkanPipeline>();
+
+		// Get the needed matricies from the camera
+		glm::mat4 projectionMatrix = renderQueue.CameraProjectionMatrix;
+		projectionMatrix[1][1] *= -1; // GLM uses opengl style of rendering, where the y coordonate is inverted
+		glm::mat4 viewProjectionMatrix = projectionMatrix * renderQueue.CameraViewMatrix;
+
+		VoxelizationUpdateData(renderQueue);
+
+		/*
+			Each mesh might have a set of submeshes which are sent to render individualy.
+			We dont need them when we render them indirectly (because the gpu renders all the submeshes automatically - `multidraw`),
+			instead we just need to know the `start index` of every mesh in the `VkDrawIndexedIndirectCommand` buffer.
+			(TODO: This explanation is outdated, now we are using `instanced indirect multidraw rendering` :D)
+		*/
+		s_VoxelizationMeshIndirectData.clear();
+		s_GroupedMeshesCached.clear();
+
+		for (auto& [meshAssetUUID, instanceCount] : renderQueue.m_MeshInstanceCount)
+		{
+			s_GroupedMeshesCached[meshAssetUUID].reserve(instanceCount);
+		}
+
+
+		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
+		{
+			// Get the mesh
+			auto mesh = renderQueue.m_Data[i].Mesh;
+
+			s_GroupedMeshesCached[mesh->GetMeshAsset()->Handle].push_back({ mesh.Raw(), renderQueue.m_Data[i].Transform, i});
+		}
+
+		// `Indirect draw commands` offset
+		uint64_t indirectCmdsOffset = 0;
+
+		// `Instance data` offset.
+		//uint64_t materialDataOffset = 0;
+
+		// `Instance data` offset.
+		uint64_t instanceVertexOffset = 0;
+
+		for (auto& [handle, groupedMeshes] : s_GroupedMeshesCached)
+		{
+			NewIndirectMeshData* currentIndirectMeshData;
+			NewIndirectMeshData* lastIndirectMeshData = nullptr;
+			if (s_VoxelizationMeshIndirectData.size() > 0)
+				lastIndirectMeshData = &s_VoxelizationMeshIndirectData[s_VoxelizationMeshIndirectData.size() - 1];
+
+			// If we are submitting the first mesh, we don't need any offset
+			currentIndirectMeshData = &s_VoxelizationMeshIndirectData.emplace_back();
+
+			Ref<MeshAsset> meshAsset = groupedMeshes[0].Mesh->GetMeshAsset();
+			const Vector<Submesh>& submeshes = meshAsset->GetSubMeshes();
+
+			currentIndirectMeshData->MeshAssetHandle = meshAsset->Handle;
+			currentIndirectMeshData->InstanceCount = groupedMeshes.size();
+			currentIndirectMeshData->SubmeshCount = submeshes.size();
+			currentIndirectMeshData->TotalSubmeshCount = currentIndirectMeshData->SubmeshCount * currentIndirectMeshData->InstanceCount;
+			currentIndirectMeshData->MaterialCount = groupedMeshes[0].Mesh->GetMaterialCount();
+
+			currentIndirectMeshData->CmdOffset = indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand);
+
+			currentIndirectMeshData->MaterialOffset = 0;
+			currentIndirectMeshData->TotalMeshOffset = 0;
+			if (s_VoxelizationMeshIndirectData.size() > 1)
+			{
+				currentIndirectMeshData->MaterialOffset = lastIndirectMeshData->MaterialOffset + (lastIndirectMeshData->MaterialCount * lastIndirectMeshData->InstanceCount);
+				currentIndirectMeshData->TotalMeshOffset = lastIndirectMeshData->TotalMeshOffset + (lastIndirectMeshData->SubmeshCount * lastIndirectMeshData->InstanceCount);
+			}
+
+			// Set up the instanced vertex buffer (per submesh, per instance)
+			for (uint32_t submeshIndex = 0; submeshIndex < submeshes.size(); submeshIndex++)
+			{
+				MeshInstancedVertexBuffer meshInstancedVertexBuffer{};
+				uint32_t meshInstanceNr = 0;
+				for (auto& meshInstance : groupedMeshes)
+				{
+					 // Using skeletal (dynamic) submesh transforms, instead of the static ones which are found in the mesh asset
+					glm::mat4 modelMatrix = meshInstance.Transform * meshInstance.Mesh->GetSkeletalSubmeshes()[submeshIndex].Transform;
+
+
+					// Adding the neccesary Matricies for the shader
+					meshInstancedVertexBuffer.ModelSpaceMatrix = modelMatrix;
+					meshInstancedVertexBuffer.WorldSpaceMatrix = viewProjectionMatrix * modelMatrix;
+					/////////////////////////////////////////////////////
+
+					// Doing `MaterialOffset` because we are indicating it to the whole material buffer (so the index should be global)
+					meshInstancedVertexBuffer.MaterialIndexOffset = currentIndirectMeshData->MaterialOffset + (meshInstanceNr * currentIndirectMeshData->MaterialCount);
+					/////////////////////////////////////////////////////
+
+					m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].HostBuffer.Write((void*)&meshInstancedVertexBuffer, sizeof(MeshInstancedVertexBuffer), instanceVertexOffset);
+					instanceVertexOffset += sizeof(MeshInstancedVertexBuffer);
+
+					meshInstanceNr++;
+				}
+			}
+
+			for (uint32_t submeshIndex = 0; submeshIndex < submeshes.size(); submeshIndex++)
+			{
+				const Submesh& submesh = submeshes[submeshIndex];
+
+				// Submit the submesh into the cpu buffer
+				VkDrawIndexedIndirectCommand indirectCmdBuf{};
+				indirectCmdBuf.firstIndex = submesh.BaseIndex;
+				indirectCmdBuf.indexCount = submesh.IndexCount;
+				indirectCmdBuf.vertexOffset = submesh.BaseVertex;
+
+				indirectCmdBuf.instanceCount = groupedMeshes.size();
+
+				if (lastIndirectMeshData)
+				{
+					indirectCmdBuf.firstInstance = currentIndirectMeshData->TotalMeshOffset;
+				}
+				else
+				{
+					indirectCmdBuf.firstInstance = 0;
+				}
+
+				m_Data->IndirectVoxelCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
+				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
+			}
+		}
+
+		// Sending the data into the gpu buffer
+		// Indirect draw commands
+		auto vulkanIndirectCmdBuffer = m_Data->IndirectVoxelCmdBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		void* indirectCmdsPointer = m_Data->IndirectVoxelCmdBuffer[currentFrameIndex].HostBuffer.Data;
+		vulkanIndirectCmdBuffer->SetData(indirectCmdsOffset, indirectCmdsPointer);
+
+		// Global Instanced Vertex Buffer data
+		auto vulkanInstancedVertexBuffer = m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		void* instancedVertexBufferPointer = m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].HostBuffer.Data;
+		vulkanInstancedVertexBuffer->SetData(instanceVertexOffset, instancedVertexBufferPointer);
+
+
+		Ref<VulkanImage2D> shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
+		shadowDepthTexture->TransitionLayout(cmdBuf, shadowDepthTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+
+
+		// Bind the pipeline and renderpass
+		m_Data->VoxelizationRenderPass->Bind();
+		m_Data->VoxelizationPipeline->Bind();
+
+		// Set the viewport and scrissors
+		VkViewport viewport{};
+		viewport.width = (float)m_Data->VoxelizationRenderPass->GetColorAttachment(0, currentFrameIndex)->GetWidth();
+		viewport.height = (float)m_Data->VoxelizationRenderPass->GetColorAttachment(0, currentFrameIndex)->GetHeight();
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
+
+		VkRect2D scissor{};
+		scissor.extent = { (uint32_t)viewport.width, (uint32_t)viewport.height };
+		scissor.offset = { 0, 0 };
+		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
+
+
+
+		// TODO: This is so bad, pls fix this
+		VkPipelineLayout pipelineLayout = m_Data->VoxelizationPipeline.As<VulkanPipeline>()->GetVulkanPipelineLayout();
+
+		auto vulkanDescriptor = m_Data->VoxelizationDescriptor[currentFrameIndex].As<VulkanMaterial>();
+		vulkanDescriptor->UpdateVulkanDescriptorIfNeeded();
+		Vector<VkDescriptorSet> descriptorSets = vulkanDescriptor->GetVulkanDescriptorSets();
+		descriptorSets[1] = VulkanBindlessAllocator::GetVulkanDescriptorSet(currentFrameIndex);
+
+		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+		//m_Data->Descriptor[currentFrameIndex]->Bind(m_Data->Pipeline);
+
+
+		// Binding the global instanced vertex buffer only once
+		auto vulkanVertexBufferInstanced = m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		VkBuffer vertexBufferInstanced = vulkanVertexBufferInstanced->GetVulkanBuffer();
+		VkDeviceSize deviceSize[1] = { 0 };
+		vkCmdBindVertexBuffers(cmdBuf, 0, 1, &vertexBufferInstanced, deviceSize);
+
+
+		// Sending the indirect draw commands to the command buffer
+		for (uint32_t i = 0; i < s_VoxelizationMeshIndirectData.size(); i++)
+		{
+			auto& indirectPerMeshData = s_VoxelizationMeshIndirectData[i];
+
+			// Get the mesh
+			const AssetMetadata& assetMetadata = AssetManager::GetMetadata(indirectPerMeshData.MeshAssetHandle);
+			Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(assetMetadata.FilePath.string());
+
+			// Bind the index buffer
+			meshAsset->GetIndexBuffer()->Bind();
+
+
+			// Set the transform matrix and model matrix of the submesh into a constant buffer
+			m_VoxelizationPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
+			//m_VoxelizationPushConstant.MaterialIndex = s_VoxelizationMeshIndirectData[i].MaterialOffset;
+			m_VoxelizationPushConstant.VertexBufferBDA = meshAsset->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
+			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_VoxelizationPushConstant);
+
+			uint32_t submeshCount = indirectPerMeshData.SubmeshCount;
+			uint32_t offset = indirectPerMeshData.CmdOffset * sizeof(VkDrawIndexedIndirectCommand);
 			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
 
 		}

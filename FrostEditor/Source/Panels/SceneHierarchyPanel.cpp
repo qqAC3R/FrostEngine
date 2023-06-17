@@ -3,6 +3,10 @@
 
 #include "Frost/InputCodes/KeyCodes.h"
 #include "Frost/Renderer/Renderer.h"
+#include "Frost/EntitySystem/Prefab.h"
+#include "Frost/Utils/PlatformUtils.h"
+#include "Frost/Asset/AssetManager.h"
+
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -81,6 +85,27 @@ namespace Frost
 					m_SelectedEntity.AddComponent<RectangularLightComponent>();
 					TransformComponent& ts = m_SelectedEntity.GetComponent<TransformComponent>();
 				}
+				ImGui::Separator();
+				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(3, 161, 252, 255)); // Prefab blue color
+				if (ImGui::MenuItem("Import Prefab"))
+				{
+					std::string path = FileDialogs::OpenFile("");
+					
+					if (!path.empty())
+					{
+						Ref<Prefab> prefab = AssetManager::GetOrLoadAsset<Prefab>(path);
+						if (prefab)
+						{
+							m_SceneContext->Instantiate(prefab);
+						}
+						else
+						{
+							FROST_CORE_ERROR("Prefab cannot be initialized or is not valid!");
+						}
+					}
+				}
+				ImGui::PopStyleColor();
+
 				ImGui::EndPopup();
 			}
 			ImGui::PopStyleVar(); // ImGuiStyleVar_PopupRounding
@@ -114,6 +139,9 @@ namespace Frost
 					ImGui::PushID(idCounter);
 					Entity entity{ entityID , m_SceneContext.Raw() };
 
+					if (entity.HasComponent<PrefabComponent>())
+						ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(3, 161, 252, 255)); // Prefab Blue Color
+
 					// Only draw the entities which are not parented, i.e. at top level
 					if (entity.GetParent() == 0)
 					{
@@ -121,6 +149,9 @@ namespace Frost
 
 						DrawEntityNode(entity);
 					}
+
+					if (entity.HasComponent<PrefabComponent>())
+						ImGui::PopStyleColor();
 
 					ImGui::PopID();
 					idCounter++;
@@ -268,6 +299,41 @@ namespace Frost
 				}
 			}
 
+			
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(3, 161, 252, 255)); // Set blue color text, specific for prefabs
+			if (ImGui::MenuItem("Save As Prefab"))
+			{
+				std::string path = FileDialogs::SaveFile("");
+
+				if (!path.empty())
+				{
+					bool isAssetAlreadyLoaded = true;
+
+
+					// Using `GetAsset` instead of `LoadOrGetAsset` because we need to check if it is loaded in memory or not
+					Ref<Prefab> prefab = AssetManager::GetAsset<Prefab>(path);
+					if (!prefab)
+					{
+						// We are temporarily creating (or loading) a physics material asset.
+						// The only purpose of using `LoadAsset` or `CreateNewAsset` is to register the asset into the registry file and set the parameters.
+						// After that we serialize and delete the asset from memory.
+						prefab = AssetManager::LoadAsset<Prefab>(path);
+						if (!prefab)
+							prefab = AssetManager::CreateNewAsset<Prefab>(path);
+
+						isAssetAlreadyLoaded = false;
+					}
+					prefab->Create(entity);
+
+					AssetImporter::Serialize(prefab);
+					if (!isAssetAlreadyLoaded)
+						AssetManager::RemoveAssetFromMemory(prefab->Handle);
+				}
+				//entity
+			}
+			ImGui::PopStyleColor();
+
+
 			ImGui::EndPopup();
 		}
 
@@ -354,7 +420,11 @@ namespace Frost
 		if (!entity.GetComponent<ParentChildComponent>().ParentID)
 		{
 			ImGui::TableNextColumn();
-			ImGui::TextUnformatted("Entity");
+
+			if (entity.HasComponent<PrefabComponent>())
+				ImGui::TextUnformatted("Prefab");
+			else
+				ImGui::TextUnformatted("Entity");
 		}
 
 		if (entityDeleted)

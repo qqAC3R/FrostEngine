@@ -26,7 +26,7 @@ namespace Frost
 
 		// AO
 		AmbientOcclusion.Enabled = 1;
-		AmbientOcclusion.AOMode = 1; // 0 = HBAO || 1 = GTAO
+		AmbientOcclusion.AOMode = 0; // 0 = HBAO || 1 = GTAO
 
 		// SSR
 		SSR.Enabled = 1;

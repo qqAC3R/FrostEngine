@@ -552,11 +552,21 @@ namespace Frost
 	{
 		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 
+		m_Data->CustomProjectionMatrix = glm::perspective(
+			glm::radians(renderQueue.m_Camera->GetCameraFOV()),
+			float(renderQueue.m_Camera->GetViewportWidth()) / float(renderQueue.m_Camera->GetViewportHeight()),
+			renderQueue.m_Camera->GetNearClip(),
+			renderQueue.m_Camera->GetFarClip()
+		);
+
+#if 0
 		if (m_Data->CameraFOV != renderQueue.m_Camera->GetCameraFOV())
 		{
 			m_Data->CustomProjectionMatrix = glm::perspective(glm::radians(renderQueue.m_Camera->GetCameraFOV()), float(renderQueue.ViewPortWidth) / float(renderQueue.ViewPortHeight), 0.1f, 500.0f);
+
 		}
 		m_Data->CameraFOV = renderQueue.m_Camera->GetCameraFOV();
+#endif
 
 		VulkanRenderer::BeginTimeStampPass("Cloud Compute Pass");
 		CloudComputeUpdate(renderQueue);
@@ -992,8 +1002,6 @@ namespace Frost
 
 	void VulkanVolumetricPass::OnResize(uint32_t width, uint32_t height)
 	{
-		m_Data->CustomProjectionMatrix = glm::perspective(glm::radians(m_Data->CameraFOV), float(width) / float(height), 0.1f, 1000.0f);
-
 		CloudComputeInitData(width, height);
 
 		FroxelPopulateInitData(width, height);

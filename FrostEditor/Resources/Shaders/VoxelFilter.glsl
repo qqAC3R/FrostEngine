@@ -25,7 +25,7 @@ layout(binding = 3) uniform DirectionaLightData
 	mat4 LightViewProjMatrix2;
 	mat4 LightViewProjMatrix3;
 
-	float CascadeDepthSplit[4];
+	vec4 CascadeDepthSplit;
 
 	float DirectionalLightIntensity;
 

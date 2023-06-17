@@ -126,7 +126,21 @@ namespace Frost
         }
 
         // TODO: Instantiate method (for prefabs)?
+        public static Entity Instantiate(Prefab prefab)
+        {
+            ulong entityID = Instantiate_Native(prefab.ID);
+            if (entityID == 0)
+                return null;
+            return new Entity(entityID);
+        }
 
+        public static Entity Instantiate(Prefab prefab, Vector3 translation)
+        {
+            ulong entityID = InstantiateWithTranslation_Native(prefab.ID, ref translation);
+            if (entityID == 0)
+                return null;
+            return new Entity(entityID);
+        }
 
         // Destroys the calling Entity
         public void Destroy()
@@ -197,6 +211,12 @@ namespace Frost
         private static extern bool HasComponent_Native(ulong entityID, Type type);
         [MethodImpl(MethodImplOptions.InternalCall)]
         private static extern ulong FindEntityByTag_Native(string tag);
+
+
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        private static extern ulong Instantiate_Native(ulong prefabAssetID);
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        private static extern ulong InstantiateWithTranslation_Native(ulong prefabAssetID, ref Vector3 translation);
 
 
         [MethodImpl(MethodImplOptions.InternalCall)]

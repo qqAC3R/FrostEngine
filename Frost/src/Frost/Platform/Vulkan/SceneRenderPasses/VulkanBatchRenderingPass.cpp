@@ -30,7 +30,8 @@ namespace Frost
 		m_RenderPassPipeline = renderPassPipeline;
 		m_Data = new InternalData();
 
-		m_Data->BatchRendererShader = Renderer::GetShaderLibrary()->Get("BatchRenderer");
+		m_Data->BatchQuadRendererShader = Renderer::GetShaderLibrary()->Get("BatchRendererQuad");
+		m_Data->BatchLineRendererShader = Renderer::GetShaderLibrary()->Get("BatchRendererLine");
 		m_Data->RenderWireframeShader = Renderer::GetShaderLibrary()->Get("Wireframe");
 		m_Data->RenderGridShader = Renderer::GetShaderLibrary()->Get("SceneGrid");
 		m_Data->LineDetectionShader = Renderer::GetShaderLibrary()->Get("LineDetection");
@@ -73,32 +74,55 @@ namespace Frost
 		};
 		m_Data->BatchRendererRenderPass = RenderPass::Create(renderPassSpec);
 
-		// Batch rendering pipeline
-		BufferLayout bufferLayout = {
-			{ "a_Position",  ShaderDataType::Float3 },
-			{ "a_Color",  ShaderDataType::Float4 },
-			{ "a_TexCoord",  ShaderDataType::Float2 },
-			{ "a_TexIndex",  ShaderDataType::UInt },
-		};
-		bufferLayout.m_InputType = InputType::Vertex;
-		Pipeline::CreateInfo pipelineCreateInfo{};
-		pipelineCreateInfo.Shader = m_Data->BatchRendererShader;
-		pipelineCreateInfo.UseDepthTest = true;
-		pipelineCreateInfo.UseDepthWrite = false;
-		pipelineCreateInfo.RenderPass = m_Data->BatchRendererRenderPass;
-		pipelineCreateInfo.VertexBufferLayout = bufferLayout;
-		pipelineCreateInfo.Topology = PrimitiveTopology::Triangles;
-		if (!m_Data->BatchRendererPipeline)
-			m_Data->BatchRendererPipeline = Pipeline::Create(pipelineCreateInfo);
+		{
+
+			// Batch Quads rendering pipeline
+			BufferLayout bufferLayout = {
+				{ "a_Position",  ShaderDataType::Float3 },
+				{ "a_Color",  ShaderDataType::Float4 },
+				{ "a_TexCoord",  ShaderDataType::Float2 },
+				{ "a_TexIndex",  ShaderDataType::UInt },
+			};
+			bufferLayout.m_InputType = InputType::Vertex;
+			Pipeline::CreateInfo pipelineCreateInfo{};
+			pipelineCreateInfo.Shader = m_Data->BatchQuadRendererShader;
+			pipelineCreateInfo.UseDepthTest = true;
+			pipelineCreateInfo.UseDepthWrite = false;
+			pipelineCreateInfo.RenderPass = m_Data->BatchRendererRenderPass;
+			pipelineCreateInfo.VertexBufferLayout = bufferLayout;
+			pipelineCreateInfo.Topology = PrimitiveTopology::Triangles;
+			if (!m_Data->BatchQuadRendererPipeline)
+				m_Data->BatchQuadRendererPipeline = Pipeline::Create(pipelineCreateInfo);
+		}
+
+		{
+
+			// Batch Quads rendering pipeline
+			BufferLayout bufferLayout = {
+				{ "a_Position",  ShaderDataType::Float3 },
+				{ "a_Color",  ShaderDataType::Float4 },
+			};
+			bufferLayout.m_InputType = InputType::Vertex;
+			Pipeline::CreateInfo pipelineCreateInfo{};
+			pipelineCreateInfo.Shader = m_Data->BatchLineRendererShader;
+			pipelineCreateInfo.UseDepthTest = true;
+			pipelineCreateInfo.UseDepthWrite = false;
+			pipelineCreateInfo.RenderPass = m_Data->BatchRendererRenderPass;
+			pipelineCreateInfo.VertexBufferLayout = bufferLayout;
+			pipelineCreateInfo.Topology = PrimitiveTopology::Lines;
+			if (!m_Data->BatchLineRendererPipeline)
+				m_Data->BatchLineRendererPipeline = Pipeline::Create(pipelineCreateInfo);
+		}
 
 
 		m_Data->BatchRendererMaterial.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
-			m_Data->BatchRendererMaterial[i] = Material::Create(m_Data->BatchRendererShader, "BatchRendererMaterial");
+			m_Data->BatchRendererMaterial[i] = Material::Create(m_Data->BatchQuadRendererShader, "BatchQuadRendererMaterial");
 		}
 
 		{
+			// Quads
 			m_Data->QuadVertexBuffer.resize(framesInFlight);
 			for (uint32_t i = 0; i < framesInFlight; i++)
 			{
@@ -125,6 +149,17 @@ namespace Frost
 
 			m_Data->QuadIndexBuffer = IndexBuffer::Create(quadIndices, MaxIndices);
 			delete[] quadIndices;
+		}
+
+		{
+			// Lines
+			m_Data->LineVertexBuffer.resize(framesInFlight);
+			for (uint32_t i = 0; i < framesInFlight; i++)
+			{
+				m_Data->LineVertexBuffer[i] = BufferDevice::Create(MaxVertices * sizeof(LineVertex), { BufferUsage::Vertex });
+			}
+			m_Data->LineVertexBufferBase = new LineVertex[MaxVertices];
+			m_Data->LineVertexBufferPtr = m_Data->LineVertexBufferBase;
 		}
 	}
 
@@ -282,11 +317,17 @@ namespace Frost
 
 	void VulkanBatchRenderingPass::OnUpdate(const RenderQueue& renderQueue)
 	{
+		
+
+
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 
 		m_Data->QuadIndexCount = 0;
 		m_Data->QuadCount = 0;
 		m_Data->QuadVertexBufferPtr = m_Data->QuadVertexBufferBase;
+
+		m_Data->LineVertexCount = 0;
+		m_Data->LineVertexBufferPtr = m_Data->LineVertexBufferBase;
 
 		for (const auto& object2d : renderQueue.m_BatchRendererData)
 		{
@@ -294,11 +335,13 @@ namespace Frost
 			{
 				case RenderQueue::Object2D::ObjectType::Billboard: SubmitBillboard(renderQueue, object2d); break;
 				case RenderQueue::Object2D::ObjectType::Quad:      SubmitQuad(object2d); break;
+				case RenderQueue::Object2D::ObjectType::Line:      SubmitLine(object2d); break;
 				default: FROST_CORE_ERROR("2D Object type is unknown!");  break;
 			}
 		}
 
 		m_Data->QuadVertexBuffer[currentFrameIndex]->SetData(m_Data->QuadCount * 4 * sizeof(QuadVertex), m_Data->QuadVertexBufferBase);
+		m_Data->LineVertexBuffer[currentFrameIndex]->SetData(m_Data->LineVertexCount * sizeof(LineVertex), m_Data->LineVertexBufferBase);
 
 		BatchRendererUpdate(renderQueue);
 		SelectEntityUpdate(renderQueue);
@@ -308,7 +351,6 @@ namespace Frost
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
-		Ref<VulkanPipeline> batchRendererPipeline = m_Data->BatchRendererPipeline.As<VulkanPipeline>();
 		Ref<Framebuffer> framebuffer = m_Data->BatchRendererRenderPass->GetFramebuffer(currentFrameIndex);
 
 		{
@@ -333,40 +375,75 @@ namespace Frost
 
 
 		m_Data->BatchRendererRenderPass->Bind();
-		batchRendererPipeline->Bind();
-		batchRendererPipeline->BindVulkanPushConstant("u_PushConstant", &viewProj);
 
 
-		VkViewport viewport{};
-		viewport.width = (float)framebuffer->GetSpecification().Width;
-		viewport.height = (float)framebuffer->GetSpecification().Height;
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-		vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
+		{
+			Ref<VulkanPipeline> batchQuadRendererPipeline = m_Data->BatchQuadRendererPipeline.As<VulkanPipeline>();
 
-		VkRect2D scissor{};
-		scissor.extent = { framebuffer->GetSpecification().Width, framebuffer->GetSpecification().Height };
-		scissor.offset = { 0, 0 };
-		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
+			batchQuadRendererPipeline->Bind();
+			batchQuadRendererPipeline->BindVulkanPushConstant("u_PushConstant", &viewProj);
 
-		////////////////// Render the batched quads //////////////////////////////
-		Ref<VulkanMaterial> batchRendererMaterial = m_Data->BatchRendererMaterial[currentFrameIndex].As<VulkanMaterial>();
-		
-		// TODO: This is so bad, pls fix this
-		VkPipelineLayout pipelineLayout = batchRendererPipeline->GetVulkanPipelineLayout();
-		Vector<VkDescriptorSet> descriptorSets = batchRendererMaterial->GetVulkanDescriptorSets();
-		descriptorSets[1] = VulkanBindlessAllocator::GetVulkanDescriptorSet(currentFrameIndex);
-		vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-		m_Data->QuadIndexBuffer->Bind();
-		Ref<VulkanBufferDevice> batchVertexBuffer = m_Data->QuadVertexBuffer[currentFrameIndex].As<VulkanBufferDevice>();
+			VkViewport viewport{};
+			viewport.width = (float)framebuffer->GetSpecification().Width;
+			viewport.height = (float)framebuffer->GetSpecification().Height;
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
+			vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
 
-		uint64_t offset = 0;
-		VkBuffer batchVertexBufferInternal = batchVertexBuffer->GetVulkanBuffer();
-		vkCmdBindVertexBuffers(cmdBuf, 0, 1, &batchVertexBufferInternal, &offset);
+			VkRect2D scissor{};
+			scissor.extent = { framebuffer->GetSpecification().Width, framebuffer->GetSpecification().Height };
+			scissor.offset = { 0, 0 };
+			vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
-		vkCmdDrawIndexed(cmdBuf, indexCount, 1, 0, 0, 0);
+			////////////////// Render the batched quads //////////////////////////////
+			Ref<VulkanMaterial> batchRendererMaterial = m_Data->BatchRendererMaterial[currentFrameIndex].As<VulkanMaterial>();
 
+			// TODO: This is so bad, pls fix this
+			VkPipelineLayout pipelineLayout = batchQuadRendererPipeline->GetVulkanPipelineLayout();
+			Vector<VkDescriptorSet> descriptorSets = batchRendererMaterial->GetVulkanDescriptorSets();
+			descriptorSets[1] = VulkanBindlessAllocator::GetVulkanDescriptorSet(currentFrameIndex);
+			vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+			m_Data->QuadIndexBuffer->Bind();
+			Ref<VulkanBufferDevice> batchVertexBuffer = m_Data->QuadVertexBuffer[currentFrameIndex].As<VulkanBufferDevice>();
+
+			uint64_t offset = 0;
+			VkBuffer batchVertexBufferInternal = batchVertexBuffer->GetVulkanBuffer();
+			vkCmdBindVertexBuffers(cmdBuf, 0, 1, &batchVertexBufferInternal, &offset);
+
+			vkCmdDrawIndexed(cmdBuf, indexCount, 1, 0, 0, 0);
+		}
+
+		{
+			Ref<VulkanPipeline> batchLineRendererPipeline = m_Data->BatchLineRendererPipeline.As<VulkanPipeline>();
+
+			batchLineRendererPipeline->Bind();
+			batchLineRendererPipeline->BindVulkanPushConstant("u_PushConstant", &viewProj);
+
+
+			VkViewport viewport{};
+			viewport.width = (float)framebuffer->GetSpecification().Width;
+			viewport.height = (float)framebuffer->GetSpecification().Height;
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
+			vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
+
+			VkRect2D scissor{};
+			scissor.extent = { framebuffer->GetSpecification().Width, framebuffer->GetSpecification().Height };
+			scissor.offset = { 0, 0 };
+			vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
+
+			////////////////// Render the batched lines //////////////////////////////
+			Ref<VulkanBufferDevice> batchVertexBuffer = m_Data->LineVertexBuffer[currentFrameIndex].As<VulkanBufferDevice>();
+
+			uint64_t offset = 0;
+			VkBuffer batchVertexBufferInternal = batchVertexBuffer->GetVulkanBuffer();
+			vkCmdBindVertexBuffers(cmdBuf, 0, 1, &batchVertexBufferInternal, &offset);
+
+			vkCmdDraw(cmdBuf, m_Data->LineVertexCount, 1, 0, 0);
+
+		}
 
 		////////////////// Wireframe mesh //////////////////////////////
 		RenderWireframeUpdate(renderQueue);
@@ -476,6 +553,19 @@ namespace Frost
 			FROST_CORE_ERROR("The maximum number of indices has been reached! The batch renderer cannot render more objects!");
 			return;
 		}
+	}
+
+	void VulkanBatchRenderingPass::SubmitLine(const RenderQueue::Object2D& object2d)
+	{
+		m_Data->LineVertexBufferPtr->Position = object2d.Position;
+		m_Data->LineVertexBufferPtr->Color = object2d.Color;
+		m_Data->LineVertexBufferPtr++;
+
+		m_Data->LineVertexBufferPtr->Position = object2d.Position_SecondPos_Line;
+		m_Data->LineVertexBufferPtr->Color = object2d.Color;
+		m_Data->LineVertexBufferPtr++;
+
+		m_Data->LineVertexCount += 2;
 	}
 
 	void VulkanBatchRenderingPass::RenderWireframeUpdate(const RenderQueue& renderQueue)

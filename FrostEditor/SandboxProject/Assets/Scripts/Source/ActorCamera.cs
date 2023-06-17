@@ -10,6 +10,7 @@ namespace Frost
         //public Entity ActorEntityMesh = null;
         public Vector3 m_CameraOffset = new Vector3(0, 1, 3);
         public float m_Distance = 8.0f;
+        
 
         protected override void OnCreate()
         {

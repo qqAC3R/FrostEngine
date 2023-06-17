@@ -94,7 +94,8 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudPerlinNoise.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudWoorleyNoise.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/CloudComputeVolumetric.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BatchRenderer.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BatchRendererQuad.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BatchRendererLine.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Wireframe.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SceneGrid.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EntityGlow.glsl");
@@ -193,6 +194,11 @@ namespace Frost
 	void Renderer::SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture)
 	{
 		s_RendererAPI->SubmitBillboards(positon, size, texture);
+	}
+
+	void Renderer::SubmitLines(const glm::vec3& positon0, const glm::vec3& positon1, const glm::vec4& color)
+	{
+		s_RendererAPI->SubmitLines(positon0, positon1, color);
 	}
 
 	void Renderer::SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth)

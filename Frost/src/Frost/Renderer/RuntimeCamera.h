@@ -16,7 +16,9 @@ namespace Frost
 		const glm::vec3& GetPosition() const override { return m_Position; }
 
 		void SetTransform(const glm::mat4& transform);
-		void SetViewportSize(uint32_t width, uint32_t height);
+		//void SetViewportSize(uint32_t width, uint32_t height);
+		//uint32_t GetViewportWidth() const { return m_ViewportWidth; }
+		//uint32_t GetViewportHeight() const { return m_ViewportHeight; }
 	private:
 		void UpdateViewMatrix(const glm::vec3& pos, const glm::vec3& rotation);
 	private:
@@ -25,8 +27,6 @@ namespace Frost
 
 		glm::mat4 m_ViewProjecitonMatrix;
 		glm::mat4 m_ViewProjecitonMatrix_Vk;
-
-		uint32_t m_ViewportWidth = 1600, m_ViewportHeight = 900;
 
 		friend class RenderQueue;
 	};

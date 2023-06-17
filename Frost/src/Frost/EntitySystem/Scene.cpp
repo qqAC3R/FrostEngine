@@ -6,6 +6,7 @@
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/EntitySystem/Entity.h"
 #include "Frost/EntitySystem/Components.h"
+#include "Frost/EntitySystem/Prefab.h"
 
 #include "Frost/Physics/PhysicsEngine.h"
 #include "Frost/Script/ScriptEngine.h"
@@ -15,14 +16,21 @@
 namespace Frost
 {
 
-	Scene::Scene()
+	Scene::Scene(const std::string& name, bool construct)
+		: m_Name(name)
 	{
+		if (construct)
+		{
+			m_Registry.on_construct<ScriptComponent>().connect<&Scene::OnScriptComponentConstruct>(this);
+			m_Registry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptComponentDestroy>(this);
+		}
 		//m_Registry.on_construct<ScriptComponent>().connect<&Scene::OnScriptComponentConstruct>(this);
 		//m_Registry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptComponentDestroy>(this);
 	}
 
 	Scene::~Scene()
 	{
+		m_Registry.on_destroy<ScriptComponent>().disconnect();
 #if 0
 		m_Registry.each([&](auto entity)
 		{
@@ -141,8 +149,6 @@ namespace Frost
 		UpdateBoxFogVolumes(ts);
 		UpdateCloudVolumes(ts);
 
-		UpdateChildrenTransforms(ts);
-
 		//UpdatePhysicsDebugMeshes(ts);
 	}
 
@@ -239,14 +245,19 @@ namespace Frost
 
 	Entity Scene::FindEntityByUUID(UUID id)
 	{
-		auto view = m_Registry.view<IDComponent>();
-		for (const auto& entity : view)
+		if (m_EntityIDMap.find(id) != m_EntityIDMap.end())
 		{
-			auto& idComponent = m_Registry.get<IDComponent>(entity);
-			if (idComponent.ID == id)
-				return Entity(entity, this);
+			return m_EntityIDMap[id];
 		}
 		return Entity{};
+
+		//auto view = m_Registry.view<IDComponent>();
+		//for (const auto& entity : view)
+		//{
+		//	auto& idComponent = m_Registry.get<IDComponent>(entity);
+		//	if (idComponent.ID == id)
+		//		return Entity(entity, this);
+		//}
 	}
 
 	Entity Scene::FindEntityByTag(const std::string& tag)
@@ -277,9 +288,112 @@ namespace Frost
 		return nullptr;
 	}
 
-	Entity Scene::GetEntityByUUID(UUID uuid)
+	template<typename T>
+	static void CopyComponentIfExists(entt::entity dst, entt::registry& dstRegistry, entt::entity src, entt::registry& srcRegistry)
 	{
-		return m_EntityIDMap[uuid];
+		if (srcRegistry.any_of<T>(src))
+		{
+			auto& srcComponent = srcRegistry.get<T>(src);
+			dstRegistry.emplace_or_replace<T>(dst, srcComponent);
+		}
+	}
+	
+	template<typename T>
+	static void CopyComponentIfExists(entt::entity dst, entt::entity src, entt::registry& registry)
+	{
+		if (registry.any_of<T>(src))
+		{
+			auto& srcComponent = registry.get<T>(src);
+			registry.emplace_or_replace<T>(dst, srcComponent);
+		}
+	}
+
+	Entity Scene::CreatePrefabEntity(Entity entity, Entity parent, const glm::vec3* translation)
+	{
+		FROST_ASSERT_INTERNAL(entity.HasComponent<PrefabComponent>());
+
+		Entity newEntity = CreateEntity();
+		if (parent)
+		{
+			newEntity.SetParentUUID(parent.GetComponent<IDComponent>().ID);
+		}
+		else
+		{
+			PrefabComponent& prefabComponent = newEntity.AddComponent<PrefabComponent>();
+			prefabComponent.PrefabAssetHandle = entity.GetComponent<PrefabComponent>().PrefabAssetHandle;
+			//prefabComponent.EntityID = newEntity.GetUUID();
+		}
+
+		CopyComponentIfExists<TagComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<TransformComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<MeshComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<AnimationComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<CameraComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<PointLightComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<DirectionalLightComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<SkyLightComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<RectangularLightComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<FogBoxVolumeComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<CloudVolumeComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<RigidBodyComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<BoxColliderComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<SphereColliderComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<CapsuleColliderComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<MeshColliderComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+		CopyComponentIfExists<ScriptComponent>(newEntity, m_Registry, entity, entity.m_Scene->m_Registry);
+
+		
+		if (translation)
+			newEntity.Transform().Translation = *translation;
+
+		// Create children
+		for (auto childId : entity.GetChildren())
+		{
+			Entity child = CreatePrefabEntity(entity.m_Scene->FindEntityByUUID(childId), newEntity);
+			newEntity.GetChildren().push_back(child.GetUUID());
+		}
+
+		if (m_IsScenePlaying)
+		{
+			if (newEntity.HasComponent<RigidBodyComponent>())
+			{
+				Ref<PhysicsScene> physicsScene = PhysicsEngine::GetScene();
+				if (physicsScene)
+				{
+					physicsScene->CreateActor(newEntity);
+				}
+
+				if (newEntity.HasComponent<ScriptComponent>())
+				{
+					if (ScriptEngine::ModuleExists(newEntity.GetComponent<ScriptComponent>().ModuleName))
+					{
+						ScriptEngine::InstantiateEntityClass(newEntity);
+						ScriptEngine::OnCreateEntity(newEntity);
+					}
+				}
+			}
+
+		}
+
+		return newEntity;
+	}
+
+	Entity Scene::Instantiate(Ref<Prefab> prefab, const glm::vec3* translation)
+	{
+		Entity result;
+
+		auto entities = prefab->m_Scene->GetAllEntitiesWith<ParentChildComponent>();
+		for (auto e : entities)
+		{
+			Entity entity = { e, prefab->m_Scene.Raw() };
+			if (!entity.HasParent())
+			{
+				result = CreatePrefabEntity(entity, {}, translation);
+				break;
+			}
+		}
+
+		return result;
 	}
 
 	void Scene::UpdateSkyLight(Timestep ts)
@@ -423,6 +537,54 @@ namespace Frost
 			Math::DecomposeTransform(transform, translation, rotation, scale);
 
 			Renderer::SubmitBillboards(translation, glm::vec2(1.0f), Renderer::GetInternalEditorIcon("SceneCamera"));
+
+			if (m_SelectedEntity != entt::null)
+			{
+				if (m_SelectedEntity == entity)
+				{
+					cameraComponent.Camera->SetTransform(transform);
+
+					const glm::mat4 inv = glm::inverse(cameraComponent.Camera->GetViewProjectionVK());
+					glm::vec4 frustumCorners[8] =
+					{
+						// Near face
+						{  1.0f,  1.0f, 0.0f, 1.0f },
+						{ -1.0f,  1.0f, 0.0f, 1.0f },
+						{  1.0f, -1.0f, 0.0f, 1.0f },
+						{ -1.0f, -1.0f, 0.0f, 1.0f },
+
+						// Far face
+						{  1.0f,  1.0f, 1.0f, 1.0f },
+						{ -1.0f,  1.0f, 1.0f, 1.0f },
+						{  1.0f, -1.0f, 1.0f, 1.0f },
+						{ -1.0f, -1.0f, 1.0f, 1.0f },
+					};
+
+					glm::vec3 v[8];
+					for (uint32_t i = 0; i < 8; i++)
+					{
+						const glm::vec4 ff = inv * frustumCorners[i];
+						v[i].x = ff.x / ff.w;
+						v[i].y = ff.y / ff.w;
+						v[i].z = ff.z / ff.w;
+					}
+
+					Renderer::SubmitLines(v[0], v[1], glm::vec4(1.0f));
+					Renderer::SubmitLines(v[0], v[2], glm::vec4(1.0f));
+					Renderer::SubmitLines(v[3], v[1], glm::vec4(1.0f));
+					Renderer::SubmitLines(v[3], v[2], glm::vec4(1.0f));
+
+					Renderer::SubmitLines(v[4], v[5], glm::vec4(1.0f));
+					Renderer::SubmitLines(v[4], v[6], glm::vec4(1.0f));
+					Renderer::SubmitLines(v[7], v[5], glm::vec4(1.0f));
+					Renderer::SubmitLines(v[7], v[6], glm::vec4(1.0f));
+
+					Renderer::SubmitLines(v[0], v[4], glm::vec4(1.0f));
+					Renderer::SubmitLines(v[1], v[5], glm::vec4(1.0f));
+					Renderer::SubmitLines(v[3], v[7], glm::vec4(1.0f));
+					Renderer::SubmitLines(v[2], v[6], glm::vec4(1.0f));
+				}
+			}
 		}
 	}
 
@@ -567,26 +729,20 @@ namespace Frost
 		m_PostUpdateQueue.clear();
 	}
 
-	void Scene::UpdateChildrenTransforms(Timestep ts)
+	void Scene::OnScriptComponentConstruct(entt::registry& registry, entt::entity entity)
 	{
-		auto group = m_Registry.group<ParentChildComponent>(entt::get<TransformComponent>);
-		for (auto& entity : group)
+		auto entityID = registry.get<IDComponent>(entity).ID;
+		FROST_ASSERT_INTERNAL(bool(m_EntityIDMap.find(entityID) != m_EntityIDMap.end()));
+		ScriptEngine::InitScriptEntity(m_EntityIDMap.at(entityID));
+	}
+
+	void Scene::OnScriptComponentDestroy(entt::registry& registry, entt::entity entity)
+	{
+		if (registry.any_of<IDComponent>(entity))
 		{
-			Entity e = { entity, this };
-			Entity parent = FindEntityByUUID(e.GetParent());
-
-			if (!parent)
-				continue;
-
-			//ConvertEntityToParentTransform(e);
-			//
-			//TransformComponent& transform = e.GetComponent<TransformComponent>();
-			//glm::mat4 parentTransform = GetTransformMatFromEntityAndParent(parent);
-			//
-			//glm::mat4 localTransform = glm::inverse(parentTransform) * transform.GetTransform();
-
+			auto entityID = registry.get<IDComponent>(entity).ID;
+			ScriptEngine::OnScriptComponentDestroyed(GetUUID(), entityID);
 		}
-
 	}
 
 	void Scene::DestroyEntity(Entity entity)
@@ -727,6 +883,23 @@ namespace Frost
 		//	auto rhsEntity = target->GetEntityMap().find(rhs.ID);
 		//	return static_cast<uint32_t>(lhsEntity->second) < static_cast<uint32_t>(rhsEntity->second);
 		//});
+	}
+
+	void Scene::SetSelectedEntity(Entity entity)
+	{
+		m_SelectedEntity = entity.Raw();
+		Renderer::SetEditorActiveEntity((uint32_t)m_SelectedEntity);
+		//if (entity)
+		//{
+		//	if (m_EntityIDMap.find(entity.GetUUID()) != m_EntityIDMap.end())
+		//	{
+		//	}
+		//}
+	}
+
+	Ref<Scene> Scene::CreateEmpty()
+	{
+		return Ref<Scene>::Create("Empty", false);
 	}
 
 }

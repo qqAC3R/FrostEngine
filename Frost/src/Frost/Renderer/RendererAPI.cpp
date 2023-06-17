@@ -45,6 +45,8 @@ namespace Frost
 		data.EntityID = entityID;
 
 		m_SubmeshCount += mesh->GetMeshAsset()->GetSubMeshes().size();
+
+		m_MeshInstanceCount[mesh->GetMeshAsset()->Handle]++;
 	}
 
 	void RenderQueue::AddWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth)
@@ -115,6 +117,7 @@ namespace Frost
 		m_BatchRendererData.push_back({
 			Object2D::ObjectType::Billboard,
 			positon,
+			glm::vec3(1.0f),
 			size,
 			color,
 			nullptr
@@ -126,9 +129,22 @@ namespace Frost
 		m_BatchRendererData.push_back({
 			Object2D::ObjectType::Billboard,
 			positon,
+			glm::vec3(1.0f),
 			size,
 			glm::vec4(1.0f),
 			texture
+		});
+	}
+
+	void RenderQueue::AddLines(const glm::vec3& positon0, const glm::vec3& positon1, const glm::vec4& color)
+	{
+		m_BatchRendererData.push_back({
+			Object2D::ObjectType::Line,
+			positon0,
+			positon1,
+			glm::vec2(1.0f),
+			color,
+			nullptr
 		});
 	}
 
@@ -142,6 +158,7 @@ namespace Frost
 	{
 		m_SubmeshCount = 0;
 		m_Data.clear();
+		m_MeshInstanceCount.clear();
 		m_LightData.PointLights.clear();
 		m_LightData.RectangularLights.clear();
 		m_FogVolumeData.clear();

@@ -102,6 +102,8 @@ namespace Frost
 		static void ShutdownScriptEntity(Entity entity, const std::string& moduleName);
 		static void ShutdownScene(Scene* scene);
 
+		static void OnScriptComponentDestroyed(UUID sceneID, UUID entityID);
+
 		static void InstantiateEntityClass(Entity entity);
 
 		static void CopyEntityScriptData(Scene* dstScene, Scene* srcScene);

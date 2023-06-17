@@ -4,6 +4,7 @@
 #include "Frost/Asset/AssetManager.h"
 #include "Frost/Renderer/MaterialAsset.h"
 #include "Frost/Renderer/Renderer.h"
+#include "Frost/EntitySystem/Prefab.h"
 
 #include "UserInterface/UIWidgets.h"
 #include <imgui.h>
@@ -102,6 +103,16 @@ namespace Frost
 			if (removeComponent)
 				entity.RemoveComponent<T>();
 		}
+	}
+
+	static std::string GetNameFromFilepath(const std::string& filepath)
+	{
+		auto lastSlash = filepath.find_last_of("/\\");
+		lastSlash = lastSlash == std::string::npos ? 0 : lastSlash + 1;
+		auto lastDot = filepath.rfind(".");
+		auto count = lastDot == std::string::npos ? filepath.size() - lastSlash : lastDot - lastSlash;
+
+		return filepath.substr(lastSlash, count);
 	}
 
 	void InspectorPanel::DrawComponents(Entity& entity)
@@ -481,11 +492,14 @@ namespace Frost
 										if (!materialPath.empty())
 										{
 											bool isAssetAlreadyLoaded = true;
-											// Check if the material asset is loaded
+
+											// Using `GetAsset` instead of `LoadOrGetAsset` because we need to check if it is loaded in memory or not
 											Ref<MaterialAsset> materialAsset = AssetManager::GetAsset<MaterialAsset>(materialPath);
 											if (!materialAsset)
 											{
-												// If it is not, then load (or if it doesn't exist, create it) and set `isAssetAlreadyLoaded` to false
+												// We are temporarily creating (or loading) a physics material asset.
+												// The only purpose of using `LoadAsset` or `CreateNewAsset` is to register the asset into the registry file and set the parameters.
+												// After that we serialize and delete the asset from memory.
 												materialAsset = AssetManager::LoadAsset<MaterialAsset>(materialPath);
 
 												if(!materialAsset)
@@ -1199,6 +1213,8 @@ namespace Frost
 							if (!materialPath.empty())
 							{
 								bool isAssetAlreadyLoaded = true;
+
+								// Using `GetAsset` instead of `LoadOrGetAsset` because we need to check if it is loaded in memory or not
 								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetAsset<PhysicsMaterial>(materialPath);
 								if (!physicsMaterialAsset)
 								{
@@ -1375,6 +1391,8 @@ namespace Frost
 							if (!materialPath.empty())
 							{
 								bool isAssetAlreadyLoaded = true;
+
+								// Using `GetAsset` instead of `LoadOrGetAsset` because we need to check if it is loaded in memory or not
 								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetAsset<PhysicsMaterial>(materialPath);
 								if (!physicsMaterialAsset)
 								{
@@ -1552,6 +1570,8 @@ namespace Frost
 							if (!materialPath.empty())
 							{
 								bool isAssetAlreadyLoaded = true;
+
+								// Using `GetAsset` instead of `LoadOrGetAsset` because we need to check if it is loaded in memory or not
 								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetAsset<PhysicsMaterial>(materialPath);
 								if (!physicsMaterialAsset)
 								{
@@ -1741,6 +1761,8 @@ namespace Frost
 							if (!materialPath.empty())
 							{
 								bool isAssetAlreadyLoaded = true;
+
+								// Using `GetAsset` instead of `LoadOrGetAsset` because we need to check if it is loaded in memory or not
 								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetAsset<PhysicsMaterial>(materialPath);
 								if (!physicsMaterialAsset)
 								{
@@ -2336,6 +2358,44 @@ namespace Frost
 								case FieldType::Asset:
 								{
 									// TODO: Add assets
+									break;
+								}
+								case FieldType::Prefab:
+								{
+									UUID assetID = isRuntime ?
+										field.GetRuntimeValue<UUID>(entityInstanceData.Instance) :
+										field.GetStoredValue<UUID>();
+
+									Entity entity = m_SceneHierarchy->m_SceneContext->FindEntityByUUID(assetID);
+
+									std::string prefabName = "Null";
+									if (AssetManager::IsAssetHandleValid(assetID))
+									{
+										const AssetMetadata& metedata = AssetManager::GetMetadata(assetID);//GetNameFromFilepath()
+										prefabName = GetNameFromFilepath(metedata.FilePath.string());
+									}
+									
+									if (UserInterface::PropertyPrefabReference("##prefabRef", prefabName.c_str()))
+									{
+										std::string filepath = FileDialogs::OpenFile("");
+
+										if (!filepath.empty())
+										{
+											Ref<Prefab> prefab = AssetManager::GetOrLoadAsset<Prefab>(filepath);
+											if (prefab)
+											{
+												if (isRuntime)
+													field.SetRuntimeValue<const UUID&>(entityInstanceData.Instance, prefab->Handle);
+												else
+													field.SetStoredValue(prefab->Handle);
+											}
+											else
+											{
+												FROST_CORE_ERROR("Prefab is invalid!");
+											}
+										}
+
+									}
 									break;
 								}
 								case FieldType::Entity:

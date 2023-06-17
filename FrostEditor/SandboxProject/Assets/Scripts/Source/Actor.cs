@@ -15,6 +15,8 @@ namespace Frost
 
         public Entity m_MeshChild;
 
+        public Prefab m_SphereBullet = null;
+
         //private Texture2D m_TextureField;
         //private Mesh m_Mesh;
 
@@ -61,7 +63,23 @@ namespace Frost
                 m_LastPosition = Translation;
             }
 #endif
+            
 
+            if (Input.IsMouseButtonPressed(MouseButton.Left))
+            {
+                Entity newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+                newEntity = Instantiate(m_SphereBullet);
+            }
 
             if (Input.IsKeyPressed(KeyCode.A))
             {

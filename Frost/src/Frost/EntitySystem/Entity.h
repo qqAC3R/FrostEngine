@@ -16,13 +16,6 @@ namespace Frost
 
 		~Entity() {}
 
-		/*template <typename T>
-		T& AddComponent()
-		{
-			T& component = m_Scene->GetRegistry().emplace<T>(m_Handle);
-			return component;
-		}*/
-
 		template <typename T, typename... Args>
 		T& AddComponent(Args&&... args)
 		{
@@ -60,6 +53,8 @@ namespace Frost
 		const glm::mat4& Transform() const { return m_Scene->GetRegistry().get<TransformComponent>(m_Handle).GetTransform(); }
 		const glm::mat4& GetGlobalTransform() const { return m_Scene->GetTransformMatFromEntityAndParent(*this); }
 
+		bool HasParent() { return m_Scene->FindEntityByUUID(GetParent()); }
+
 		bool IsAncesterOf(Entity entity)
 		{
 			const auto& children = GetComponent<ParentChildComponent>().ChildIDs;
@@ -91,7 +86,8 @@ namespace Frost
 
 		UUID GetUUID() const { return GetComponent<IDComponent>().ID; }
 		UUID GetParent() const { return GetComponent<ParentChildComponent>().ParentID; }
-		const Vector<UUID>& GetChildren() const { return GetComponent<ParentChildComponent>().ChildIDs; }
+		void SetParentUUID(UUID parent) { GetComponent<ParentChildComponent>().ParentID = parent; }
+		Vector<UUID>& GetChildren() { return GetComponent<ParentChildComponent>().ChildIDs; }
 		UUID GetSceneUUID() const { return m_Scene->GetUUID(); }
 
 		entt::entity Raw() { return m_Handle; }
@@ -107,6 +103,7 @@ namespace Frost
 
 		friend class Scene;
 		friend class ScriptEngine;
+		friend class Prefab;
 	};
 
 

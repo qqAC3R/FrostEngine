@@ -22,6 +22,7 @@ namespace Frost
 		Vec4,
 		ClassReference,
 		Asset,
+		Prefab,
 		Entity
 	};
 
@@ -37,6 +38,7 @@ namespace Frost
 			case FieldType::Vec3:        return "Vec3";
 			case FieldType::Vec4:        return "Vec4";
 			case FieldType::Asset:		 return "Asset";
+			case FieldType::Prefab:		 return "Prefab";
 			case FieldType::Entity:		 return "Entity";
 		}
 		FROST_ASSERT_MSG("Unknown field type!");
@@ -54,7 +56,7 @@ namespace Frost
 			case FieldType::Vec2:        return 4 * 2;
 			case FieldType::Vec3:        return 4 * 3;
 			case FieldType::Vec4:        return 4 * 4;
-			case FieldType::Asset:       return 8;
+			case FieldType::Prefab:      return 8;
 			case FieldType::Entity:		 return 8;
 		}
 		FROST_ASSERT_MSG("Unknown field type!");

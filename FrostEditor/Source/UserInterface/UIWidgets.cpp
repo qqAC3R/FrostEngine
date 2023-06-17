@@ -148,11 +148,48 @@ namespace Frost
 		return false;
 	}
 
+	bool UserInterface::PropertyPrefabReference(const char* label, const char* prefabName)
+	{
+		bool isButtonClicked = false;
+
+		{
+			float width = ImGui::GetContentRegionAvail().x;
+			float itemHeight = 23.0f;
+
+			
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(3, 161, 252, 255)); // Prefab blue color
+			if (ImGui::Button(prefabName, { width, itemHeight }))
+				isButtonClicked = true;
+			ImGui::PopStyleColor();
+				
+		}
+		return isButtonClicked;
+
+
+		// TODO: This should work with the content browser
+#if 0
+		if (ImGui::BeginDragDropTarget())
+		{
+			auto data = ImGui::AcceptDragDropPayload(HIERARCHY_ENTITY_DRAG_DROP);
+			if (data)
+			{
+				entity = *(Entity*)data->Data;
+				receivedValidEntity = true;
+			}
+
+			ImGui::EndDragDropTarget();
+		}
+#endif
+
+
+		//return receivedValidEntity;
+	}
+
 	bool UserInterface::PropertyEntityReference(const char* label, Entity& entity)
 	{
 		bool receivedValidEntity = false;
 
-		ImVec2 originalButtonTextAlign = ImGui::GetStyle().ButtonTextAlign;
+		//ImVec2 originalButtonTextAlign = ImGui::GetStyle().ButtonTextAlign;
 		{
 			//ImGui::GetStyle().ButtonTextAlign = { 0.0f, 0.5f };
 			float width = ImGui::GetContentRegionAvail().x;
@@ -165,7 +202,7 @@ namespace Frost
 
 			ImGui::Button(buttonText.c_str(), {width, itemHeight});
 		}
-		ImGui::GetStyle().ButtonTextAlign = originalButtonTextAlign;
+		//ImGui::GetStyle().ButtonTextAlign = originalButtonTextAlign;
 
 		if (ImGui::BeginDragDropTarget())
 		{

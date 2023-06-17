@@ -124,16 +124,17 @@ float ComputeHBAO(vec3 vpos, vec3 vnorm, vec3 vdir)
 	vec2 noises	= texelFetch(u_NoiseTex, loc % 4, 0).rg;
 	vec2 offset;
 
-	float radius = (RADIUS * u_PushConstant.AO_Data.x) / (1.0f - vpos.z);
-	radius = max(NUM_STEPS, radius);
+	float radius = (RADIUS * u_PushConstant.AO_Data.x) / (1.0 - vpos.z);
+	radius = max(float(NUM_STEPS), radius);
 		
 	float stepSize	= radius / NUM_STEPS;
 	float phi		= noises.x * PI;
 	float division	= noises.y * stepSize;
 	float currStep	= 1.0 + division;
 
-	//float dist, invdist, falloff, cosh;
 
+	float cosh, falloff, dist, invdist;
+	vec2 horizons = vec2(-1.0, -1.0);
 
 	dir = vec3(cos(phi), sin(phi), 0.0);
 
@@ -146,28 +147,77 @@ float ComputeHBAO(vec3 vpos, vec3 vnorm, vec3 vdir)
 		// h1
 		{
 			s = GetViewPosition(vec2(gl_GlobalInvocationID.xy) + offset, currStep);
+			ao += ComputeAO(vpos.xyz, vnorm.xyz, s.xyz);
+
+
 			ws = (s.xyz - vpos.xyz);
 
-			ao += ComputeAO(vpos.xyz, vnorm.xyz, s.xyz);
+			// Length of the vector
+			dist = length(ws);
+			invdist = 1.0 / dist;
+
+			// Compute sample's cosine
+			cosh = invdist  * dot(ws, vdir);
+			falloff = Falloff(dist);
+
+			horizons.x = max(horizons.x, cosh - falloff);
 		}
 
 
 		// h2
 		{
 			s = GetViewPosition(vec2(gl_GlobalInvocationID.xy) - offset, currStep);
+			ao += ComputeAO(vpos.xyz, vnorm.xyz, s.xyz);
+			
 			ws = (s.xyz - vpos.xyz);
 
-			ao += ComputeAO(vpos.xyz, vnorm.xyz, s.xyz);
+			// Length of the vector
+			dist = length(ws);
+			invdist = 1.0 / dist;
+
+			// Compute sample's cosine
+			cosh = invdist  * dot(ws, vdir);
+			falloff = Falloff(dist);
+
+			horizons.y = max(horizons.y, cosh - falloff);
 		}
 
 		// increment
 		currStep += stepSize;
 	}
 
-	float aoIntensity = 4.0f;
 
-	ao *= aoIntensity / (NUM_STEPS * 2);
-	ao = (1.0f - ao);
+	float aoIntensity = 8.0;
+	ao *= aoIntensity / float(NUM_STEPS * 2);
+	ao = (1.0 - ao);
+
+
+	vnorm.x *= -1;
+
+	horizons = acos(horizons);
+
+	// calculate gamma
+	vec3 bitangent	= normalize(cross(normalize(vdir), normalize(dir)));
+	vec3 tangent	= normalize(cross(bitangent, vdir));
+	vec3 nx			= vnorm - bitangent * dot(vnorm, bitangent);
+
+	float nnx		= length(nx);
+	float invnnx	= 1.0 / (nnx + 1e-6);			// to avoid division with zero
+	float cosxi		= dot(nx, tangent) * invnnx;	// xi = gamma + HALF_PI
+	float gamma		= acos(cosxi) - HALF_PI;
+	float cosgamma	= dot(nx, vdir) * invnnx;
+	float singamma2	= -2.0 * cosxi;					// cos(x + HALF_PI) = -sin(x)
+
+	// clamp to normal hemisphere
+	horizons.y = gamma + max(-horizons.y - gamma, -HALF_PI);
+	horizons.x = gamma + min( horizons.x - gamma,  HALF_PI);
+
+	// Riemann integral is additive
+	ao += nnx * 0.25 * (
+		(horizons.y * singamma2 + cosgamma - cos(2.0 * horizons.y - gamma)) +
+		(horizons.x * singamma2 + cosgamma - cos(2.0 * horizons.x - gamma)));
+
+	ao /= 2.0;
 
 	return ao;
 }

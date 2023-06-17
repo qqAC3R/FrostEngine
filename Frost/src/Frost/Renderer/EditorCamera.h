@@ -36,8 +36,6 @@ namespace Frost
 
 		const glm::vec3& GetFocalPoint() const { return m_FocalPoint; }
 
-		void SetViewportSize(uint32_t width, uint32_t height);
-
 		virtual const glm::mat4& GetViewMatrix() const override { return m_ViewMatrix; }
 		virtual const glm::mat4& GetViewProjection() const override { return m_ViewProjecitonMatrix; }
 		virtual const glm::mat4& GetViewProjectionVK() const override { return m_ViewProjecitonMatrix_Vk; }
@@ -95,8 +93,6 @@ namespace Frost
 		CameraMode m_CameraMode{ CameraMode::FLYCAM };
 
 		float m_MinFocusDistance = 100.0f;
-
-		uint32_t m_ViewportWidth = 1600, m_ViewportHeight = 900;
 
 		friend class EditorLayer;
 		friend class RenderQueue;

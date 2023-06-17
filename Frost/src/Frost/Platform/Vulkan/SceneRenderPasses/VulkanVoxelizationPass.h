@@ -31,6 +31,7 @@ namespace Frost
 		void VoxelizationInit();
 		void VoxelizationUpdateData(const RenderQueue& renderQueue);
 		void VoxelizationUpdateRendering(const RenderQueue& renderQueue);
+		void VoxelizationUpdateRenderingWithInstancing(const RenderQueue& renderQueue);
 		// -------------------------------------------------------
 
 		// ------------ Voxel texture filtering ------------------
@@ -49,6 +50,13 @@ namespace Frost
 
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
+
+		struct MeshInstancedVertexBuffer // `MeshInstancedVertexBuffer` For Geometry Pass
+		{
+			glm::mat4 ModelSpaceMatrix;
+			glm::mat4 WorldSpaceMatrix;
+			uint32_t MaterialIndexOffset;
+		};
 
 		struct InternalData
 		{
@@ -74,9 +82,11 @@ namespace Frost
 			Ref<BufferDevice> ClearBuffer;
 			Vector<HeapBlock> IndirectVoxelCmdBuffer;
 
+			// Global Instaced Vertex Buffer
+			Vector<HeapBlock> GlobalInstancedVertexBuffer;
+
 
 			int32_t m_VoxelGrid; // Renderer::GetRendererConfig().VoxelTextureResolution
-			//float m_VoxelSize = 1.0f; 
 			glm::vec3 VoxelCameraPosition = { 0.0f, 0.0f, 0.0f }; // Camera position
 			float m_VoxelAABB = 0.0f; // Rounded value of 'm_VoxelGrid' to fixed jittering
 		};
@@ -92,7 +102,7 @@ namespace Frost
 		{
 			glm::mat4 ViewMatrix;
 
-			uint32_t MaterialIndex;
+			//uint32_t MaterialIndex;
 			uint64_t VertexBufferBDA;
 			int32_t VoxelDimensions;
 			int32_t AtomicOperation = 1;

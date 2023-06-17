@@ -301,72 +301,36 @@ namespace Frost
 
 			}
 
-#if 0
-			m_BoneTransforms.resize(m_BoneInfo.size());
-#endif
-
-
 			m_Animations.resize(scene->mNumAnimations);
 			for (size_t m = 0; m < scene->mNumAnimations; m++)
 			{
 				const aiAnimation* animation = scene->mAnimations[m];
 				m_Animations[m] = Ref<Animation>::Create(animation, this);
 			}
-
-#if 0
-			for (size_t i = 0; i < m_BoneInfo.size(); ++i)
-				m_BoneTransforms[i] = glm::mat4(FLT_MAX);
-#endif
-
 		}
 
 
 
 
+		// Vertex/Index buffer
+		if(m_IsAnimated)
+			m_VertexBuffer = VertexBuffer::Create(m_SkinnedVertices.data(), m_SkinnedVertices.size() * sizeof(AnimatedVertex));
+		else
+			m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
+
+		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)m_Indices.size() * sizeof(Index));
+
+		// Acceleration structure (for Ray Tracing)
+		if (meshBuildSettings.CreateBottomLevelStructure)
 		{
-			// Vertex/Index buffer
-			if(m_IsAnimated)
-				m_VertexBuffer = VertexBuffer::Create(m_SkinnedVertices.data(), m_SkinnedVertices.size() * sizeof(AnimatedVertex));
-			else
-				m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
+			// Acceleration structure creation
+			MeshASInfo meshInfo{};
+			meshInfo.MeshVertexBuffer = m_VertexBuffer;
+			meshInfo.MeshIndexBuffer = m_IndexBuffer;
+			meshInfo.SubmeshIndexBuffer = m_SubmeshIndexBuffers;
+			meshInfo.SubMeshes = m_Submeshes;
 
-			m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)m_Indices.size() * sizeof(Index));
-
-			// Instanced vertex buffer
-			uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-
-
-#if 0
-			m_VertexBufferInstanced.resize(framesInFlight);
-			m_VertexBufferInstanced_CPU.resize(framesInFlight);
-			for (uint32_t i = 0; i < framesInFlight; i++)
-			{
-				m_VertexBufferInstanced[i] = BufferDevice::Create(m_Submeshes.size() * sizeof(SubmeshInstanced), {BufferUsage::Vertex});
-				m_VertexBufferInstanced_CPU[i].Allocate(m_Submeshes.size() * sizeof(SubmeshInstanced) + 1);
-			}
-
-
-			if (m_IsAnimated)
-			{
-				m_BoneTransformsUniformBuffer.resize(framesInFlight);
-				for (uint32_t i = 0; i < framesInFlight; i++)
-				{
-					m_BoneTransformsUniformBuffer[i] = UniformBuffer::Create(sizeof(glm::mat4) * m_BoneTransforms.size());
-				}
-			}
-#endif
-
-			if (meshBuildSettings.CreateBottomLevelStructure)
-			{
-				// Acceleration structure creation
-				MeshASInfo meshInfo{};
-				meshInfo.MeshVertexBuffer = m_VertexBuffer;
-				meshInfo.MeshIndexBuffer = m_IndexBuffer;
-				meshInfo.SubmeshIndexBuffer = m_SubmeshIndexBuffers;
-				meshInfo.SubMeshes = m_Submeshes;
-
-				m_AccelerationStructure = BottomLevelAccelerationStructure::Create(meshInfo);
-			}
+			m_AccelerationStructure = BottomLevelAccelerationStructure::Create(meshInfo);
 		}
 
 		// Materials
@@ -829,39 +793,6 @@ namespace Frost
 			TraverseNodes(node->mChildren[i], transform, level + 1);
 	}
 
-#if 0
-	void MeshAsset::UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex)
-	{
-		// Instanced data for submeshes
-		SubmeshInstanced submeshInstanced{};
-		uint32_t vboInstancedDataOffset = 0;
-
-		//for (uint32_t i = 0; i < m_Submeshes.size(); i++)
-		for (auto& submesh : m_Submeshes)
-		{
-			glm::mat4 modelMatrix = transform * submesh.Transform;
-
-			// Submit instanced data into a cpu buffer (which will be later sent to the gpu's instanced vbo)
-			submeshInstanced.ModelSpaceMatrix = modelMatrix;
-			submeshInstanced.WorldSpaceMatrix = viewProjMatrix * modelMatrix;
-
-			m_VertexBufferInstanced_CPU[currentFrameIndex].Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
-
-			vboInstancedDataOffset += sizeof(SubmeshInstanced);
-		}
-
-		// Submit instanced data from a cpu buffer to gpu vertex buffer
-		auto vulkanVBOInstanced = m_VertexBufferInstanced[currentFrameIndex];
-		vulkanVBOInstanced->SetData(vboInstancedDataOffset, m_VertexBufferInstanced_CPU[currentFrameIndex].Data);
-
-		if (m_IsAnimated)
-		{
-			m_BoneTransformsUniformBuffer[currentFrameIndex]->SetData(m_BoneTransforms.data());
-		}
-
-	}
-#endif
-
 	static glm::mat4 Mat4FromFloat4x4(const ozz::math::Float4x4& float4x4)
 	{
 		glm::mat4 result;
@@ -872,57 +803,8 @@ namespace Frost
 		return result;
 	}
 
-#if 0
-	void MeshAsset::UpdateBoneTransformMatrices(const ozz::vector<ozz::math::Float4x4>& modelSpaceMatrices)
-	{
-		if (m_IsAnimated)
-		{
-
-			//m_AnimationController->OnUpdate(deltaTime);
-			if (modelSpaceMatrices.empty() || modelSpaceMatrices.size() < m_BoneInfo.size())
-			{
-				for (size_t i = 0; i < m_BoneInfo.size(); ++i)
-					m_BoneTransforms[i] = glm::mat4(FLT_MAX);
-			}
-			else
-			{
-				for (size_t i = 0; i < m_BoneInfo.size(); ++i)
-				{
-					uint32_t jointIndex = m_BoneInfo[i].JointIndex;
-					m_BoneTransforms[i] = Mat4FromFloat4x4(modelSpaceMatrices[jointIndex]) * m_BoneInfo[i].InverseBindPose;
-				}
-			}
-			//BoneTransform(deltaTime);
-			//m_BoneTransformsUniformBuffer[currentFrameIndex]->SetData(m_BoneTransforms.data());
-		}
-	}
-#endif
-
-#if 0
-	void MeshAsset::SetNewTexture(uint32_t textureId, Ref<Texture2D> texture)
-	{
-		if (texture->Loaded())
-		{
-			if (m_Textures.find(textureId) != m_Textures.end())
-			{
-				BindlessAllocator::AddTextureCustomSlot(texture, textureId);
-				m_Textures[textureId] = texture;
-			}
-		}
-	}
-#endif
-
 	MeshAsset::~MeshAsset()
 	{
-#if 0
-		auto whiteTexture = Renderer::GetWhiteLUT();
-		for (auto& textureSlotPair : m_TextureAllocatorSlots)
-		{
-			uint32_t textureSlot = textureSlotPair.second;
-			BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureSlot);
-			BindlessAllocator::RemoveTextureCustomSlot(textureSlot);
-		}
-#endif
 	}
 
 	Mesh::Mesh(Ref<MeshAsset> meshAsset)
@@ -931,21 +813,9 @@ namespace Frost
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		size_t numMaterials = m_MeshAsset->m_MaterialData.size();
 
-#if 0
-		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
-		// Allocate texture slots before storing the vertex data, because we are using bindless
-		// We are using `numMaterials * 4`, because each mesh has a albedo, roughness, metalness and normal map
-		for (uint32_t i = 0; i < numMaterials * 4; i++)
-		{
-			uint32_t textureSlot = BindlessAllocator::AddTexture(whiteTexture);
-			m_TextureAllocatorSlots[i] = textureSlot;
-		}
-#endif
 
 		// Setting up the materials for the new Mesh, using information from the Mesh Asset
 		// Materials
-		//m_Textures.reserve(m_MeshAsset->m_TexturesList.size());
-		//m_MaterialData.resize(m_MeshAsset->m_MaterialData.size());
 		m_MaterialAssets.resize(numMaterials);
 		for (uint32_t i = 0; i < numMaterials; i++)
 		{
@@ -974,84 +844,14 @@ namespace Frost
 			materialAsset->SetRoughnessMap(m_MeshAsset->m_TexturesList[roughnessTextureIndex]);
 			materialAsset->SetMetalnessMap(m_MeshAsset->m_TexturesList[metalnessTextureIndex]);
 			materialAsset->SetNormalMap(m_MeshAsset->m_TexturesList[normalMapTextureIndex]);
-
-			//FROST_CORE_INFO("Roughness: {0}, UseNormalMap: {1}", materialAsset->GetRoughness(), materialAsset->IsUsingNormalMap());
-
-#if 0
-			// Albedo -         vec4        (16 bytes)
-			// Roughness -      float       (4 bytes)
-			// Metalness -      float       (4 bytes)
-			// Emission -       float       (4 bytes)
-			// UseNormalMap -   uint32_t    (4 bytes)
-			// Texture IDs -    4 uint32_t  (16 bytes)
-			m_MaterialData[i]->Allocate(48);
-
-			// Fill up the data in the correct order for us to copy it later
-			Ref<DataStorage> materialData = m_MaterialData[i];
-			materialData->Add("AlbedoColor", glm::vec4(0.0f));
-			materialData->Add("EmissionFactor", 0.0f);
-			materialData->Add("RoughnessFactor", 0.0f);
-			materialData->Add("MetalnessFactor", 0.0f);
-
-			materialData->Add("UseNormalMap", 0);
-
-			materialData->Add("AlbedoTexture", 0);
-			materialData->Add("RoughnessTexture", 0);
-			materialData->Add("MetalnessTexture", 0);
-			materialData->Add("NormalTexture", 0);
-
-
-			// Each mesh has 4 textures, and se we allocated numMaterials * 4 texture slots.
-			uint32_t albedoTextureIndex = (i * 4) + 0;
-			uint32_t roughnessTextureIndex = (i * 4) + 1;
-			uint32_t metalnessTextureIndex = (i * 4) + 2;
-			uint32_t normalMapTextureIndex = (i * 4) + 3;
-
-			materialData->Set("AlbedoTexture", m_TextureAllocatorSlots[albedoTextureIndex]);
-			materialData->Set("NormalTexture", m_TextureAllocatorSlots[normalMapTextureIndex]);
-			materialData->Set("RoughnessTexture", m_TextureAllocatorSlots[roughnessTextureIndex]);
-			materialData->Set("MetalnessTexture", m_TextureAllocatorSlots[metalnessTextureIndex]);
-
-			m_MaterialData[i]->Set("AlbedoColor", m_MeshAsset->m_MaterialData[i].Get<glm::vec4>("AlbedoColor"));
-			m_MaterialData[i]->Set("EmissionFactor", m_MeshAsset->m_MaterialData[i].Get<float>("EmissionFactor"));
-			m_MaterialData[i]->Set("RoughnessFactor", m_MeshAsset->m_MaterialData[i].Get<float>("RoughnessFactor"));
-			m_MaterialData[i]->Set("MetalnessFactor", m_MeshAsset->m_MaterialData[i].Get<float>("MetalnessFactor"));
-			m_MaterialData[i]->Set("UseNormalMap", m_MeshAsset->m_MaterialData[i].Get<uint32_t>("UseNormalMap"));
-
-			// Albedo Map
-			{
-				Ref<Texture2D> meshAssetAlbedoTexture = m_MeshAsset->m_TexturesList[albedoTextureIndex];
-				uint32_t albedoTextureId = m_TextureAllocatorSlots[albedoTextureIndex];
-				m_Textures[albedoTextureId] = meshAssetAlbedoTexture;
-				BindlessAllocator::AddTextureCustomSlot(meshAssetAlbedoTexture, albedoTextureId);
-			}
-
-			// Normal map
-			{
-				Ref<Texture2D> meshAssetNormalTexture = m_MeshAsset->m_TexturesList[normalMapTextureIndex];
-				uint32_t normalMapTextureId = m_TextureAllocatorSlots[normalMapTextureIndex];
-				m_Textures[normalMapTextureId] = meshAssetNormalTexture;
-				BindlessAllocator::AddTextureCustomSlot(meshAssetNormalTexture, normalMapTextureId);
-			}
-
-			// Roughness map
-			{
-				Ref<Texture2D> meshAssetRoughnessTexture = m_MeshAsset->m_TexturesList[roughnessTextureIndex];
-				uint32_t roughnessMapTextureId = m_TextureAllocatorSlots[roughnessTextureIndex];
-				m_Textures[roughnessMapTextureId] = meshAssetRoughnessTexture;
-				BindlessAllocator::AddTextureCustomSlot(meshAssetRoughnessTexture, roughnessMapTextureId);
-			}
-
-			// Metalness map
-			{
-				Ref<Texture2D> meshAssetMetalnessTexture = m_MeshAsset->m_TexturesList[metalnessTextureIndex];
-				uint32_t metalnessMapTextureId = m_TextureAllocatorSlots[metalnessTextureIndex];
-				m_Textures[metalnessMapTextureId] = meshAssetMetalnessTexture;
-				BindlessAllocator::AddTextureCustomSlot(meshAssetMetalnessTexture, metalnessMapTextureId);
-			}
-#endif
 		}
 
+		m_Submeshes.resize(m_MeshAsset->GetSubMeshes().size());
+		for(uint32_t submeshIndex = 0; submeshIndex < m_MeshAsset->GetSubMeshes().size(); submeshIndex++)
+		{
+			const auto& submesh = m_MeshAsset->GetSubMeshes()[submeshIndex];
+			m_Submeshes[submeshIndex].Transform = submesh.Transform;
+		}
 
 		// Setting up the animations for the new Mesh, using information from the Mesh Asset
 		if (m_MeshAsset->IsAnimated())
@@ -1081,37 +881,11 @@ namespace Frost
 
 			m_VertexBufferInstanced_CPU[i].Allocate(submeshCount * sizeof(SubmeshInstanced));
 		}
-
-
-
 	}
 
 	void Mesh::SetMaterialByAsset(uint32_t index, Ref<MaterialAsset> materialAsset)
 	{
 		m_MaterialAssets[index] = materialAsset;
-#if 0
-		Ref<DataStorage> materialData = m_MaterialData[index];
-		materialData->Set<glm::vec4>("AlbedoColor", materialAsset->GetAlbedoColor());
-		materialData->Set<float>("EmissionFactor", materialAsset->GetEmission());
-		materialData->Set<float>("RoughnessFactor", materialAsset->GetRoughness());
-		materialData->Set<float>("MetalnessFactor", materialAsset->GetMetalness());
-		materialData->Set<uint32_t>("UseNormalMap", materialAsset->IsUsingNormalMap());
-
-		uint32_t albedoTextureIndex = (index * 4) + 0;
-		uint32_t roughnessTextureIndex = (index * 4) + 1;
-		uint32_t metalnessTextureIndex = (index * 4) + 2;
-		uint32_t normalMapTextureIndex = (index * 4) + 3;
-
-		m_Textures[albedoTextureIndex] = materialAsset->GetAlbedoMap();
-		m_Textures[roughnessTextureIndex] = materialAsset->GetRoughnessMap();
-		m_Textures[metalnessTextureIndex] = materialAsset->GetMetalnessMap();
-		m_Textures[normalMapTextureIndex] = materialAsset->GetNormalMap();
-
-		BindlessAllocator::AddTextureCustomSlot(m_Textures[albedoTextureIndex], albedoTextureIndex);
-		BindlessAllocator::AddTextureCustomSlot(m_Textures[roughnessTextureIndex], roughnessTextureIndex);
-		BindlessAllocator::AddTextureCustomSlot(m_Textures[metalnessTextureIndex], metalnessTextureIndex);
-		BindlessAllocator::AddTextureCustomSlot(m_Textures[normalMapTextureIndex], normalMapTextureIndex);
-#endif
 	}
 
 	void Mesh::SetMaterialAssetToDefault(uint32_t materialIndex)
@@ -1141,48 +915,7 @@ namespace Frost
 	void Mesh::SetNewTexture(uint32_t materialIndex, uint32_t textureId, Ref<Texture2D> texture)
 	{
 		m_MaterialAssets[materialIndex]->SetTextureById(textureId, texture);
-#if 0
-		if (texture->Loaded())
-		{
-			if (m_Textures.find(textureId) != m_Textures.end())
-			{
-				BindlessAllocator::AddTextureCustomSlot(texture, textureId);
-				m_Textures[textureId] = texture;
-			}
-		}
-#endif
 	}
-
-#if 0
-	void Mesh::UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex)
-	{
-		// Instanced data for submeshes
-		SubmeshInstanced submeshInstanced{};
-		uint32_t vboInstancedDataOffset = 0;
-
-		for (auto& submesh : m_MeshAsset->m_Submeshes)
-		{
-			glm::mat4 modelMatrix = transform * submesh.Transform;
-
-			// Submit instanced data into a cpu buffer (which will be later sent to the gpu's instanced vbo)
-			submeshInstanced.ModelSpaceMatrix = modelMatrix;
-			submeshInstanced.WorldSpaceMatrix = viewProjMatrix * modelMatrix;
-
-			m_VertexBufferInstanced_CPU[currentFrameIndex].Write((void*)&submeshInstanced, sizeof(SubmeshInstanced), vboInstancedDataOffset);
-
-			vboInstancedDataOffset += sizeof(SubmeshInstanced);
-		}
-
-		// Submit instanced data from a cpu buffer to gpu vertex buffer
-		auto vulkanVBOInstanced = m_VertexBufferInstanced[currentFrameIndex];
-		vulkanVBOInstanced->SetData(vboInstancedDataOffset, m_VertexBufferInstanced_CPU[currentFrameIndex].Data);
-
-		if (m_MeshAsset->IsAnimated())
-		{
-			m_BoneTransformsUniformBuffer[currentFrameIndex]->SetData(m_BoneTransforms.data());
-		}
-	}
-#endif
 
 	void Mesh::UpdateBoneTransformMatrices(const ozz::vector<ozz::math::Float4x4>& modelSpaceMatrices)
 	{
@@ -1213,15 +946,6 @@ namespace Frost
 
 	Mesh::~Mesh()
 	{
-#if 0
-		auto whiteTexture = Renderer::GetWhiteLUT();
-		for (auto& textureSlotPair : m_TextureAllocatorSlots)
-		{
-			uint32_t textureSlot = textureSlotPair.second;
-			BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureSlot);
-			BindlessAllocator::RemoveTextureCustomSlot(textureSlot);
-		}
-#endif
 	}
 
 }

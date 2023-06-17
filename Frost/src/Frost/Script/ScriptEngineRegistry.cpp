@@ -58,6 +58,8 @@ namespace Frost
 		mono_add_internal_call("Frost.Entity::HasComponent_Native", Frost::ScriptInternalCalls::EntityScript::HasComponent);
 		mono_add_internal_call("Frost.Entity::FindEntityByTag_Native", Frost::ScriptInternalCalls::EntityScript::FindEntityByTag);
 		mono_add_internal_call("Frost.Entity::CreateEntity_Native", Frost::ScriptInternalCalls::EntityScript::CreateEntity);
+		mono_add_internal_call("Frost.Entity::Instantiate_Native", Frost::ScriptInternalCalls::EntityScript::Instantiate);
+		mono_add_internal_call("Frost.Entity::InstantiateWithTranslation_Native", Frost::ScriptInternalCalls::EntityScript::InstantiateWithTranslation);
 		
 		// Tag Component class native methods
 		mono_add_internal_call("Frost.TagComponent::GetTag_Native", Frost::ScriptInternalCalls::Components::Tag::GetTag);

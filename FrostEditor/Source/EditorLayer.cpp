@@ -150,7 +150,7 @@ namespace Frost
 		{
 			m_EditorCamera->OnUpdate(ts);
 			Renderer::BeginScene(m_EditorCamera);
-			Renderer::SetEditorActiveEntity((uint32_t)m_SceneHierarchyPanel->GetSelectedEntity().Raw());
+			m_CurrentScene->SetSelectedEntity(m_SceneHierarchyPanel->GetSelectedEntity());
 			m_CurrentScene->Update(ts);
 
 			// Render selected entity - physics debug mesh (if it has)
@@ -365,6 +365,14 @@ namespace Frost
 					glm::mat4 transform = m_EditorScene->GetTransformMatFromEntityAndParent(selectedEntity);
 					TransformComponent& tc = selectedEntity.GetComponent<TransformComponent>();
 
+					//uint32_t selectedEntitySubmesh = m_SceneHierarchyPanel->GetSelectedEntitySubmesh();
+					//if (selectedEntitySubmesh != UINT32_MAX)
+					//{
+					//	glm::mat4 sceneTransform = transform;
+					//	Ref<Mesh> mesh = selectedEntity.GetComponent<MeshComponent>().Mesh;
+					//	transform = sceneTransform * mesh->GetSkeletalSubmeshes()[selectedEntitySubmesh].Transform;
+					//}
+
 					// Snapping
 					bool snap = Input::IsKeyPressed(Key::LeftControl);
 					float snapValue = 0.5f;
@@ -394,6 +402,7 @@ namespace Frost
 						if (parent)
 						{
 							glm::mat4 parentTransform = m_EditorScene->GetTransformMatFromEntityAndParent(parent);
+
 							transform = glm::inverse(parentTransform) * transform;
 						}
 
@@ -418,7 +427,7 @@ namespace Frost
 
 		AssetManager::RemoveAssetFromMemory(m_EditorScene->Handle);
 
-		m_EditorScene = Ref<Scene>::Create();
+		m_EditorScene = Ref<Scene>::Create("New Empty Scene");
 		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
 		SetCurrentScene(m_EditorScene);
 		//Application::Get().GetWindow().SetWindowProjectName("Untilted scene");
@@ -472,7 +481,7 @@ namespace Frost
 	{
 		m_SceneState = SceneState::Play;
 
-		m_RuntimeScene = Ref<Scene>::Create();
+		m_RuntimeScene = Ref<Scene>::Create("RunTime Scene");
 		m_EditorScene->CopyTo(m_RuntimeScene);
 		m_SceneHierarchyPanel->SetSceneContext(m_RuntimeScene);
 

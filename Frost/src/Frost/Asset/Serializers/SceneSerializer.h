@@ -23,6 +23,9 @@ namespace Frost
 
 	private:
 		static void SerializeEntity(nlohmann::ordered_json& out, Entity entity);
+		static void DeserializeEntities(const std::string& filepath, Ref<Scene>& scene);
+
+		friend class PrefabSerializer;
 	};
 
 

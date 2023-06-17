@@ -31,6 +31,7 @@ namespace Frost
 		virtual void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale) override;
 		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color) override;
 		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture) override;
+		virtual void SubmitLines(const glm::vec3& positon0, const glm::vec3& positon1, const glm::vec4& color) override;
 		virtual void SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth) override;
 
 		virtual uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y) override;

@@ -94,6 +94,7 @@ namespace Frost
 		static void SetSky(const SkyLightComponent& skyLightComponent);
 		static void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color);
 		static void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture);
+		static void SubmitLines(const glm::vec3& positon0, const glm::vec3& positon1, const glm::vec4& color);
 		static void SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.0f), float lineWidth = 1.0f);
 
 		static uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y);

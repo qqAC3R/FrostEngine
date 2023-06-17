@@ -25,7 +25,8 @@ layout(binding = 5) uniform DirectionaLightData
 	mat4 LightViewProjMatrix2;
 	mat4 LightViewProjMatrix3;
 
-	float CascadeDepthSplit[4];
+	//float CascadeDepthSplit[4];
+	vec4 CascadeDepthSplit;
 	
 	vec3 MieScattering;
 	float Density;
@@ -172,10 +173,10 @@ float SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 
 		if (shadowCoord.w > 0 && dist < shadowCoord.z - bias)
 		{
-			return 0.1f;
+			return 0.1;
 		}
 	}
-	return 1.0f;
+	return 1.0;
 }
 // ---------------------------------------------------------
 
@@ -337,6 +338,7 @@ void main()
 	uint cascadeIndex = GetCascadeIndex(worldSpacePosition.z);
 	mat4 cascadeMat = GetCascadeMatrix(cascadeIndex);
 	vec4 shadowCoord = cascadeMat * vec4(worldSpacePosition, 1.0f);
+	shadowCoord /= shadowCoord.w;
 	float visibility = SampleShadowTexture(shadowCoord, cascadeIndex);
 
 	

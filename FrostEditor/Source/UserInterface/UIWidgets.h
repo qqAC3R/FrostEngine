@@ -25,6 +25,7 @@ namespace Frost
 
 		static bool InputText(const std::string& label, const char* buffer);
 
+		static bool PropertyPrefabReference(const char* label, const char* prefabName);
 		static bool PropertyEntityReference(const char* label, Entity& entity);
 	};
 

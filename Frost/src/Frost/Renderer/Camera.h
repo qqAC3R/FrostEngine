@@ -48,11 +48,17 @@ namespace Frost
 		float GetDOF() const { return m_DOF; }
 		float& GetDOF() { return m_DOF; }
 
+		void SetViewportSize(uint32_t width, uint32_t height);
+		uint32_t GetViewportWidth() const { return m_ViewportWidth; }
+		uint32_t GetViewportHeight() const { return m_ViewportHeight; }
+
 		Camera::Type GetCameraType() const { return m_CameraType; }
 	public:
 		void RecalculateProjectionMatrix();
 	protected:
 		glm::mat4 m_ProjectionMatrix = glm::mat4(1.0f);
+
+		uint32_t m_ViewportWidth = 1600, m_ViewportHeight = 900;
 
 		float m_FOV = 70.0f;
 		float m_NearClip, m_FarClip, m_AspectRatio;

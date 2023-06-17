@@ -36,6 +36,7 @@ namespace Frost
 		void BatchRendererUpdate(const RenderQueue& renderQueue);
 		void SubmitBillboard(const RenderQueue& renderQueue, const RenderQueue::Object2D& object2d);
 		void SubmitQuad(const RenderQueue::Object2D& object2d); // TODO
+		void SubmitLine(const RenderQueue::Object2D& object2d);
 		// ------------------------------------------------------
 
 		// ------------------- Render Wireframe --------------------
@@ -66,38 +67,50 @@ namespace Frost
 		SceneRenderPassPipeline* m_RenderPassPipeline;
 
 		struct QuadVertex;
+		struct LineVertex;
 
 		struct InternalData
 		{
-			Ref<Shader> BatchRendererShader;
-			Ref<Pipeline> BatchRendererPipeline;
-			Vector<Ref<Material>> BatchRendererMaterial;
+			// This is common for both quads and lines
 			Ref<RenderPass> BatchRendererRenderPass;
+			Vector<Ref<Material>> BatchRendererMaterial;
+
+			// Quads renderer
+			Ref<Shader> BatchQuadRendererShader;
+			Ref<Pipeline> BatchQuadRendererPipeline;
 
 			Vector<Ref<BufferDevice>> QuadVertexBuffer;
 			Ref<IndexBuffer> QuadIndexBuffer;
-
 			uint32_t QuadIndexCount = 0;
 			uint32_t QuadCount = 0;
 			QuadVertex* QuadVertexBufferBase = nullptr;
 			QuadVertex* QuadVertexBufferPtr = nullptr;
 
+			// Lines Renderer
+			Ref<Shader> BatchLineRendererShader;
+			Ref<Pipeline> BatchLineRendererPipeline;
 
+			Vector<Ref<BufferDevice>> LineVertexBuffer;
+			uint32_t LineVertexCount = 0;
+			LineVertex* LineVertexBufferBase = nullptr;
+			LineVertex* LineVertexBufferPtr = nullptr;
+
+			// Wireframe Renderer
 			Ref<Shader> RenderWireframeShader;
 			Ref<Pipeline> RenderWireframePipeline;
 
+			// Grid Renderer
 			Ref<Shader> RenderGridShader;
 			Ref<Pipeline> RenderGridPipeline;
 			Ref<BufferDevice> GridVertexBuffer;
 			Ref<IndexBuffer> GridIndexBuffer;
 
+			// Used for selecting and entity
 			Vector<Ref<Image2D>> EntityIDTexture_CPU;
 			uint32_t* TextureDataCPU;
 			glm::ivec2 ViewportSize;
-			//uint32_t ViewportSize[2];
 
-
-
+			// Line detection
 			Ref<Shader> LineDetectionShader;
 			Ref<ComputePipeline> LineDetectionPipeline;
 			Vector<Ref<Material>> LineDetectionMaterial;
@@ -130,6 +143,12 @@ namespace Frost
 			glm::vec4 Color;
 			glm::vec2 TexCoord;
 			uint32_t TexIndex;
+		};
+
+		struct LineVertex
+		{
+			glm::vec3 Position;
+			glm::vec4 Color;
 		};
 
 		struct RenderWireframePushConstant

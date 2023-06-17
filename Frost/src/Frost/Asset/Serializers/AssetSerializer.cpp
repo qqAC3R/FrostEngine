@@ -4,8 +4,10 @@
 #include "Frost/Asset/AssetManager.h"
 #include "Frost/Renderer/Mesh.h"
 #include "Frost/Renderer/Renderer.h"
+#include "Frost/EntitySystem/Prefab.h"
 #include "Frost/Renderer/MaterialAsset.h"
 #include "Frost/Physics/PhysicsMaterial.h"
+#include "Frost/Asset/Serializers/SceneSerializer.h"
 
 #include <json/nlohmann/json.hpp>
 
@@ -296,4 +298,57 @@ namespace Frost
 
 		return filepath.substr(lastSlash, count);
 	}
+
+	void PrefabSerializer::Serialize(const AssetMetadata& metadata, Ref<Asset> asset) const
+	{
+		std::string filepath = AssetManager::GetFileSystemPathString(metadata);
+
+		std::ofstream istream(filepath);
+		istream.clear();
+
+		nlohmann::ordered_json out = nlohmann::ordered_json();
+
+		Ref<Prefab> prefab = asset.As<Asset>();
+
+		prefab->m_Scene->m_Registry.each([&](auto entityID)
+		{
+			Entity entity = { entityID, prefab->m_Scene.Raw() };
+			if (!entity || !entity.HasComponent<IDComponent>())
+				return;
+
+			SceneSerializer::SerializeEntity(out, entity);
+		});
+
+		istream << out.dump(4);
+		istream.close();
+	}
+
+	bool PrefabSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const
+	{
+		Ref<Prefab> prefab = Ref<Prefab>::Create();
+		std::string filepath = AssetManager::GetFileSystemPathString(metadata);
+
+		std::string content;
+		std::ifstream instream(filepath);
+
+		if (!instream.is_open())
+		{
+			asset = nullptr;
+			return false;
+		}
+
+		SceneSerializer::DeserializeEntities(filepath, prefab->m_Scene);
+		//prefab->Create();
+		asset = prefab.As<Asset>();
+
+		return true;
+	}
+
+	Ref<Asset> PrefabSerializer::CreateAssetRef(const AssetMetadata& metadata, void* pNext) const
+	{
+		Ref<Prefab> prefab = Ref<Prefab>::Create();
+		prefab->SetFlag(AssetFlag::None);
+		return prefab.As<Asset>();
+	}
+
 }

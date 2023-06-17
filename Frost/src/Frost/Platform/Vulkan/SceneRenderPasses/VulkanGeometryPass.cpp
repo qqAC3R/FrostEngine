@@ -290,13 +290,21 @@ namespace Frost
 		s_GeometryMeshIndirectData.clear();
 		s_GroupedMeshesCached.clear();
 
+		for (auto& [meshAssetUUID, instanceCount] : renderQueue.m_MeshInstanceCount)
+		{
+			s_GroupedMeshesCached[meshAssetUUID].reserve(instanceCount);
+		}
+
 
 		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
 		{
 			// Get the mesh
 			auto mesh = renderQueue.m_Data[i].Mesh;
+
 			s_GroupedMeshesCached[mesh->GetMeshAsset()->Handle].push_back({ mesh.Raw(), renderQueue.m_Data[i].Transform, i, renderQueue.m_Data[i].EntityID});
 		}
+
+		//FROST_CORE_INFO(renderQueue.m_Data.size());
 
 
 		// `Indirect draw commands` offset
@@ -358,7 +366,10 @@ namespace Frost
 				uint32_t meshInstanceNr = 0;
 				for (auto& meshInstance : groupedMeshes)
 				{
-					glm::mat4 modelMatrix = meshInstance.Transform * submeshes[submeshIndex].Transform;
+					//glm::mat4 modelMatrix = meshInstance.Transform * submeshes[submeshIndex].Transform;
+
+					 // Using skeletal (dynamic) submesh transforms, instead of the static ones which are found in the mesh asset
+					glm::mat4 modelMatrix = meshInstance.Transform * meshInstance.Mesh->GetSkeletalSubmeshes()[submeshIndex].Transform;
 
 
 					// Adding the neccesary Matricies for the shader
@@ -479,7 +490,7 @@ namespace Frost
 			auto& indirectPerMeshData = s_GeometryMeshIndirectData[i];
 
 			// Get the mesh
-			const AssetMetadata& assetMetadata = AssetManager::GetMetadata(s_GeometryMeshIndirectData[i].MeshAssetHandle);
+			const AssetMetadata& assetMetadata = AssetManager::GetMetadata(indirectPerMeshData.MeshAssetHandle);
 			Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(assetMetadata.FilePath.string());
 
 			// Bind the index buffer

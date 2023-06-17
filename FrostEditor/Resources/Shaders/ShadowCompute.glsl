@@ -128,8 +128,8 @@ float AverageBlockDepth(vec4 projCoords, uint cascadeIndex, float w_light)
     float blockerSum = 0.0;
     int blockerCount = 0;
     
-    //vec2 texelSize = 1.0 / (textureSize(u_ShadowDepthTexture, 0) / 2.0);
-    vec2 texelSize = 1.0 / (textureSize(u_ShadowDepthTexture, 0));
+    vec2 texelSize = 1.0 / (textureSize(u_ShadowDepthTexture, 0) / 2.0);
+    //vec2 texelSize = 1.0 / (textureSize(u_ShadowDepthTexture, 0));
     
     float currentDepth = projCoords.z;
     
@@ -204,7 +204,7 @@ float PCFDirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius, 
 	{
 		vec2 offset;
 		if(cascadeIndex <= 2)
-			offset = (rot * (1.0 - blockerDistance)) * SamplePoisson(i) * uvRadius;
+			offset = (rot * blockerDistance) * SamplePoisson(i) * uvRadius;
 		else
 			offset = SamplePoisson(i) * uvRadius;
 
@@ -227,6 +227,7 @@ float PCSS_SampleShadowTexture(vec4 shadowCoords, uint cascadeIndex, float light
 	float uvRadius = penumbraWidth * lightSize * NEAR / receiverDepth;
 
 	//uvRadius = min(uvRadius, 0.002);
+	//return blockerDistance;
 	return PCFDirectionalLight(shadowCoords, cascadeIndex, uvRadius, blockerDistance);
 }
 
@@ -245,8 +246,10 @@ void main()
 	float lightSize = u_DirLightData.DirectionLightSize;
 
 	// Depth compare for shadowing
-	vec4 shadowCoord = (BIAS_MAT * (GetCascadeMatrix(cascadeIndex))) * vec4(position, 1.0);
+	vec4 shadowCoord = ((GetCascadeMatrix(cascadeIndex))) * vec4(position, 1.0);
 	shadowCoord /= shadowCoord.w;
+
+	shadowCoord.xy = shadowCoord.xy * 0.5 + 0.5;
 
 	float shadowFactor = 0.0f;
 	/*
@@ -289,12 +292,9 @@ void main()
 	}
 	*/
 	shadowFactor = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
-	//shadowFactor = PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize);
 
 	
 	vec3 shadow = vec3(clamp(shadowFactor, 0.0f, 1.0f));
-	//vec3 shadow = vec3(shadowCoord.z);
-
 
 	if(u_DirLightData.CascadeDebug == 1)
 	{

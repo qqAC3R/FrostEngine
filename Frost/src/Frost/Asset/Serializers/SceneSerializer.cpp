@@ -20,7 +20,7 @@ namespace Frost
 
 	bool SceneSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const
 	{
-		Ref<Scene> scene = Ref<Scene>::Create(); // Maybe not create a new scene and leave the one passed in parameters?
+		Ref<Scene> scene = Ref<Scene>::Create(GetNameFromFilepath(metadata.FilePath.string()), true); // Maybe not create a new scene and leave the one passed in parameters?
 		DeserializeScene(AssetManager::GetFileSystemPathString(metadata), scene);
 
 		asset = scene;
@@ -89,6 +89,13 @@ namespace Frost
 			entityOut["TransformComponent"]["Translation"] = translation;
 			entityOut["TransformComponent"]["Rotation"] = rotation;
 			entityOut["TransformComponent"]["Scale"] = scale;
+		}
+
+		if (entity.HasComponent<PrefabComponent>())
+		{
+			PrefabComponent& prefab = entity.GetComponent<PrefabComponent>();
+
+			entityOut["PrefabComponent"]["PrefabAssetHandle"] = prefab.PrefabAssetHandle.Get();
 		}
 
 		if (entity.HasComponent<MeshComponent>())
@@ -336,6 +343,7 @@ namespace Frost
 					case FieldType::Asset: break; // TODO: Add assets (prefabs in our case)
 
 					case FieldType::Entity:
+					case FieldType::Prefab:
 					{
 						UUID entityUUID = field.GetStoredValue<UUID>();
 						jsonPublicField["Value"] = entityUUID.Get();
@@ -351,16 +359,19 @@ namespace Frost
 
 		}
 
-		
-
 		out.push_back(entityOut);
 	}
 
 	void SceneSerializer::DeserializeScene(const std::string& filepath, Ref<Scene>& scene)
 	{
+		DeserializeEntities(filepath, scene);
+	}
+
+	void SceneSerializer::DeserializeEntities(const std::string& filepath, Ref<Scene>& scene)
+	{
 		std::string content;
 		std::ifstream instream(filepath);
-		
+
 		// Get the scene name from filepath
 		instream.seekg(0, std::ios::end);
 		size_t size = instream.tellg();
@@ -402,10 +413,17 @@ namespace Frost
 				std::vector<float> translation = entity["TransformComponent"]["Translation"];
 				std::vector<float> rotation = entity["TransformComponent"]["Rotation"];
 				std::vector<float> scale = entity["TransformComponent"]["Scale"];
-					
+
 				transformComponent.Translation = { translation[0], translation[1], translation[2] };
 				transformComponent.Rotation = { rotation[0], rotation[1], rotation[2] };
 				transformComponent.Scale = { scale[0], scale[1], scale[2] };
+			}
+
+			if (!entity["PrefabComponent"].is_null())
+			{
+				PrefabComponent& prefabComponent = ent.AddComponent<PrefabComponent>();
+
+				prefabComponent.PrefabAssetHandle = UUID(entity["PrefabComponent"]["PrefabAssetHandle"]);
 			}
 
 			// Transform Component
@@ -547,7 +565,7 @@ namespace Frost
 					}
 				}
 
-				
+
 			}
 
 			// Sphere Collider Component
@@ -739,7 +757,7 @@ namespace Frost
 
 				scriptComponent.ModuleName = entity["ScriptComponent"]["ModuleName"];
 				auto& fieldMap = scriptComponent.ModuleFieldMap[scriptComponent.ModuleName];
-				
+
 				ScriptEngine::InitScriptEntity(ent);
 				ScriptEngine::InstantiateEntityClass(ent);
 
@@ -756,43 +774,42 @@ namespace Frost
 
 						switch (publicFieldType)
 						{
-							case FieldType::Float:           publicField.SetStoredValue<float>(publicFieldJson["Value"]); break;
-							case FieldType::Int:             publicField.SetStoredValue<int32_t>(publicFieldJson["Value"]); break;
-							case FieldType::UnsignedInt:     publicField.SetStoredValue<uint32_t>(publicFieldJson["Value"]); break;
-							case FieldType::String:          publicField.SetStoredValue<const std::string&>(publicFieldJson["Value"]); break;
-							case FieldType::Vec2:
-							{
-								publicField.SetStoredValue<glm::vec2>({ publicFieldJson["Value"][0], publicFieldJson["Value"][1] });
-								break;
-							}
-							case FieldType::Vec3:
-							{
-								publicField.SetStoredValue<glm::vec3>({ publicFieldJson["Value"][0], publicFieldJson["Value"][1], publicFieldJson["Value"][2] });
-								break;
-							}
-							case FieldType::Vec4:
-							{
-								publicField.SetStoredValue<glm::vec4>({ publicFieldJson["Value"][0], publicFieldJson["Value"][1], publicFieldJson["Value"][2], publicFieldJson["Value"][3] });
-								break;
-							}
-							case FieldType::ClassReference: break;// TODO: Not sure if storing a class reference would even make any sense, because eventually the pointer address will differ
-							case FieldType::Asset: break; // TODO: Add assets (prefabs in our case)
+						case FieldType::Float:           publicField.SetStoredValue<float>(publicFieldJson["Value"]); break;
+						case FieldType::Int:             publicField.SetStoredValue<int32_t>(publicFieldJson["Value"]); break;
+						case FieldType::UnsignedInt:     publicField.SetStoredValue<uint32_t>(publicFieldJson["Value"]); break;
+						case FieldType::String:          publicField.SetStoredValue<const std::string&>(publicFieldJson["Value"]); break;
+						case FieldType::Vec2:
+						{
+							publicField.SetStoredValue<glm::vec2>({ publicFieldJson["Value"][0], publicFieldJson["Value"][1] });
+							break;
+						}
+						case FieldType::Vec3:
+						{
+							publicField.SetStoredValue<glm::vec3>({ publicFieldJson["Value"][0], publicFieldJson["Value"][1], publicFieldJson["Value"][2] });
+							break;
+						}
+						case FieldType::Vec4:
+						{
+							publicField.SetStoredValue<glm::vec4>({ publicFieldJson["Value"][0], publicFieldJson["Value"][1], publicFieldJson["Value"][2], publicFieldJson["Value"][3] });
+							break;
+						}
+						case FieldType::ClassReference: break;// TODO: Not sure if storing a class reference would even make any sense, because eventually the pointer address will differ
+						case FieldType::Asset: break; // TODO: Add assets (prefabs in our case)
 
-							case FieldType::Entity:
-							{
-								publicField.SetStoredValue<UUID>(UUID(publicFieldJson["Value"]));
-								break;
-							}
+						case FieldType::Entity:
+						case FieldType::Prefab:
+						{
+							publicField.SetStoredValue<UUID>(UUID(publicFieldJson["Value"]));
+							break;
+						}
 
-							case FieldType::None:
-							default: FROST_ASSERT_MSG("Field Type is not valid!");
+						case FieldType::None:
+						default: FROST_ASSERT_MSG("Field Type is not valid!");
 						}
 					}
 
 				}
 			}
-
-
 		}
 	}
 
@@ -821,6 +838,7 @@ namespace Frost
 			case FieldType::ClassReference: return "ClassReference";
 			case FieldType::Asset: return "Asset";
 			case FieldType::Entity: return "Entity";
+			case FieldType::Prefab: return "Prefab";
 
 			case FieldType::None: FROST_ASSERT_MSG("Field Type is not valid!");
 			default: FROST_ASSERT_MSG("Field Type is not valid!");
@@ -840,6 +858,7 @@ namespace Frost
 		else if(fieldTypeStr == "ClassReference" )  return FieldType::ClassReference;
 		else if(fieldTypeStr == "Asset" )           return FieldType::Asset;
 		else if(fieldTypeStr == "Entity" )          return FieldType::Entity;
+		else if(fieldTypeStr == "Prefab" )          return FieldType::Prefab;
 		else FROST_ASSERT_MSG("Field Type is not valid!");
 
 		return FieldType::None;

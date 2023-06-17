@@ -34,6 +34,9 @@ namespace Frost
 		void ShadowComputeInitData(uint32_t width, uint32_t height);
 		void ShadowComputeUpdate(const RenderQueue& renderQueue);
 
+		void ShadowComputeDenoiseInitData(uint32_t width, uint32_t height);
+		void ShadowComputeDenoiseUpdate(const RenderQueue& renderQueue);
+
 		void UpdateCascades(const RenderQueue& renderQueue);
 		void CalculateCascadeOffsets();
 
@@ -57,6 +60,11 @@ namespace Frost
 			Ref<ComputePipeline> ShadowComputePipeline;
 			Vector<Ref<Material>> ShadowComputeDescriptor;
 			Vector<Ref<Image2D>> ShadowComputeTexture;
+
+			Ref<Shader> ShadowComputeDenoiseShader;
+			Ref<ComputePipeline> ShadowComputeDenoisePipeline;
+			Vector<Ref<Material>> ShadowComputeDenoiseDescriptor;
+			Vector<Ref<Image2D>> ShadowComputeDenoiseTexture;
 
 
 			Vector<HeapBlock> IndirectShadowCmdBuffer;

@@ -17,6 +17,15 @@ namespace Frost
 		RecalculateProjectionMatrix();
 	}
 
+	void Camera::SetViewportSize(uint32_t width, uint32_t height)
+	{
+		if (m_ViewportWidth == width && m_ViewportHeight == height) return;
+
+		m_ViewportWidth = width;
+		m_ViewportHeight = height;
+		Resize((float)width / height);
+	}
+
 	void Camera::RecalculateProjectionMatrix()
 	{
 		m_ProjectionMatrix = glm::perspective(glm::radians(m_FOV), m_AspectRatio, m_NearClip, m_FarClip);

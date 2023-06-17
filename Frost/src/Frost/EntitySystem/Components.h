@@ -35,6 +35,14 @@ namespace Frost
 		Vector<UUID> ChildIDs;
 	};
 
+	struct PrefabComponent
+	{
+		PrefabComponent() = default;
+		PrefabComponent(const PrefabComponent& other) = default;
+
+		UUID PrefabAssetHandle = 0;
+	};
+
 	struct TagComponent
 	{
 		TagComponent() = default;

@@ -47,9 +47,9 @@ vec4 smartDeNoise(sampler2D tex, vec2 uv, float sigma, float kSigma, float thres
     return aBuff/zBuff;
 }
 
-float Sample2x2(sampler2D tex, ivec2 loc)
+float Sample2x2(sampler2D tex, vec2 loc)
 {
-	vec4 color = textureGather(i_Texture, loc + ivec2(0, 0), 0);
+	vec4 color = textureGather(i_Texture, loc + vec2(0, 0), 0);
 	return (color.x + color.y + color.z + color.w) / 4.0f;
 }
 
@@ -67,30 +67,30 @@ void main()
 
 	// NOTE: textureGather requires GL 4
 
-	//totalao += Sample2x2(i_Texture, loc + ivec2(0, 0));
-	//totalao += Sample2x2(i_Texture, loc + ivec2(2, 0));
-	//totalao += Sample2x2(i_Texture, loc + ivec2(0, 2));
-	//totalao += Sample2x2(i_Texture, loc + ivec2(2, 2));
+	totalao += Sample2x2(i_Texture, uv + texelSize * vec2(0, 0));
+	totalao += Sample2x2(i_Texture, uv + texelSize * vec2(2, 0));
+	totalao += Sample2x2(i_Texture, uv + texelSize * vec2(0, 2));
+	totalao += Sample2x2(i_Texture, uv + texelSize * vec2(2, 2));
 
-	totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 0.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 0.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 1.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 1.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 0.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 0.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 1.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 1.0)).r;
+	//
+	//totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 0.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 0.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 1.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 1.0)).r;
+	//
+	//totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 2.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 2.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 3.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 3.0)).r;
 	
-	totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 0.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 0.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 1.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 1.0)).r;
-	
-	totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 2.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 2.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 3.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 3.0)).r;
-	
-	totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 2.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 2.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 3.0)).r;
-	totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 3.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 2.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 2.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 3.0)).r;
+	//totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 3.0)).r;
 
-	imageStore(o_Texture, ivec2(gl_GlobalInvocationID.xy), vec4(totalao / 16.0f, vec3(1.0f)));
+	imageStore(o_Texture, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(totalao / 4.0f), 1.0f));
 }

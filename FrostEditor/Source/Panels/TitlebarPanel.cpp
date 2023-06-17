@@ -107,16 +107,17 @@ namespace Frost
 		ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-		ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(31, 36, 43, 255));
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
 
 
-		// Minimize button
-		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - 110.0f - windowPadding.x, windowPadding.y + 20.0f));
-		ImTextureID minimizeButtonTexID = imguiLayer->GetImGuiTextureID(m_MinimizeButtonTex->GetImage2D());
-		ImGui::Image(minimizeButtonTexID, { 14.0f, 2.0f });
+		ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(31, 36, 43, 255)); // Color GRAY Buttons Style
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(50, 55, 63, 255)); // Color GRAY Buttons Style
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(60, 65, 73, 255)); // Color GRAY Buttons Style
 
-		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - 110.0f - windowPadding.x, windowPadding.y + 10.0f));
-		if (ImGui::InvisibleButton("##MinimizeButton", { 14.0f, 14.0f }))
+
+		/// Minimize button
+		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - 118.0f - windowPadding.x, windowPadding.y + 2.0f));
+		if (ImGui::Button("##MinimizeButton", { 30.0f, 30.0f }))
 		{
 			// TODO: move this stuff to a better place, like Window class
 			if (auto* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow()))
@@ -127,19 +128,18 @@ namespace Frost
 				});
 			}
 		}
+		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - 110.0f - windowPadding.x, windowPadding.y + 20.0f));
+		ImTextureID minimizeButtonTexID = imguiLayer->GetImGuiTextureID(m_MinimizeButtonTex->GetImage2D());
+		ImGui::Image(minimizeButtonTexID, { 14.0f, 2.0f });
 
 
-		// Maximize button
-		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - (110 - 40) - windowPadding.x, windowPadding.y + 10.0f));
-		ImTextureID maximizeButtonTexID = imguiLayer->GetImGuiTextureID(m_MaximizeButtonTex->GetImage2D());
-		ImGui::Image(maximizeButtonTexID, { 14.0f, 14.0f });
-
-		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - (110 - 40) - windowPadding.x, windowPadding.y + 10.0f));
-		if (ImGui::InvisibleButton("##MaximizeButton", { 14.0f, 14.0f }))
+		
+		/// Maximize button
+		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - (118.0f - 40) - windowPadding.x, windowPadding.y + 1.0f));
+		if (ImGui::Button("##MaximizeButton", { 30.0f, 30.0f }))
 		{
 			auto* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
 			bool isMaximized = Application::Get().GetWindow().IsMaximized();
-
 
 			Renderer::SubmitDeletion([isMaximized]()
 			{
@@ -153,25 +153,36 @@ namespace Frost
 				}
 			});
 		}
+		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - (110 - 40) - windowPadding.x, windowPadding.y + 10.0f));
+		ImTextureID maximizeButtonTexID = imguiLayer->GetImGuiTextureID(m_MaximizeButtonTex->GetImage2D());
+		ImGui::Image(maximizeButtonTexID, { 14.0f, 14.0f });
+
+		ImGui::PopStyleColor(3);// Color GRAY Buttons Style
 
 
-		// Close button
-		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - (110 - 80) - windowPadding.x, windowPadding.y + 10.0f));
-		ImTextureID closeButtonTexID = imguiLayer->GetImGuiTextureID(m_CloseButtonTex->GetImage2D());
-		ImGui::Image(closeButtonTexID, { 14.0f, 14.0f });
-
-		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - (110 - 80) - windowPadding.x, windowPadding.y + 10.0f));
-		if (ImGui::InvisibleButton("##CloseButton", { 14.0f, 14.0f }))
+		/// Close button
+		ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(31, 36, 43, 255)); // Color RED Buttons Style
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(199, 8, 8, 255)); // Color RED Buttons Style
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(232, 7, 7, 255)); // Color RED Buttons Style
+		
+		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - (118.0f - 80) - windowPadding.x, windowPadding.y + 1.0f));
+		if (ImGui::Button("##CloseButton", { 30.0f, 30.0f }))
 		{
 			auto* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
 			bool isMaximized = Application::Get().GetWindow().IsMaximized();
 
 			Application::Get().Close();
 		}
+		ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - (110 - 80) - windowPadding.x, windowPadding.y + 10.0f));
+		ImTextureID closeButtonTexID = imguiLayer->GetImGuiTextureID(m_CloseButtonTex->GetImage2D());
+		ImGui::Image(closeButtonTexID, { 14.0f, 14.0f });
+
+
+		ImGui::PopStyleColor(3);// Color RED Buttons Style
+
 
 		// Button transparent Style (close)
-		ImGui::PopStyleVar(3);
-		ImGui::PopStyleColor();
+		ImGui::PopStyleVar(4);
 	}
 
 	void TitlebarPanel::RenderMenuBar()

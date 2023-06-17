@@ -9,6 +9,7 @@
 // Instanced vertex buffer
 layout(location = 0) in mat4 a_ModelSpaceMatrix;
 layout(location = 4) in mat4 a_WorldSpaceMatrix;
+layout(location = 8) in uint a_MaterialIndexOffset;
 
 struct Vertex
 {
@@ -26,7 +27,7 @@ layout(buffer_reference, scalar) buffer Vertices { Vertex v[]; }; // Positions o
 layout(push_constant) uniform Constants
 {
 	mat4 ViewMatrix;
-	uint MaterialIndex;
+	//uint MaterialIndex;
 	uint64_t VertexBufferBDA;
 	int VoxelDimensions;
 	int AtomicOperation;
@@ -43,8 +44,8 @@ void main()
 
 	v_TexCoord = vertex.TexCoord;
 
-	int meshIndex = int(u_PushConstant.MaterialIndex + vertex.MaterialIndex);
-	v_BufferIndex = int(meshIndex);
+	int meshIndex = int(a_MaterialIndexOffset + vertex.MaterialIndex);
+	v_BufferIndex = meshIndex;
 
 	// Compute world position
 	vec4 worldPos = a_ModelSpaceMatrix * vec4(vertex.Position, 1.0f);
@@ -158,7 +159,7 @@ layout(set = 0, binding = 3) readonly buffer u_MaterialUniform
 layout(push_constant) uniform Constants
 {
 	mat4 ViewMatrix;
-	uint MaterialIndex;
+	//uint MaterialIndex;
 	uint64_t VertexBufferBDA;
 	int VoxelDimensions;
 	int AtomicOperation;

@@ -111,7 +111,7 @@ namespace Frost
 			MonoObject* obj = ScriptEngine::ConstructClass(TypeName + ":.ctor(intptr)", true, params);
 			mono_field_set_value(entityInstance.GetInstance(), m_MonoClassField, obj);
 		}
-		else if (Type == FieldType::Asset || Type == FieldType::Entity)
+		else if (Type == FieldType::Asset || Type == FieldType::Entity || Type == FieldType::Prefab)
 		{
 			FROST_ASSERT(!TypeName.empty(), "The type name is wrong!");
 
@@ -309,7 +309,7 @@ namespace Frost
 	{
 		FROST_ASSERT_INTERNAL(entityInstance.GetInstance());
 
-		if (Type == FieldType::Entity)
+		if (Type == FieldType::Entity || Type == FieldType::Prefab)
 		{
 			MonoObject* obj;
 			if (m_MonoProperty)
@@ -337,7 +337,6 @@ namespace Frost
 
 	void PublicField::GetRuntimeValue_Internal(EntityInstance& entityInstance, std::string& outValue) const
 	{
-
 		FROST_ASSERT_INTERNAL(entityInstance.GetInstance());
 
 		MonoString* monoString;

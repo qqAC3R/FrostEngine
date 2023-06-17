@@ -15,6 +15,7 @@ namespace Frost
 		s_Serializers[AssetType::Material] = CreateScope<MaterialAssetSerializer>();
 		s_Serializers[AssetType::Texture] = CreateScope<TextureAssetSerializer>();
 		s_Serializers[AssetType::PhysicsMat] = CreateScope<PhysicsMaterialSerializer>();
+		s_Serializers[AssetType::Prefab] = CreateScope<PrefabSerializer>();
 	}
 
 	void AssetImporter::Serialize(const AssetMetadata& metadata, const Ref<Asset>& asset)

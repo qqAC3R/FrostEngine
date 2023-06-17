@@ -45,6 +45,7 @@ namespace Frost
 		virtual void Submit(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale) = 0;
 		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color) = 0;
 		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture) = 0;
+		virtual void SubmitLines(const glm::vec3& positon0, const glm::vec3& positon1, const glm::vec4& color) = 0;
 		virtual void SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth) = 0;
 
 		virtual uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y) = 0;
@@ -74,6 +75,7 @@ namespace Frost
 		void AddCloudVolume(const CloudVolumeComponent& cloudVolume, const glm::vec3& position, const glm::vec3& scale);
 		void AddBillBoard(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color);
 		void AddBillBoard(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture);
+		void AddLines(const glm::vec3& positon0, const glm::vec3& positon1, const glm::vec4& color);
 		void AddPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
 		void AddRectangularLight(const RectangularLightComponent& rectangularLight, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale);
 		void SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
@@ -89,6 +91,7 @@ namespace Frost
 			uint32_t EntityID;
 		};
 		Vector<RenderQueue::RenderData> m_Data;
+		HashMap<UUID, uint32_t> m_MeshInstanceCount;
 		uint32_t m_SelectedEntityID;
 
 		struct LightData
@@ -127,14 +130,14 @@ namespace Frost
 		{
 			enum class ObjectType
 			{
-				Quad, Billboard
+				Quad, Billboard, Line
 			};
 			ObjectType Type = ObjectType::Quad;
 
 			glm::vec3 Position{ 0.0f };
+			glm::vec3 Position_SecondPos_Line{ 0.0f }; // Only needed for lines
 			glm::vec2 Size{ 1.0f };
 			glm::vec4 Color{ 1.0f };
-			//uint32_t TexIndex = 0;
 			Ref<Texture2D> Texture;
 		};
 		Vector<Object2D> m_BatchRendererData;
@@ -190,6 +193,7 @@ namespace Frost
 		glm::mat4 CameraViewMatrix;
 		glm::mat4 CameraProjectionMatrix;
 		glm::vec3 CameraPosition;
+		glm::mat4 CameraTransform;
 
 		uint32_t ViewPortWidth;
 		uint32_t ViewPortHeight;

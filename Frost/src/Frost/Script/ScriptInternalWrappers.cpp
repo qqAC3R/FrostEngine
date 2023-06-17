@@ -7,6 +7,7 @@
 #include "ScriptEngine.h"
 #include "Frost/EntitySystem/Scene.h"
 #include "Frost/EntitySystem/Entity.h"
+#include "Frost/EntitySystem/Prefab.h"
 
 #include "Frost/Renderer/BindlessAllocator.h"
 
@@ -139,6 +140,50 @@ namespace ScriptInternalCalls
 
 		Entity entity = entityMap.at(entityID);
 		scene->SubmitToDestroyEntity(entity);
+	}
+
+	uint64_t EntityScript::Instantiate(uint64_t prefabAssetID)
+	{
+		const AssetMetadata& metadata = AssetManager::GetMetadata(prefabAssetID);
+
+		if (!AssetManager::IsAssetHandleValid(prefabAssetID))
+			FROST_CORE_ERROR("Prefab instantiation failed! Prefab is invalid!");
+
+		Ref<Prefab> prefab = AssetManager::GetOrLoadAsset<Prefab>(metadata.FilePath.string());
+		if (prefab)
+		{
+			Scene* scene = ScriptEngine::GetCurrentSceneContext();
+			FROST_ASSERT(scene, "No active scene!");
+
+			Entity newEntity = scene->Instantiate(prefab);
+			return newEntity.GetUUID();
+		}
+		else
+		{
+			FROST_CORE_ERROR("Prefab instantiation failed! Prefab is invalid!");
+		}
+	}
+
+	uint64_t EntityScript::InstantiateWithTranslation(uint64_t prefabAssetID, glm::vec3* translation)
+	{
+		const AssetMetadata& metadata = AssetManager::GetMetadata(prefabAssetID);
+
+		if (!AssetManager::IsAssetHandleValid(prefabAssetID))
+			FROST_CORE_ERROR("Prefab instantiation failed! Prefab is invalid!");
+
+		Ref<Prefab> prefab = AssetManager::GetOrLoadAsset<Prefab>(metadata.FilePath.string());
+		if (prefab)
+		{
+			Scene* scene = ScriptEngine::GetCurrentSceneContext();
+			FROST_ASSERT(scene, "No active scene!");
+
+			Entity newEntity = scene->Instantiate(prefab, translation);
+			return newEntity.GetUUID();
+		}
+		else
+		{
+			FROST_CORE_ERROR("Prefab instantiation failed! Prefab is invalid!");
+		}
 	}
 
 	MonoString* Components::Tag::GetTag(uint64_t entityID)
