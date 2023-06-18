@@ -290,10 +290,10 @@ namespace Frost
 		s_GeometryMeshIndirectData.clear();
 		s_GroupedMeshesCached.clear();
 
-		for (auto& [meshAssetUUID, instanceCount] : renderQueue.m_MeshInstanceCount)
-		{
-			s_GroupedMeshesCached[meshAssetUUID].reserve(instanceCount);
-		}
+		//for (auto& [meshAssetUUID, instanceCount] : renderQueue.m_MeshInstanceCount)
+		//{
+		//	s_GroupedMeshesCached[meshAssetUUID].reserve(instanceCount);
+		//}
 
 
 		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)

@@ -95,6 +95,7 @@ namespace Frost
 			LineVertex* LineVertexBufferBase = nullptr;
 			LineVertex* LineVertexBufferPtr = nullptr;
 
+
 			// Wireframe Renderer
 			Ref<Shader> RenderWireframeShader;
 			Ref<Pipeline> RenderWireframePipeline;
@@ -115,6 +116,7 @@ namespace Frost
 			Ref<ComputePipeline> LineDetectionPipeline;
 			Vector<Ref<Material>> LineDetectionMaterial;
 			
+			// Glow entity which is selected
 			Ref<Shader> GlowSelectedEntityShader;
 			Ref<ComputePipeline> GlowSelectedEntityPipeline;
 			Vector<Ref<Material>> GlowSelectedEntityMaterial;
@@ -125,9 +127,9 @@ namespace Frost
 		};
 		InternalData* m_Data;
 
-		static const uint64_t MaxQuads = 200000;
-		static const uint64_t MaxVertices = MaxQuads * 4;
-		static const uint64_t MaxIndices = MaxQuads * 6;
+		//static const uint64_t MaxQuads = 200000;
+		//static const uint64_t MaxVertices = MaxQuads * 4;
+		//static const uint64_t MaxIndices = MaxQuads * 6;
 		const glm::vec4 QuadVertexPositions[4] = {
 				{ -0.5f, -0.5f, 0.0f, 1.0f },
 				{ -0.5f,  0.5f, 0.0f, 1.0f },

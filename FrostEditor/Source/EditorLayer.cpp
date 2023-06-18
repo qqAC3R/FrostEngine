@@ -322,7 +322,6 @@ namespace Frost
 
 
 			Ref<Image2D> texture = Renderer::GetFinalImage(m_ViewportPanel->m_OutputImageID);
-			//Ref<Image2D> texture = Renderer::GetFinalImage(1);
 			m_ViewportPanel->RenderTexture(texture);
 
 

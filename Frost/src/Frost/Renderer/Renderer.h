@@ -28,6 +28,12 @@ namespace Frost
 			uint32_t MaxInstance = static_cast<uint32_t>(std::pow(2, 10)); // 1024
 		} RayTracing;
 
+		struct Renderer2DSettings
+		{
+			uint64_t MaxQuads = static_cast<uint64_t>(std::pow(2, 16)); // 65536
+			uint64_t MaxLines = static_cast<uint64_t>(std::pow(2, 16)); // 65536
+		} Renderer2D;
+
 		// Maximum amount of meshes for the indirect drawing buffer
 		uint64_t MaxMeshCount_GeometryPass = static_cast<uint64_t>(std::pow(2, 14)); // 16834
 

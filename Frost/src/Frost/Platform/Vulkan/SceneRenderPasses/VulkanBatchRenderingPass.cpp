@@ -53,6 +53,9 @@ namespace Frost
 	void VulkanBatchRenderingPass::BatchRendererInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		uint64_t maxQuadsVerticies = Renderer::GetRendererConfig().Renderer2D.MaxQuads * 4;
+		uint64_t maxQuadsIndices = Renderer::GetRendererConfig().Renderer2D.MaxQuads * 6;
+		uint64_t maxLinesVerticies = Renderer::GetRendererConfig().Renderer2D.MaxLines * 2;
 
 		RenderPassSpecification renderPassSpec =
 		{
@@ -121,46 +124,40 @@ namespace Frost
 			m_Data->BatchRendererMaterial[i] = Material::Create(m_Data->BatchQuadRendererShader, "BatchQuadRendererMaterial");
 		}
 
+		/// Quads
+		m_Data->QuadVertexBuffer.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
-			// Quads
-			m_Data->QuadVertexBuffer.resize(framesInFlight);
-			for (uint32_t i = 0; i < framesInFlight; i++)
-			{
-				m_Data->QuadVertexBuffer[i] = BufferDevice::Create(MaxVertices * sizeof(QuadVertex), {BufferUsage::Vertex});
-			}
-
-			m_Data->QuadVertexBufferBase = new QuadVertex[MaxVertices];
-
-			uint32_t* quadIndices = new uint32_t[MaxIndices];
-
-			uint32_t offset = 0;
-			for (uint32_t i = 0; i < MaxIndices; i += 6)
-			{
-				quadIndices[i + 0] = offset + 0;
-				quadIndices[i + 1] = offset + 1;
-				quadIndices[i + 2] = offset + 2;
-
-				quadIndices[i + 3] = offset + 2;
-				quadIndices[i + 4] = offset + 3;
-				quadIndices[i + 5] = offset + 0;
-
-				offset += 4;
-			}
-
-			m_Data->QuadIndexBuffer = IndexBuffer::Create(quadIndices, MaxIndices);
-			delete[] quadIndices;
+			m_Data->QuadVertexBuffer[i] = BufferDevice::Create(maxQuadsVerticies * sizeof(QuadVertex), {BufferUsage::Vertex});
 		}
+		m_Data->QuadVertexBufferBase = new QuadVertex[maxQuadsVerticies];
 
+		uint32_t* quadIndices = new uint32_t[maxQuadsIndices];
+		uint32_t offset = 0;
+		for (uint32_t i = 0; i < maxQuadsIndices; i += 6)
 		{
-			// Lines
-			m_Data->LineVertexBuffer.resize(framesInFlight);
-			for (uint32_t i = 0; i < framesInFlight; i++)
-			{
-				m_Data->LineVertexBuffer[i] = BufferDevice::Create(MaxVertices * sizeof(LineVertex), { BufferUsage::Vertex });
-			}
-			m_Data->LineVertexBufferBase = new LineVertex[MaxVertices];
-			m_Data->LineVertexBufferPtr = m_Data->LineVertexBufferBase;
+			quadIndices[i + 0] = offset + 0;
+			quadIndices[i + 1] = offset + 1;
+			quadIndices[i + 2] = offset + 2;
+
+			quadIndices[i + 3] = offset + 2;
+			quadIndices[i + 4] = offset + 3;
+			quadIndices[i + 5] = offset + 0;
+
+			offset += 4;
 		}
+		m_Data->QuadIndexBuffer = IndexBuffer::Create(quadIndices, maxQuadsIndices);
+		delete[] quadIndices;
+
+
+		/// Lines
+		m_Data->LineVertexBuffer.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			m_Data->LineVertexBuffer[i] = BufferDevice::Create(maxLinesVerticies * sizeof(LineVertex), { BufferUsage::Vertex });
+		}
+		m_Data->LineVertexBufferBase = new LineVertex[maxLinesVerticies];
+		m_Data->LineVertexBufferPtr = m_Data->LineVertexBufferBase;
 	}
 
 	void VulkanBatchRenderingPass::RenderWireframeInitData(uint32_t width, uint32_t height)
@@ -369,15 +366,12 @@ namespace Frost
 
 
 
-
 		glm::mat4 viewProj = renderQueue.m_Camera->GetViewProjectionVK();
-		uint32_t indexCount = m_Data->QuadIndexCount;
-
-
 		m_Data->BatchRendererRenderPass->Bind();
 
 
 		{
+			////////////////// Render the batched quads //////////////////////////////
 			Ref<VulkanPipeline> batchQuadRendererPipeline = m_Data->BatchQuadRendererPipeline.As<VulkanPipeline>();
 
 			batchQuadRendererPipeline->Bind();
@@ -396,7 +390,6 @@ namespace Frost
 			scissor.offset = { 0, 0 };
 			vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
-			////////////////// Render the batched quads //////////////////////////////
 			Ref<VulkanMaterial> batchRendererMaterial = m_Data->BatchRendererMaterial[currentFrameIndex].As<VulkanMaterial>();
 
 			// TODO: This is so bad, pls fix this
@@ -412,10 +405,11 @@ namespace Frost
 			VkBuffer batchVertexBufferInternal = batchVertexBuffer->GetVulkanBuffer();
 			vkCmdBindVertexBuffers(cmdBuf, 0, 1, &batchVertexBufferInternal, &offset);
 
-			vkCmdDrawIndexed(cmdBuf, indexCount, 1, 0, 0, 0);
+			vkCmdDrawIndexed(cmdBuf, m_Data->QuadIndexCount, 1, 0, 0, 0);
 		}
 
 		{
+			////////////////// Render the batched lines //////////////////////////////
 			Ref<VulkanPipeline> batchLineRendererPipeline = m_Data->BatchLineRendererPipeline.As<VulkanPipeline>();
 
 			batchLineRendererPipeline->Bind();
@@ -434,7 +428,6 @@ namespace Frost
 			scissor.offset = { 0, 0 };
 			vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
-			////////////////// Render the batched lines //////////////////////////////
 			Ref<VulkanBufferDevice> batchVertexBuffer = m_Data->LineVertexBuffer[currentFrameIndex].As<VulkanBufferDevice>();
 
 			uint64_t offset = 0;
@@ -445,22 +438,21 @@ namespace Frost
 
 		}
 
-		////////////////// Wireframe mesh //////////////////////////////
+		////////////////// Render Wireframed mesh //////////////////////////////
 		RenderWireframeUpdate(renderQueue);
 
-		////////////////// Grid //////////////////////////////
+		////////////////// Render Grid //////////////////////////////
 		RenderGridUpdate(renderQueue);
 
 		m_Data->BatchRendererRenderPass->Unbind();
 
+		////////////////// Glow Seleceted mesh(Compute) //////////////////////////////
 		GlowSelectedEntityUpdate(renderQueue);
-
-		//SelectEntityUpdate(renderQueue);
 	}
 
 	void VulkanBatchRenderingPass::SubmitBillboard(const RenderQueue& renderQueue, const RenderQueue::Object2D& object2d)
 	{
-		if (m_Data->QuadIndexCount >= MaxIndices)
+		if (m_Data->QuadIndexCount >= (Renderer::GetRendererConfig().Renderer2D.MaxQuads * 6))
 		{
 			FROST_CORE_ERROR("The maximum number of indices has been reached! The batch renderer cannot render more objects!");
 			return;
@@ -548,7 +540,7 @@ namespace Frost
 
 	void VulkanBatchRenderingPass::SubmitQuad(const RenderQueue::Object2D& object2d)
 	{
-		if (m_Data->QuadIndexCount >= MaxIndices)
+		if (m_Data->QuadIndexCount >= (Renderer::GetRendererConfig().Renderer2D.MaxQuads * 6))
 		{
 			FROST_CORE_ERROR("The maximum number of indices has been reached! The batch renderer cannot render more objects!");
 			return;
@@ -557,6 +549,12 @@ namespace Frost
 
 	void VulkanBatchRenderingPass::SubmitLine(const RenderQueue::Object2D& object2d)
 	{
+		if (m_Data->QuadIndexCount >= (Renderer::GetRendererConfig().Renderer2D.MaxLines * 2))
+		{
+			FROST_CORE_ERROR("The maximum number of verticies has been reached! The batch renderer cannot render more objects!");
+			return;
+		}
+
 		m_Data->LineVertexBufferPtr->Position = object2d.Position;
 		m_Data->LineVertexBufferPtr->Color = object2d.Color;
 		m_Data->LineVertexBufferPtr++;

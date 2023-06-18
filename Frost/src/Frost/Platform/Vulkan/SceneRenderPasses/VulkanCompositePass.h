@@ -49,10 +49,15 @@ namespace Frost
 		struct InternalData
 		{
 			// Composite pass
-			Ref<Pipeline> CompositePipeline;
+			//Ref<Pipeline> CompositePipeline;
 			Ref<RenderPass> RenderPass;
-			Vector<Ref<Material>> Descriptor;
-			Ref<Shader> CompositeShader;
+
+			//Ref<Shader> CompositeShader;
+			Ref<Shader> CompositeComputeShader;
+			Vector<Ref<Material>> CompositeDescriptor;
+			Ref<ComputePipeline> CompositePipeline;
+			//Vector<Ref<Image2D>> CompositeImage;
+
 
 			// Point Light data
 			Vector<Ref<BufferDevice>> PointLightBufferData;

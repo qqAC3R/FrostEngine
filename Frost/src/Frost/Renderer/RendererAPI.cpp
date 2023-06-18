@@ -46,6 +46,9 @@ namespace Frost
 
 		m_SubmeshCount += mesh->GetMeshAsset()->GetSubMeshes().size();
 
+		if (m_MeshInstanceCount.find(mesh->GetMeshAsset()->Handle) == m_MeshInstanceCount.end())
+			m_MeshInstanceCount.insert({ mesh->GetMeshAsset()->Handle, 0 });
+
 		m_MeshInstanceCount[mesh->GetMeshAsset()->Handle]++;
 	}
 

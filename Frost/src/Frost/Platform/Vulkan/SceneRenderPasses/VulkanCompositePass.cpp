@@ -39,7 +39,8 @@ namespace Frost
 		m_RenderPassPipeline = renderPassPipeline;
 		m_Data = new InternalData();
 
-		m_Data->CompositeShader = Renderer::GetShaderLibrary()->Get("PBRDeffered");
+		//m_Data->CompositeShader = Renderer::GetShaderLibrary()->Get("PBRDeffered");
+		m_Data->CompositeComputeShader = Renderer::GetShaderLibrary()->Get("PBRDeffered_Compute");
 		m_Data->PointLightCullingShader = Renderer::GetShaderLibrary()->Get("TiledPointLightCulling");
 		m_Data->RectLightCullingShader = Renderer::GetShaderLibrary()->Get("TiledRectangularLightCulling");
 
@@ -76,7 +77,7 @@ namespace Frost
 				// Color Attachment
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
-					OperationLoad::Clear,  OperationStore::Store,
+					OperationLoad::Load,  OperationStore::Store,
 					OperationLoad::Load,   OperationStore::DontCare,
 				},
 				// Depth Attachment
@@ -89,7 +90,7 @@ namespace Frost
 		};
 		m_Data->RenderPass = RenderPass::Create(renderPassSpec);
 
-
+#if 0
 		// Composite pipeline
 		BufferLayout bufferLayout = {};
 		Pipeline::CreateInfo pipelineCreateInfo{};
@@ -101,20 +102,25 @@ namespace Frost
 		pipelineCreateInfo.Topology = PrimitiveTopology::TriangleStrip;
 		if(!m_Data->CompositePipeline)
 			m_Data->CompositePipeline = Pipeline::Create(pipelineCreateInfo);
+#endif
+
+		ComputePipeline::CreateInfo computePipelineCreateInfo{};
+		computePipelineCreateInfo.Shader = m_Data->CompositeComputeShader;
+		if(!m_Data->CompositePipeline)
+			m_Data->CompositePipeline = ComputePipeline::Create(computePipelineCreateInfo);
 
 		// Composite pipeline descriptor
-		m_Data->Descriptor.resize(framesInFlight);
+		m_Data->CompositeDescriptor.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
-			if(!m_Data->Descriptor[i])
-				m_Data->Descriptor[i] = Material::Create(m_Data->CompositeShader, "CompositePass-Material");
+			if(!m_Data->CompositeDescriptor[i])
+				m_Data->CompositeDescriptor[i] = Material::Create(m_Data->CompositeComputeShader, "CompositeComputePass-Material");
 
-			auto descriptor = m_Data->Descriptor[i];
+			auto descriptor = m_Data->CompositeDescriptor[i];
 
 			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
 			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
 			Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(2, i);
-			//Ref<Image2D> shadowTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowComputeTexture[i];
 			Ref<Image2D> shadowTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowComputeDenoiseTexture[i];
 			Ref<Image2D> voxelIndirectDiffuseTex = m_RenderPassPipeline->GetRenderPassData<VulkanVoxelizationPass>()->VCT_IndirectDiffuseTexture[i];
 			Ref<Image2D> voxelIndirectSpecularTex = m_RenderPassPipeline->GetRenderPassData<VulkanVoxelizationPass>()->VCT_IndirectSpecularTexture[i];
@@ -140,6 +146,8 @@ namespace Frost
 			// Rectangular Lights
 			descriptor->Set("u_RectangularLightData", m_Data->RectLightBufferData[i]);
 			descriptor->Set("u_VisibleRectLightData", m_Data->RectLightIndices[i]);
+
+			descriptor->Set("o_Image", m_Data->RenderPass->GetColorAttachment(0, i)); // Get the color buffer as output image
 
 			descriptor.As<VulkanMaterial>()->UpdateVulkanDescriptorIfNeeded();
 		}
@@ -263,7 +271,7 @@ namespace Frost
 
 	void VulkanCompositePass::OnEnvMapChangeCallback(const Ref<TextureCubeMap>& prefiltered, const Ref<TextureCubeMap>& irradiance)
 	{
-		for (auto& descriptor : m_Data->Descriptor)
+		for (auto& descriptor : m_Data->CompositeDescriptor)
 		{
 			descriptor->Set("u_RadianceFilteredMap", prefiltered);
 			descriptor->Set("u_IrradianceMap", irradiance);
@@ -279,8 +287,8 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		Ref<Framebuffer> framebuffer = m_Data->RenderPass->GetFramebuffer(currentFrameIndex);
-		Ref<VulkanPipeline> vulkanPipeline = m_Data->CompositePipeline.As<VulkanPipeline>();
-		//Ref<VulkanPipeline> vulkanSkyboxPipeline = m_Data->SkyboxPipeline.As<VulkanPipeline>();
+		Ref<VulkanComputePipeline> vulkanCompositePipeline = m_Data->CompositePipeline.As<VulkanComputePipeline>();
+		Ref<VulkanMaterial> vulkanCompositeDescriptor = m_Data->CompositeDescriptor[currentFrameIndex].As<VulkanMaterial>();
 
 		// Updating the push constant data from the renderQueue
 		m_PushConstantData.CameraPosition = glm::vec4(renderQueue.CameraPosition, 1.0f);
@@ -332,9 +340,32 @@ namespace Frost
 
 		m_PushConstantData.CameraPosition.w = static_cast<float>(pointLightCount);
 
+		//vulkanComputePipeline->Bind(cmdBuf);
+		vulkanCompositePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_PushConstantData);
+
+		// Camera information
+		m_Data->CompositeDescriptor[currentFrameIndex]->Set("UniformBuffer.CameraExposure", renderQueue.m_Camera->GetExposure());
+		m_Data->CompositeDescriptor[currentFrameIndex]->Set("UniformBuffer.PointLightCount", static_cast<float>(pointLightCount));
+		m_Data->CompositeDescriptor[currentFrameIndex]->Set("UniformBuffer.RectangularLightCount", static_cast<float>(rectLightCount));
+
+		uint32_t width = static_cast<uint32_t>(renderQueue.ViewPortWidth);
+		float workGroupX = std::ceil(renderQueue.ViewPortWidth / 16.0f);
+		m_Data->CompositeDescriptor[currentFrameIndex]->Set("UniformBuffer.LightCullingWorkgroup", workGroupX);
+
+
+		// Drawing a quad
+		vulkanCompositeDescriptor->Bind(cmdBuf, m_Data->CompositePipeline);
+
+		uint32_t groupX = static_cast<uint32_t>(std::ceil((renderQueue.ViewPortWidth / 1.0f) / 32.0f));
+		uint32_t groupY = static_cast<uint32_t>(std::ceil((renderQueue.ViewPortHeight / 1.0f) / 32.0f));
+		vulkanCompositePipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+
+		Ref<VulkanImage2D> vulkanOutputImage = m_Data->RenderPass->GetColorAttachment(0, currentFrameIndex).As<VulkanImage2D>();
+		vulkanOutputImage->TransitionLayout(cmdBuf, vulkanOutputImage->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+
+
 		m_Data->RenderPass->Bind();
-		vulkanPipeline->Bind();
-		vulkanPipeline->BindVulkanPushConstant("u_PushConstant", &m_PushConstantData);
 
 		VkViewport viewport{};
 		viewport.width = (float)framebuffer->GetSpecification().Width;
@@ -348,24 +379,11 @@ namespace Frost
 		scissor.offset = { 0, 0 };
 		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
-		// Camera information
-		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.CameraExposure", renderQueue.m_Camera->GetExposure());
-		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.PointLightCount", static_cast<float>(pointLightCount));
-		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.RectangularLightCount", static_cast<float>(rectLightCount));
-
-		uint32_t width = static_cast<uint32_t>(renderQueue.ViewPortWidth);
-		float workGroupX = std::ceil(renderQueue.ViewPortWidth / 16.0f);
-		m_Data->Descriptor[currentFrameIndex]->Set("UniformBuffer.LightCullingWorkgroup", workGroupX);
-
-
-		// Drawing a quad
-		m_Data->Descriptor[currentFrameIndex]->Bind(m_Data->CompositePipeline);
-		vkCmdDraw(cmdBuf, 3, 1, 0, 0);
-
-
 		Renderer::GetSceneEnvironment()->RenderSkyBox(renderQueue);
 
 		m_Data->RenderPass->Unbind();
+
+
 
 		VulkanRenderer::EndTimeStampPass("Lightning Pass (PBR)");
 	}

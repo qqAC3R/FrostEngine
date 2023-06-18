@@ -53,7 +53,8 @@ namespace Frost
 
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirectBindless.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPass.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PBRDeffered.glsl");
+		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/PBRDeffered.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PBRDeffered_Compute.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PreethamSky.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PathTracer.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EquirectangularToCubeMap.glsl");
