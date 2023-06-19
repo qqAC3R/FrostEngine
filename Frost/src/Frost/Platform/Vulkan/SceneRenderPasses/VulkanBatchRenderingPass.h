@@ -9,6 +9,27 @@ typedef struct VkImage_T* VkImage;
 namespace Frost
 {
 	
+	struct QuadVertex
+	{
+		glm::vec3 Position;
+		glm::vec4 Color;
+		glm::vec2 TexCoord;
+		uint32_t TexIndex;
+	};
+
+	struct LineVertex
+	{
+		glm::vec3 Position;
+		glm::vec4 Color;
+	};
+
+	struct TextVertex
+	{
+		glm::vec3 Position;
+		glm::vec4 Color;
+		glm::vec2 TexCoord;
+		uint32_t TexIndex;
+	};
 
 	class VulkanBatchRenderingPass  : public SceneRenderPass
 	{
@@ -36,6 +57,7 @@ namespace Frost
 		void BatchRendererUpdate(const RenderQueue& renderQueue);
 		void SubmitBillboard(const RenderQueue& renderQueue, const RenderQueue::Object2D& object2d);
 		void SubmitQuad(const RenderQueue::Object2D& object2d); // TODO
+		void SubmitText(const RenderQueue::TextObject2D& textObject2D);
 		void SubmitLine(const RenderQueue::Object2D& object2d);
 		// ------------------------------------------------------
 
@@ -66,16 +88,13 @@ namespace Frost
 		std::string m_Name;
 		SceneRenderPassPipeline* m_RenderPassPipeline;
 
-		struct QuadVertex;
-		struct LineVertex;
-
 		struct InternalData
 		{
 			// This is common for both quads and lines
 			Ref<RenderPass> BatchRendererRenderPass;
 			Vector<Ref<Material>> BatchRendererMaterial;
 
-			// Quads renderer
+			/// Quads renderer
 			Ref<Shader> BatchQuadRendererShader;
 			Ref<Pipeline> BatchQuadRendererPipeline;
 
@@ -86,7 +105,7 @@ namespace Frost
 			QuadVertex* QuadVertexBufferBase = nullptr;
 			QuadVertex* QuadVertexBufferPtr = nullptr;
 
-			// Lines Renderer
+			/// Lines Renderer
 			Ref<Shader> BatchLineRendererShader;
 			Ref<Pipeline> BatchLineRendererPipeline;
 
@@ -94,6 +113,14 @@ namespace Frost
 			uint32_t LineVertexCount = 0;
 			LineVertex* LineVertexBufferBase = nullptr;
 			LineVertex* LineVertexBufferPtr = nullptr;
+
+			/// Text Renderer
+			Vector<Ref<BufferDevice>> TextVertexBuffer;
+			uint32_t TextIndexCount = 0;
+			uint32_t TextCount = 0;
+			TextVertex* TextVertexBufferBase = nullptr;
+			TextVertex* TextVertexBufferPtr = nullptr;
+
 
 
 			// Wireframe Renderer
@@ -127,9 +154,6 @@ namespace Frost
 		};
 		InternalData* m_Data;
 
-		//static const uint64_t MaxQuads = 200000;
-		//static const uint64_t MaxVertices = MaxQuads * 4;
-		//static const uint64_t MaxIndices = MaxQuads * 6;
 		const glm::vec4 QuadVertexPositions[4] = {
 				{ -0.5f, -0.5f, 0.0f, 1.0f },
 				{ -0.5f,  0.5f, 0.0f, 1.0f },
@@ -139,19 +163,13 @@ namespace Frost
 
 		HashMap<VkImage, uint32_t> m_BindlessAllocatedTextures;
 
-		struct QuadVertex
-		{
-			glm::vec3 Position;
-			glm::vec4 Color;
-			glm::vec2 TexCoord;
-			uint32_t TexIndex;
-		};
 
-		struct LineVertex
+		struct BatchQuadRenderPushConstant
 		{
-			glm::vec3 Position;
-			glm::vec4 Color;
+			glm::mat4 ViewProjectionMatrix;
+			uint32_t UseAtlas;
 		};
+		BatchQuadRenderPushConstant m_BatchQuadRenderPushConstant;
 
 		struct RenderWireframePushConstant
 		{

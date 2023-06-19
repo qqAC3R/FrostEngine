@@ -611,10 +611,12 @@ namespace Frost
 		s_VoxelizationMeshIndirectData.clear();
 		s_GroupedMeshesCached.clear();
 
-		//for (auto& [meshAssetUUID, instanceCount] : renderQueue.m_MeshInstanceCount)
-		//{
-		//	s_GroupedMeshesCached[meshAssetUUID].reserve(instanceCount);
-		//}
+		// Allocate all the neccesary array buffers before, so we won't waste cpus cycles on reallocating memory
+		for (auto& [meshAssetUUID, instanceCount] : renderQueue.m_MeshInstanceCount)
+		{
+			s_GroupedMeshesCached[meshAssetUUID].reserve(instanceCount);
+		}
+		s_VoxelizationMeshIndirectData.reserve(s_GroupedMeshesCached.size());
 
 
 		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
@@ -638,11 +640,14 @@ namespace Frost
 		{
 			NewIndirectMeshData* currentIndirectMeshData;
 			NewIndirectMeshData* lastIndirectMeshData = nullptr;
-			if (s_VoxelizationMeshIndirectData.size() > 0)
-				lastIndirectMeshData = &s_VoxelizationMeshIndirectData[s_VoxelizationMeshIndirectData.size() - 1];
-
+			
 			// If we are submitting the first mesh, we don't need any offset
 			currentIndirectMeshData = &s_VoxelizationMeshIndirectData.emplace_back();
+
+			// We are checking `.size() > 1` and also `.size() - 2` because we've already pushed_back and element before, so we should go 2 elements behind instead of one
+			if (s_VoxelizationMeshIndirectData.size() > 1)
+				lastIndirectMeshData = &s_VoxelizationMeshIndirectData[s_VoxelizationMeshIndirectData.size() - 2];
+
 
 			Ref<MeshAsset> meshAsset = groupedMeshes[0].Mesh->GetMeshAsset();
 			const Vector<Submesh>& submeshes = meshAsset->GetSubMeshes();

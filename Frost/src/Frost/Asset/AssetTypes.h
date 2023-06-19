@@ -21,6 +21,7 @@ namespace Frost
 		PhysicsMat = 5,
 		Texture = 6,
 		EnvMap = 7, // TODO: Not sure if I would like to include this?
+		Font = 8
 	};
 
 	namespace Utils
@@ -35,6 +36,7 @@ namespace Frost
 			if (assetType == "EnvMap")      return AssetType::EnvMap;
 			if (assetType == "Texture")     return AssetType::Texture;
 			if (assetType == "PhysicsMat")  return AssetType::PhysicsMat;
+			if (assetType == "Font")        return AssetType::Font;
 
 			FROST_ASSERT_MSG("Unknown Asset Type");
 			return AssetType::None;
@@ -52,6 +54,7 @@ namespace Frost
 				case AssetType::EnvMap:      return "EnvMap";
 				case AssetType::Texture:     return "Texture";
 				case AssetType::PhysicsMat:  return "PhysicsMat";
+				case AssetType::Font:        return "Font";
 			}
 
 			FROST_ASSERT_MSG("Unknown Asset Type");

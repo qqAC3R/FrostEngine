@@ -290,10 +290,12 @@ namespace Frost
 		s_GeometryMeshIndirectData.clear();
 		s_GroupedMeshesCached.clear();
 
-		//for (auto& [meshAssetUUID, instanceCount] : renderQueue.m_MeshInstanceCount)
-		//{
-		//	s_GroupedMeshesCached[meshAssetUUID].reserve(instanceCount);
-		//}
+		// Allocate all the neccesary array buffers before, so we won't waste cpus cycles on reallocating memory
+		for (auto& [meshAssetUUID, instanceCount] : renderQueue.m_MeshInstanceCount)
+		{
+			s_GroupedMeshesCached[meshAssetUUID].reserve(instanceCount);
+		}
+		s_GeometryMeshIndirectData.reserve(s_GroupedMeshesCached.size());
 
 
 		for (uint32_t i = 0; i < renderQueue.GetQueueSize(); i++)
@@ -303,9 +305,6 @@ namespace Frost
 
 			s_GroupedMeshesCached[mesh->GetMeshAsset()->Handle].push_back({ mesh.Raw(), renderQueue.m_Data[i].Transform, i, renderQueue.m_Data[i].EntityID});
 		}
-
-		//FROST_CORE_INFO(renderQueue.m_Data.size());
-
 
 		// `Indirect draw commands` offset
 		uint64_t indirectCmdsOffset = 0;
@@ -320,11 +319,13 @@ namespace Frost
 		{
 			NewIndirectMeshData* currentIndirectMeshData;
 			NewIndirectMeshData* lastIndirectMeshData = nullptr;
-			if (s_GeometryMeshIndirectData.size() > 0)
-				lastIndirectMeshData = &s_GeometryMeshIndirectData[s_GeometryMeshIndirectData.size() - 1];
 
 			// If we are submitting the first mesh, we don't need any offset
 			currentIndirectMeshData = &s_GeometryMeshIndirectData.emplace_back();
+
+			// We are checking `.size() > 1` and also `.size() - 2` because we've already pushed_back and element before, so we should go 2 elements behind instead of one
+			if (s_GeometryMeshIndirectData.size() > 1)
+				lastIndirectMeshData = &s_GeometryMeshIndirectData[s_GeometryMeshIndirectData.size() - 2];
 
 			Ref<MeshAsset> meshAsset = groupedMeshes[0].Mesh->GetMeshAsset();
 			const Vector<Submesh>& submeshes = meshAsset->GetSubMeshes();

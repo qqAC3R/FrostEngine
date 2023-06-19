@@ -14,6 +14,10 @@
 #include "Frost/Platform/Vulkan/VulkanRenderer.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanPostFXPass.h"
 
+#include "Frost/Renderer/UserInterface/MSDFData.h"
+
+#include <codecvt>
+
 namespace Frost
 {
 	VulkanBatchRenderingPass::VulkanBatchRenderingPass()
@@ -55,6 +59,7 @@ namespace Frost
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		uint64_t maxQuadsVerticies = Renderer::GetRendererConfig().Renderer2D.MaxQuads * 4;
 		uint64_t maxQuadsIndices = Renderer::GetRendererConfig().Renderer2D.MaxQuads * 6;
+		uint64_t maxTextVerticies = maxQuadsVerticies;
 		uint64_t maxLinesVerticies = Renderer::GetRendererConfig().Renderer2D.MaxLines * 2;
 
 		RenderPassSpecification renderPassSpec =
@@ -79,10 +84,10 @@ namespace Frost
 
 		{
 
-			// Batch Quads rendering pipeline
+			// Batched Quads rendering pipeline
 			BufferLayout bufferLayout = {
 				{ "a_Position",  ShaderDataType::Float3 },
-				{ "a_Color",  ShaderDataType::Float4 },
+				{ "a_Color",     ShaderDataType::Float4 },
 				{ "a_TexCoord",  ShaderDataType::Float2 },
 				{ "a_TexIndex",  ShaderDataType::UInt },
 			};
@@ -99,11 +104,10 @@ namespace Frost
 		}
 
 		{
-
-			// Batch Quads rendering pipeline
+			// Batched Lines rendering pipeline
 			BufferLayout bufferLayout = {
 				{ "a_Position",  ShaderDataType::Float3 },
-				{ "a_Color",  ShaderDataType::Float4 },
+				{ "a_Color",     ShaderDataType::Float4 },
 			};
 			bufferLayout.m_InputType = InputType::Vertex;
 			Pipeline::CreateInfo pipelineCreateInfo{};
@@ -116,8 +120,7 @@ namespace Frost
 			if (!m_Data->BatchLineRendererPipeline)
 				m_Data->BatchLineRendererPipeline = Pipeline::Create(pipelineCreateInfo);
 		}
-
-
+		
 		m_Data->BatchRendererMaterial.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
@@ -146,7 +149,7 @@ namespace Frost
 
 			offset += 4;
 		}
-		m_Data->QuadIndexBuffer = IndexBuffer::Create(quadIndices, maxQuadsIndices);
+		m_Data->QuadIndexBuffer = IndexBuffer::Create(quadIndices, sizeof(uint32_t) * maxQuadsIndices);
 		delete[] quadIndices;
 
 
@@ -158,6 +161,16 @@ namespace Frost
 		}
 		m_Data->LineVertexBufferBase = new LineVertex[maxLinesVerticies];
 		m_Data->LineVertexBufferPtr = m_Data->LineVertexBufferBase;
+
+		/// Text
+		m_Data->TextVertexBuffer.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			m_Data->TextVertexBuffer[i] = BufferDevice::Create(maxTextVerticies * sizeof(TextVertex), { BufferUsage::Vertex });
+		}
+		m_Data->TextVertexBufferBase = new TextVertex[maxTextVerticies];
+		m_Data->TextVertexBufferPtr = m_Data->TextVertexBufferBase;
+
 	}
 
 	void VulkanBatchRenderingPass::RenderWireframeInitData(uint32_t width, uint32_t height)
@@ -314,9 +327,6 @@ namespace Frost
 
 	void VulkanBatchRenderingPass::OnUpdate(const RenderQueue& renderQueue)
 	{
-		
-
-
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 
 		m_Data->QuadIndexCount = 0;
@@ -325,6 +335,11 @@ namespace Frost
 
 		m_Data->LineVertexCount = 0;
 		m_Data->LineVertexBufferPtr = m_Data->LineVertexBufferBase;
+
+		m_Data->TextIndexCount = 0;
+		m_Data->TextCount = 0;
+		m_Data->TextVertexBufferPtr = m_Data->TextVertexBufferBase;
+
 
 		for (const auto& object2d : renderQueue.m_BatchRendererData)
 		{
@@ -337,8 +352,14 @@ namespace Frost
 			}
 		}
 
+		for (const auto& textObject2d : renderQueue.m_TextRendererData)
+		{
+			SubmitText(textObject2d);
+		}
+
 		m_Data->QuadVertexBuffer[currentFrameIndex]->SetData(m_Data->QuadCount * 4 * sizeof(QuadVertex), m_Data->QuadVertexBufferBase);
 		m_Data->LineVertexBuffer[currentFrameIndex]->SetData(m_Data->LineVertexCount * sizeof(LineVertex), m_Data->LineVertexBufferBase);
+		m_Data->TextVertexBuffer[currentFrameIndex]->SetData(m_Data->TextCount * 4 * sizeof(TextVertex), m_Data->TextVertexBufferBase);
 
 		BatchRendererUpdate(renderQueue);
 		SelectEntityUpdate(renderQueue);
@@ -367,30 +388,33 @@ namespace Frost
 
 
 		glm::mat4 viewProj = renderQueue.m_Camera->GetViewProjectionVK();
+		
+		
 		m_Data->BatchRendererRenderPass->Bind();
+
+		VkViewport viewport{};
+		viewport.width = (float)framebuffer->GetSpecification().Width;
+		viewport.height = (float)framebuffer->GetSpecification().Height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
+
+		VkRect2D scissor{};
+		scissor.extent = { framebuffer->GetSpecification().Width, framebuffer->GetSpecification().Height };
+		scissor.offset = { 0, 0 };
+		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
 
 		{
-			////////////////// Render the batched quads //////////////////////////////
+			////////////////// Render the batched quads/text //////////////////////////////
 			Ref<VulkanPipeline> batchQuadRendererPipeline = m_Data->BatchQuadRendererPipeline.As<VulkanPipeline>();
+			Ref<VulkanMaterial> batchRendererMaterial = m_Data->BatchRendererMaterial[currentFrameIndex].As<VulkanMaterial>();
+
+			m_BatchQuadRenderPushConstant.UseAtlas = false;
+			m_BatchQuadRenderPushConstant.ViewProjectionMatrix = viewProj;
 
 			batchQuadRendererPipeline->Bind();
-			batchQuadRendererPipeline->BindVulkanPushConstant("u_PushConstant", &viewProj);
-
-
-			VkViewport viewport{};
-			viewport.width = (float)framebuffer->GetSpecification().Width;
-			viewport.height = (float)framebuffer->GetSpecification().Height;
-			viewport.minDepth = 0.0f;
-			viewport.maxDepth = 1.0f;
-			vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
-
-			VkRect2D scissor{};
-			scissor.extent = { framebuffer->GetSpecification().Width, framebuffer->GetSpecification().Height };
-			scissor.offset = { 0, 0 };
-			vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
-
-			Ref<VulkanMaterial> batchRendererMaterial = m_Data->BatchRendererMaterial[currentFrameIndex].As<VulkanMaterial>();
+			batchQuadRendererPipeline->BindVulkanPushConstant("u_PushConstant", &m_BatchQuadRenderPushConstant);
 
 			// TODO: This is so bad, pls fix this
 			VkPipelineLayout pipelineLayout = batchQuadRendererPipeline->GetVulkanPipelineLayout();
@@ -399,43 +423,44 @@ namespace Frost
 			vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
 			m_Data->QuadIndexBuffer->Bind();
-			Ref<VulkanBufferDevice> batchVertexBuffer = m_Data->QuadVertexBuffer[currentFrameIndex].As<VulkanBufferDevice>();
+			Ref<VulkanBufferDevice> batchQuadVertexBuffer = m_Data->QuadVertexBuffer[currentFrameIndex].As<VulkanBufferDevice>();
 
+			//  Render Batched Quads
 			uint64_t offset = 0;
-			VkBuffer batchVertexBufferInternal = batchVertexBuffer->GetVulkanBuffer();
-			vkCmdBindVertexBuffers(cmdBuf, 0, 1, &batchVertexBufferInternal, &offset);
+			VkBuffer batchQuadVertexBufferInternal = batchQuadVertexBuffer->GetVulkanBuffer();
+			vkCmdBindVertexBuffers(cmdBuf, 0, 1, &batchQuadVertexBufferInternal, &offset);
 
 			vkCmdDrawIndexed(cmdBuf, m_Data->QuadIndexCount, 1, 0, 0, 0);
+
+
+
+
+			m_BatchQuadRenderPushConstant.UseAtlas = true;
+			batchQuadRendererPipeline->BindVulkanPushConstant("u_PushConstant", &m_BatchQuadRenderPushConstant);
+
+			// Render Batched Text Quads
+			Ref<VulkanBufferDevice> batchTextVertexBuffer = m_Data->TextVertexBuffer[currentFrameIndex].As<VulkanBufferDevice>();
+
+			VkBuffer batchTextVertexBufferInternal = batchTextVertexBuffer->GetVulkanBuffer();
+			vkCmdBindVertexBuffers(cmdBuf, 0, 1, &batchTextVertexBufferInternal, &offset);
+
+			vkCmdDrawIndexed(cmdBuf, m_Data->TextIndexCount, 1, 0, 0, 0);
+
 		}
 
 		{
 			////////////////// Render the batched lines //////////////////////////////
 			Ref<VulkanPipeline> batchLineRendererPipeline = m_Data->BatchLineRendererPipeline.As<VulkanPipeline>();
+			Ref<VulkanBufferDevice> batchVertexBuffer = m_Data->LineVertexBuffer[currentFrameIndex].As<VulkanBufferDevice>();
 
 			batchLineRendererPipeline->Bind();
 			batchLineRendererPipeline->BindVulkanPushConstant("u_PushConstant", &viewProj);
-
-
-			VkViewport viewport{};
-			viewport.width = (float)framebuffer->GetSpecification().Width;
-			viewport.height = (float)framebuffer->GetSpecification().Height;
-			viewport.minDepth = 0.0f;
-			viewport.maxDepth = 1.0f;
-			vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
-
-			VkRect2D scissor{};
-			scissor.extent = { framebuffer->GetSpecification().Width, framebuffer->GetSpecification().Height };
-			scissor.offset = { 0, 0 };
-			vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
-
-			Ref<VulkanBufferDevice> batchVertexBuffer = m_Data->LineVertexBuffer[currentFrameIndex].As<VulkanBufferDevice>();
 
 			uint64_t offset = 0;
 			VkBuffer batchVertexBufferInternal = batchVertexBuffer->GetVulkanBuffer();
 			vkCmdBindVertexBuffers(cmdBuf, 0, 1, &batchVertexBufferInternal, &offset);
 
 			vkCmdDraw(cmdBuf, m_Data->LineVertexCount, 1, 0, 0);
-
 		}
 
 		////////////////// Render Wireframed mesh //////////////////////////////
@@ -544,6 +569,192 @@ namespace Frost
 		{
 			FROST_CORE_ERROR("The maximum number of indices has been reached! The batch renderer cannot render more objects!");
 			return;
+		}
+	}
+
+	// From https://stackoverflow.com/questions/31302506/stdu32string-conversion-to-from-stdstring-and-stdu16string
+	static std::u32string To_UTF32(const std::string& s)
+	{
+		std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+		return conv.from_bytes(s);
+	}
+
+	static bool NextLine(int index, const std::vector<int>& lines)
+	{
+		for (int line : lines)
+		{
+			if (line == index)
+				return true;
+		}
+		return false;
+	}
+
+	void VulkanBatchRenderingPass::SubmitText(const RenderQueue::TextObject2D& textObject2D)
+	{
+		if (textObject2D.String.empty())
+			return;
+
+		std::u32string utf32string = To_UTF32(textObject2D.String);
+
+		Ref<Texture2D> fontAtlas = textObject2D.Font->GetFontAtlas();
+		FROST_ASSERT_INTERNAL(fontAtlas);
+
+		uint32_t atlasTextureSlot;
+		Ref<VulkanImage2D> texture = fontAtlas->GetImage2D().As<VulkanImage2D>();
+		if (m_BindlessAllocatedTextures.find(texture->GetVulkanImage()) == m_BindlessAllocatedTextures.end())
+		{
+			atlasTextureSlot = VulkanBindlessAllocator::AddTexture(fontAtlas);
+			m_BindlessAllocatedTextures[texture->GetVulkanImage()] = atlasTextureSlot;
+		}
+		else
+		{
+			atlasTextureSlot = m_BindlessAllocatedTextures[texture->GetVulkanImage()];
+		}
+
+
+		auto& fontGeometry = textObject2D.Font->GetMSDFData()->FontGeometry;
+		const auto& metrics = fontGeometry.getMetrics();
+
+		
+		// Computing the new lines in the text
+		Vector<int> nextLines;
+		{
+			double xOffset = 0.0;
+			double fsScale = 1 / (metrics.ascenderY - metrics.descenderY);
+			double yOffset = -fsScale * metrics.ascenderY;
+			int lastSpace = -1;
+
+			for (int i = 0; i < utf32string.size(); i++)
+			{
+				char32_t character = utf32string[i];
+				if (character == '\n')
+				{
+					xOffset = 0;
+					yOffset -= fsScale * metrics.lineHeight + textObject2D.LineHeightOffset;
+					continue;
+				}
+
+				auto glyph = fontGeometry.getGlyph(character);
+				if (!glyph)
+				{
+					glyph = fontGeometry.getGlyph('?');
+					if (!glyph)
+					{
+						continue;
+					}
+				}
+
+				if (character != ' ')
+				{
+					// Calculate geometry for the glyph
+					double pl, pb, pr, pt;
+					glyph->getQuadPlaneBounds(pl, pb, pr, pt);
+					glm::vec2 quadMin((float)pl, (float)pb);
+					glm::vec2 quadMax((float)pr, (float)pt);
+
+					quadMin *= fsScale;
+					quadMax *= fsScale;
+					
+					quadMin += glm::vec2(xOffset, yOffset);
+					quadMax += glm::vec2(xOffset, yOffset);
+
+					if (quadMax.x > textObject2D.MaxWidth && lastSpace != -1)
+					{
+						i = lastSpace;
+						nextLines.emplace_back(lastSpace);
+						lastSpace = -1;
+						
+						xOffset = 0;
+						yOffset -= fsScale * metrics.lineHeight + textObject2D.LineHeightOffset;
+					}
+				}
+				else
+				{
+					lastSpace = i;
+				}
+
+				double advance = glyph->getAdvance();
+				fontGeometry.getAdvance(advance, character, utf32string[i + 1]);
+				xOffset += fsScale * advance + textObject2D.KerningOffset;
+			}
+		}
+
+		{
+			double xOffset = 0.0;
+			double fsScale = 1 / (metrics.ascenderY - metrics.descenderY);
+			double yOffset = 0.0;
+			for (int i = 0; i < utf32string.size(); i++)
+			{
+				char32_t character = utf32string[i];
+				if (character == '\n' || NextLine(i, nextLines))
+				{
+					xOffset = 0;
+					yOffset -= fsScale * metrics.lineHeight + textObject2D.LineHeightOffset;
+					continue;
+				}
+
+				auto glyph = fontGeometry.getGlyph(character);
+				if (!glyph)
+				{
+					glyph = fontGeometry.getGlyph('?');
+					if (!glyph)
+					{
+						continue;
+					}
+				}
+
+				// Atlas Quad Bounds
+				double al, ab, ar, at;
+				glyph->getQuadAtlasBounds(al, ab, ar, at);
+
+				double pl, pb, pr, pt;
+				glyph->getQuadPlaneBounds(pl, pb, pr, pt);
+
+				pl = (pl * fsScale) + xOffset;
+				pb = (pb * fsScale) + yOffset;
+				pr = (pr * fsScale) + xOffset;
+				pt = (pt * fsScale) + yOffset;
+
+				double texelWidth = 1.0 / fontAtlas->GetWidth();
+				double texelHeight = 1.0 / fontAtlas->GetHeight();
+
+				al *= texelWidth;
+				ab *= texelHeight;
+				ar *= texelWidth;
+				at *= texelHeight;
+
+				m_Data->TextVertexBufferPtr->Position = textObject2D.Transform * glm::vec4(pl, pb, 0.0f, 1.0f);
+				m_Data->TextVertexBufferPtr->Color = textObject2D.Color;
+				m_Data->TextVertexBufferPtr->TexCoord = { al, ab };
+				m_Data->TextVertexBufferPtr->TexIndex = atlasTextureSlot;
+				m_Data->TextVertexBufferPtr++;
+				
+				m_Data->TextVertexBufferPtr->Position = textObject2D.Transform * glm::vec4(pl, pt, 0.0f, 1.0f);
+				m_Data->TextVertexBufferPtr->Color = textObject2D.Color;
+				m_Data->TextVertexBufferPtr->TexCoord = { al, at };
+				m_Data->TextVertexBufferPtr->TexIndex = atlasTextureSlot;
+				m_Data->TextVertexBufferPtr++;
+				
+				m_Data->TextVertexBufferPtr->Position = textObject2D.Transform * glm::vec4(pr, pt, 0.0f, 1.0f);
+				m_Data->TextVertexBufferPtr->Color = textObject2D.Color;
+				m_Data->TextVertexBufferPtr->TexCoord = { ar, at };
+				m_Data->TextVertexBufferPtr->TexIndex = atlasTextureSlot;
+				m_Data->TextVertexBufferPtr++;
+				
+				m_Data->TextVertexBufferPtr->Position = textObject2D.Transform * glm::vec4(pr, pb, 0.0f, 1.0f);
+				m_Data->TextVertexBufferPtr->Color = textObject2D.Color;
+				m_Data->TextVertexBufferPtr->TexCoord = { ar, ab };
+				m_Data->TextVertexBufferPtr->TexIndex = atlasTextureSlot;
+				m_Data->TextVertexBufferPtr++;
+
+				m_Data->TextIndexCount += 6;
+				m_Data->TextCount++;
+
+				double advance = glyph->getAdvance();
+				fontGeometry.getAdvance(advance, character, utf32string[i + 1]);
+				xOffset += fsScale * advance + textObject2D.KerningOffset;
+
+			}
 		}
 	}
 

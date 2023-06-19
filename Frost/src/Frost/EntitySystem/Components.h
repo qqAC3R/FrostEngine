@@ -4,6 +4,7 @@
 #include "Frost/Core/UUID.h"
 #include "Frost/Renderer/Mesh.h"
 #include "Frost/Renderer/RuntimeCamera.h"
+#include "Frost/Renderer/UserInterface/Font.h"
 #include "Frost/Script/ScriptModuleField.h"
 #include "Frost/Physics/PhysicsShapes.h"
 #include "Frost/Physics/PhysicsMaterial.h"
@@ -325,6 +326,23 @@ namespace Frost
 		ScriptComponent(const ScriptComponent& other) = default;
 		ScriptComponent(const std::string& moduleName)
 			: ModuleName(moduleName) {}
+	};
+
+	struct TextComponent
+	{
+		std::string TextString = "Text";
+
+		// Font
+		Ref<Font> FontAsset;
+		glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		float LineSpacing = 0.0f;
+		float Kerning = 0.0f;
+
+		// Layout
+		float MaxWidth = 10.0f;
+
+		TextComponent() = default;
+		TextComponent(const TextComponent& other) = default;
 	};
 
 }

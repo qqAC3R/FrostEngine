@@ -6,6 +6,7 @@
 #include "Frost/Renderer/Material.h"
 #include "Frost/Renderer/EditorCamera.h"
 
+#include "Frost/Renderer/UserInterface/Font.h"
 #include "Frost/EntitySystem/Components.h"
 
 #include <glm/glm.hpp>
@@ -46,6 +47,7 @@ namespace Frost
 		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color) = 0;
 		virtual void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture) = 0;
 		virtual void SubmitLines(const glm::vec3& positon0, const glm::vec3& positon1, const glm::vec4& color) = 0;
+		virtual void SubmitText(const std::string& string, const Ref<Font>& font, const glm::mat4& transform, float maxWidth, float lineHeightOffset, float kerningOffset, const glm::vec4& color) = 0;
 		virtual void SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth) = 0;
 
 		virtual uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y) = 0;
@@ -76,6 +78,7 @@ namespace Frost
 		void AddBillBoard(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color);
 		void AddBillBoard(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture);
 		void AddLines(const glm::vec3& positon0, const glm::vec3& positon1, const glm::vec4& color);
+		void AddTextRender(const std::string& string, const Ref<Font>& font, const glm::mat4& transform, float maxWidth, float lineHeightOffset, float kerningOffset, const glm::vec4& color);
 		void AddPointLight(const PointLightComponent& pointLight, const glm::vec3& position);
 		void AddRectangularLight(const RectangularLightComponent& rectangularLight, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale);
 		void SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction);
@@ -141,6 +144,19 @@ namespace Frost
 			Ref<Texture2D> Texture;
 		};
 		Vector<Object2D> m_BatchRendererData;
+		
+		struct TextObject2D
+		{
+			std::string String;
+			const Ref<Font>& Font;
+			glm::mat4 Transform;
+			glm::vec4 Color;
+			float MaxWidth;
+			float LineHeightOffset;
+			float KerningOffset;
+		};
+		Vector<TextObject2D> m_TextRendererData;
+
 
 		struct RenderWireframeData
 		{

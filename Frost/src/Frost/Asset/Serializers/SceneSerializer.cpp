@@ -296,6 +296,18 @@ namespace Frost
 			entityOut["CameraComponent"]["Primary"] = cameraComponent.Primary;
 		}
 
+		if (entity.HasComponent<TextComponent>())
+		{
+			TextComponent& textComponent = entity.GetComponent<TextComponent>();
+
+			entityOut["TextComponent"]["TextString"] = textComponent.TextString;
+			entityOut["TextComponent"]["FontAssetHandle"] = textComponent.FontAsset->Handle.Get();
+			entityOut["TextComponent"]["Color"] = { textComponent.Color.r, textComponent.Color.g, textComponent.Color.b, textComponent.Color.a };
+			entityOut["TextComponent"]["LineSpacing"] = textComponent.LineSpacing;
+			entityOut["TextComponent"]["Kerning"] = textComponent.Kerning;
+			entityOut["TextComponent"]["MaxWidth"] = textComponent.MaxWidth;
+		}
+
 		if (entity.HasComponent<ScriptComponent>())
 		{
 			ScriptComponent& scriptComponent = entity.GetComponent<ScriptComponent>();
@@ -749,6 +761,28 @@ namespace Frost
 				cameraComponent.Camera->RecalculateProjectionMatrix();
 
 				cameraComponent.Primary = entity["CameraComponent"]["Primary"];
+			}
+
+			if (!entity["TextComponent"].is_null())
+			{
+				TextComponent& textComponent = ent.AddComponent<TextComponent>();
+				nlohmann::json textComponentIn = entity["TextComponent"];
+
+				textComponent.TextString = textComponentIn["TextString"];
+				textComponent.Color = { textComponentIn["Color"][0], textComponentIn["Color"][1], textComponentIn["Color"][2], textComponentIn["Color"][3] };
+				textComponent.LineSpacing = textComponentIn["LineSpacing"];
+				textComponent.Kerning = textComponentIn["Kerning"];
+				textComponent.MaxWidth = textComponentIn["MaxWidth"];
+
+				if (textComponentIn["FontAssetHandle"] == 0)
+				{
+					textComponent.FontAsset = Renderer::GetDefaultFont();
+				}
+				else
+				{
+					const AssetMetadata& metadata = AssetManager::GetMetadata(AssetHandle(textComponentIn["FontAssetHandle"]));
+					textComponent.FontAsset = AssetManager::GetOrLoadAsset<Font>(metadata.FilePath.string());
+				}
 			}
 
 			if (!entity["ScriptComponent"].is_null())

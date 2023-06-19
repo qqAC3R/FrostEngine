@@ -68,17 +68,6 @@ namespace Frost
             if (Input.IsMouseButtonPressed(MouseButton.Left))
             {
                 Entity newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
-                newEntity = Instantiate(m_SphereBullet);
             }
 
             if (Input.IsKeyPressed(KeyCode.A))

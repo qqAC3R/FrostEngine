@@ -68,6 +68,7 @@ namespace Frost
 	private:
 		void UpdateSkyLight(Timestep ts);
 		void UpdateMeshComponents(Timestep ts);
+		void UpdateTextComponents(Timestep ts);
 		void UpdateAnimationControllers(Timestep ts);
 		void UpdatePointLightComponent(Timestep ts);
 		void UpdateRectangularLightComponent(Timestep ts);

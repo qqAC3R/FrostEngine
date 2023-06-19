@@ -18,12 +18,12 @@ namespace Frost
 		return nullptr;
 	}
 
-	Ref<Texture2D> Texture2D::Create(uint32_t width, uint32_t height, TextureSpecification textureSpec)
+	Ref<Texture2D> Texture2D::Create(uint32_t width, uint32_t height, TextureSpecification textureSpec, const void* data)
 	{
 		switch (Renderer::GetAPI())
 		{
 			case RendererAPI::API::None:   FROST_ASSERT(false, "Renderer::API::None is not supported!");
-			case RendererAPI::API::Vulkan: return CreateRef<VulkanTexture2D>(width, height, textureSpec);
+			case RendererAPI::API::Vulkan: return CreateRef<VulkanTexture2D>(width, height, textureSpec, data);
 		}
 
 		FROST_ASSERT_MSG("Unknown RendererAPI!");

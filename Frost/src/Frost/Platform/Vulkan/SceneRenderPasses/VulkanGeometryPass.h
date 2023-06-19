@@ -37,15 +37,15 @@ namespace Frost
 	{
 		NewIndirectMeshData() = default;
 
-		uint32_t CmdOffset;          /// DONE
+		uint64_t CmdOffset;          /// DONE
 
-		uint32_t TotalMeshOffset;    /// DONE // Same as `TotalSubmeshCount` however with the added Offset from the previous mesh
-		uint32_t SubmeshCount;       /// DONE   // Reponsible for Submesh Count (without instances) and for the Indirect Command Numbers
-		uint32_t InstanceCount;      /// DONE
-		uint32_t TotalSubmeshCount;  /// DONE // SubmeshCount * InstanceCount
+		uint64_t TotalMeshOffset;    /// DONE // Same as `TotalSubmeshCount` however with the added Offset from the previous mesh
+		uint64_t SubmeshCount;       /// DONE   // Reponsible for Submesh Count (without instances) and for the Indirect Command Numbers
+		uint64_t InstanceCount;      /// DONE
+		uint64_t TotalSubmeshCount;  /// DONE // SubmeshCount * InstanceCount
 
-		uint32_t MaterialCount;	     /// DONE
-		uint32_t MaterialOffset;     /// DONE
+		uint64_t MaterialCount;	     /// DONE
+		uint64_t MaterialOffset;     /// DONE
 
 		AssetHandle MeshAssetHandle; /// DONE
 	};

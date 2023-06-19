@@ -12,6 +12,10 @@
 
 namespace Frost
 {
+	static bool IsItemDisabled()
+	{
+		return ImGui::GetItemFlags() & ImGuiItemFlags_Disabled;
+	}
 
 	void UserInterface::DrawVec3ColorEdit(const std::string& name, glm::vec3& values)
 	{
@@ -220,6 +224,35 @@ namespace Frost
 		//ImGui::NextColumn();
 
 		return receivedValidEntity;
+	}
+
+	static char* s_MultilineBuffer = nullptr;
+
+	bool UserInterface::PropertyMultiline(const char* label, std::string& value)
+	{
+		bool modified = false;
+
+		ImGui::TableNextColumn();
+		ImGui::Text(label);
+
+		if (!s_MultilineBuffer)
+		{
+			s_MultilineBuffer = new char[1024 * 1024]; // 1KB
+			memset(s_MultilineBuffer, 0, 1024 * 1024);
+		}
+
+		strcpy(s_MultilineBuffer, value.c_str());
+
+		ImGui::TableNextColumn();
+		ImGui::PushItemWidth(-1);
+		if (ImGui::InputTextMultiline("", s_MultilineBuffer, 1024 * 1024))
+		{
+			value = s_MultilineBuffer;
+			modified = true;
+		}
+		ImGui::PopItemWidth();
+
+		return modified;
 	}
 
 	void UserInterface::Text(const std::string& text)

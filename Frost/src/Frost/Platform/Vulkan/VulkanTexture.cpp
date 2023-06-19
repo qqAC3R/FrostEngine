@@ -48,17 +48,9 @@ namespace Frost
 			m_IsLoaded = true;
 		}
 
-
-		bool isTrue = m_TextureSpecification.Format == ImageFormat::RGBA_BC7;
-
 		m_Width = width;
 		m_Height = height;
 		m_TextureSpecification.Format = imageFormat;
-
-		//if (m_TextureSpecification.Format != ImageFormat::RGBA_BC7)
-		//	m_TextureSpecification.Format = imageFormat;
-		//else
-		//	imageFormat = m_TextureSpecification.Format;
 
 		if (textureSpec.UseMips)
 			m_MipMapLevels = Utils::CalculateMipMapLevels(width, height);
@@ -150,7 +142,7 @@ namespace Frost
 #endif
 	}
 
-	VulkanTexture2D::VulkanTexture2D(uint32_t width, uint32_t height, const TextureSpecification& textureSpec)
+	VulkanTexture2D::VulkanTexture2D(uint32_t width, uint32_t height, const TextureSpecification& textureSpec, const void* data)
 	{
 		m_Width = width;
 		m_Height = height;
@@ -165,13 +157,21 @@ namespace Frost
 		imageSpec.Sampler.SamplerWrap = textureSpec.Sampler.SamplerWrap;
 		imageSpec.Usage = textureSpec.Usage;
 		imageSpec.Format = textureSpec.Format;
-		m_Image = Image2D::Create(imageSpec);
+		
+		if (data)
+		{
+			m_Image = Image2D::Create(imageSpec, data);
+			m_IsLoaded = true;
+		}
+		else
+		{
+			m_Image = Image2D::Create(imageSpec);
+			m_IsLoaded = false;
+		}
 
 		Ref<VulkanImage2D> vulkanImage = m_Image.As<VulkanImage2D>();
 		m_DescriptorInfo[DescriptorImageType::Sampled] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
 		m_DescriptorInfo[DescriptorImageType::Storage] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
-
-		m_IsLoaded = false;
 
 		m_TextureData.Allocate(width * height * sizeof(glm::vec4) / 4.0f);
 	}

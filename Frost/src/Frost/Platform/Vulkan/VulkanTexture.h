@@ -13,7 +13,7 @@ namespace Frost
 	{
 	public:
 		VulkanTexture2D(const std::string& filepath, const TextureSpecification& textureSpec);
-		VulkanTexture2D(uint32_t width, uint32_t height, const TextureSpecification& textureSpec);
+		VulkanTexture2D(uint32_t width, uint32_t height, const TextureSpecification& textureSpec, const void* data = nullptr);
 		virtual ~VulkanTexture2D();
 
 		virtual void Destroy() override;

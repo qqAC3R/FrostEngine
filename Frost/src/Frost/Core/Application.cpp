@@ -18,7 +18,7 @@
 namespace Frost
 {
 	Application* Application::s_Instance = nullptr;
-	std::string Application::m_ApplicationVersion = "0.6.0a";
+	std::string Application::m_ApplicationVersion = "0.7.0a";
 
 	Application::Application()
 	{
@@ -34,13 +34,13 @@ namespace Frost
 		m_ImGuiLayer = ImGuiLayer::Create();
 		PushOverlay(m_ImGuiLayer);
 
-		Renderer::Init();
-		PhysicsEngine::Initialize();
-		ScriptEngine::Init("Resources/Scripts/FrostScriptCore.dll");
-
 		Ref<Project> project = Project::Deserialize("D:\\Visual Studio\\FrostEngine\\master\\FrostEditor\\SandboxProject\\Sandbox.fproj"); // Hardcoded currently
 		Project::SetActive(project);
 		Application::Get().GetWindow().SetWindowProjectName(Project::GetProjectName());
+
+		Renderer::Init();
+		PhysicsEngine::Initialize();
+		ScriptEngine::Init("Resources/Scripts/FrostScriptCore.dll");
 	}
 
 	Application::~Application()

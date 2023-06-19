@@ -61,6 +61,12 @@ namespace Frost
 					m_SelectedEntity = m_SceneContext->CreateEntity("Camera");
 					m_SelectedEntity.AddComponent<CameraComponent>();
 				}
+				if (ImGui::MenuItem("Text"))
+				{
+					m_SelectedEntity = m_SceneContext->CreateEntity("Text");
+					TextComponent& textComponent = m_SelectedEntity.AddComponent<TextComponent>();
+					textComponent.FontAsset = Renderer::GetDefaultFont();
+				}
 				ImGui::Separator();
 				if (ImGui::MenuItem("Sky Light"))
 				{

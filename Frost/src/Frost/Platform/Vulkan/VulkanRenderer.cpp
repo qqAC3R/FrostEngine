@@ -392,6 +392,15 @@ namespace Frost
 		});
 	}
 
+	void VulkanRenderer::SubmitText(const std::string& string, const Ref<Font>& font, const glm::mat4& transform, float maxWidth, float lineHeightOffset, float kerningOffset, const glm::vec4& color)
+	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		Renderer::Submit([&, currentFrameIndex, string, font, transform, maxWidth, lineHeightOffset, kerningOffset, color]()
+		{
+			s_RenderQueue[currentFrameIndex].AddTextRender(string, font, transform, maxWidth, lineHeightOffset, kerningOffset, color);
+		});
+	}
+
 	void VulkanRenderer::SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();

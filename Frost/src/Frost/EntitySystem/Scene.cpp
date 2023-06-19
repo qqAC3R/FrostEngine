@@ -125,6 +125,7 @@ namespace Frost
 		UpdateBoxFogVolumes(ts);
 		UpdateCloudVolumes(ts);
 
+		UpdateTextComponents(ts);
 		UpdateSceneCameras(ts);
 
 
@@ -149,6 +150,7 @@ namespace Frost
 		UpdateBoxFogVolumes(ts);
 		UpdateCloudVolumes(ts);
 
+		UpdateTextComponents(ts);
 		//UpdatePhysicsDebugMeshes(ts);
 	}
 
@@ -424,6 +426,30 @@ namespace Frost
 			{
 				glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
 				Renderer::Submit(mesh.Mesh, transform, (uint32_t)entity);
+			}
+		}
+	}
+
+	void Scene::UpdateTextComponents(Timestep ts)
+	{
+		// Meshes
+		auto group = m_Registry.group<TextComponent>(entt::get<TransformComponent>);
+		for (auto& entity : group)
+		{
+			auto [textComponent, transformComponent] = group.get<TextComponent, TransformComponent>(entity);
+			if (!textComponent.TextString.empty())
+			{
+				glm::mat4 transform = GetTransformMatFromEntityAndParent(Entity(entity, this));
+
+				Renderer::SubmitText(
+					textComponent.TextString,
+					textComponent.FontAsset,
+					transform,
+					textComponent.MaxWidth,
+					textComponent.LineSpacing,
+					textComponent.Kerning,
+					textComponent.Color
+				);
 			}
 		}
 	}

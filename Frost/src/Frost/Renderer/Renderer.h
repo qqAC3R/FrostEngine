@@ -101,6 +101,7 @@ namespace Frost
 		static void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, const glm::vec4& color);
 		static void SubmitBillboards(const glm::vec3& positon, const glm::vec2& size, Ref<Texture2D> texture);
 		static void SubmitLines(const glm::vec3& positon0, const glm::vec3& positon1, const glm::vec4& color);
+		static void SubmitText(const std::string& string, const Ref<Font>& font, const glm::mat4& transform, float maxWidth, float lineHeightOffset = 0.0f, float kerningOffset = 0.0f, const glm::vec4& color = glm::vec4(1.0f));
 		static void SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.0f), float lineWidth = 1.0f);
 
 		static uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y);
@@ -157,6 +158,8 @@ namespace Frost
 		static Ref<Image2D> GetFinalImage(uint32_t id) { return s_RendererAPI->GetFinalImage(id); } // TODO: Remove
 		static Ref<Image2D> GetFinalImage(const std::string& name);
 		static const HashMap<std::string, std::function<Ref<Image2D>()>>& GetOutputImageMap();
+
+		static Ref<Font> GetDefaultFont();
 
 		static void ExecuteCommandBuffer();
 		static void ExecuteDeletionCommands();

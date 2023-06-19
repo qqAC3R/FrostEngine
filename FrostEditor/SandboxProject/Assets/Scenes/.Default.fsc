@@ -13,9 +13,9 @@
                 5.960464477539063e-08
             ],
             "Rotation": [
-                -124.37213134765625,
+                -126.87000274658203,
                 0.0,
-                0.0
+                -52.29999923706055
             ],
             "Scale": [
                 1.0,
@@ -102,7 +102,7 @@
             "Translation": [
                 6.149590015411377,
                 1.055105447769165,
-                1.7689929008483887
+                3.5113894939422607
             ],
             "Rotation": [
                 0.0,
@@ -110,9 +110,9 @@
                 0.0
             ],
             "Scale": [
-                44.22367858886719,
+                34.66653060913086,
                 2.049999952316284,
-                28.522127151489258
+                38.908199310302734
             ]
         },
         "MeshComponent": {
@@ -163,9 +163,9 @@
         },
         "TransformComponent": {
             "Translation": [
-                10.397780418395996,
-                4.7870917320251465,
-                1.33478581905365
+                3.004664897918701,
+                4.6645331382751465,
+                13.674077033996582
             ],
             "Rotation": [
                 -14.630988121032715,
@@ -279,6 +279,11 @@
                     "FieldName": "m_MeshChild",
                     "Type": "Entity",
                     "Value": 10420978217721102904
+                },
+                {
+                    "FieldName": "m_SphereBullet",
+                    "Type": "Prefab",
+                    "Value": 0
                 }
             ]
         }
@@ -292,9 +297,9 @@
         },
         "TransformComponent": {
             "Translation": [
-                19.965213775634766,
-                4.165013313293457,
-                -1.066266655921936
+                -0.22913110256195068,
+                4.165012836456299,
+                12.562137603759766
             ],
             "Rotation": [
                 0.0,
@@ -327,12 +332,12 @@
         },
         "TransformComponent": {
             "Translation": [
+                -1.7881393432617188e-07,
                 0.0,
-                0.009904146194458008,
-                0.0
+                -1.236236572265625
             ],
             "Rotation": [
-                0.09565474092960358,
+                0.0,
                 0.0,
                 0.0
             ],
@@ -344,18 +349,18 @@
         },
         "RectangularLightComponent": {
             "Radiance": [
-                0.8039215803146362,
                 0.0,
-                1.0
+                1.0,
+                0.9014084339141846
             ],
-            "Intensity": 6.929999828338623,
-            "Radius": 10.569999694824219,
+            "Intensity": 2.1449999809265137,
+            "Radius": 19.700000762939453,
             "TwoSided": false
         }
     },
     {
         "UUID": 17871614152960146670,
-        "TagComponent": "Area Light",
+        "TagComponent": "BlueWall",
         "ParentChildComponent": {
             "ParentID": 0,
             "ChildIDs": [
@@ -364,9 +369,9 @@
         },
         "TransformComponent": {
             "Translation": [
-                0.2828233242034912,
-                2.305941104888916,
-                6.501838207244873
+                19.007652282714844,
+                2.91654109954834,
+                11.994243621826172
             ],
             "Rotation": [
                 0.0,
@@ -374,8 +379,8 @@
                 0.0
             ],
             "Scale": [
-                4.654111385345459,
-                7.033790111541748,
+                12.732568740844727,
+                10.618841171264648,
                 0.04035197198390961
             ]
         },
@@ -387,6 +392,183 @@
                 }
             ],
             "Filepath": "Meshes/Cube.fbx"
+        }
+    },
+    {
+        "UUID": 4216194312864966591,
+        "TagComponent": "Wall",
+        "ParentChildComponent": {
+            "ParentID": 0,
+            "ChildIDs": null
+        },
+        "TransformComponent": {
+            "Translation": [
+                22.87834930419922,
+                4.750284194946289,
+                4.5218353271484375
+            ],
+            "Rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "Scale": [
+                1.0,
+                14.432448387145996,
+                41.45423889160156
+            ]
+        },
+        "MeshComponent": {
+            "Materials": [
+                {
+                    "AssetID": 0,
+                    "MaterialIndex": 0
+                }
+            ],
+            "Filepath": "Meshes/Cube.fbx"
+        }
+    },
+    {
+        "UUID": 7544032118903134211,
+        "TagComponent": "RedWall",
+        "ParentChildComponent": {
+            "ParentID": 0,
+            "ChildIDs": [
+                7894542063716724504
+            ]
+        },
+        "TransformComponent": {
+            "Translation": [
+                17.852659225463867,
+                3.076831102371216,
+                -3.6333601474761963
+            ],
+            "Rotation": [
+                180.0,
+                0.0,
+                180.0
+            ],
+            "Scale": [
+                9.169724464416504,
+                9.772391319274902,
+                0.07688404619693756
+            ]
+        },
+        "MeshComponent": {
+            "Materials": [
+                {
+                    "AssetID": 11122918961487004630,
+                    "MaterialIndex": 0
+                }
+            ],
+            "Filepath": "Meshes/Cube.fbx"
+        }
+    },
+    {
+        "UUID": 872012815359988086,
+        "TagComponent": "Sphere",
+        "ParentChildComponent": {
+            "ParentID": 0,
+            "ChildIDs": null
+        },
+        "TransformComponent": {
+            "Translation": [
+                16.876657485961914,
+                3.288219451904297,
+                4.023622512817383
+            ],
+            "Rotation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "Scale": [
+                1.7300000190734863,
+                1.7300000190734863,
+                1.7300000190734863
+            ]
+        },
+        "MeshComponent": {
+            "Materials": [
+                {
+                    "AssetID": 406617002415104350,
+                    "MaterialIndex": 0
+                }
+            ],
+            "Filepath": "Meshes/Sphere.fbx"
+        }
+    },
+    {
+        "UUID": 7894542063716724504,
+        "TagComponent": "Rectangular Light",
+        "ParentChildComponent": {
+            "ParentID": 7544032118903134211,
+            "ChildIDs": null
+        },
+        "TransformComponent": {
+            "Translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "Rotation": [
+                3.141592502593994,
+                -0.06270743906497955,
+                3.141592502593994
+            ],
+            "Scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        "RectangularLightComponent": {
+            "Radiance": [
+                1.0,
+                0.0,
+                6.008148193359375e-05
+            ],
+            "Intensity": 2.1549999713897705,
+            "Radius": 19.700000762939453,
+            "TwoSided": false
+        }
+    },
+    {
+        "UUID": 4820835705600126791,
+        "TagComponent": "Text",
+        "ParentChildComponent": {
+            "ParentID": 0,
+            "ChildIDs": null
+        },
+        "TransformComponent": {
+            "Translation": [
+                22.34783172607422,
+                9.623405456542969,
+                -3.1330337524414063
+            ],
+            "Rotation": [
+                0.0,
+                -90.0,
+                0.0
+            ],
+            "Scale": [
+                2.1959388256073,
+                2.196140766143799,
+                2.1959388256073
+            ]
+        },
+        "TextComponent": {
+            "TextString": "Welcome to Frost Engine",
+            "FontAssetHandle": 17149604308433143013,
+            "Color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "LineSpacing": 0.0,
+            "Kerning": 0.0,
+            "MaxWidth": 10.0
         }
     }
 ]

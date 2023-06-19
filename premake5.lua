@@ -35,6 +35,8 @@ IncludeDir["json"] = "Frost/vendor/json/include"
 IncludeDir["shaderc"] = "Frost/vendor/shaderc/Include"
 IncludeDir["entt"] = "Frost/vendor/entt/include"
 IncludeDir["Mono"] = "Frost/vendor/mono/include"
+IncludeDir["msdfgen"] = "Frost/vendor/msdf/msdfgen"
+IncludeDir["msdf_atlas_gen"] = "Frost/vendor/msdf/msdf-atlas-gen"
 
 LibraryDir = {}
 
@@ -64,6 +66,7 @@ group "Dependencies"
 	include "Frost/vendor/SPIRV-Cross"
 	include "Frost/vendor/ozz-animation"
 	include "Frost/vendor/ImGui"
+	include "Frost/vendor/msdf"
 group ""
 
 group "Core"
@@ -121,6 +124,8 @@ project "Frost"
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.SPIRV_Cross}",
 		"%{IncludeDir.OZZ_Animation}",
+		"%{IncludeDir.msdfgen}",
+		"%{IncludeDir.msdf_atlas_gen}",
 		"%{IncludeDir.json}",
 		"%{IncludeDir.json}/json",
 		"%{IncludeDir.PhysX}",
@@ -139,6 +144,7 @@ project "Frost"
 		"ImGui",
 		"SPIR-V_Cross",
 		"OZZ-Animation",
+		"msdf-atlas-gen",
 
 		"%{Library.Vulkan}", -- vulkan-1.lib
 		"shaderc_shared.lib",

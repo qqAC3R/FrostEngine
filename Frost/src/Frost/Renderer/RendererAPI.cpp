@@ -8,6 +8,7 @@ namespace Frost
 	RenderQueue::RenderQueue()
 	{
 		m_Data.reserve(2048);
+		m_TextRendererData.reserve(1024);
 		m_LightData.PointLights.reserve(1024);
 		m_FogVolumeData.reserve(1024);
 		m_CloudVolumeData.reserve(1024);
@@ -151,6 +152,19 @@ namespace Frost
 		});
 	}
 
+	void RenderQueue::AddTextRender(const std::string& string, const Ref<Font>& font, const glm::mat4& transform, float maxWidth, float lineHeightOffset, float kerningOffset, const glm::vec4& color)
+	{
+		m_TextRendererData.push_back({
+			string,
+			font,
+			transform,
+			color,
+			maxWidth,
+			lineHeightOffset,
+			kerningOffset,
+		});
+	}
+
 	void RenderQueue::SetDirectionalLight(const DirectionalLightComponent& directionalLight, const glm::vec3& direction)
 	{
 		m_LightData.DirLight.Specification = directionalLight;
@@ -161,6 +175,7 @@ namespace Frost
 	{
 		m_SubmeshCount = 0;
 		m_Data.clear();
+		m_TextRendererData.clear();
 		m_MeshInstanceCount.clear();
 		m_LightData.PointLights.clear();
 		m_LightData.RectangularLights.clear();

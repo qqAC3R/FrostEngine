@@ -4,6 +4,7 @@
 #include "Frost/Asset/AssetManager.h"
 #include "Frost/Renderer/MaterialAsset.h"
 #include "Frost/Renderer/Renderer.h"
+#include "Frost/Renderer/UserInterface/Font.h"
 #include "Frost/EntitySystem/Prefab.h"
 
 #include "UserInterface/UIWidgets.h"
@@ -2131,6 +2132,101 @@ namespace Frost
 					ImGui::PushItemWidth(-1);
 					if (ImGui::DragFloat("", &component.Camera->GetFarClip(), 2.0f, 1.0f, 10000.0f))
 						component.Camera->RecalculateProjectionMatrix();
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+			ImGui::PopStyleVar();
+		});
+
+		DrawComponent<TextComponent>("TEXT", entity, [&](auto& component)
+		{
+			constexpr ImGuiTableFlags flags{};
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+			if (ImGui::BeginTable("TextProperties", 2, flags))
+			{
+				{
+					ImGui::PushID(1);
+					UserInterface::PropertyMultiline("Text String", component.TextString);
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(2);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Font");
+
+					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
+					ImGui::Button(component.FontAsset->GetFontName().c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+					
+					if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && ImGui::IsItemHovered())
+					{
+						std::string filepath = FileDialogs::OpenFile("");
+						if (!filepath.empty())
+						{
+							Ref<Font> newFontAsset = AssetManager::GetOrLoadAsset<Font>(filepath);
+							if (newFontAsset)
+							{
+								component.FontAsset = newFontAsset;
+							}
+						}
+					}
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(3);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Color");
+
+					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
+					ImGui::ColorEdit4("", &component.Color.x);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(4);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Line Spacing");
+
+					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
+					ImGui::DragFloat("", &component.LineSpacing, 0.01f, -100.0f, 100.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(5);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Kerning");
+
+					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
+					ImGui::DragFloat("", &component.Kerning, 0.01f, -100.0f, 100.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(6);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("Max Width");
+
+					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
+					ImGui::DragFloat("", &component.MaxWidth, 0.01f, 1.0f, 10000.0f);
 
 					ImGui::PopID();
 				}

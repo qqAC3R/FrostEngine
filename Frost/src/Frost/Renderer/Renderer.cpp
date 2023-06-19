@@ -22,6 +22,8 @@ namespace Frost
 
 		HashMap<std::string, Ref<Texture2D>> EditorIcons;
 		DefaultMeshStorage DefaultMeshes;
+
+		Ref<Font> DefaultFont;
 	};
 
 	RendererAPI* Renderer::s_RendererAPI = nullptr;
@@ -131,6 +133,7 @@ namespace Frost
 
 		InitEditorIcons();
 		MeshAsset::InitDefaultMeshes();
+		s_Data->DefaultFont = Ref<Font>::Create("Resources/Fonts/san-francisco/SF-Regular.otf");
 
 		// Environment cubemaps
 		s_Data->m_Environment = SceneEnvironment::Create();
@@ -202,6 +205,11 @@ namespace Frost
 		s_RendererAPI->SubmitLines(positon0, positon1, color);
 	}
 
+	void Renderer::SubmitText(const std::string& string, const Ref<Font>& font, const glm::mat4& transform, float maxWidth, float lineHeightOffset, float kerningOffset, const glm::vec4& color)
+	{
+		s_RendererAPI->SubmitText(string, font, transform, maxWidth, lineHeightOffset, kerningOffset, color);
+	}
+
 	void Renderer::SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth)
 	{
 		s_RendererAPI->SubmitWireframeMesh(mesh, transform, color, lineWidth);
@@ -240,6 +248,11 @@ namespace Frost
 	const HashMap<std::string, std::function<Ref<Image2D>()>>& Renderer::GetOutputImageMap()
 	{
 		return s_Data->m_OutputImageMap;
+	}
+
+	Ref<Font> Renderer::GetDefaultFont()
+	{
+		return s_Data->DefaultFont;
 	}
 
 	Ref<ShaderLibrary> Renderer::GetShaderLibrary()

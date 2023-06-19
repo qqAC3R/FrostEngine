@@ -338,7 +338,6 @@ namespace Frost
 		}
 
 		SceneSerializer::DeserializeEntities(filepath, prefab->m_Scene);
-		//prefab->Create();
 		asset = prefab.As<Asset>();
 
 		return true;
@@ -349,6 +348,25 @@ namespace Frost
 		Ref<Prefab> prefab = Ref<Prefab>::Create();
 		prefab->SetFlag(AssetFlag::None);
 		return prefab.As<Asset>();
+	}
+
+	bool FontSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const
+	{
+		std::filesystem::path filepath = AssetManager::GetFileSystemPath(metadata);
+		Ref<Font> font = Ref<Font>::Create(filepath);
+
+		std::string content;
+		std::ifstream instream(filepath.string());
+
+		if (!instream.is_open())
+		{
+			asset = nullptr;
+			return false;
+		}
+
+		asset = font.As<Asset>();
+
+		return true;
 	}
 
 }

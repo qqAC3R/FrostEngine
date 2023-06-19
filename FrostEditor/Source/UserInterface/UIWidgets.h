@@ -27,6 +27,8 @@ namespace Frost
 
 		static bool PropertyPrefabReference(const char* label, const char* prefabName);
 		static bool PropertyEntityReference(const char* label, Entity& entity);
+
+		static bool PropertyMultiline(const char* label, std::string& value);
 	};
 
 }

@@ -46,7 +46,7 @@ namespace Frost
 		virtual AssetType GetAssetType() const override { return AssetType::Texture; }
 
 		static Ref<Texture2D> Create(const std::string& filepath, TextureSpecification textureSpec = {});
-		static Ref<Texture2D> Create(uint32_t width, uint32_t height, TextureSpecification textureSpec = {});
+		static Ref<Texture2D> Create(uint32_t width, uint32_t height, TextureSpecification textureSpec = {}, const void* data = nullptr);
 	};
 
 	class TextureCubeMap : public Image
