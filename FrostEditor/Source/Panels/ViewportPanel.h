@@ -7,12 +7,13 @@
 
 namespace Frost
 {
+	class EditorLayer;
 	enum class SceneState;
 
 	class ViewportPanel : public Panel
 	{
 	public:
-		ViewportPanel() = default;
+		ViewportPanel(EditorLayer* editorLayer);
 		virtual ~ViewportPanel() = default;
 
 		virtual void Init(void* initArgs) override;
@@ -35,6 +36,10 @@ namespace Frost
 		void SetScenePlayFunction(const std::function<void()>& func) { m_ScenePlayFunc = func; }
 		void SetSceneStopFunction(const std::function<void()>& func) { m_SceneStopFunc = func; }
 	private:
+		void UpdateDragDrop();
+	private:
+		EditorLayer* m_Context = nullptr;
+
 		glm::vec2 m_ViewportSize = glm::vec2(0.0f);
 		bool m_Visibility = true;
 		bool m_IsResized = false;

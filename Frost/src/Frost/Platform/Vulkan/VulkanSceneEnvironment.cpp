@@ -87,6 +87,7 @@ namespace Frost
 		// Creating the equirectangular map
 		TextureSpecification textureSpec{};
 		textureSpec.Usage = ImageUsage::ReadOnly;
+		textureSpec.FlipTexture = false;
 
 		Ref<Texture2D> environmentMap = Texture2D::Create(filepath, textureSpec);
 		if (!environmentMap->Loaded())

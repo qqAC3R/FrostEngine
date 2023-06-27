@@ -22,16 +22,17 @@ namespace Frost
 		int width, height, channels;
 		ImageFormat imageFormat;
 
+
+		stbi_set_flip_vertically_on_load(textureSpec.FlipTexture);
+
 		if (stbi_is_hdr(filepath.c_str()))
 		{
-			stbi_set_flip_vertically_on_load(false);
 			m_TextureData.Data = (void*)stbi_loadf(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
 			m_TextureData.Size = width * height * 4 * sizeof(float);
 			imageFormat = ImageFormat::RGBA32F;
 		}
 		else
 		{
-			stbi_set_flip_vertically_on_load(true);
 			m_TextureData.Data = (void*)stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
 			m_TextureData.Size = width * height * 4;
 			imageFormat = ImageFormat::RGBA8;

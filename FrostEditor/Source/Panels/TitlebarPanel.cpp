@@ -92,7 +92,9 @@ namespace Frost
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(15, 16, 20, 255));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(15, 16, 20, 255));
 
+		imguiLayer->SetBoldFont();
 		ImGui::Button(Project::GetProjectName().c_str(), { 150, 40 });
+		imguiLayer->SetRegularFont();
 
 		ImGui::PopStyleVar(3);
 		ImGui::PopStyleColor(3);

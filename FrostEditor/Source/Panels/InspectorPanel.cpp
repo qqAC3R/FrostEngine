@@ -68,7 +68,12 @@ namespace Frost
 
 			//ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.18f, 0.20f, 0.23f, 1.0f));
 
-			bool open = ImGui::TreeNodeEx((void*)typeid(T).hash_code(), treeNodeFlags, name.c_str());
+			bool open = false;
+			{
+
+				UserInterface::ScopedFontStyle fontStyle(UserInterface::ScopedFontStyle::FontType::Bold);
+				open = ImGui::TreeNodeEx((void*)typeid(T).hash_code(), treeNodeFlags, name.c_str());
+			}
 			ImGui::PopStyleVar();
 			//ImGui::PopStyleColor();
 			// End Tree Node
@@ -451,6 +456,25 @@ namespace Frost
 								{
 									ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
 								}
+
+								// After setting up the button for the material, the DragDrop feature needs to be set
+								if (ImGui::BeginDragDropTarget())
+								{
+									auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+									if (data)
+									{
+										SelectionData selectionData = *(SelectionData*)data->Data;
+
+										if (selectionData.AssetType == AssetType::Material)
+										{
+											Ref<MaterialAsset> materialAsset = AssetManager::GetOrLoadAsset<MaterialAsset>(selectionData.FilePath.string());
+											Ref<Mesh> mesh = component.Mesh;
+
+											mesh->SetMaterialByAsset(materialIndex, materialAsset);
+										}
+									}
+								}
+
 
 
 								// Opening a new Material
@@ -1173,6 +1197,22 @@ namespace Frost
 						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
 					}
 
+					// After setting up the button for the physics material, the DragDrop feature needs to be set
+					if (ImGui::BeginDragDropTarget())
+					{
+						auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+						if (data)
+						{
+							SelectionData selectionData = *(SelectionData*)data->Data;
+
+							if (selectionData.AssetType == AssetType::PhysicsMat)
+							{
+								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(selectionData.FilePath.string());
+								component.MaterialHandle = physicsMaterialAsset;
+							}
+						}
+					}
+
 					// Opening a new Material
 					if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && ImGui::IsItemHovered())
 					{
@@ -1349,6 +1389,22 @@ namespace Frost
 					else
 					{
 						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+					}
+
+					// After setting up the button for the physics material, the DragDrop feature needs to be set
+					if (ImGui::BeginDragDropTarget())
+					{
+						auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+						if (data)
+						{
+							SelectionData selectionData = *(SelectionData*)data->Data;
+
+							if (selectionData.AssetType == AssetType::PhysicsMat)
+							{
+								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(selectionData.FilePath.string());
+								component.MaterialHandle = physicsMaterialAsset;
+							}
+						}
 					}
 
 					// Opening a new Material
@@ -1528,6 +1584,22 @@ namespace Frost
 					else
 					{
 						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+					}
+
+					// After setting up the button for the physics material, the DragDrop feature needs to be set
+					if (ImGui::BeginDragDropTarget())
+					{
+						auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+						if (data)
+						{
+							SelectionData selectionData = *(SelectionData*)data->Data;
+
+							if (selectionData.AssetType == AssetType::PhysicsMat)
+							{
+								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(selectionData.FilePath.string());
+								component.MaterialHandle = physicsMaterialAsset;
+							}
+						}
 					}
 
 					// Opening a new Material
@@ -1719,6 +1791,22 @@ namespace Frost
 					else
 					{
 						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+					}
+
+					// After setting up the button for the physics material, the DragDrop feature needs to be set
+					if (ImGui::BeginDragDropTarget())
+					{
+						auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+						if (data)
+						{
+							SelectionData selectionData = *(SelectionData*)data->Data;
+
+							if (selectionData.AssetType == AssetType::PhysicsMat)
+							{
+								Ref<PhysicsMaterial> physicsMaterialAsset = AssetManager::GetOrLoadAsset<PhysicsMaterial>(selectionData.FilePath.string());
+								component.MaterialHandle = physicsMaterialAsset;
+							}
+						}
 					}
 
 					// Opening a new Material
@@ -2172,6 +2260,25 @@ namespace Frost
 							if (newFontAsset)
 							{
 								component.FontAsset = newFontAsset;
+							}
+						}
+					}
+
+					// After setting up the button for the font, the DragDrop feature needs to be set
+					if (ImGui::BeginDragDropTarget())
+					{
+						auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+						if (data)
+						{
+							SelectionData selectionData = *(SelectionData*)data->Data;
+
+							if (selectionData.AssetType == AssetType::Font)
+							{
+								Ref<Font> fontAsset = AssetManager::GetOrLoadAsset<Font>(selectionData.FilePath.string());
+								if (fontAsset)
+								{
+									component.FontAsset = fontAsset;
+								}
 							}
 						}
 					}

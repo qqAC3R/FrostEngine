@@ -106,12 +106,15 @@ namespace Frost
 			textureSpec.Format = ImageFormat::RGBA8;
 			textureSpec.Usage = ImageUsage::ReadOnly;
 			textureSpec.UseMips = true;
+			textureSpec.FlipTexture = true;
 
 			AssetMetadata metadata = AssetManager::GetMetadata(AssetHandle(in["AlbedoTexture"]));
 			Ref<Texture2D> albedoTexture = AssetManager::GetOrLoadAsset<Texture2D>(metadata.FilePath.string(), (void*)&textureSpec);
 
+
 			if (albedoTexture)
 			{
+				albedoTexture->GenerateMipMaps();
 				materialAsset->SetAlbedoMap(albedoTexture);
 			}
 			else
@@ -131,6 +134,7 @@ namespace Frost
 			TextureSpecification textureSpec{};
 			textureSpec.Format = ImageFormat::RGBA8;
 			textureSpec.Usage = ImageUsage::ReadOnly;
+			textureSpec.FlipTexture = true;
 
 			AssetMetadata metadata = AssetManager::GetMetadata(AssetHandle(in["NormalTexture"]));
 			Ref<Texture2D> normalTexture = AssetManager::GetOrLoadAsset<Texture2D>(metadata.FilePath.string(), (void*)&textureSpec);
@@ -156,6 +160,7 @@ namespace Frost
 			TextureSpecification textureSpec{};
 			textureSpec.Format = ImageFormat::RGBA8;
 			textureSpec.Usage = ImageUsage::ReadOnly;
+			textureSpec.FlipTexture = true;
 
 			AssetMetadata metadata = AssetManager::GetMetadata(AssetHandle(in["RoughnessTexture"]));
 			Ref<Texture2D> roughnessTexture = AssetManager::GetOrLoadAsset<Texture2D>(metadata.FilePath.string(), (void*)&textureSpec);
@@ -181,6 +186,7 @@ namespace Frost
 			TextureSpecification textureSpec{};
 			textureSpec.Format = ImageFormat::RGBA8;
 			textureSpec.Usage = ImageUsage::ReadOnly;
+			textureSpec.FlipTexture = true;
 
 			AssetMetadata metadata = AssetManager::GetMetadata(AssetHandle(in["MetalnessTexture"]));
 			Ref<Texture2D> metalnessTexture = AssetManager::GetOrLoadAsset<Texture2D>(metadata.FilePath.string(), (void*)&textureSpec);

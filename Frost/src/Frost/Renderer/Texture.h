@@ -11,6 +11,7 @@ namespace Frost
 		ImageFormat Format = ImageFormat::RGBA8;
 		ImageUsage Usage = ImageUsage::Storage;
 		SamplerProperties Sampler{};
+		bool FlipTexture = false;
 		bool UseMips = false;
 	};
 

@@ -33,6 +33,11 @@ namespace Frost
 		uint32_t GetSelectedEntitySubmesh() { return m_SelectedSubmesh; }
 
 		void SetSelectedEntityByID(uint32_t entityID);
+		void SetSelectedEntity(Entity ent)
+		{
+			m_SelectedEntity = ent;
+			m_SelectedSubmesh = UINT32_MAX;
+		}
 	private:
 		void DrawEntityNode(Entity& entity);
 

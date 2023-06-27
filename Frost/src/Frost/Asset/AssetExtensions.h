@@ -9,13 +9,21 @@ namespace Frost
 		// Engine types (Frost)
 		{ ".fsc",  AssetType::Scene },
 		{ ".fmat",  AssetType::Material },
-		{ ".fprefab",  AssetType::Material },
+		{ ".fprefab",  AssetType::Prefab },
 		{ ".fpmat",  AssetType::PhysicsMat },
 
 		// Meshes
 		{ ".fbx",  AssetType::MeshAsset },
 		{ ".gltf", AssetType::MeshAsset },
 		{ ".obj",  AssetType::MeshAsset },
+
+		// Fonts
+		{ ".ttf",  AssetType::Font },
+		{ ".otf",  AssetType::Font },
+
+		// Textures
+		{ ".png",  AssetType::Texture },
+		{ ".jpg",  AssetType::Texture },
 
 		{ ".hdr", AssetType::EnvMap }
 	};

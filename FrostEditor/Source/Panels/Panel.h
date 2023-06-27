@@ -7,7 +7,7 @@ namespace Frost
 	class Panel
 	{
 	public:
-		Panel() = default;
+		//Panel() = default;
 		virtual ~Panel() = default;
 
 		virtual void Init(void* initArgs) = 0;

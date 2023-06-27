@@ -36,6 +36,13 @@ namespace Frost
 	{
 	}
 
+	struct VulkanImGuiFonts
+	{
+		ImFont* RegularFont;
+		ImFont* BoldFont;
+	};
+	static VulkanImGuiFonts s_ImGuiFonts;
+
 	void VulkanImGuiLayer::OnInit(VkRenderPass renderPass)
 	{
 		VkInstance instance = VulkanContext::GetInstance();
@@ -73,19 +80,15 @@ namespace Frost
 
 		// Font creation
 		float fontSize = 14.0f;
+		InitFonts(fontSize);
 
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
-		io.FontDefault = io.Fonts->AddFontFromFileTTF("Resources/Fonts/san-francisco/SF-Regular.otf", fontSize);
+		io.FontDefault = s_ImGuiFonts.RegularFont;
 
-		// Merge Icons
-		static const ImWchar iconsRanges[] = { ICON_MIN_FK, ICON_MAX_FK, 0 };
-		ImFontConfig iconsConfig{};
-		iconsConfig.MergeMode = true;
-		io.Fonts->AddFontFromFileTTF("Resources/Fonts/iconfont/fontawesome-webfont.ttf", fontSize, &iconsConfig, iconsRanges);
-
+		
 
 		// Styling
 		ImGui::StyleColorsDark();
@@ -187,6 +190,20 @@ namespace Frost
 		event.Handled |= event.IsInCategory(EventCategoryKeyboard) & io.WantCaptureKeyboard;
 	}
 
+	void VulkanImGuiLayer::SetRegularFont()
+	{
+		//ImGuiIO& io = ImGui::GetIO();
+		//io.FontDefault = s_ImGuiFonts.RegularFont;
+		ImGui::PopFont();
+	}
+
+	void VulkanImGuiLayer::SetBoldFont()
+	{
+		//ImGuiIO& io = ImGui::GetIO();
+		//io.FontDefault = s_ImGuiFonts.BoldFont;
+		ImGui::PushFont(s_ImGuiFonts.BoldFont);
+	}
+
 	void VulkanImGuiLayer::Begin()
 	{
 		ImGui_ImplVulkan_NewFrame();
@@ -219,6 +236,11 @@ namespace Frost
 		);
 	}
 
+	//void* VulkanImGuiLayer::GetTextureIDFromVulkanTexture(Ref<Texture2D> texture)
+	//{
+	//	return GetTextureIDFromVulkanTexture(texture->GetImage2D());
+	//}
+
 	void* VulkanImGuiLayer::GetTextureIDFromVulkanTexture_MipLevel(Ref<Image2D> texture, uint32_t mipLevel)
 	{
 		Ref<VulkanImage2D> vulkanTexture = texture.As<VulkanImage2D>();
@@ -227,6 +249,11 @@ namespace Frost
 			vulkanTexture->GetVulkanSampler(), vulkanTexture->GetVulkanImageViewMip(mipLevel), vulkanTexture->GetVulkanImageLayout()
 		);
 	}
+
+	//void* VulkanImGuiLayer::GetTextureIDFromVulkanTexture_MipLevel(Ref<Texture2D> texture, uint32_t mipLevel)
+	//{
+	//	return GetTextureIDFromVulkanTexture_MipLevel(texture->GetImage2D(), mipLevel);
+	//}
 
 	void* VulkanImGuiLayer::GetImGuiTextureID(Ref<Image2D> texture, uint32_t mip)
 	{
@@ -259,9 +286,25 @@ namespace Frost
 		ImGui::Image(textureId, { static_cast<float>(width), static_cast<float>(height) });
 	}
 
+	void VulkanImGuiLayer::InitFonts(float fontSize)
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		s_ImGuiFonts.RegularFont = io.Fonts->AddFontFromFileTTF("Resources/Fonts/san-francisco/SF-Regular.otf", fontSize);
+
+		// Merge Icons
+		static const ImWchar iconsRanges[] = { ICON_MIN_FK, ICON_MAX_FK, 0 };
+		ImFontConfig iconsConfig{};
+		iconsConfig.MergeMode = true;
+		io.FontDefault = s_ImGuiFonts.RegularFont;
+		io.Fonts->AddFontFromFileTTF("Resources/Fonts/iconfont/fontawesome-webfont.ttf", fontSize, &iconsConfig, iconsRanges);
+
+		s_ImGuiFonts.BoldFont = io.Fonts->AddFontFromFileTTF("Resources/Fonts/san-francisco/SF-Pro-Text-Bold.otf", fontSize);
+	}
+
 	void VulkanImGuiLayer::Set_FrostStyle_Theme()
 	{
 		ImVec4* colors = ImGui::GetStyle().Colors;
+	
 		colors[ImGuiCol_Text] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
 		colors[ImGuiCol_TextDisabled] = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
 		//colors[ImGuiCol_WindowBg] = ImVec4(0.10f, 0.10f, 0.10f, 1.00f);
@@ -296,7 +339,6 @@ namespace Frost
 		colors[ImGuiCol_Header] =        ImVec4(0.00f, 0.00f, 0.00f, 0.52f); // Tree Nodes
 		colors[ImGuiCol_HeaderHovered] = ImVec4(0.00f, 0.00f, 0.00f, 0.36f); // Tree Nodes
 		colors[ImGuiCol_HeaderActive] =  ImVec4(0.20f, 0.22f, 0.23f, 0.33f); // Tree Nodes
-
 		colors[ImGuiCol_Separator] =        ImVec4(0.09f, 0.12f, 0.15f, 1.0f);
 		colors[ImGuiCol_SeparatorHovered] = ImVec4(0.11f, 0.14f, 0.17f, 1.0f);
 		colors[ImGuiCol_SeparatorActive] =  ImVec4(0.13f, 0.16f, 0.19f, 1.0f);
@@ -357,7 +399,7 @@ namespace Frost
 		style.WindowRounding = 7;
 		style.ChildRounding = 4;
 		style.FrameRounding = 3; // Rouding for the buttons
-		style.PopupRounding = 4;
+		style.PopupRounding = 0;
 		style.ScrollbarRounding = 9;
 		style.GrabRounding = 3;
 		style.LogSliderDeadzone = 4;

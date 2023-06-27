@@ -81,8 +81,8 @@ namespace Frost
 		if (!Exists(absolutePath))
 			return false;
 
-		//std::string cmd = fmt::format("explorer.exe /select,\"{0}\"", absolutePath.string());
-		//system(cmd.c_str());
+		std::string cmd = fmt::format("explorer.exe /select,\"{0}\"", absolutePath.string());
+		system(cmd.c_str());
 		return true;
 	}
 

@@ -434,6 +434,7 @@ namespace Frost
 					textureSpec.Format = ImageFormat::RGBA8;
 					textureSpec.Usage = ImageUsage::ReadOnly;
 					textureSpec.UseMips = true;
+					textureSpec.FlipTexture = true;
 					Ref<Texture2D> texture = AssetManager::GetOrLoadAsset<Texture2D>(texturePath, (void*)&textureSpec);
 					if (texture->Loaded())
 					{
@@ -465,6 +466,7 @@ namespace Frost
 					TextureSpecification textureSpec{};
 					textureSpec.Format = ImageFormat::RGBA8;
 					textureSpec.Usage = ImageUsage::ReadOnly;
+					textureSpec.FlipTexture = true;
 #if 0
 					auto texture = Texture2D::Create(texturePath, textureSpec);
 #endif
@@ -501,6 +503,7 @@ namespace Frost
 					TextureSpecification textureSpec{};
 					textureSpec.Format = ImageFormat::RGBA8;
 					textureSpec.Usage = ImageUsage::ReadOnly;
+					textureSpec.FlipTexture = true;
 					Ref<Texture2D> texture = AssetManager::GetOrLoadAsset<Texture2D>(texturePath, (void*)&textureSpec);
 					if (texture->Loaded())
 					{
@@ -540,6 +543,7 @@ namespace Frost
 							TextureSpecification textureSpec{};
 							textureSpec.Format = ImageFormat::RGBA8;
 							textureSpec.Usage = ImageUsage::ReadOnly;
+							textureSpec.FlipTexture = true;
 							Ref<Texture2D> texture = AssetManager::GetOrLoadAsset<Texture2D>(texturePath, (void*)&textureSpec);
 							if (texture->Loaded())
 							{

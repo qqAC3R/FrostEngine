@@ -6,7 +6,7 @@
 #include "Panels/InspectorPanel.h"
 #include "Panels/ViewportPanel.h"
 #include "Panels/MaterialEditor.h"
-#include "Panels/AssetBrowser.h"
+#include "Panels/ContentBrowser/ContentBrowser.h"
 #include "Panels/TitlebarPanel.h"
 #include "Panels/MaterialAssetEditor.h"
 #include "Panels/PhysicsMaterialEditor.h"
@@ -36,6 +36,7 @@ namespace Frost
 		void NewScene();
 		void SaveSceneAs();
 		void OpenScene();
+		void OpenSceneWithFilepath(const std::string& filepath);
 
 		virtual void OnEvent(Event& event);
 		bool OnKeyPressed(KeyPressedEvent& event);
@@ -64,7 +65,7 @@ namespace Frost
 		Ref<ViewportPanel> m_ViewportPanel;
 		//Ref<MaterialEditor> m_MaterialEditor;
 		Ref<TitlebarPanel> m_TitlebarPanel;
-		//Ref<AssetBrowser> m_AssetBrowser;
+		Ref<ContentBrowserPanel> m_ContentBrowser;
 		Ref<MaterialAssetEditor> m_MaterialAssetEditor;
 		Ref<PhysicsMaterialEditor> m_PhysicsMaterialEditor;
 
@@ -85,5 +86,6 @@ namespace Frost
 		glm::vec2 m_ViewportBounds[2];
 
 		friend class InspectorPanel;
+		friend class ViewportPanel;
 	};
 }

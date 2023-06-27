@@ -1,30 +1,38 @@
 #include "frostpch.h"
 #include "ViewportPanel.h"
 
-#include "Frost/ImGui/ImGuiLayer.h"
-
-//#include "EditorLayer.h"
-#include "Frost/Renderer/Renderer.h"
-#include <imgui.h>
-#include <imgui_internal.h>
-#include <ImGuizmo.h>
-
-#include "IconsFontAwesome.hpp"
-
+#include "Frost/Asset/AssetManager.h"
 #include "Frost/Core/Application.h"
 #include "Frost/Core/Input.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
+#include "Frost/EntitySystem/Prefab.h"
+
+#include "Frost/Renderer/Renderer.h"
+#include "Frost/ImGui/ImGuiLayer.h"
+
+#include "IconsFontAwesome.hpp"
+
+#include "EditorLayer.h"
+#include "Panels/ContentBrowser/ContentBrowser.h"
+#include "Panels/ContentBrowser/ContentBrowserSelectionStack.h"
+#include "UserInterface/UIWidgets.h"
+
 #include <imgui.h>
+#include <imgui_internal.h>
+#include <ImGuizmo.h>
 
 namespace Frost
 {
 	//  TODO: This is also called in "EditorLayer.h",
 	// but currently including the header gives linking errors, fix that!
-	enum class SceneState
-	{
-		Edit,
-		Play
-	};
+	//enum class SceneState
+	//{
+	//	Edit,
+	//	Play
+	//};
+
+	ViewportPanel::ViewportPanel(EditorLayer* editorLayer)
+		: m_Context(editorLayer) {}
 
 	void ViewportPanel::Init(void* initArgs)
 	{
@@ -43,7 +51,9 @@ namespace Frost
 	{
 		// Begin the viewport panel
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
-		ImGui::Begin("Viewport");
+		ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_NoCollapse);
+
+		//ImGui::BeginChild("ViewportPanel");
 
 		// Check if the viewport is focused
 		bool IsViewPortFocused = ImGui::IsWindowFocused();
@@ -77,6 +87,7 @@ namespace Frost
 #endif
 
 		}
+
 	}
 
 	void ViewportPanel::RenderTexture(Ref<Image2D> texture)
@@ -85,9 +96,69 @@ namespace Frost
 		imguiLayer->RenderTexture(texture, m_ViewportSize.x, m_ViewportSize.y);
 	}
 
+	void ViewportPanel::UpdateDragDrop()
+	{
+		if (ImGui::BeginDragDropTarget())
+		{
+			UserInterface::ScopedStyle itemSpacing(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+
+			auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+			if (data)
+			{
+				SelectionData selectionData = *(SelectionData*)data->Data;
+
+				if (selectionData.AssetType == AssetType::MeshAsset)
+				{
+					Entity ent = m_Context->m_CurrentScene->CreateEntity("New Mesh");
+					Ref<Mesh> mesh = Ref<Mesh>::Create(AssetManager::GetOrLoadAsset<MeshAsset>(selectionData.FilePath.string()));
+
+					MeshComponent& meshComponent = ent.AddComponent<MeshComponent>();
+					meshComponent.Mesh = mesh;
+
+					m_Context->m_SceneHierarchyPanel->SetSelectedEntity(ent);
+				}
+
+				if (selectionData.AssetType == AssetType::Scene)
+				{
+					m_Context->OpenSceneWithFilepath(selectionData.FilePath.string());
+				}
+
+				if (selectionData.AssetType == AssetType::Prefab)
+				{
+					Ref<Prefab> prefab = AssetManager::GetOrLoadAsset<Prefab>(selectionData.FilePath.string());
+					if (prefab)
+					{
+						Entity ent = m_Context->m_CurrentScene->Instantiate(prefab);
+						m_Context->m_SceneHierarchyPanel->SetSelectedEntity(ent);
+					}
+				}
+
+			}
+		}
+	}
+
 	void ViewportPanel::EndRender()
 	{
 		// End the viewport panel rendering
+
+
+		{
+			// Offset a bit to see the outlined border of the drag drop
+			ImGui::SetCursorPos({ 5, 5 });
+
+			UserInterface::ScopedStyle buttonColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+			UserInterface::ScopedStyle buttonColorActive(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+			UserInterface::ScopedStyle buttonColorHovered(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+			UserInterface::ScopedStyle borderColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+
+			// Same here, offset the button with 5 pixels (in both sides) to see the outlined bordered of the drag drop
+			// Also a custom function was required for InvisibleButton, because this should work as a dummy and should not add any events (only for rendering)
+			UserInterface::InvisibleButtonWithNoBehaivour("##InvisibleButtonDragDrop", { m_ViewportSize.x - 10.0f, m_ViewportSize.y - 10.0f });
+
+			UpdateDragDrop();
+		}
+		
+
 		ImGui::End();
 		ImGui::PopStyleVar();
 	}

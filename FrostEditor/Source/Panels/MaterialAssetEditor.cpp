@@ -7,6 +7,8 @@
 #include "Frost/Asset/AssetManager.h"
 
 #include "UserInterface/UIWidgets.h"
+#include "Panels/ContentBrowser/ContentBrowser.h"
+#include "Panels/ContentBrowser/ContentBrowserSelectionStack.h"
 
 #include <imgui.h>
 #include <imgui/imgui_internal.h>
@@ -38,7 +40,10 @@ namespace Frost
 				ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
 				ImTextureID imguiAlbedoTextureId = imguiLayer->GetImGuiTextureID(albedoTexture->GetImage2D());
 
+
 				ImGui::PushID("Albedo_Texture_Button");
+				ImVec2 cursourPosFromStart = ImGui::GetCursorPos();
+
 				ImGui::ImageButton(imguiAlbedoTextureId, { 64, 64 });
 				if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered())
 				{
@@ -49,13 +54,15 @@ namespace Frost
 						textureSpec.Format = ImageFormat::RGBA8;
 						textureSpec.Usage = ImageUsage::ReadOnly;
 						textureSpec.UseMips = true;
+						textureSpec.FlipTexture = true;
 						Ref<Texture2D> newAlbedoTex = AssetManager::LoadAsset<Texture2D>(filepath, (void*)&textureSpec);
-						if(!newAlbedoTex)
+						if (!newAlbedoTex)
 							newAlbedoTex = AssetManager::CreateNewAsset<Texture2D>(filepath, (void*)&textureSpec);
 
 						if (newAlbedoTex->Loaded())
 						{
 							Renderer::Submit([&, newAlbedoTex]() mutable {
+								newAlbedoTex->GenerateMipMaps();
 								m_ActiveMaterialAsset->SetAlbedoMap(newAlbedoTex);
 							});
 						}
@@ -65,8 +72,43 @@ namespace Frost
 						}
 					}
 				}
+				{
+					ImVec2 imageButtonSize = ImGui::GetItemRectSize();
+					ImGui::SetCursorPos(cursourPosFromStart);
+					UserInterface::InvisibleButtonWithNoBehaivour("##AlbedoTextureInvisibleButton", imageButtonSize);
 
+					// After setting up the button for the ALBEDO TEXTURE, the DragDrop feature needs to be set
+					if (ImGui::BeginDragDropTarget())
+					{
+						auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+						if (data)
+						{
+							SelectionData selectionData = *(SelectionData*)data->Data;
+
+							if (selectionData.AssetType == AssetType::Texture)
+							{
+								TextureSpecification textureSpec{};
+								textureSpec.Format = ImageFormat::RGBA8;
+								textureSpec.Usage = ImageUsage::ReadOnly;
+								textureSpec.UseMips = true;
+								textureSpec.FlipTexture = true;
+
+								Ref<Texture2D> albedoTexture = AssetManager::LoadAsset<Texture2D>(selectionData.FilePath.string(), (void*)&textureSpec);
+								if (!albedoTexture)
+									albedoTexture = AssetManager::CreateNewAsset<Texture2D>(selectionData.FilePath.string(), (void*)&textureSpec);
+
+
+								Renderer::Submit([&, albedoTexture]() mutable {
+									albedoTexture->GenerateMipMaps();
+									m_ActiveMaterialAsset->SetAlbedoMap(albedoTexture);
+								});
+							}
+						}
+					}
+				}
 				ImGui::PopID();
+
+
 
 
 				ImGui::SameLine(0.0f, 5.0f);
@@ -97,6 +139,8 @@ namespace Frost
 				ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
 				ImTextureID imguiRoughnessTextureId = imguiLayer->GetImGuiTextureID(roughnessTexture->GetImage2D());
 
+				ImVec2 cursourPosFromStart = ImGui::GetCursorPos();
+
 				ImGui::PushID("Roughness_Texture_Button");
 				ImGui::ImageButton(imguiRoughnessTextureId, { 64, 64 });
 				if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered())
@@ -108,6 +152,7 @@ namespace Frost
 						textureSpec.Format = ImageFormat::RGBA8;
 						textureSpec.Usage = ImageUsage::ReadOnly;
 						textureSpec.UseMips = false;
+						textureSpec.FlipTexture = true;
 
 						Ref<Texture2D> newRoughnessTex = AssetManager::LoadAsset<Texture2D>(filepath, (void*)&textureSpec);
 						if(!newRoughnessTex)
@@ -122,6 +167,38 @@ namespace Frost
 						else
 						{
 							FROST_ERROR("[MaterialAssetEditor] Roughness Texture '{0}' cannot be loaded", filepath);
+						}
+					}
+				}
+				{
+					ImVec2 imageButtonSize = ImGui::GetItemRectSize();
+					ImGui::SetCursorPos(cursourPosFromStart);
+					UserInterface::InvisibleButtonWithNoBehaivour("##RoughnessTextureInvisibleButton", imageButtonSize);
+
+					// After setting up the button for the ROUGHNESS TEXTURE, the DragDrop feature needs to be set
+					if (ImGui::BeginDragDropTarget())
+					{
+						auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+						if (data)
+						{
+							SelectionData selectionData = *(SelectionData*)data->Data;
+
+							if (selectionData.AssetType == AssetType::Texture)
+							{
+								TextureSpecification textureSpec{};
+								textureSpec.Format = ImageFormat::RGBA8;
+								textureSpec.Usage = ImageUsage::ReadOnly;
+								textureSpec.UseMips = false;
+								textureSpec.FlipTexture = true;
+
+								Ref<Texture2D> roughhnessTexture = AssetManager::LoadAsset<Texture2D>(selectionData.FilePath.string(), (void*)&textureSpec);
+								if (!roughhnessTexture)
+									roughhnessTexture = AssetManager::CreateNewAsset<Texture2D>(selectionData.FilePath.string(), (void*)&textureSpec);
+
+								Renderer::Submit([&, roughhnessTexture]() mutable {
+									m_ActiveMaterialAsset->SetRoughnessMap(roughhnessTexture);
+								});
+							}
 						}
 					}
 				}
@@ -140,6 +217,8 @@ namespace Frost
 				ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
 				ImTextureID imguiMetalnesstextureId = imguiLayer->GetImGuiTextureID(metalnessTexture->GetImage2D());
 
+				ImVec2 cursourPosFromStart = ImGui::GetCursorPos();
+
 				ImGui::PushID("Metalness_Texture_Button");
 				ImGui::ImageButton(imguiMetalnesstextureId, { 64, 64 });
 				if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered())
@@ -151,6 +230,7 @@ namespace Frost
 						textureSpec.Format = ImageFormat::RGBA8;
 						textureSpec.Usage = ImageUsage::ReadOnly;
 						textureSpec.UseMips = false;
+						textureSpec.FlipTexture = true;
 
 						Ref<Texture2D> newMetalnessTex = AssetManager::LoadAsset<Texture2D>(filepath, (void*)&textureSpec);
 						if(!newMetalnessTex)
@@ -165,6 +245,39 @@ namespace Frost
 						else
 						{
 							FROST_ERROR("[MaterialAssetEditor] Metalness Texture '{0}' cannot be loaded", filepath);
+						}
+					}
+				}
+				{
+					ImVec2 imageButtonSize = ImGui::GetItemRectSize();
+					ImGui::SetCursorPos(cursourPosFromStart);
+					UserInterface::InvisibleButtonWithNoBehaivour("##MetalnessTextureInvisibleButton", imageButtonSize);
+
+					// After setting up the button for the METALNESS TEXTURE, the DragDrop feature needs to be set
+					if (ImGui::BeginDragDropTarget())
+					{
+						auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+						if (data)
+						{
+							SelectionData selectionData = *(SelectionData*)data->Data;
+
+							if (selectionData.AssetType == AssetType::Texture)
+							{
+								TextureSpecification textureSpec{};
+								textureSpec.Format = ImageFormat::RGBA8;
+								textureSpec.Usage = ImageUsage::ReadOnly;
+								textureSpec.UseMips = false;
+								textureSpec.FlipTexture = true;
+
+								Ref<Texture2D> metalnesssTexture = AssetManager::LoadAsset<Texture2D>(selectionData.FilePath.string(), (void*)&textureSpec);
+								if (!metalnesssTexture)
+									metalnesssTexture = AssetManager::CreateNewAsset<Texture2D>(selectionData.FilePath.string(), (void*)&textureSpec);
+
+
+								Renderer::Submit([&, metalnesssTexture]() mutable {
+									m_ActiveMaterialAsset->SetMetalnessMap(metalnesssTexture);
+								});
+							}
 						}
 					}
 				}
@@ -185,6 +298,8 @@ namespace Frost
 				ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
 				ImTextureID imguiNormaltextureId = imguiLayer->GetImGuiTextureID(normalTexture->GetImage2D());
 
+				ImVec2 cursourPosFromStart = ImGui::GetCursorPos();
+
 				ImGui::PushID("Normal_Texture_Button");
 				ImGui::ImageButton(imguiNormaltextureId, { 64, 64 });
 				if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered())
@@ -196,6 +311,7 @@ namespace Frost
 						textureSpec.Format = ImageFormat::RGBA8;
 						textureSpec.Usage = ImageUsage::ReadOnly;
 						textureSpec.UseMips = false;
+						textureSpec.FlipTexture = true;
 
 						Ref<Texture2D> newNormalTex = AssetManager::LoadAsset<Texture2D>(filepath, (void*)&textureSpec);
 						if (!newNormalTex)
@@ -204,12 +320,45 @@ namespace Frost
 						if (newNormalTex->Loaded())
 						{
 							Renderer::Submit([&, newNormalTex]() mutable {
-								m_ActiveMaterialAsset->SetUseNormalMap(newNormalTex);
+								m_ActiveMaterialAsset->SetNormalMap(newNormalTex);
 							});
 						}
 						else
 						{
 							FROST_ERROR("[MaterialAssetEditor] Normal Texture '{0}' cannot be loaded", filepath);
+						}
+					}
+				}
+				{
+					ImVec2 imageButtonSize = ImGui::GetItemRectSize();
+					ImGui::SetCursorPos(cursourPosFromStart);
+					UserInterface::InvisibleButtonWithNoBehaivour("##NormalTextureInvisibleButton", imageButtonSize);
+
+					// After setting up the button for the NORMAL TEXTURE, the DragDrop feature needs to be set
+					if (ImGui::BeginDragDropTarget())
+					{
+						auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+						if (data)
+						{
+							SelectionData selectionData = *(SelectionData*)data->Data;
+
+							if (selectionData.AssetType == AssetType::Texture)
+							{
+								TextureSpecification textureSpec{};
+								textureSpec.Format = ImageFormat::RGBA8;
+								textureSpec.Usage = ImageUsage::ReadOnly;
+								textureSpec.UseMips = false;
+								textureSpec.FlipTexture = true;
+
+								Ref<Texture2D> normalTexture = AssetManager::LoadAsset<Texture2D>(selectionData.FilePath.string(), (void*)&textureSpec);
+								if (!normalTexture)
+									normalTexture = AssetManager::CreateNewAsset<Texture2D>(selectionData.FilePath.string(), (void*)&textureSpec);
+
+
+								Renderer::Submit([&, normalTexture]() mutable {
+									m_ActiveMaterialAsset->SetNormalMap(normalTexture);
+								});
+							}
 						}
 					}
 				}

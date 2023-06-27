@@ -269,7 +269,7 @@ namespace Frost
 	{
 		GLFWimage icon;
 		int channels;
-		icon.pixels = stbi_load("Resources/Editor/Logo_Frost_I.png", &icon.width, &icon.height, &channels, 4);
+		icon.pixels = stbi_load("Resources/Editor/Logo_Frost.png", &icon.width, &icon.height, &channels, 4);
 		glfwSetWindowIcon(m_Window, 1, &icon);
 		stbi_image_free(icon.pixels);
 	}

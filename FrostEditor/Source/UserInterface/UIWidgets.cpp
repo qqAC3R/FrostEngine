@@ -3,12 +3,11 @@
 
 #include "Frost/Utils/PlatformUtils.h"	
 
-#include <imgui/imgui.h>
-#include <imgui/imgui_internal.h>
-
 #include "Frost/EntitySystem/Entity.h"
 #include "Frost/EntitySystem/Components.h"
 #include "Panels/SceneHierarchyPanel.h"
+#include "Panels/ContentBrowser/ContentBrowser.h"
+#include "Panels/ContentBrowser/ContentBrowserSelectionStack.h"
 
 namespace Frost
 {
@@ -100,6 +99,8 @@ namespace Frost
 
 	std::string UserInterface::DrawFilePath(const std::string& label, const std::string& textBox, const std::string& format, float columnWidth)
 	{
+		std::string filePath;
+
 		ImGuiIO& io = ImGui::GetIO();
 		auto boldFont = io.Fonts->Fonts[0];
 
@@ -121,20 +122,34 @@ namespace Frost
 		ImGui::SetNextItemWidth(-1.0f);
 		ImGui::InputText("##Tag", buffer, sizeof(buffer));
 
+		if (ImGui::BeginDragDropTarget())
+		{
+			auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+			if (data)
+			{
+				SelectionData selectionData = *(SelectionData*)data->Data;
+				
+				if (selectionData.AssetType == AssetType::MeshAsset)
+					filePath = selectionData.FilePath.string();
+				else
+					FROST_CORE_WARN("Dragged-Dropped wrong asset type (Need Mesh Asset!)");
+			}
+
+			ImGui::EndDragDropTarget();
+		}
+
 		ImGui::NextColumn();
 
-		//float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
-		//ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
-		std::string path;
+		
 		if (ImGui::Button("..", buttonSize))
 		{
-			path = FileDialogs::OpenFile("");
+			filePath = FileDialogs::OpenFile("");
 		}
 
 		ImGui::Columns(1);
 		ImGui::PopID();
 
-		return path;
+		return filePath;
 	}
 
 	void UserInterface::CheckBox(const std::string& label, bool& value)
@@ -193,9 +208,7 @@ namespace Frost
 	{
 		bool receivedValidEntity = false;
 
-		//ImVec2 originalButtonTextAlign = ImGui::GetStyle().ButtonTextAlign;
 		{
-			//ImGui::GetStyle().ButtonTextAlign = { 0.0f, 0.5f };
 			float width = ImGui::GetContentRegionAvail().x;
 			float itemHeight = 23.0f;
 
@@ -206,7 +219,6 @@ namespace Frost
 
 			ImGui::Button(buttonText.c_str(), {width, itemHeight});
 		}
-		//ImGui::GetStyle().ButtonTextAlign = originalButtonTextAlign;
 
 		if (ImGui::BeginDragDropTarget())
 		{
@@ -219,9 +231,6 @@ namespace Frost
 
 			ImGui::EndDragDropTarget();
 		}
-
-		//ImGui::PopItemWidth();
-		//ImGui::NextColumn();
 
 		return receivedValidEntity;
 	}
@@ -255,6 +264,74 @@ namespace Frost
 		return modified;
 	}
 
+	void UserInterface::InvisibleButtonWithNoBehaivour(const char* str_id, const ImVec2& size_arg)
+	{
+		ImGuiWindow* window = ImGui::GetCurrentWindow();
+		if (window->SkipItems)
+			return;
+
+		// Cannot use zero-size for InvisibleButton(). Unlike Button() there is not way to fallback using the label size.
+		IM_ASSERT(size_arg.x != 0.0f && size_arg.y != 0.0f);
+
+		const ImGuiID id = window->GetID(str_id);
+		ImVec2 size = ImGui::CalcItemSize(size_arg, 0.0f, 0.0f);
+		const ImRect bb(window->DC.CursorPos, { window->DC.CursorPos.x + size.x, window->DC.CursorPos.y + size.y });
+		ImGui::ItemSize(size);
+		if (!ImGui::ItemAdd(bb, id))
+			return;
+	}
+
+	void UserInterface::ShiftCursorX(float x)
+	{
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x);
+	}
+
+	void UserInterface::ShiftCursorY(float y)
+	{
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y);
+	}
+
+	void UserInterface::DrawButtonImage(Ref<Texture2D> imageNormal, Ref<Texture2D> imageHovered, Ref<Texture2D> imagePressed, ImU32 tintNormal, ImU32 tintHovered, ImU32 tintPressed, ImVec2 rectMin, ImVec2 rectMax)
+	{
+		ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+		auto* drawList = ImGui::GetWindowDrawList();
+		if (ImGui::IsItemActive())
+			drawList->AddImage((ImTextureID)imguiLayer->GetImGuiTextureID(imagePressed->GetImage2D()), rectMin, rectMax, ImVec2(0, 0), ImVec2(1, 1), tintPressed);
+		else if (ImGui::IsItemHovered())
+			drawList->AddImage((ImTextureID)imguiLayer->GetImGuiTextureID(imageHovered->GetImage2D()), rectMin, rectMax, ImVec2(0, 0), ImVec2(1, 1), tintHovered);
+		else
+			drawList->AddImage((ImTextureID)imguiLayer->GetImGuiTextureID(imageNormal->GetImage2D()), rectMin, rectMax, ImVec2(0, 0), ImVec2(1, 1), tintNormal);
+	}
+
+	void UserInterface::DrawShadowInner(const Ref<Texture2D>& shadowImage, int radius, ImVec2 rectMin, ImVec2 rectMax, float alpha /*= 1.0f*/, float lengthStretch /*= 10.0f*/, bool drawLeft /*= true*/, bool drawRight /*= true*/, bool drawTop /*= true*/, bool drawBottom /*= true*/)
+	{
+		const float widthOffset = lengthStretch;
+		const float alphaTop = alpha; //std::min(0.25f * alphMultiplier, 1.0f);
+		const float alphaSides = alpha; //std::min(0.30f * alphMultiplier, 1.0f);
+		const float alphaBottom = alpha; //std::min(0.60f * alphMultiplier, 1.0f);
+		const auto p1 = ImVec2(rectMin.x + radius, rectMin.y + radius);
+		const auto p2 = ImVec2(rectMax.x - radius, rectMax.y - radius);
+		auto* drawList = ImGui::GetWindowDrawList();
+
+		ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+		ImTextureID textureID = (ImTextureID)imguiLayer->GetImGuiTextureID(shadowImage->GetImage2D());
+
+		drawList->PushClipRect({ p2.x + 1.0f, p1.y - widthOffset }, { p2.x + radius, p2.y + widthOffset });
+
+		if (drawTop)
+			drawList->AddImage(textureID, { p1.x - widthOffset,  p1.y - radius }, { p2.x + widthOffset, p1.y }, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f), ImColor(0.0f, 0.0f, 0.0f, alphaTop));
+		if (drawBottom)
+			drawList->AddImage(textureID, { p1.x - widthOffset,  p2.y }, { p2.x + widthOffset, p2.y + radius }, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), ImColor(0.0f, 0.0f, 0.0f, alphaBottom));
+		if (drawLeft)
+			drawList->AddImageQuad(textureID, { p1.x - radius, p1.y - widthOffset }, { p1.x, p1.y - widthOffset }, { p1.x, p2.y + widthOffset }, { p1.x - radius, p2.y + widthOffset },
+				{ 0.0f, 1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, ImColor(0.0f, 0.0f, 0.0f, alphaSides));
+		if (drawRight)
+			drawList->AddImageQuad(textureID, { p2.x, p1.y - widthOffset }, { p2.x + radius, p1.y - widthOffset }, { p2.x + radius, p2.y + widthOffset }, { p2.x, p2.y + widthOffset },
+				{ 0.0f, 0.0f }, { 0.0f, 1.0f }, { 1.0f, 1.0f }, { 1.0f, 0.0f }, ImColor(0.0f, 0.0f, 0.0f, alphaSides));
+
+		drawList->PopClipRect();
+	};
+
 	void UserInterface::Text(const std::string& text)
 	{
 		ImGui::Text(text.c_str());
@@ -269,4 +346,55 @@ namespace Frost
 	{
 		ImGui::DragFloat(name.c_str(), &value, speed, minValue, maxValue);
 	}
+
+	UserInterface::ScopedStyle::ScopedStyle(ImGuiCol style, const ImVec4& vec)
+	{
+		ImGui::PushStyleColor(style, vec);
+		m_Type = ScopedStyleType::StyleColor;
+	}
+
+	UserInterface::ScopedStyle::ScopedStyle(ImGuiCol style, const ImU32& col)
+	{
+		ImGui::PushStyleColor(style, ImGui::ColorConvertU32ToFloat4(col));
+		m_Type = ScopedStyleType::StyleColor;
+	}
+		
+	UserInterface::ScopedStyle::ScopedStyle(ImGuiStyleVar style, float value)
+	{
+		ImGui::PushStyleVar(style, value);
+		m_Type = ScopedStyleType::StyleVar;
+	}
+
+	UserInterface::ScopedStyle::ScopedStyle(ImGuiStyleVar style, const ImVec2& value)
+	{
+		ImGui::PushStyleVar(style, value);
+		m_Type = ScopedStyleType::StyleVar;
+	}
+
+	UserInterface::ScopedStyle::~ScopedStyle()
+	{
+		switch (m_Type)
+		{
+		case UserInterface::ScopedStyle::ScopedStyleType::StyleColor: ImGui::PopStyleColor(); break;
+		case UserInterface::ScopedStyle::ScopedStyleType::StyleVar: ImGui::PopStyleVar(); break;
+		}
+	}
+
+	UserInterface::ScopedFontStyle::ScopedFontStyle(FontType type)
+		: m_Type(type)
+	{
+		ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+
+		if (type == FontType::Bold)
+			imguiLayer->SetBoldFont();
+	}
+
+	UserInterface::ScopedFontStyle::~ScopedFontStyle()
+	{
+		ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+
+		if (m_Type == FontType::Bold)
+			imguiLayer->SetRegularFont();
+	}
+
 }

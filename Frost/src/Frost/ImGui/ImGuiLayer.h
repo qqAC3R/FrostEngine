@@ -19,6 +19,9 @@ namespace Frost
 		virtual void Begin() = 0;
 		virtual void Render() = 0;
 
+		virtual void SetRegularFont() = 0;
+		virtual void SetBoldFont() = 0;
+
 		virtual void* GetImGuiTextureID(Ref<Image2D> texture, uint32_t mip = UINT32_MAX) = 0;
 		virtual void RenderTexture(Ref<Image2D> texture, uint32_t width, uint32_t height, uint32_t mip = UINT32_MAX) = 0;
 

@@ -326,6 +326,7 @@ namespace Frost
 		textureSpec.Usage = ImageUsage::ReadOnly;
 		textureSpec.Format = ImageFormat::RGBA16F;
 		textureSpec.UseMips = false;
+		textureSpec.FlipTexture = true;
 
 		s_Data->EditorIcons["PointLight"] = Texture2D::Create("Resources/Editor/PointLight.png", textureSpec);
 		s_Data->EditorIcons["DirectionalLight"] = Texture2D::Create("Resources/Editor/DirectionalLight.png", textureSpec);

@@ -45,6 +45,8 @@ namespace Frost
 		m_EditorScene = AssetManager::LoadAsset<Scene>("Scenes/.Default.fsc");
 		SetCurrentScene(m_EditorScene);
 
+		m_ContentBrowser = Ref<ContentBrowserPanel>::Create();
+		m_ContentBrowser->Init(nullptr);;
 
 		// Scene Hierarchy Panel initialization
 		m_SceneHierarchyPanel = Ref<SceneHierarchyPanel>::Create();
@@ -69,7 +71,7 @@ namespace Frost
 		m_InspectorPanel->SetPhysicsMaterialAssetEditor(m_PhysicsMaterialEditor);
 
 		// Viewport Panel initialization
-		m_ViewportPanel = Ref<ViewportPanel>::Create();
+		m_ViewportPanel = Ref<ViewportPanel>::Create(this);
 		m_ViewportPanel->Init(nullptr);
 		m_ViewportPanel->SetScenePlayFunction(std::bind(&EditorLayer::OnScenePlay, this));
 		m_ViewportPanel->SetSceneStopFunction(std::bind(&EditorLayer::OnSceneStop, this));
@@ -299,10 +301,10 @@ namespace Frost
 			// Phyiscs Material Asset Editor
 			m_PhysicsMaterialEditor->Render();
 
-#if 0
-			// Asset browser rendering
-			m_AssetBrowser->Render();
-#endif
+			// Content browser rendering
+			m_ContentBrowser->Render();
+
+
 			if (m_ShowRendererDebugger)
 				Renderer::RenderDebugger();
 
@@ -459,16 +461,16 @@ namespace Frost
 		if (m_SceneState == SceneState::Play) return;
 
 		std::string filepath = FileDialogs::OpenFile("");
+		OpenSceneWithFilepath(filepath);
+	}
 
+	void EditorLayer::OpenSceneWithFilepath(const std::string& filepath)
+	{
 		if (!filepath.empty())
 		{
-			//AssetManager::RemoveAssetFromMemory(m_EditorScene->Handle);
-
 			NewScene();
-		
-			m_CurrentScene = AssetManager::LoadAsset<Scene>(filepath);
 
-			//Application::Get().GetWindow().SetWindowProjectName(sceneSerializer.GetSceneName());
+			m_CurrentScene = AssetManager::LoadAsset<Scene>(filepath);
 
 			m_EditorScene = m_CurrentScene;
 			m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
@@ -627,6 +629,7 @@ namespace Frost
 
 	void EditorLayer::OnDetach()
 	{
+		m_ContentBrowser->Shutdown();
 		this->~EditorLayer();
 	}
 }

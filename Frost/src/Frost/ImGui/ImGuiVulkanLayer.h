@@ -26,9 +26,14 @@ namespace Frost
 
 		virtual void OnEvent(Event& event) override;
 
+		virtual void SetRegularFont() override;
+		virtual void SetBoldFont() override;
+
 		virtual void Begin() override;
 		virtual void Render() override;
 
+		//static void* GetTextureIDFromVulkanTexture(Ref<Texture2D> texture);
+		//static void* GetTextureIDFromVulkanTexture_MipLevel(Ref<Texture2D> texture, uint32_t mipLevel);
 		static void* GetTextureIDFromVulkanTexture(Ref<Image2D> texture);
 		static void* GetTextureIDFromVulkanTexture_MipLevel(Ref<Image2D> texture, uint32_t mipLevel);
 
@@ -38,6 +43,7 @@ namespace Frost
 		virtual void RenderTexture(Ref<Image2D> texture, uint32_t width, uint32_t height, uint32_t mip = UINT32_MAX) override;
 
 	private:
+		void InitFonts(float fontSize);
 		void Set_FrostStyle_Theme();
 	private:
 		VkRenderPass m_ImGuiRenderPass;
