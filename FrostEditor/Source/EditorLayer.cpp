@@ -38,7 +38,8 @@ namespace Frost
 	void EditorLayer::OnAttach()
 	{
 		m_EditorCamera = Ref<EditorCamera>::Create(85.0, 1600.0f / 900.0f, 0.1f, 1000.0f);
-	
+		m_EditorCamera->OnUpdate(0.0f); // Have to set it before, because this actually updates only when the mouse is hovered to the viewport
+
 		ScriptEngine::LoadAppAssembly(Project::GetScriptModulePath().string());
 
 		// Scene initialization
@@ -122,27 +123,30 @@ namespace Frost
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
 		ScriptEngine::SetSceneContext(m_CurrentScene.Raw());
-
 		ScriptEngine::OnHotReload(Project::GetScriptModulePath().string());
+
+
+		m_CurrentScene->SetSelectedEntity(m_SceneHierarchyPanel->GetSelectedEntity());
 
 		if (m_SceneState == SceneState::Play)
 		{
 			CameraComponent* primaryCamera = m_CurrentScene->GetPrimaryCamera();
-
 			if (primaryCamera)
 			{
 				if (m_SceneState == SceneState::Play)
 				{
 					primaryCamera->Camera->SetViewportSize(m_ViewportPanel->GetViewportPanelSize().x, m_ViewportPanel->GetViewportPanelSize().y);
-					Renderer::BeginScene(primaryCamera->Camera);
+					Renderer::BeginScene(m_CurrentScene, primaryCamera->Camera);
 
 					m_CurrentScene->UpdateRuntime(ts);
 				}
 			}
 			else
 			{
-				m_EditorCamera->OnUpdate(ts);
-				Renderer::BeginScene(m_EditorCamera);
+				if (m_ViewPortMouseHovered || Input::GetCursorMode() == CursorMode::Locked)
+					m_EditorCamera->OnUpdate(ts);
+
+				Renderer::BeginScene(m_CurrentScene, m_EditorCamera);
 				m_CurrentScene->Update(ts);
 
 				FROST_CORE_WARN("The scene doesn't have a camera!");
@@ -150,9 +154,10 @@ namespace Frost
 		}
 		else
 		{
-			m_EditorCamera->OnUpdate(ts);
-			Renderer::BeginScene(m_EditorCamera);
-			m_CurrentScene->SetSelectedEntity(m_SceneHierarchyPanel->GetSelectedEntity());
+			if (m_ViewPortMouseHovered || Input::GetCursorMode() == CursorMode::Locked)
+				m_EditorCamera->OnUpdate(ts);
+
+			Renderer::BeginScene(m_CurrentScene, m_EditorCamera);
 			m_CurrentScene->Update(ts);
 
 			// Render selected entity - physics debug mesh (if it has)
@@ -331,6 +336,7 @@ namespace Frost
 			m_ViewportPanel->RenderViewportRenderPasses();
 
 			m_IsViewPortFocused = ImGui::IsWindowFocused();
+			m_ViewPortMouseHovered = ImGui::IsWindowHovered();
 
 			{
 				auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
@@ -518,12 +524,29 @@ namespace Frost
 
 	void EditorLayer::OnEvent(Event& event)
 	{
+
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& event) { return OnKeyPressed(event); });
 
-		m_EditorCamera->OnEvent(event);
-		m_SceneHierarchyPanel->OnEvent(event);
-		m_InspectorPanel->OnEvent(event);
+		
+		if (m_ViewPortMouseHovered || Input::GetCursorMode() == CursorMode::Locked)
+		{
+			m_EditorCamera->OnEvent(event);
+			m_SceneHierarchyPanel->OnEvent(event); // This is mostly only for the deletion of entities
+		}
+		else
+		{
+
+			if (!m_ContentBrowser->IsContentBrowserFocused())
+			{
+				m_SceneHierarchyPanel->OnEvent(event);
+				m_InspectorPanel->OnEvent(event);
+			}
+			else
+			{
+				m_ContentBrowser->OnEvent(event);
+			}
+		}
 	}
 
 	bool EditorLayer::OnKeyPressed(KeyPressedEvent& event)

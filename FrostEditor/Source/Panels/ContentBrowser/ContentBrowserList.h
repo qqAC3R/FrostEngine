@@ -23,7 +23,7 @@ namespace Frost
 			Items.clear();
 		}
 
-		size_t FindItem(AssetHandle handle) const
+		size_t FindItem(UUID handle) const
 		{
 			for (size_t i = 0; i < Items.size(); i++)
 			{
@@ -34,8 +34,7 @@ namespace Frost
 			return InvalidItem;
 		}
 
-#if 0
-		void erase(AssetHandle handle)
+		void Erase(UUID handle)
 		{
 			size_t index = FindItem(handle);
 			if (index == InvalidItem)
@@ -44,9 +43,5 @@ namespace Frost
 			auto it = Items.begin() + index;
 			Items.erase(it);
 		}
-
-		
-		}
-#endif
 	};
 }

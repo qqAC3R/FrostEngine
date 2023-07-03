@@ -29,6 +29,7 @@ namespace Frost
 		static std::string GetFileSystemPathString(const AssetMetadata& metadata) { return GetFileSystemPath(metadata).string(); }
 
 		static bool IsAssetHandleValid(AssetHandle assetHandle) { return GetMetadata(assetHandle).IsValid(); }
+		static bool IsAssetHandleNonZero(AssetHandle assetHandle) { return assetHandle.Get() != 0; }
 		static bool IsAssetLoaded(AssetHandle handle) { return s_LoadedAssets.find(handle) != s_LoadedAssets.end(); }
 
 
@@ -45,19 +46,6 @@ namespace Frost
 			{
 				if (IsAssetLoaded(assetHandle))
 					return s_LoadedAssets.at(assetHandle).As<T>();
-
-#if 0
-				AssetMetadata& metadata = GetMetadataInternal(assetHandle);
-
-				Ref<Asset> asset = nullptr;
-				metadata.IsDataLoaded = AssetImporter::TryLoadData(metadata, asset);
-
-				if (!metadata.IsDataLoaded)
-					return nullptr;
-
-				s_LoadedAssets[assetHandle] = asset;
-				return asset.As<T>();
-#endif
 			}
 
 			return nullptr;
@@ -91,11 +79,12 @@ namespace Frost
 
 			asset->Handle = metadata.Handle;
 			s_LoadedAssets[asset->Handle] = asset;
+			s_AssetRegistry[metadata.FilePath.string()] = metadata;
 
 
 			if (!s_AssetRegistry.Find(metadata.FilePath))
 			{
-				s_AssetRegistry[metadata.FilePath.string()] = metadata;
+				//s_AssetRegistry[metadata.FilePath.string()] = metadata;
 
 				// If an asset has recently been created, we firstly serialize,
 				// because it must have a physical location on the disk
@@ -137,9 +126,8 @@ namespace Frost
 
 			if (!metadata.IsDataLoaded)
 			{
-				// This was mostly created for the MaterialAsset, Prefab, because we firstly have to search for the data in files
-				// If not found, create a new MaterialAsset
-				// In the case of other assets, we try to just reload and thats it
+				// This was mostly designed for the MaterialAsset, Prefab, because we firstly have to search for the data in files
+				// If not found, create a new MaterialAsset. In the case of other assets, we try to just load and thats it
 				asset = AssetImporter::CreateAssetRef(metadata, pNext);
 
 				if (asset)
@@ -150,11 +138,11 @@ namespace Frost
 
 			asset->Handle = metadata.Handle;
 			s_LoadedAssets[asset->Handle] = asset;
-
+			s_AssetRegistry[metadata.FilePath.string()] = metadata;
 
 			if (!s_AssetRegistry.Find(metadata.FilePath))
 			{
-				s_AssetRegistry[metadata.FilePath.string()] = metadata;
+				//s_AssetRegistry[metadata.FilePath.string()] = metadata;
 
 				// If an asset has recently been created, we firstly serialize,
 				// because it must have a physical location on the disk
@@ -208,30 +196,34 @@ namespace Frost
 			RemoveAssetFromMemory(assetHandle);
 		}
 
-#if 0
-		static void CopyAssetToFilePath(Ref<Asset> asset, const std::string& newFilepath)
+		template<typename T>
+		static Vector<Ref<T>> GetAllLoadedAssetsByType()
 		{
-			std::string newAssetFilepath = AssetManager::GetRelativePath(newFilepath).string();
-			AssetMetadata oldMetadata = GetMetadataInternal(asset->Handle);
+			if (!std::is_base_of<Asset, T>::value)
+				FROST_ASSERT_INTERNAL("GetAllLoadedAssetsByType only works for types derived from Asset");
 
-			AssetMetadata newMetadata;
-			newMetadata.Handle = AssetHandle();
-			newMetadata.FilePath = newAssetFilepath;
-			newMetadata.Type = oldMetadata.Type;
-
-			s_AssetRegistry[newMetadata.FilePath] = newMetadata;
-
-			s_LoadedAssets[newMetadata.Handle] = s_LoadedAssets[oldMetadata.Handle];
+			Vector<Ref<T>> assets;
+			for (auto& [filepath, metadata] : s_AssetRegistry)
+			{
+				if (metadata.Type == T::GetStaticType())
+					assets.push_back(s_LoadedAssets[metadata.Handle]);
+			}
+			return assets;
 		}
-#endif
-		
-
 	public:
-
 		static bool FileExists(AssetMetadata& metadata)
 		{
 			return FileSystem::Exists(Project::GetActive()->GetAssetDirectory() / metadata.FilePath);
 		}
+
+		static bool ReloadData(AssetHandle assetHandle);
+
+		static void OnMoveAsset(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath);
+		static void OnRenameAsset(const std::filesystem::path& filepath, const std::string& name);
+		static void OnAssetDeleted(AssetHandle assetHandle);
+
+		static void OnMoveFilepath(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath);
+		static void OnRenameFilepath(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath);
 
 	private:
 		static void LoadAssetRegistry();

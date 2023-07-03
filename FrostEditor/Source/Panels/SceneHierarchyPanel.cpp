@@ -6,6 +6,7 @@
 #include "Frost/EntitySystem/Prefab.h"
 #include "Frost/Utils/PlatformUtils.h"
 #include "Frost/Asset/AssetManager.h"
+#include "Panels/ContentBrowser/ContentBrowser.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -116,19 +117,28 @@ namespace Frost
 			}
 			ImGui::PopStyleVar(); // ImGuiStyleVar_PopupRounding
 
-
+#if 0
 			ImRect windowRect = { ImGui::GetWindowContentRegionMin(), ImGui::GetWindowContentRegionMax() };
 			if (ImGui::BeginDragDropTargetCustom(windowRect, ImGui::GetCurrentWindow()->ID))
 			{
-				const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("scene_entity_hierarchy", ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
+				const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP, ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
+				ContentBrowserDragDropData* dragDropData = (ContentBrowserDragDropData*)payload->Data;
 
 				if (payload)
 				{
-					Entity& entity = *(Entity*)payload->Data;
-					m_SceneContext->UnparentEntity(entity);
+					// "Prefab type" might also be used as entity for the scene hierarchy panel. In this way, we dont have to add another AssetType "Entity"
+					if (dragDropData->AssetType == AssetType::Prefab)
+					{
+						Entity& entity = *(Entity*)dragDropData->Data;
+						m_SceneContext->UnparentEntity(entity);
+					}
+					delete dragDropData->Data;
 				}
+
+
 				ImGui::EndDragDropTarget();
 			}
+#endif
 
 
 			constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
@@ -191,8 +201,11 @@ namespace Frost
 		{
 			if (event.GetKeyCode() == Key::Delete)
 			{
-				m_SceneContext->DestroyEntity(m_SelectedEntity);
-				m_SelectedEntity = {};
+				if (m_SelectedEntity)
+				{
+					m_SceneContext->DestroyEntity(m_SelectedEntity);
+					m_SelectedEntity = {};
+				}
 			}
 			return false;
 		});
@@ -245,15 +258,16 @@ namespace Frost
 		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers))
 		{
 			ImGui::Text(entity.GetComponent<TagComponent>().Tag.c_str());
-			ImGui::SetDragDropPayload(HIERARCHY_ENTITY_DRAG_DROP, &entity, sizeof(Entity));
+
+			ContentBrowserDragDropData dragDropData(AssetType::Prefab, &entity, sizeof(Entity));
+
+			ImGui::SetDragDropPayload(CONTENT_BROWSER_DRAG_DROP, &dragDropData, sizeof(ContentBrowserDragDropData));
 			ImGui::EndDragDropSource();
 
 			if (m_SelectedEntity)
 			{
 				m_SelectedEntity = m_PreviousEntity;
-				//m_PreviousEntity = {};
 				m_SelectedSubmesh = NO_SUBMESH_SELECTED;
-
 			}
 		}
 		else
@@ -268,11 +282,24 @@ namespace Frost
 
 		if (ImGui::BeginDragDropTarget())
 		{
-			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(HIERARCHY_ENTITY_DRAG_DROP);
+			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
 			if (payload)
 			{
+#if 0
 				Entity& droppedEntity = *(Entity*)payload->Data;
 				m_SceneContext->ParentEntity(entity, droppedEntity);
+#endif
+				ContentBrowserDragDropData dragDropData = *(ContentBrowserDragDropData*)payload->Data;
+
+				// "Prefab type" might also be used as entity for the scene hierarchy panel. In this way, we dont have to add another AssetType "Entity"
+				if (dragDropData.AssetType == AssetType::Prefab)
+				{
+					Entity& droppedEntity = *(Entity*)dragDropData.Data;
+					m_SceneContext->ParentEntity(entity, droppedEntity);
+				}
+
+				//delete dragDropData.Data;
+
 			}
 			ImGui::EndDragDropTarget();
 		}

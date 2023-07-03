@@ -2,10 +2,13 @@
 #include "ContentBrowserList.h"
 
 #include "Frost/Core/Input.h"
+#include "Frost/Project/Project.h"
 #include "Frost/InputCodes/KeyCodes.h"
+#include "Frost/Utils/FileSystem.h"
 
 #include "UserInterface/UIWidgets.h"
 #include "Frost/Asset/AssetExtensions.h"
+#include "Frost/Asset/AssetManager.h"
 #include "Panels/ContentBrowser/ContentBrowser.h"
 
 #include <imgui_internal.h>
@@ -30,7 +33,24 @@ namespace Frost
 		ImGui::BeginGroup();
 	}
 
-	ContentBrowserItemAction ContentBrowserItem::OnRender(float thumbnailSize, bool displayAssetType)
+	static ImU32 GetInfoPanelAssetTypeColo(AssetType assetType)
+	{
+		switch (assetType)
+		{
+			case AssetType::None:        return IM_COL32(64, 127, 254, 255); // Blue (Default)
+			case AssetType::Scene:       return IM_COL32(202, 114, 0, 255); // Orange
+			case AssetType::MeshAsset:   return IM_COL32(92, 184, 255, 255); // Light Blue
+			case AssetType::Material:    return IM_COL32(25, 255, 64, 255); // Light Green (lime)
+			case AssetType::Prefab:      return IM_COL32(249, 51, 255, 255); // Pink
+			case AssetType::PhysicsMat:  return IM_COL32(252, 58, 58, 255); // Red
+			case AssetType::Texture:     return IM_COL32(207, 252, 5, 255); // Yellowish green
+			case AssetType::EnvMap:      return IM_COL32(58, 252, 178, 255); // Cyan
+			case AssetType::Font:        return IM_COL32(128, 0, 130, 255); // Dark pink
+		}
+		return IM_COL32(64, 127, 254, 255);
+	}
+
+	ContentBrowserItemAction ContentBrowserItem::OnRender(float thumbnailSize, bool displayAssetType, bool isItemCutAndPasted)
 	{
 		ContentBrowserItemAction result;
 		result.Set(ContentBrowserAction::None, true);
@@ -66,6 +86,10 @@ namespace Frost
 			drawList->AddRect(itemRect.Min, itemRect.Max, propertyFieldColor, 6.0f, directory ? 0 : ImDrawFlags_RoundCornersBottom, 2.0f);
 		};
 
+		std::string invisibleButtonID = "##" + m_Name + "_InvisibleButton";
+		UserInterface::InvisibleButtonWithNoBehaivour(invisibleButtonID.c_str(), { bottomRight.x - topLeft.x, infoTopLeft.y - topLeft.y + infoPanelHeight });
+		ImGui::SetCursorScreenPos(topLeft);
+
 		/// Draw buttons
 		if (m_Type != ItemType::Directory)
 		{
@@ -76,15 +100,15 @@ namespace Frost
 
 			constexpr auto backgroundDarkColor = IM_COL32(26, 26, 26, 255);
 			constexpr auto groupHeaderColor = IM_COL32(47, 47, 47, 255);
+			//constexpr auto blueColor = IM_COL32(22, 139, 247, 255);
 
 			// Draw background
 			drawList->AddRectFilled(topLeft, thumbBottomRight, backgroundDarkColor);
 			drawList->AddRectFilled(infoTopLeft, bottomRight, groupHeaderColor, 6.0f, ImDrawFlags_RoundCornersBottom);
+			drawList->AddRectFilled(infoTopLeft, { bottomRight.x, infoTopLeft.y + 2.0f }, GetInfoPanelAssetTypeColo(m_AssetType));
 		}
 		else if (ImGui::ItemHoverable(ImRect(topLeft, bottomRight), ImGui::GetID(m_Name.c_str())) || m_IsSelected)
 		{
-			// If hovered or selected directory
-
 			// Draw shadow
 			drawShadow(topLeft, bottomRight, true);
 
@@ -111,17 +135,34 @@ namespace Frost
 			if(m_Type == ItemType::Directory)
 				icon = ContentBrowserPanel::GetFolderIcon();
 
+			ImU32 thumbnailColorTint = IM_COL32(255, 255, 255, 225);
+
+			if(isItemCutAndPasted)
+				thumbnailColorTint = IM_COL32(255, 255, 255, 150);
 
 			UserInterface::DrawButtonImage(icon,
-				IM_COL32(255, 255, 255, 225),
-				IM_COL32(255, 255, 255, 225),
-				IM_COL32(255, 255, 255, 225),
+				thumbnailColorTint,
+				thumbnailColorTint,
+				thumbnailColorTint,
 				result
 			);
 		}
 		
 		
 		/// Info Panel
+
+		auto renamingWidget = [&]
+		{
+			ImGui::SetKeyboardFocusHere();
+			if (ImGui::InputText("##rename", s_RenameBuffer, MAX_INPUT_BUFFER_LENGTH, ImGuiInputTextFlags_EnterReturnsTrue))
+			{
+				OnRenamed(s_RenameBuffer);
+				m_IsRenaming = false;
+				result.Set(ContentBrowserAction::Renamed, true);
+				result.Set(ContentBrowserAction::Refresh, true);
+
+			}
+		};
 
 		const ImVec2 cursor = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(cursor.x + edgeOffset , cursor.y + edgeOffset));
@@ -130,7 +171,6 @@ namespace Frost
 		{
 			{
 				const float textWidth = std::min(ImGui::CalcTextSize(m_Name.c_str()).x, thumbnailSize);
-				//ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + (thumbnailSize - edgeOffset * 3.0f));
 				const float textCenter = ((thumbnailSize / 2.0f) - (textWidth / 2.0f)) - 1.0f;
 				ImGui::PushTextWrapPos(ImGui::GetCursorPosX() +  (thumbnailSize - edgeOffset * 3.0f) );
 
@@ -138,8 +178,9 @@ namespace Frost
 
 				if (m_IsRenaming)
 				{
-					ImGui::SetNextItemWidth(thumbnailSize - edgeOffset * 3.0f);
-					//renamingWidget();
+					ImGui::SetCursorPosX(ImGui::GetCursorPosX() - textCenter / 2.0f);
+					ImGui::SetNextItemWidth(textWidth + textCenter);
+					renamingWidget();
 				}
 				else
 				{
@@ -155,7 +196,7 @@ namespace Frost
 			if (m_IsRenaming)
 			{
 				ImGui::SetNextItemWidth(thumbnailSize - edgeOffset * 3.0f);
-				//renamingWidget();
+				renamingWidget();
 			}
 			else
 			{
@@ -302,8 +343,8 @@ namespace Frost
 		{
 			result.Set(ContentBrowserAction::Selected, true);
 
-			if (!Input::IsKeyPressed(Key::LeftControl) && !Input::IsKeyPressed(Key::LeftShift))
-				result.Set(ContentBrowserAction::ClearSelection, true);
+			//if (!Input::IsKeyPressed(Key::LeftControl) && !Input::IsKeyPressed(Key::LeftShift))
+			//	result.Set(ContentBrowserAction::ClearSelection, true);
 
 			OnContextMenuOpen(result);
 			ImGui::EndPopup();
@@ -351,15 +392,83 @@ namespace Frost
 
 	void ContentBrowserItem::OnContextMenuOpen(ContentBrowserItemAction& actionResult)
 	{
-		//if (ImGui::MenuItem("Delete"))
-		//	actionResult.Set(ContentBrowserAction::OpenDeleteDialogue, true);
-		//
-		//ImGui::Separator();
+
+		if (ImGui::MenuItem("Reload Asset"))
+			actionResult.Set(ContentBrowserAction::ReloadAsset, true);
+
+		if (ImGui::MenuItem("Rename", "F2"))
+		{
+			StartRenaming();
+			actionResult.Set(ContentBrowserAction::Renamed, true);
+		}
+
+		if (ImGui::MenuItem("Copy", "Ctrl+C"))
+			actionResult.Set(ContentBrowserAction::Copy, true);
+
+		if (ImGui::MenuItem("Delete"))
+			actionResult.Set(ContentBrowserAction::Delete, true);
+
+
+		ImGui::Separator();
 
 		if (ImGui::MenuItem("Show In Explorer"))
 			actionResult.Set(ContentBrowserAction::ShowInExplorer, true);
 		if (ImGui::MenuItem("Open Externally"))
 			actionResult.Set(ContentBrowserAction::OpenExternal, true);
+	}
+
+	void ContentBrowserItem::OnRenamed(const std::string& newName)
+	{
+		if (FileSystem::Exists(Project::GetActive()->GetAssetDirectory() / m_Filepath.parent_path() / newName))
+		{
+			FROST_CORE_ERROR("A directory with that name already exists!");
+			return;
+		}
+
+		FileSystem::Rename(Project::GetActive()->GetAssetDirectory() / m_Filepath, Project::GetActive()->GetAssetDirectory() / m_Filepath.parent_path() / newName);
+
+		if (m_Type == ItemType::Directory)
+		{
+
+			AssetManager::OnRenameFilepath(
+				Project::GetActive()->GetAssetDirectory() / m_Filepath,
+				Project::GetActive()->GetAssetDirectory() / m_Filepath.parent_path() / newName
+			);
+		}
+		else
+		{
+			AssetManager::OnRenameAsset(
+				Project::GetActive()->GetAssetDirectory() / m_Filepath,
+				newName
+			);
+		}
+
+		
+
+	}
+
+	void ContentBrowserItem::OnDelete()
+	{
+		bool deleted = FileSystem::DeleteFile(Project::GetActive()->GetAssetDirectory() / m_Filepath);
+		if (!deleted)
+		{
+			FROST_CORE_ERROR("Failed to delete folder {0}", m_Filepath.string());
+			return;
+		}
+
+		if (m_Type == ItemType::Directory)
+		{
+			for (auto& [assetUUID, assetInfo] : m_ContentBrowserPanel->m_CurrentDirectory->Files)
+			{
+				const AssetMetadata& assetMetadata = AssetManager::GetMetadata(assetInfo->FilePath);
+				AssetManager::OnAssetDeleted(assetMetadata.Handle);
+			}
+		}
+		else
+		{
+			const AssetMetadata& assetMetadata = AssetManager::GetMetadata(m_Filepath);
+			AssetManager::OnAssetDeleted(assetMetadata.Handle);
+		}
 	}
 
 }

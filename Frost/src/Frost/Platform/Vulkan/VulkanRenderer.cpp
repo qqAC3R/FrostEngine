@@ -343,21 +343,23 @@ namespace Frost
 		});
 	}
 
-	void VulkanRenderer::BeginScene(Ref<EditorCamera> camera)
+	void VulkanRenderer::BeginScene(Ref<Scene> scene, Ref<EditorCamera>& camera)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		Renderer::Submit([&, camera, currentFrameIndex]()
+		Renderer::Submit([&, scene, camera, currentFrameIndex]()
 		{
 			s_RenderQueue[currentFrameIndex].SetCamera(camera);
+			s_RenderQueue[currentFrameIndex].SetActiveScene(scene);
 		});
 	}
 
-	void VulkanRenderer::BeginScene(Ref<RuntimeCamera> camera)
+	void VulkanRenderer::BeginScene(Ref<Scene> scene, Ref<RuntimeCamera>& camera)
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		Renderer::Submit([&, camera, currentFrameIndex]()
+		Renderer::Submit([&, scene, camera, currentFrameIndex]()
 		{
 			s_RenderQueue[currentFrameIndex].SetCamera(camera);
+			s_RenderQueue[currentFrameIndex].SetActiveScene(scene);
 		});
 	}
 
@@ -420,13 +422,10 @@ namespace Frost
 		return VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 	}
 
-	void VulkanRenderer::SetEditorActiveEntity(uint32_t selectedEntityId)
+	Ref<Scene> VulkanRenderer::GetActiveScene()
 	{
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		Renderer::Submit([&, currentFrameIndex, selectedEntityId]()
-		{
-			s_RenderQueue[currentFrameIndex].SetEditorActiveEntity(selectedEntityId);
-		});
+		return s_RenderQueue[currentFrameIndex].m_ActiveScene;
 	}
 
 	void VulkanRenderer::Submit(const Ref<Mesh>& mesh, const glm::mat4& transform, uint32_t entityID)

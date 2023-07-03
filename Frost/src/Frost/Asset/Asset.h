@@ -23,6 +23,8 @@ namespace Frost
 			return ((Flags & (uint16_t)AssetFlag::Missing) | (Flags & (uint16_t)AssetFlag::Invalid)) == 0;
 		}
 
+		virtual bool ReloadData(const std::string& filepath) { return false; }
+
 		virtual bool operator==(const Asset& other) const
 		{
 			return Handle == other.Handle;

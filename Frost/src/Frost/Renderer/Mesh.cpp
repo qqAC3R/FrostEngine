@@ -9,6 +9,9 @@
 #include "Frost/Renderer/OZZAssimpImporter.h"
 #include "Frost/Renderer/BindlessAllocator.h"
 
+#include "Frost/EntitySystem/Scene.h"
+#include "Frost/EntitySystem/Entity.h"
+
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <assimp/Importer.hpp>
@@ -226,7 +229,7 @@ namespace Frost
 				index = { maxIndex + mesh->mFaces[i].mIndices[0], maxIndex + mesh->mFaces[i].mIndices[1], maxIndex + mesh->mFaces[i].mIndices[2] };
 				submeshIndices.push_back(index);
 
-				
+
 
 				if (subMeshLastIndex < index.V1) subMeshLastIndex = index.V1;
 				if (subMeshLastIndex < index.V2) subMeshLastIndex = index.V2;
@@ -313,7 +316,7 @@ namespace Frost
 
 
 		// Vertex/Index buffer
-		if(m_IsAnimated)
+		if (m_IsAnimated)
 			m_VertexBuffer = VertexBuffer::Create(m_SkinnedVertices.data(), m_SkinnedVertices.size() * sizeof(AnimatedVertex));
 		else
 			m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
@@ -353,21 +356,21 @@ namespace Frost
 
 				// Fill up the data in the correct order for us to copy it later
 				DataStorage& materialData = m_MaterialData[i];
-				materialData.Add("AlbedoColor",     glm::vec4(0.0f));
-				materialData.Add("EmissionFactor",  0.0f);
+				materialData.Add("AlbedoColor", glm::vec4(0.0f));
+				materialData.Add("EmissionFactor", 0.0f);
 				materialData.Add("RoughnessFactor", 0.0f);
 				materialData.Add("MetalnessFactor", 0.0f);
 
 				materialData.Add("UseNormalMap", 0);
 
-				materialData.Add("AlbedoTexture",    0);
+				materialData.Add("AlbedoTexture", 0);
 				materialData.Add("RoughnessTexture", 0);
 				materialData.Add("MetalnessTexture", 0);
-				materialData.Add("NormalTexture",    0);
+				materialData.Add("NormalTexture", 0);
 
 
 				// Each mesh has 4 textures, and se we allocated numMaterials * 4 texture slots.
-				uint32_t albedoTextureIndex =    (i * 4) + 0;
+				uint32_t albedoTextureIndex = (i * 4) + 0;
 				uint32_t roughnessTextureIndex = (i * 4) + 1;
 				uint32_t metalnessTextureIndex = (i * 4) + 2;
 				uint32_t normalMapTextureIndex = (i * 4) + 3;
@@ -382,7 +385,7 @@ namespace Frost
 
 				auto aiMaterialName = aiMaterial->GetName();
 				m_MaterialNames[i] = aiMaterialName.C_Str();
-				
+
 				uint32_t textureCount = aiMaterial->GetTextureCount(aiTextureType_DIFFUSE);
 
 				aiColor3D aiColor, aiEmission;
@@ -467,9 +470,6 @@ namespace Frost
 					textureSpec.Format = ImageFormat::RGBA8;
 					textureSpec.Usage = ImageUsage::ReadOnly;
 					textureSpec.FlipTexture = true;
-#if 0
-					auto texture = Texture2D::Create(texturePath, textureSpec);
-#endif
 					Ref<Texture2D> texture = AssetManager::GetOrLoadAsset<Texture2D>(texturePath, (void*)&textureSpec);
 					if (texture->Loaded())
 					{
@@ -565,187 +565,6 @@ namespace Frost
 				{
 					m_TexturesList[metalnessTextureIndex] = whiteTexture;
 				}
-
-#if 0
-				// Albedo Map
-				aiString aiTexPath;
-				bool hasAlbedoMap = aiMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &aiTexPath) == AI_SUCCESS;
-				if (hasAlbedoMap)
-				{
-					std::filesystem::path path = filepath;
-					auto parentPath = path.parent_path();
-					parentPath /= std::string(aiTexPath.data);
-					std::string texturePath = parentPath.string();
-
-					TextureSpecification textureSpec{};
-					textureSpec.Format = ImageFormat::RGBA8;
-					textureSpec.Usage = ImageUsage::ReadOnly;
-					textureSpec.UseMips = true;
-					auto texture = Texture2D::Create(texturePath, textureSpec);
-					if (texture->Loaded())
-					{
-						texture->GenerateMipMaps();
-
-						uint32_t textureId = m_TextureAllocatorSlots[albedoTextureIndex];
-						m_Textures[textureId] = texture;
-						m_TexturesFilepaths[i].AlbedoFilepath = texturePath;
-						
-						BindlessAllocator::AddTextureCustomSlot(texture, textureId);
-					}
-					else
-					{
-						FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
-	
-						uint32_t textureId = m_TextureAllocatorSlots[albedoTextureIndex];
-						m_Textures[textureId] = whiteTexture;
-						
-						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-					}
-				}
-				else
-				{
-					uint32_t textureId = m_TextureAllocatorSlots[albedoTextureIndex];
-					m_Textures[textureId] = whiteTexture;
-					
-					BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-				}
-
-
-				// Normal map
-				bool hasNormalMap = aiMaterial->GetTexture(aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS;
-				if (hasNormalMap)
-				{
-					std::filesystem::path path = filepath;
-					auto parentPath = path.parent_path();
-					parentPath /= std::string(aiTexPath.data);
-					std::string texturePath = parentPath.string();
-
-					TextureSpecification textureSpec{};
-					textureSpec.Format = ImageFormat::RGBA8;
-					textureSpec.Usage = ImageUsage::ReadOnly;
-					auto texture = Texture2D::Create(texturePath, textureSpec);
-					if (texture->Loaded())
-					{
-						uint32_t textureId = m_TextureAllocatorSlots[normalMapTextureIndex];
-						m_Textures[textureId] = texture;
-						m_TexturesFilepaths[i].NormalMapFilepath = texturePath;
-
-						m_MaterialData[i].Set("UseNormalMap", uint32_t(1));
-						BindlessAllocator::AddTextureCustomSlot(texture, textureId);
-					}
-					else
-					{
-						FROST_CORE_ERROR("Couldn't load albedo texture: {0}", texturePath);
-						uint32_t textureId = m_TextureAllocatorSlots[normalMapTextureIndex];
-						m_Textures[textureId] = whiteTexture;
-
-						m_MaterialData[i].Set("UseNormalMap", uint32_t(0));
-						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-					}
-				}
-				else
-				{
-					uint32_t textureId = m_TextureAllocatorSlots[normalMapTextureIndex];
-					m_Textures[textureId] = whiteTexture;
-
-					m_MaterialData[i].Set("UseNormalMap", uint32_t(0));
-					BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-				}
-
-
-				// Roughness map
-				bool hasRoughnessMap = aiMaterial->GetTexture(aiTextureType_SHININESS, 0, &aiTexPath) == AI_SUCCESS;
-				if (hasRoughnessMap)
-				{
-					std::filesystem::path path = filepath;
-					auto parentPath = path.parent_path();
-					parentPath /= std::string(aiTexPath.data);
-					std::string texturePath = parentPath.string();
-
-					TextureSpecification textureSpec{};
-					textureSpec.Format = ImageFormat::RGBA8;
-					textureSpec.Usage = ImageUsage::ReadOnly;
-					auto texture = Texture2D::Create(texturePath, textureSpec);
-					if (texture->Loaded())
-					{
-						uint32_t textureId = m_TextureAllocatorSlots[roughnessTextureIndex];
-						m_Textures[textureId] = texture;
-						m_TexturesFilepaths[i].RoughnessMapFilepath = texturePath;
-
-						BindlessAllocator::AddTextureCustomSlot(texture, textureId);
-					}
-					else
-					{
-						FROST_CORE_ERROR("Couldn't load normal texture: {0}", texturePath);
-
-						uint32_t textureId = m_TextureAllocatorSlots[roughnessTextureIndex];
-						m_Textures[textureId] = whiteTexture;
-						
-						BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-					}
-				}
-				else
-				{
-					uint32_t textureId = m_TextureAllocatorSlots[roughnessTextureIndex];
-					m_Textures[textureId] = whiteTexture;
-					
-					BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-				}
-
-
-				bool metalnessTextureFound = false;
-				for (uint32_t p = 0; p < aiMaterial->mNumProperties; p++)
-				{
-					auto prop = aiMaterial->mProperties[p];
-
-					if (prop->mType == aiPTI_String)
-					{
-						uint32_t strLength = *(uint32_t*)prop->mData;
-						std::string str(prop->mData + 4, strLength);
-
-						std::string key = prop->mKey.data;
-						if (key == "$raw.ReflectionFactor|file")
-						{
-							std::filesystem::path path = filepath;
-							auto parentPath = path.parent_path();
-							parentPath /= std::string(aiTexPath.data);
-							std::string texturePath = parentPath.string();
-
-							TextureSpecification textureSpec{};
-							textureSpec.Format = ImageFormat::RGBA8;
-							textureSpec.Usage = ImageUsage::ReadOnly;
-
-							auto texture = Texture2D::Create(texturePath, textureSpec);
-							if (texture->Loaded())
-							{
-								metalnessTextureFound = true;
-
-								uint32_t textureId = m_TextureAllocatorSlots[metalnessTextureIndex];
-								m_Textures[textureId] = texture;
-								m_TexturesFilepaths[i].MetalnessMapFilepath = texturePath;
-
-								BindlessAllocator::AddTextureCustomSlot(texture, textureId);
-							}
-							else
-							{
-								FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
-							}
-							break;
-						}
-					}
-
-				}
-
-				if (!metalnessTextureFound)
-				{
-					uint32_t textureId = m_TextureAllocatorSlots[metalnessTextureIndex];
-					m_Textures[textureId] = whiteTexture;
-
-					BindlessAllocator::AddTextureCustomSlot(whiteTexture, textureId);
-				}
-
-#endif
-
 			}
 		}
 		else
@@ -781,6 +600,142 @@ namespace Frost
 		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)(m_Indices.size() * sizeof(Index)));
 
 		m_IsLoaded = true;
+	}
+
+	bool MeshAsset::ReloadData(const std::string& filepath)
+	{
+		std::string totalFilepath = AssetManager::GetFileSystemPathString(AssetManager::GetMetadata(filepath));
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		size_t numMaterials = m_MaterialData.size();
+
+		Ref<MeshAsset> newMeshAsset = MeshAsset::Load(totalFilepath);
+
+		if (!newMeshAsset->IsLoaded())
+		{
+			FROST_CORE_ERROR("Reloaded Mesh Asset is invalid!");
+			return false;
+		}
+
+		// When reloading the mesh data, there might be a chance that the user wants to change the materials or submeshes or even bone information.
+		// In that case we should retrieve all the meshes from the AssetManager which use this MeshAsset and reset their specificed paramaters to be updated to MeshAsset
+		bool doAllMeshesNeedReset = false;
+		if (newMeshAsset->m_Submeshes.size() != m_Submeshes.size() ||
+			newMeshAsset->m_MaterialData.size() != m_MaterialData.size() ||
+			newMeshAsset->m_BoneInfo.size() != m_BoneInfo.size())
+		{
+			doAllMeshesNeedReset = true;
+		}
+
+		m_IsLoaded = newMeshAsset->m_IsLoaded;
+		m_IsAnimated = newMeshAsset->m_IsAnimated;
+
+		// Mesh data
+		m_Vertices = newMeshAsset->m_Vertices;
+		m_SkinnedVertices = newMeshAsset->m_SkinnedVertices;
+		m_Indices = newMeshAsset->m_Indices;
+		m_Submeshes = newMeshAsset->m_Submeshes;
+
+		// Bone/Animation information
+		m_BoneCount = newMeshAsset->m_BoneCount;
+		m_BoneInfo = newMeshAsset->m_BoneInfo;
+		m_Skeleton = newMeshAsset->m_Skeleton;
+		m_Animations = newMeshAsset->m_Animations;
+
+		m_VertexBuffer = newMeshAsset->m_VertexBuffer;
+		m_IndexBuffer = newMeshAsset->m_IndexBuffer;
+
+		m_TexturesList = newMeshAsset->m_TexturesList;
+		m_MaterialData = newMeshAsset->m_MaterialData;
+		m_MaterialNames = newMeshAsset->m_MaterialNames;
+
+		m_AccelerationStructure = newMeshAsset->m_AccelerationStructure;
+		m_SubmeshIndexBuffers = newMeshAsset->m_SubmeshIndexBuffers;
+
+		// There is an explanation above for why we need this
+		if (doAllMeshesNeedReset)
+		{
+			//auto meshes = AssetManager::GetAllLoadedAssetsByType<Mesh>();
+			Ref<Scene> activeRenderingScene = Renderer::GetActiveScene();
+			auto entitiesWithMeshComponent = activeRenderingScene->GetAllEntitiesWith<MeshComponent>();
+
+
+			for (auto& entity : entitiesWithMeshComponent)
+			{
+				Entity e = Entity(entity, activeRenderingScene.Raw());
+				MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
+
+				if (meshComponent.IsMeshValid())
+				{
+					Ref<Mesh> mesh = meshComponent.Mesh;
+
+					if (mesh->GetMeshAsset()->GetFilepath() == m_Filepath)
+					{
+						mesh->m_MaterialAssets.resize(numMaterials);
+						for (uint32_t i = 0; i < numMaterials; i++)
+						{
+							mesh->m_MaterialAssets[i] = Ref<MaterialAsset>::Create();
+							Ref<MaterialAsset> materialAsset = mesh->m_MaterialAssets[i];
+
+							std::string materialName = m_MaterialNames[i];
+							if (!materialName.empty())
+								materialAsset->SetMaterialName(m_MaterialNames[i]);
+							else
+								materialAsset->SetMaterialName("Default");
+
+							materialAsset->SetAlbedoColor(m_MaterialData[i].Get<glm::vec4>("AlbedoColor"));
+							materialAsset->SetEmission(m_MaterialData[i].Get<float>("EmissionFactor"));
+							materialAsset->SetRoughness(m_MaterialData[i].Get<float>("RoughnessFactor"));
+							materialAsset->SetMetalness(m_MaterialData[i].Get<float>("MetalnessFactor"));
+							materialAsset->SetUseNormalMap(m_MaterialData[i].Get<uint32_t>("UseNormalMap"));
+
+							// Each mesh has 4 textures, and se we allocated numMaterials * 4 texture slots.
+							uint32_t albedoTextureIndex = (i * 4) + 0;
+							uint32_t roughnessTextureIndex = (i * 4) + 1;
+							uint32_t metalnessTextureIndex = (i * 4) + 2;
+							uint32_t normalMapTextureIndex = (i * 4) + 3;
+
+							materialAsset->SetAlbedoMap(m_TexturesList[albedoTextureIndex]);
+							materialAsset->SetRoughnessMap(m_TexturesList[roughnessTextureIndex]);
+							materialAsset->SetMetalnessMap(m_TexturesList[metalnessTextureIndex]);
+							materialAsset->SetNormalMap(m_TexturesList[normalMapTextureIndex]);
+						}
+
+						m_Submeshes.resize(m_Submeshes.size());
+						for (uint32_t submeshIndex = 0; submeshIndex < m_Submeshes.size(); submeshIndex++)
+						{
+							const auto& submesh = m_Submeshes[submeshIndex];
+							m_Submeshes[submeshIndex].Transform = submesh.Transform;
+						}
+
+						// Setting up the animations for the new Mesh, using information from the Mesh Asset
+						if (m_IsAnimated)
+						{
+							mesh->m_BoneTransforms.resize(m_BoneInfo.size());
+							for (size_t i = 0; i < m_BoneInfo.size(); ++i)
+								mesh->m_BoneTransforms[i] = glm::mat4(FLT_MAX);
+
+							mesh->m_BoneTransformsUniformBuffer.resize(framesInFlight);
+							for (uint32_t i = 0; i < framesInFlight; i++)
+								mesh->m_BoneTransformsUniformBuffer[i] = UniformBuffer::Create(sizeof(glm::mat4) * mesh->m_BoneTransforms.size());
+						}
+
+					}
+				}
+			}
+		}
+
+
+#if 0
+		void* memory = this;
+		AssetHandle previousAssetHandle = Handle;
+		uint16_t previousAssetFlags = Flags;
+
+		new(memory) MeshAsset(totalFilepath, MaterialInstance(), MeshBuildSettings());
+		this->Handle = previousAssetHandle;
+		this->Flags = previousAssetFlags;
+#endif
+
+		return true;
 	}
 
 	void MeshAsset::TraverseNodes(aiNode* node, const glm::mat4& parentTransform, uint32_t level)
@@ -851,7 +806,7 @@ namespace Frost
 		}
 
 		m_Submeshes.resize(m_MeshAsset->GetSubMeshes().size());
-		for(uint32_t submeshIndex = 0; submeshIndex < m_MeshAsset->GetSubMeshes().size(); submeshIndex++)
+		for (uint32_t submeshIndex = 0; submeshIndex < m_MeshAsset->GetSubMeshes().size(); submeshIndex++)
 		{
 			const auto& submesh = m_MeshAsset->GetSubMeshes()[submeshIndex];
 			m_Submeshes[submeshIndex].Transform = submesh.Transform;

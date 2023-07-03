@@ -6,6 +6,8 @@
 #include "Frost/Project/Project.h"
 #include "Frost/Utils/FileSystem.h"
 #include "Frost/Asset/AssetExtensions.h"
+#include "Frost/Renderer/MaterialAsset.h"
+#include "Frost/Physics/PhysicsMaterial.h"
 
 namespace Frost
 {
@@ -152,25 +154,179 @@ namespace Frost
 		fout << out.dump(4);
 	}
 
-#if 0
+	void AssetManager::OnRenameAsset(const std::filesystem::path& filepath, const std::string& name)
+	{
+		std::filesystem::path relativeFilepath = GetRelativePathString(filepath);
+		if (s_AssetRegistry.Find(relativeFilepath))
+		{
+			std::filesystem::path result = "";
+
+			for (auto file : relativeFilepath)
+			{
+				if (file.has_extension())
+					result /= name;
+				else
+					result /= file.string();
+			}
+
+			s_AssetRegistry[result] = s_AssetRegistry[relativeFilepath];
+			s_AssetRegistry[result].FilePath = result;
+
+			// This is optional, and mostly required only for the assets that have a `Name` in their class
+			switch (s_AssetRegistry[result].Type)
+			{
+				case AssetType::Material:
+				{
+					Ref<MaterialAsset> materialAsset = AssetManager::GetAsset<MaterialAsset>(s_AssetRegistry[result].FilePath.string());
+					if (materialAsset)
+						materialAsset->m_MaterialName = result.stem().string();
+					break;
+				}
+				case AssetType::PhysicsMat:
+				{
+					Ref<PhysicsMaterial> phyiscsmatAsset = AssetManager::GetAsset<PhysicsMaterial>(s_AssetRegistry[result].FilePath.string());
+					if (phyiscsmatAsset)
+						phyiscsmatAsset->m_MaterialName = result.stem().string();
+					break;
+				}
+			}
+
+			s_AssetRegistry.Remove(relativeFilepath);
+		}
+	}
+
+	static bool is_subpath(const std::filesystem::path& path,
+						   const std::filesystem::path& base)
+	{
+		auto rel = std::filesystem::relative(path, base);
+		return !rel.empty() && rel.native()[0] != '.';
+	}
+
+	void AssetManager::OnRenameFilepath(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath)
+	{
+		Vector<std::function<void()>> deleteFunction;
+
+		std::filesystem::path oldFilepathRelative = GetRelativePathString(oldFilepath);
+		std::filesystem::path newFilepathRelative = GetRelativePathString(newFilepath);
+
+		for (auto& [filepath, assetMetaData] : s_AssetRegistry)
+		{
+			if (is_subpath(filepath, oldFilepathRelative))
+			{
+				std::filesystem::path assetFilePath = filepath;
+				std::filesystem::path result = newFilepathRelative / filepath.filename();
+
+				deleteFunction.push_back([&, assetFilePath, result]()
+				{
+					s_AssetRegistry[result] = s_AssetRegistry[assetFilePath];
+					s_AssetRegistry[result].FilePath = result;
+
+					s_AssetRegistry.Remove(assetFilePath);
+				});
+
+			}
+		}
+
+		for (auto& func : deleteFunction)
+			func();
+	}
+
+
+	void AssetManager::OnMoveFilepath(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath)
+	{
+		Vector<std::function<void()>> deleteFunction;
+
+		std::filesystem::path oldFilepathRelative = GetRelativePathString(oldFilepath);
+		std::filesystem::path newFilepathRelative = GetRelativePathString(newFilepath);
+
+		for (auto& [filepath, assetMetaData] : s_AssetRegistry)
+		{
+			if (is_subpath(filepath, oldFilepathRelative))
+			{
+				std::vector<std::string> oldFilePathVec;
+				std::vector<std::string> newFilePathVec;
+
+				for (auto file : filepath)
+					oldFilePathVec.push_back(file.string());
+
+				for (auto file : newFilepathRelative)
+					newFilePathVec.push_back(file.string());
+
+
+				//////////
+				std::filesystem::path result = "";
+				for (uint32_t i = 0; i < oldFilePathVec.size(); i++)
+				{
+					if (i >= newFilePathVec.size())
+					{
+						result /= oldFilePathVec[i];
+						continue;
+					}
+
+					if (newFilePathVec[i] != oldFilePathVec[i])
+						result /= newFilePathVec[i];
+					else
+						result /= oldFilePathVec[i];
+				}
+
+				std::filesystem::path assetFilePath = filepath;
+				deleteFunction.push_back([&, assetFilePath, result]()
+				{
+					s_AssetRegistry[result] = s_AssetRegistry[assetFilePath];
+					s_AssetRegistry[result].FilePath = result;
+
+					s_AssetRegistry.Remove(assetFilePath);
+				});
+
+			}
+		}
+
+		for (auto& func : deleteFunction)
+			func();
+	}
+
+	void AssetManager::OnMoveAsset(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath)
+	{
+		std::filesystem::path relativeOldFilepath = GetRelativePathString(oldFilepath);
+		std::filesystem::path relativeNewFlepath = GetRelativePathString(newFilepath);
+
+		if (s_AssetRegistry.Find(relativeOldFilepath))
+		{
+			s_AssetRegistry[relativeNewFlepath] = s_AssetRegistry[relativeOldFilepath];
+			s_AssetRegistry[relativeNewFlepath].FilePath = relativeNewFlepath;
+
+			s_AssetRegistry.Remove(relativeOldFilepath);
+		}
+	}
+
+	void AssetManager::OnAssetDeleted(AssetHandle assetHandle)
+	{
+		AssetMetadata metadata = GetMetadata(assetHandle);
+		if (!metadata.IsValid())
+			return;
+
+		s_AssetRegistry.Remove(metadata.FilePath);
+		s_LoadedAssets.erase(assetHandle);
+		WriteRegistryToFile();
+	}
+
 	bool AssetManager::ReloadData(AssetHandle assetHandle)
 	{
 		auto& metadata = GetMetadataInternal(assetHandle);
-		if (!metadata.IsDataLoaded)
+		if (s_LoadedAssets.find(metadata.Handle) == s_LoadedAssets.end())
 		{
 			FROST_CORE_WARN("Trying to reload asset that was never loaded");
 
 			Ref<Asset> asset;
-			metadata.IsDataLoaded = AssetImporter::TryLoadData(metadata, asset);
+			metadata.IsDataLoaded = AssetImporter::TryLoadData(metadata, asset, nullptr);
 			return metadata.IsDataLoaded;
 		}
 
 		FROST_ASSERT_INTERNAL(bool(s_LoadedAssets.find(assetHandle) != s_LoadedAssets.end()));
-		Ref<Asset>& asset = s_LoadedAssets.at(assetHandle);
-		metadata.IsDataLoaded = AssetImporter::TryLoadData(metadata, asset);
+		metadata.IsDataLoaded = s_LoadedAssets[assetHandle]->ReloadData(metadata.FilePath.string());
+
 		return metadata.IsDataLoaded;
 	}
-#endif
 
 	static AssetMetadata s_NullMetadata;
 	AssetMetadata& AssetManager::GetMetadataInternal(AssetHandle handle)
@@ -184,8 +340,10 @@ namespace Frost
 		return s_NullMetadata;
 	}
 
-	const Frost::AssetMetadata& AssetManager::GetMetadata(AssetHandle handle)
+	const AssetMetadata& AssetManager::GetMetadata(AssetHandle handle)
 	{
+		if (handle.Get() == 0) return AssetMetadata();
+
 		return GetMetadataInternal(handle);
 	}
 
@@ -218,5 +376,4 @@ namespace Frost
 		std::replace(temp.begin(), temp.end(), '\\', '/');
 		return temp;
 	}
-
 }

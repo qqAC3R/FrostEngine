@@ -439,15 +439,18 @@ namespace Frost
 							{
 								ImGui::PushID(materialIndex);
 
+								Ref<MaterialAsset> meshMaterialAsset = component.Mesh->GetMaterialAsset(materialIndex);
+
 								ImGui::TableNextColumn();
 								std::string materialIndexStr = "Material [" + std::to_string(materialIndex) + "]";
 								ImGui::Text(materialIndexStr.c_str());
 
 								ImGui::TableNextColumn();
-								std::string materialName = component.Mesh->GetMaterialAsset(materialIndex)->GetMaterialName();
+								std::string materialName = meshMaterialAsset->GetMaterialName();
 								if (materialName.empty())
 									materialName = "Default";
-								if (component.Mesh->GetMaterialAsset(materialIndex)->Handle != 0)
+
+								if (AssetManager::IsAssetHandleNonZero(meshMaterialAsset->Handle))
 								{
 									// We are setting -38.0f to make some room for the "X" button
 									ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
@@ -475,6 +478,14 @@ namespace Frost
 									}
 								}
 
+								if (ImGui::BeginDragDropSource())
+								{
+									ContentBrowserDragDropData dragDropData(AssetType::Material, meshMaterialAsset.Raw(), sizeof(MaterialAsset));
+
+									ImGui::SetDragDropPayload(CONTENT_BROWSER_DRAG_DROP, &dragDropData, sizeof(ContentBrowserDragDropData));
+									ImGui::EndDragDropSource();
+								}
+
 
 
 								// Opening a new Material
@@ -498,16 +509,16 @@ namespace Frost
 
 								if (ImGui::BeginPopup("SaveMaterial"))
 								{
-									if (component.Mesh->GetMaterialAsset(materialIndex)->Handle != 0)
+									if (meshMaterialAsset->Handle != 0)
 									{
 										if (ImGui::MenuItem("Edit"))
 										{
 											m_MaterialAssetEditor->SetVisibility(true);
-											m_MaterialAssetEditor->SetActiveMaterialAset(component.Mesh->GetMaterialAsset(materialIndex));
+											m_MaterialAssetEditor->SetActiveMaterialAset(meshMaterialAsset);
 										}
 										if (ImGui::MenuItem("Save"))
 										{
-											AssetImporter::Serialize(component.Mesh->GetMaterialAsset(materialIndex));
+											AssetImporter::Serialize(meshMaterialAsset);
 										}
 									}
 									if (ImGui::MenuItem("Save As"))
@@ -536,31 +547,7 @@ namespace Frost
 
 											// Draw the selected material editor
 											Ref<DataStorage> materialData = mesh->GetMaterialAsset(materialIndex)->GetMaterialInternalData();
-
-											uint32_t albedoTextureID = materialData->Get<uint32_t>("AlbedoTexture");
-											uint32_t roughnessTextureID = materialData->Get<uint32_t>("RoughnessTexture");
-											uint32_t metalnessTextureID = materialData->Get<uint32_t>("MetalnessTexture");
-											uint32_t normalTextureID = materialData->Get<uint32_t>("NormalTexture");
-
-											materialAsset->SetAlbedoMap(mesh->GetTexture(materialIndex, albedoTextureID));
-											materialAsset->SetRoughnessMap(mesh->GetTexture(materialIndex, roughnessTextureID));
-											materialAsset->SetMetalnessMap(mesh->GetTexture(materialIndex, metalnessTextureID));
-											materialAsset->SetNormalMap(mesh->GetTexture(materialIndex, normalTextureID));
-
-											uint32_t useNormalMap = materialData->Get<uint32_t>("UseNormalMap");
-											materialAsset->SetUseNormalMap(useNormalMap);
-
-											const glm::vec4& albedoColor = materialData->Get<glm::vec4>("AlbedoColor");
-											materialAsset->SetAlbedoColor(albedoColor);
-
-											float roughness = materialData->Get<float>("RoughnessFactor");
-											materialAsset->SetRoughness(roughness);
-
-											float metalness = materialData->Get<float>("MetalnessFactor");
-											materialAsset->SetMetalness(metalness);
-
-											float emission = materialData->Get<float>("EmissionFactor");
-											materialAsset->SetEmission(emission);
+											materialAsset->CopyFrom(mesh->GetMaterialAsset(materialIndex).Raw());
 
 											if (!isAssetAlreadyLoaded)
 											{
@@ -1180,13 +1167,16 @@ namespace Frost
 
 					if (component.MaterialHandle)
 					{
-						if (component.MaterialHandle->Handle.Get() != 0)
-							materialName = component.MaterialHandle->m_MaterialName;
+						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
+						{
+							const AssetMetadata& metedata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
+							materialName = GetNameFromFilepath(metedata.FilePath.string());
+						}
 					}
 
 					if (component.MaterialHandle)
 					{
-						if (component.MaterialHandle->Handle.Get() != 0)
+						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
 						{
 							// We are setting -38.0f to make some room for the "X" button
 							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
@@ -1211,6 +1201,14 @@ namespace Frost
 								component.MaterialHandle = physicsMaterialAsset;
 							}
 						}
+					}
+					if (ImGui::BeginDragDropSource())
+					{
+						ContentBrowserDragDropData dragDropData(AssetType::PhysicsMat, component.MaterialHandle.Raw(), sizeof(PhysicsMaterial));
+
+						ImGui::TextUnformatted(component.MaterialHandle->m_MaterialName.c_str());
+						ImGui::SetDragDropPayload(CONTENT_BROWSER_DRAG_DROP, &dragDropData, sizeof(ContentBrowserDragDropData));
+						ImGui::EndDragDropSource();
 					}
 
 					// Opening a new Material
@@ -1272,17 +1270,13 @@ namespace Frost
 								// If the component has already a valid asset, we have to set to the current physics material's parameters
 								if (component.MaterialHandle)
 								{
-									physicsMaterialAsset->StaticFriction = component.MaterialHandle->StaticFriction;
-									physicsMaterialAsset->DynamicFriction = component.MaterialHandle->DynamicFriction;
-									physicsMaterialAsset->Bounciness = component.MaterialHandle->Bounciness;
+									physicsMaterialAsset->CopyFrom(component.MaterialHandle.Raw());
 								}
 								else
 								{
 									// Creating a new temporary phyiscs material to just retrieve the default parameters
 									Ref<PhysicsMaterial> physicsMaterialTemporay = Ref<PhysicsMaterial>::Create();
-									physicsMaterialAsset->StaticFriction = physicsMaterialTemporay->StaticFriction;
-									physicsMaterialAsset->DynamicFriction = physicsMaterialTemporay->DynamicFriction;
-									physicsMaterialAsset->Bounciness = physicsMaterialTemporay->Bounciness;
+									physicsMaterialAsset->CopyFrom(physicsMaterialTemporay.Raw());
 								}
 
 								AssetImporter::Serialize(physicsMaterialAsset);
@@ -1374,13 +1368,16 @@ namespace Frost
 
 					if (component.MaterialHandle)
 					{
-						if (component.MaterialHandle->Handle.Get() != 0)
-							materialName = component.MaterialHandle->m_MaterialName;
+						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
+						{
+							const AssetMetadata& metedata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
+							materialName = GetNameFromFilepath(metedata.FilePath.string());
+						}
 					}
 
 					if (component.MaterialHandle)
 					{
-						if (component.MaterialHandle->Handle.Get() != 0)
+						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
 						{
 							// We are setting -38.0f to make some room for the "X" button
 							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
@@ -1405,6 +1402,14 @@ namespace Frost
 								component.MaterialHandle = physicsMaterialAsset;
 							}
 						}
+					}
+					if (ImGui::BeginDragDropSource())
+					{
+						ContentBrowserDragDropData dragDropData(AssetType::PhysicsMat, component.MaterialHandle.Raw(), sizeof(PhysicsMaterial));
+
+						ImGui::TextUnformatted(component.MaterialHandle->m_MaterialName.c_str());
+						ImGui::SetDragDropPayload(CONTENT_BROWSER_DRAG_DROP, &dragDropData, sizeof(ContentBrowserDragDropData));
+						ImGui::EndDragDropSource();
 					}
 
 					// Opening a new Material
@@ -1569,13 +1574,16 @@ namespace Frost
 
 					if (component.MaterialHandle)
 					{
-						if (component.MaterialHandle->Handle.Get() != 0)
-							materialName = component.MaterialHandle->m_MaterialName;
+						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
+						{
+							const AssetMetadata& metedata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
+							materialName = GetNameFromFilepath(metedata.FilePath.string());
+						}
 					}
 
 					if (component.MaterialHandle)
 					{
-						if (component.MaterialHandle->Handle.Get() != 0)
+						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
 						{
 							// We are setting -38.0f to make some room for the "X" button
 							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
@@ -1600,6 +1608,14 @@ namespace Frost
 								component.MaterialHandle = physicsMaterialAsset;
 							}
 						}
+					}
+					if (ImGui::BeginDragDropSource())
+					{
+						ContentBrowserDragDropData dragDropData(AssetType::PhysicsMat, component.MaterialHandle.Raw(), sizeof(PhysicsMaterial));
+
+						ImGui::TextUnformatted(component.MaterialHandle->m_MaterialName.c_str());
+						ImGui::SetDragDropPayload(CONTENT_BROWSER_DRAG_DROP, &dragDropData, sizeof(ContentBrowserDragDropData));
+						ImGui::EndDragDropSource();
 					}
 
 					// Opening a new Material
@@ -1776,13 +1792,16 @@ namespace Frost
 
 					if (component.MaterialHandle)
 					{
-						if (component.MaterialHandle->Handle.Get() != 0)
-							materialName = component.MaterialHandle->m_MaterialName;
+						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
+						{
+							const AssetMetadata& metedata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
+							materialName = GetNameFromFilepath(metedata.FilePath.string());
+						}
 					}
 
 					if (component.MaterialHandle)
 					{
-						if (component.MaterialHandle->Handle.Get() != 0)
+						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
 						{
 							// We are setting -38.0f to make some room for the "X" button
 							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
@@ -1807,6 +1826,14 @@ namespace Frost
 								component.MaterialHandle = physicsMaterialAsset;
 							}
 						}
+					}
+					if (ImGui::BeginDragDropSource())
+					{
+						ContentBrowserDragDropData dragDropData(AssetType::PhysicsMat, component.MaterialHandle.Raw(), sizeof(PhysicsMaterial));
+
+						ImGui::TextUnformatted(component.MaterialHandle->m_MaterialName.c_str());
+						ImGui::SetDragDropPayload(CONTENT_BROWSER_DRAG_DROP, &dragDropData, sizeof(ContentBrowserDragDropData));
+						ImGui::EndDragDropSource();
 					}
 
 					// Opening a new Material
@@ -2597,8 +2624,35 @@ namespace Frost
 												FROST_CORE_ERROR("Prefab is invalid!");
 											}
 										}
-
 									}
+
+									// After setting up the button for the material, the DragDrop feature needs to be set
+									if (ImGui::BeginDragDropTarget())
+									{
+										auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+										if (data)
+										{
+											SelectionData selectionData = *(SelectionData*)data->Data;
+
+											if (selectionData.AssetType == AssetType::Prefab)
+											{
+												Ref<Prefab> prefab = AssetManager::GetOrLoadAsset<Prefab>(selectionData.FilePath.string());
+
+												if (prefab)
+												{
+													if (isRuntime)
+														field.SetRuntimeValue<const UUID&>(entityInstanceData.Instance, prefab->Handle);
+													else
+														field.SetStoredValue(prefab->Handle);
+												}
+												else
+												{
+													FROST_CORE_ERROR("Prefab is invalid!");
+												}
+											}
+										}
+									}
+
 									break;
 								}
 								case FieldType::Entity:

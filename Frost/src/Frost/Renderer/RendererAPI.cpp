@@ -1,6 +1,8 @@
 #include "frostpch.h"
 #include "RendererAPI.h"
 
+#include "Frost/EntitySystem/Scene.h"
+
 namespace Frost
 {
 	RendererAPI::API RendererAPI::s_API = RendererAPI::API::Vulkan;
@@ -16,6 +18,11 @@ namespace Frost
 
 	RenderQueue::~RenderQueue()
 	{
+	}
+
+	void RenderQueue::SetActiveScene(Ref<Scene> scene)
+	{
+		m_ActiveScene = scene;
 	}
 
 	void RenderQueue::SetCamera(Ref<EditorCamera> camera)
@@ -174,6 +181,8 @@ namespace Frost
 	void RenderQueue::Reset()
 	{
 		m_SubmeshCount = 0;
+		m_ActiveScene = nullptr;
+
 		m_Data.clear();
 		m_TextRendererData.clear();
 		m_MeshInstanceCount.clear();
@@ -186,4 +195,13 @@ namespace Frost
 		CameraViewMatrix = glm::mat4(1.0f);
 		CameraProjectionMatrix = glm::mat4(1.0f);
 	}
+
+	uint32_t RenderQueue::GetActiveEntity() const
+	{
+		if (m_ActiveScene)
+			return (uint32_t)m_ActiveScene->m_SelectedEntity;
+		else
+			return 0;
+	}
+
 }

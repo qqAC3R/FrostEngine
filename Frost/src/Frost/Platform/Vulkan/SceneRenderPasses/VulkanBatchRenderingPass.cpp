@@ -908,7 +908,7 @@ namespace Frost
 
 		m_GlowSelectedEntityPushConstant.CosTime = Application::Get().GetWindow().GetTime();
 		m_GlowSelectedEntityPushConstant.FilterMode = 0.0f;
-		m_GlowSelectedEntityPushConstant.SelectedEntityID = renderQueue.m_SelectedEntityID;
+		m_GlowSelectedEntityPushConstant.SelectedEntityID = renderQueue.GetActiveEntity();
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_GlowSelectedEntityPushConstant);
 
 		float width = renderQueue.ViewPortWidth;

@@ -46,6 +46,7 @@ namespace Frost
 
 		static AssetType GetStaticType() { return AssetType::Scene; }
 		virtual AssetType GetAssetType() const override { return AssetType::Scene; }
+		virtual bool ReloadData(const std::string& filepath) override;
 
 		CameraComponent* GetPrimaryCamera();
 		bool IsPlaying() const { return m_IsScenePlaying; }
@@ -57,6 +58,8 @@ namespace Frost
 		void CopyTo(Ref<Scene>& target);
 
 		void SetSelectedEntity(Entity entity);
+
+		void ClearScene();
 
 		template<typename T>
 		auto GetAllEntitiesWith()
@@ -104,6 +107,7 @@ namespace Frost
 		friend class SceneSerializer;
 		friend class EditorLayer;
 		friend class PhysicsEngine;
+		friend class RenderQueue;
 		friend class Prefab;
 		friend class PrefabSerializer;
 	};

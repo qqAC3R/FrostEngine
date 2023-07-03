@@ -5,6 +5,7 @@
 
 #include "Frost/Platform/Vulkan/VulkanRenderer.h"
 #include "Frost/Platform/Vulkan/VulkanContext.h"
+#include "Frost/Asset/AssetManager.h"
 
 #include <stb_image.h>
 
@@ -21,7 +22,6 @@ namespace Frost
 		// Loading the texture
 		int width, height, channels;
 		ImageFormat imageFormat;
-
 
 		stbi_set_flip_vertically_on_load(textureSpec.FlipTexture);
 
@@ -242,6 +242,49 @@ namespace Frost
 		auto vulkanImage = m_Image.As<VulkanImage2D>();
 		vulkanImage->GenerateMipMaps(cmdBuf, vulkanImage->GetVulkanImageLayout());
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
+	}
+
+	bool VulkanTexture2D::ReloadData(const std::string& filepath)
+	{
+		std::string totalFilepath = AssetManager::GetFileSystemPathString(AssetManager::GetMetadata(filepath));
+		
+		// Loading the texture
+		int width, height, channels;
+		ImageFormat imageFormat;
+
+		stbi_set_flip_vertically_on_load(m_TextureSpecification.FlipTexture);
+
+		if (stbi_is_hdr(totalFilepath.c_str()))
+		{
+			m_TextureData.Data = (void*)stbi_loadf(totalFilepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+			m_TextureData.Size = width * height * 4 * sizeof(float);
+			imageFormat = ImageFormat::RGBA32F;
+		}
+		else
+		{
+			m_TextureData.Data = (void*)stbi_load(totalFilepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+			m_TextureData.Size = width * height * 4;
+			imageFormat = ImageFormat::RGBA8;
+		}
+
+		if (m_TextureData.Data == nullptr)
+		{
+			FROST_CORE_WARN("Texture with filepath '{0}' hasn't been found", totalFilepath);
+			m_IsLoaded = false;
+			return false;
+		}
+		else
+		{
+			m_IsLoaded = true;
+		}
+
+		// Else, we can just submit the data to the GPU!
+		SubmitDataToGPU();
+
+		if (m_TextureSpecification.UseMips)
+			GenerateMipMaps();
+
+		return true;
 	}
 
 	void VulkanTexture2D::Destroy()

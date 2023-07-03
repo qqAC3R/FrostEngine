@@ -142,6 +142,7 @@ namespace Frost
 
 		static AssetType GetStaticType() { return AssetType::MeshAsset; }
 		virtual AssetType GetAssetType() const override { return AssetType::MeshAsset; }
+		virtual bool ReloadData(const std::string& filepath) override;
 
 		///A Buffer& GetVertexBufferInstanced_CPU(uint32_t index) { return m_VertexBufferInstanced_CPU[index]; }
 		///A void UpdateInstancedVertexBuffer(const glm::mat4& transform, const glm::mat4& viewProjMatrix, uint32_t currentFrameIndex);
@@ -300,5 +301,6 @@ namespace Frost
 
 
 		friend struct MaterialMeshPointer;
+		friend class MeshAsset;
 	};
 }

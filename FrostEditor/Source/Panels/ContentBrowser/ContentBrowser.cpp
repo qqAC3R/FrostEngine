@@ -1,11 +1,15 @@
 #include "frostpch.h"
 #include "ContentBrowser.h"
 
-#include "UserInterface/UIWidgets.h"
+#include "Frost/Core/Input.h"
+#include "Frost/Core/Application.h"
 #include "Frost/Project/Project.h"
-#include "Frost/ImGui/Utils/CustomTreeNode.h"
+#include "Frost/InputCodes/KeyCodes.h"
 
-#include "Frost/Asset/AssetManager.h"
+#include "Frost/EntitySystem/Prefab.h"
+
+#include "UserInterface/UIWidgets.h"
+#include "Frost/ImGui/Utils/CustomTreeNode.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -56,7 +60,7 @@ namespace Frost
 	void ContentBrowserPanel::Init(void* initArgs)
 	{
 		//m_Directories[0] = nullptr;
-		UUID baseDirectoryUUID = ProcessDirectory(Project::GetActive()->GetAssetDirectory(), nullptr);
+		UUID baseDirectoryUUID = ProcessDirectory(Project::GetAssetDirectory(), nullptr);
 		m_BaseDirectory = m_Directories[baseDirectoryUUID];
 		m_CurrentDirectory = m_BaseDirectory;
 		ChangeCurrentDirectory(m_CurrentDirectory);
@@ -69,6 +73,8 @@ namespace Frost
 
 	void ContentBrowserPanel::OnEvent(Event& e)
 	{
+		EventDispatcher dispatcher(e);
+		dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& event) { return OnKeyPressedEvent(event); });
 	}
 
 	Ref<Texture2D> ContentBrowserPanel::GetIconByAssetType(AssetType assetType)
@@ -96,6 +102,8 @@ namespace Frost
 
 	void ContentBrowserPanel::Render()
 	{
+		
+
 		ImGui::Begin("Asset Browser", NULL, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
 
 		{
@@ -104,14 +112,9 @@ namespace Frost
 				| ImGuiTableFlags_SizingFixedFit
 				| ImGuiTableFlags_BordersInnerV;
 
-
-			UserInterface::ScopedStyle resizeGrip(ImGuiCol_Separator, ImVec4(1.0f, 0.0f, 0.0f, 0.0f));
-			UserInterface::ScopedStyle resizeGripHovered(ImGuiCol_SeparatorHovered, ImVec4(1.0f, 0.0f, 0.0f, 0.0f));
-			UserInterface::ScopedStyle resizeGripActive(ImGuiCol_SeparatorActive, ImVec4(1.0f, 0.0f, 0.0f, 0.0f));
-
-
 			if (ImGui::BeginTable("ContentBrowserTable", 2, tableFlags, ImVec2(0.0f, 0.0f)))
 			{
+				
 				ImGui::TableSetupColumn("Outliner", 0, 300.0f);
 				ImGui::TableSetupColumn("Directory Structure", ImGuiTableColumnFlags_WidthStretch);
 
@@ -130,13 +133,10 @@ namespace Frost
 						RenderDirectoryHierarchy(m_BaseDirectory, 0);
 					}
 
+					// Render side shadow
 					{
-
-						// Render side shadow
-
 						float x = 0.0f;
 						float y = 10.0f;
-
 						ImRect windowRect = ImGui::GetCurrentWindow()->Rect();
 						windowRect.Min.x -= x;
 						windowRect.Min.y -= y;
@@ -147,8 +147,8 @@ namespace Frost
 						UserInterface::DrawShadowInner(m_AssetIconMap["SideContentShadow"], 20.0f, windowRect, 1.0f, windowRect.GetHeight() / 4.0f, false, true, false, false);
 						ImGui::PopClipRect();
 					}
-				}
-				ImGui::EndChild();
+									}
+				ImGui::EndChild(); // DirTree
 
 
 				ImGui::TableSetColumnIndex(1);
@@ -157,7 +157,7 @@ namespace Frost
 				{
 
 					UserInterface::ScopedStyle colorChildBg(ImGuiCol_ChildBg, ImVec4(0.09f, 0.12f, 0.15f, 1.0f));
-					
+
 					ImGui::BeginChild("Content");
 					{
 						{
@@ -170,11 +170,87 @@ namespace Frost
 						ImGui::Separator();
 
 						
-						ImGui::BeginChild("Scrolling");
+
+						// This Right/Left padding was mostly set to see the DragDrop border
+						float contentPadding = 5.0f;
+						float availableWidth = ImGui::GetContentRegionAvail().x;
+						float childWidth = availableWidth - (2 * contentPadding);
+
+						// Set the cursor position to add padding from the left
+						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + contentPadding);
+
+						ImGui::BeginChild("Scrolling", { childWidth, 0});
 						{
-							//ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
-							//UserInterface::ScopedStyle itemspacing(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
-							
+
+							ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
+							if (ImGui::BeginPopupContextWindow(0, 1, false))
+							{
+								if (ImGui::BeginMenu("New"))
+								{
+									if (ImGui::MenuItem("Folder"))
+									{
+										bool created = FileSystem::CreateDirectory(Project::GetAssetDirectory() / m_CurrentDirectory->FilePath / "New Folder");
+										if (created)
+										{
+											RefreshContent();
+											const auto& directoryInfo = GetDirectory(m_CurrentDirectory->FilePath / "New Folder");
+											size_t index = m_CurrentItems.FindItem(directoryInfo->Handle);
+											if (index != ContentBrowserItemList::InvalidItem)
+												m_CurrentItems[index]->StartRenaming();
+										}
+									}
+
+									if (ImGui::MenuItem("Scene"))
+										CreateAsset<Scene>("New Scene.fsc");
+
+									if (ImGui::MenuItem("Material"))
+										CreateAsset<MaterialAsset>("New Material.fmat");
+
+									if (ImGui::MenuItem("Physics Material"))
+										CreateAsset<PhysicsMaterial>("New Physics Material.fpmat");
+
+									ImGui::EndMenu();
+								}
+
+#if 0
+								if (ImGui::MenuItem("Import"))
+								{
+									std::string filepath = Application::Get().OpenFile();
+									if (!filepath.empty())
+										FileSystem::MoveFile(filepath, m_CurrentDirectory->FilePath);
+								}
+#endif
+
+								if (ImGui::MenuItem("Refresh"))
+									RefreshContent();
+
+								if (ImGui::MenuItem("Copy", "Ctrl+C", nullptr, m_SelectionStack.SelectionCount() > 0))
+									m_CopiedAssets.CopyFrom(m_SelectionStack);
+
+								if (ImGui::MenuItem("Paste", "Ctrl+V", nullptr, m_CopiedAssets.SelectionCount() > 0))
+									PasteCopiedAssets();
+
+								if (ImGui::MenuItem("Duplicate", "Ctrl+D", nullptr, m_SelectionStack.SelectionCount() > 0))
+								{
+									m_CopiedAssets.CopyFrom(m_SelectionStack);
+									PasteCopiedAssets();
+								}
+
+								ImGui::Separator();
+
+								if (ImGui::MenuItem("Show in Explorer"))
+									FileSystem::OpenDirectoryInExplorer(Project::GetAssetDirectory() / m_CurrentDirectory->FilePath);
+
+								ImGui::EndPopup();
+							}
+							ImGui::PopStyleVar(); // ItemSpacing
+
+
+
+
+
+
+
 							const float paddingForOutline = 2.0f;
 							const float scrollBarrOffset = 20.0f + ImGui::GetStyle().ScrollbarSize;
 							float panelWidth = ImGui::GetContentRegionAvail().x - scrollBarrOffset;
@@ -184,7 +260,7 @@ namespace Frost
 
 							{
 								// TODO: Maybe: rowSpacing = 12.0f
-								const float rowSpacing = 60.0f;
+								const float rowSpacing = 12.0f;
 								UserInterface::ScopedStyle itemSpacing(ImGuiStyleVar_ItemSpacing, ImVec2(paddingForOutline, rowSpacing));
 								ImGui::Columns(columnCount, 0, false);
 
@@ -193,15 +269,19 @@ namespace Frost
 
 								RenderItems();
 							}
+
+							UpdateInput();
+
+							RenderDeleteDialogue();
 						}
-						ImGui::EndChild();
+						ImGui::EndChild(); // Scrolling
+						UpdateDragDropTargetWithAssets();
 
-						//ImGui::Columns(1);
-
-						//ImGui::SliderFloat("Thumbnail Size", &thumbnailSize, 16, 512);
-						//ImGui::SliderFloat("Padding", &padding, 0, 32);
 					}
-					ImGui::EndChild();
+					ImGui::EndChild(); // Content
+
+
+					
 
 
 					ImGui::EndTable();
@@ -211,7 +291,74 @@ namespace Frost
 		}
 
 
+		// Check if the window is focused (also including child window)
+		m_IsContentBrowserFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
+		m_IsContentBrowserHovered = ImGui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
+
 		ImGui::End();
+	}
+
+	void ContentBrowserPanel::UpdateDragDropTargetWithAssets()
+	{
+		if (ImGui::BeginDragDropTarget())
+		{
+			auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+			if (data)
+			{
+				//Entity& e = *(Entity*)data->Data;
+				ContentBrowserDragDropData& dragDropData = *(ContentBrowserDragDropData*)data->Data;
+
+
+				// TODO: Maybe add also Scene saving directly from the hierarchy panel to the content browser
+				switch (dragDropData.AssetType)
+				{
+				case AssetType::Prefab:
+				{
+					Entity& e = *(Entity*)dragDropData.Data;
+					Ref<Prefab> prefab = CreateAsset<Prefab>("New Prefab.fprefab");
+					prefab->Create(e);
+					break;
+				}
+				case AssetType::Material:
+				{
+					MaterialAsset* materialAssetSource = (MaterialAsset*)dragDropData.Data;
+
+					Ref<MaterialAsset> materialAsset = CreateAsset<MaterialAsset>("New Material.fmat");
+					materialAsset->CopyFrom(materialAssetSource);
+
+					break;
+				}
+				case AssetType::PhysicsMat:
+				{
+					PhysicsMaterial* phyiscsMatAssetSource = (PhysicsMaterial*)dragDropData.Data;
+
+					Ref<PhysicsMaterial> phyiscsMatAsset = CreateAsset<PhysicsMaterial>("New Physics Material.fpmat");
+					phyiscsMatAsset->CopyFrom(phyiscsMatAssetSource);
+
+					break;
+				}
+				default:
+					break;
+				}
+
+			}
+			ImGui::EndDragDropTarget();
+		}
+	}
+
+	void ContentBrowserPanel::UpdateInput()
+	{
+		if (!m_IsContentBrowserHovered)
+			return;
+
+		if (((!m_IsAnyItemHovered && ImGui::IsMouseDown(ImGuiMouseButton_Left)) || Input::IsKeyPressed(Key::Escape)) && !m_IsDeleteDialogueOpened)
+			ClearSelections();
+
+		if (Input::IsKeyPressed(Key::Delete) && m_SelectionStack.SelectionCount() > 0)
+			ImGui::OpenPopup("Delete");
+
+		if (Input::IsKeyPressed(Key::F5))
+			RefreshContent();
 	}
 
 	void ContentBrowserPanel::Shutdown()
@@ -268,7 +415,7 @@ namespace Frost
 				if (ImGui::IsMouseDoubleClicked(0) && ImGui::IsItemHovered())
 				{
 					m_CurrentDirectory = directoryInfo;
-					RefreshContent();
+					//RefreshContent();
 					ChangeCurrentDirectory(m_CurrentDirectory);
 				}
 
@@ -313,6 +460,9 @@ namespace Frost
 
 	void ContentBrowserPanel::RenderItems()
 	{
+		bool refreshAfterItemRendering = false;
+		m_IsAnyItemHovered = false;
+
 		for (auto& item : m_CurrentItems)
 		{
 			if (std::strlen(m_SearchBuffer) > 0)
@@ -330,14 +480,36 @@ namespace Frost
 
 			item->OnRenderBegin();
 
-			ContentBrowserItemAction result = item->OnRender(s_ThumbnailSize, true);
+			ContentBrowserItemAction result = item->OnRender(
+				s_ThumbnailSize, // Thumbnail Size
+				true, // Display Asset Type
+				m_CutAndPasteAssets.IsSelected(item->GetID()) // Is Item CutAndPasted
+			);
 
 			if (result.IsSet(ContentBrowserAction::ClearSelection))
 				ClearSelections();
 
+			if (result.IsSet(ContentBrowserAction::Copy))
+			{
+				m_CopiedAssets.Select(item->GetID(), item->m_Type, item->m_AssetType, item->m_Filepath);
+				if (m_SelectionStack.SelectionCount() > 1)
+				{
+					m_CopiedAssets.CopyFrom(m_SelectionStack);
+				}
+			}
+
+			if (result.IsSet(ContentBrowserAction::Delete))
+				m_OpenDeleteDialogue = true;
+
+			if (result.IsSet(ContentBrowserAction::Hovered))
+				m_IsAnyItemHovered = true;
+
+			if (result.IsSet(ContentBrowserAction::ReloadAsset))
+				AssetManager::ReloadData(AssetManager::GetMetadata(item->GetFilepath()).Handle);
+
 			if (result.IsSet(ContentBrowserAction::Selected) && !m_SelectionStack.IsSelected(item->GetID()))
 			{
-				m_SelectionStack.Select(item->GetID(), item->m_AssetType, item->GetFilepath());
+				m_SelectionStack.Select(item->GetID(), item->m_Type, item->m_AssetType, item->GetFilepath());
 				item->SetSelected(true);
 			}
 
@@ -357,28 +529,29 @@ namespace Frost
 				{
 					auto toSelect = m_CurrentItems[i];
 					toSelect->SetSelected(true);
-					m_SelectionStack.Select(toSelect->GetID(), toSelect->m_AssetType, toSelect->GetFilepath());
+					m_SelectionStack.Select(toSelect->GetID(), item->m_Type, toSelect->m_AssetType, toSelect->GetFilepath());
 				}
 			}
 
 			if (result.IsSet(ContentBrowserAction::ShowInExplorer))
 			{
 				if (item->GetType() == ContentBrowserItem::ItemType::Directory)
-					FileSystem::ShowFileInExplorer(Project::GetActive()->GetAssetDirectory() / m_CurrentDirectory->FilePath / item->GetName());
+					FileSystem::ShowFileInExplorer(Project::GetAssetDirectory() / m_CurrentDirectory->FilePath / item->GetName());
 				else
-					FileSystem::ShowFileInExplorer(AssetManager::GetFileSystemPath(AssetManager::GetMetadata(item->GetFilepath())));
+					FileSystem::ShowFileInExplorer(Project::GetAssetDirectory() / item->GetFilepath());
 			}
 
 			if (result.IsSet(ContentBrowserAction::OpenExternal))
 			{
 				if (item->GetType() == ContentBrowserItem::ItemType::Directory)
-					FileSystem::OpenExternally(Project::GetActive()->GetAssetDirectory() / m_CurrentDirectory->FilePath / item->GetName());
+					FileSystem::OpenExternally(Project::GetAssetDirectory() / m_CurrentDirectory->FilePath / item->GetName());
 				else
-					FileSystem::OpenExternally(AssetManager::GetFileSystemPath(AssetManager::GetMetadata(item->GetFilepath())));
+					FileSystem::OpenExternally(Project::GetAssetDirectory() / item->GetFilepath());
 			}
 
 			item->OnRenderEnd();
 
+			
 
 			if (result.IsSet(ContentBrowserAction::NavigateToThis))
 			{
@@ -391,7 +564,20 @@ namespace Frost
 				}
 			}
 
+			if (result.IsSet(ContentBrowserAction::Refresh))
+				refreshAfterItemRendering = true;
 
+
+		}
+
+		if (refreshAfterItemRendering)
+			RefreshContent();
+
+		// This is a workaround an issue with ImGui: https://github.com/ocornut/imgui/issues/331
+		if (m_OpenDeleteDialogue)
+		{
+			ImGui::OpenPopup("Delete");
+			m_OpenDeleteDialogue = false;
 		}
 	}
 
@@ -399,10 +585,9 @@ namespace Frost
 	{
 		m_CurrentItems.Clear();
 		m_Directories.clear();
-		//m_ArrangedDirectories.clear();
 
 		Ref<DirectoryInfo> currentDirectory = m_CurrentDirectory;
-		UUID baseDirectoryHandle = ProcessDirectory(Project::GetActive()->GetAssetDirectory().string(), nullptr);
+		UUID baseDirectoryHandle = ProcessDirectory(Project::GetAssetDirectory().string(), nullptr);
 		m_BaseDirectory = m_Directories[baseDirectoryHandle];
 		m_CurrentDirectory = GetDirectory(currentDirectory->FilePath);
 
@@ -416,6 +601,8 @@ namespace Frost
 	{
 		RefreshAllDirectories();
 		ChangeCurrentDirectory(m_CurrentDirectory);
+
+		m_SelectionStack.Clear();
 	}
 
 	UUID ContentBrowserPanel::ProcessDirectory(const std::filesystem::path& directoryPath, const Ref<DirectoryInfo>& parent)
@@ -427,14 +614,14 @@ namespace Frost
 		else
 			directoryInfo->Parent = nullptr;
 
-		if (directoryPath == Project::GetActive()->GetAssetDirectory())
+		if (directoryPath == Project::GetAssetDirectory())
 		{
 			directoryInfo->IsRoot = true;
 			directoryInfo->FilePath = "";
 		}
 		else
 		{
-			directoryInfo->FilePath = std::filesystem::relative(directoryPath, Project::GetActive()->GetAssetDirectory());
+			directoryInfo->FilePath = std::filesystem::relative(directoryPath, Project::GetAssetDirectory());
 		}
 
 		for (auto entry : std::filesystem::directory_iterator(directoryPath))
@@ -452,8 +639,9 @@ namespace Frost
 				const AssetMetadata& assetMetadata = AssetManager::GetMetadata(entry);
 
 				UUID fileUUID = UUID();
-				directoryInfo->Files[fileUUID] = Ref<FileInfo>::Create(fileUUID, assetMetadata.Type, entry);
-				directoryInfo->ArrangedFiles[entry] = Ref<FileInfo>::Create(fileUUID, assetMetadata.Type, entry);
+				Ref<FileInfo> assetFileInfo = Ref<FileInfo>::Create(fileUUID, assetMetadata.Type, entry);
+				directoryInfo->Files[fileUUID] = assetFileInfo;
+				directoryInfo->ArrangedFiles[entry] = assetFileInfo;
 			}
 
 		}
@@ -467,13 +655,203 @@ namespace Frost
 	{
 		for (auto& item : m_CurrentItems)
 		{
-			item->SetSelected(false);
+ 			item->SetSelected(false);
 
-			//if (item->IsRenaming())
-			//	item->StopRenaming();
+			if (item->IsRenaming())
+				item->StopRenaming();
 		}
 
 		m_SelectionStack.Clear();
+	}
+
+	void ContentBrowserPanel::PasteCopiedAssets()
+	{
+		if (m_CopiedAssets.SelectionCount() == 0)
+			return;
+
+		for (SelectionData copiedAsset : m_CopiedAssets)
+		{
+			auto originalFilePath = Project::GetAssetDirectory();
+
+			if (copiedAsset.ItemType == ContentBrowserItem::ItemType::Asset)
+			{
+				originalFilePath /= copiedAsset.FilePath;
+				
+				auto newFilepath = Project::GetAssetDirectory() / m_CurrentDirectory->FilePath / (copiedAsset.FilePath.stem().string() + copiedAsset.FilePath.extension().string());
+
+				if (std::filesystem::exists(newFilepath))
+				{
+					newFilepath.replace_filename(
+						copiedAsset.FilePath.stem().string() + " (1)" + copiedAsset.FilePath.extension().string()
+					);
+					FROST_CORE_WARN("Asset already exists!");
+				}
+
+				std::filesystem::copy_file(originalFilePath, newFilepath);
+			}
+			if (copiedAsset.ItemType == ContentBrowserItem::ItemType::Directory)
+			{
+				originalFilePath /= copiedAsset.FilePath;
+
+				auto newFilepath = Project::GetAssetDirectory() / m_CurrentDirectory->FilePath / copiedAsset.FilePath.stem();
+
+				if (std::filesystem::exists(newFilepath))
+				{
+					newFilepath.replace_filename(
+						copiedAsset.FilePath.stem().string() + " (1)"
+					);
+					FROST_CORE_WARN("Asset already exists!");
+				}
+
+				std::filesystem::copy(originalFilePath, newFilepath);
+			}
+		}
+
+		RefreshContent();
+		m_SelectionStack.Clear();
+		m_CopiedAssets.Clear();
+	}
+
+	void ContentBrowserPanel::PasteCutandPasteAssets()
+	{
+		if (m_CutAndPasteAssets.SelectionCount() == 0)
+			return;
+
+		for (SelectionData copiedAsset : m_CutAndPasteAssets)
+		{
+			auto originalFilePath = Project::GetAssetDirectory();
+
+			if (copiedAsset.ItemType == ContentBrowserItem::ItemType::Asset)
+			{
+				originalFilePath /= copiedAsset.FilePath;
+
+				auto newFilepath = Project::GetAssetDirectory() / m_CurrentDirectory->FilePath / (copiedAsset.FilePath.stem().string() + copiedAsset.FilePath.extension().string());
+
+				if (std::filesystem::exists(newFilepath))
+				{
+					newFilepath.replace_filename(
+						copiedAsset.FilePath.stem().string() + " (1)" + copiedAsset.FilePath.extension().string()
+					);
+					FROST_CORE_WARN("Asset already exists!");
+				}
+
+				FileSystem::Move(originalFilePath, newFilepath);
+				AssetManager::OnMoveAsset(originalFilePath, newFilepath);
+			}
+			if (copiedAsset.ItemType == ContentBrowserItem::ItemType::Directory)
+			{
+				originalFilePath /= copiedAsset.FilePath;
+
+				auto newFilepath = Project::GetAssetDirectory() / m_CurrentDirectory->FilePath / copiedAsset.FilePath.stem();
+
+				if (std::filesystem::exists(newFilepath))
+				{
+					newFilepath.replace_filename(
+						copiedAsset.FilePath.stem().string() + " (1)"
+					);
+					FROST_CORE_WARN("Asset already exists!");
+				}
+
+				FileSystem::Move(originalFilePath, newFilepath);
+				AssetManager::OnMoveFilepath(originalFilePath, newFilepath);
+			}
+		}
+
+		RefreshContent();
+		m_SelectionStack.Clear();
+		m_CutAndPasteAssets.Clear();
+	}
+
+	void ContentBrowserPanel::RenderDeleteDialogue()
+	{
+		ImGui::SetNextWindowPos({ Application::Get().GetWindow().GetWidth() / 2.0f, Application::Get().GetWindow().GetHeight() / 2.0f });
+		if (ImGui::BeginPopupModal("Delete", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			if (m_SelectionStack.SelectionCount() == 0)
+				ImGui::CloseCurrentPopup();
+
+			m_IsDeleteDialogueOpened = true;
+
+			ImGui::Text("Are you sure you want to delete %d items?", m_SelectionStack.SelectionCount());
+
+			float columnWidth = ImGui::GetContentRegionAvailWidth() / 4;
+
+
+			ImGui::Columns(4, 0, false);
+			ImGui::SetColumnWidth(0, columnWidth);
+			ImGui::SetColumnWidth(1, columnWidth);
+			ImGui::SetColumnWidth(2, columnWidth);
+			ImGui::SetColumnWidth(3, columnWidth);
+			ImGui::NextColumn();
+			if (ImGui::Button("Yes", ImVec2(columnWidth, 0)))
+			{
+				for (SelectionData handle : m_SelectionStack)
+				{
+					size_t index = m_CurrentItems.FindItem(handle.Handle);
+					if (index == ContentBrowserItemList::InvalidItem)
+						continue;
+
+					m_CurrentItems[index]->OnDelete();
+					m_CurrentItems.Erase(handle.Handle);
+				}
+
+				m_SelectionStack.Clear();
+
+				RefreshContent();
+				ChangeCurrentDirectory(m_CurrentDirectory);
+
+				ImGui::CloseCurrentPopup();
+			}
+
+			ImGui::NextColumn();
+			ImGui::SetItemDefaultFocus();
+			if (ImGui::Button("No", ImVec2(columnWidth, 0)))
+				ImGui::CloseCurrentPopup();
+
+			ImGui::NextColumn();
+			ImGui::EndPopup();
+		}
+		else
+		{
+			m_IsDeleteDialogueOpened = false;
+		}
+	}
+
+	bool ContentBrowserPanel::OnKeyPressedEvent(KeyPressedEvent& e)
+	{
+		bool handled = false;
+
+		if (Input::IsKeyPressed(Key::LeftControl))
+		{
+			switch (e.GetKeyCode())
+			{
+			case Key::C:
+				m_CutAndPasteAssets.Clear();
+				m_CopiedAssets.CopyFrom(m_SelectionStack);
+				handled = true;
+				break;
+			case Key::V:
+				if (m_CopiedAssets.SelectionCount() > 0)
+					PasteCopiedAssets();
+				else if (m_CutAndPasteAssets.SelectionCount() > 0)
+					PasteCutandPasteAssets();
+
+				handled = true;
+				break;
+			case Key::D:
+				m_CopiedAssets.CopyFrom(m_SelectionStack);
+				PasteCopiedAssets();
+				handled = true;
+				break;
+			case Key::X:
+				m_CopiedAssets.Clear();
+				m_CutAndPasteAssets.CopyFrom(m_SelectionStack);
+				handled = true;
+				break;
+			}
+		}
+
+		return handled;
 	}
 
 	Ref<DirectoryInfo> ContentBrowserPanel::GetDirectory(const std::filesystem::path& filepath) const
@@ -523,6 +901,8 @@ namespace Frost
 				);
 			}
 		}
+
+		m_SelectionStack.Clear();
 	}
 
 	void ContentBrowserPanel::GetAllDirectoriesForBreadcrumbs(Vector<Ref<DirectoryInfo>>& directories, const Ref<DirectoryInfo>& directory)
@@ -603,7 +983,8 @@ namespace Frost
 			if (contenBrowserButton("##ContentTopBar_BackButton", m_AssetIconMap["IconBack"], disableBackButton))
 			{
 				m_CurrentDirectory = m_CurrentDirectory->Parent;
-				RefreshContent();
+				//RefreshContent();
+				ChangeCurrentDirectory(m_CurrentDirectory);
 			}
 
 			ImGui::SameLine();
@@ -632,8 +1013,6 @@ namespace Frost
 			for (int32_t i = directories.size() - 1; i >= 0; i--)
 			{
 				RenderBreadcrumbs(directories, offsetX, beforeCursourY, i);
-				//ImGui::SetCursorPosY(beforeCursourY + iconYOffset);
-
 			}
 
 
@@ -660,15 +1039,16 @@ namespace Frost
 				if (ImGui::Button(directory->FilePath.filename().string().c_str()))
 				{
 					m_CurrentDirectory = m_Directories[directory->Handle];
-					RefreshContent();
+					//RefreshContent();
+					ChangeCurrentDirectory(m_CurrentDirectory);
 				}
 			}
 			else
 			{
-				if (ImGui::Button(Project::GetActive()->GetAssetDirectory().filename().string().c_str()))
+				if (ImGui::Button(Project::GetAssetDirectory().filename().string().c_str()))
 				{
 					m_CurrentDirectory = m_BaseDirectory;
-					RefreshContent();
+					//RefreshContent();
 				}
 			}
 
@@ -677,8 +1057,6 @@ namespace Frost
 
 			{
 				
-				
-				//ImGui::SameLine(buttonRectSize + offsetX);
 				ImGui::SetCursorPosX(buttonRectSize + offsetX);
 				ImGui::SetCursorPosY(cursorPosY);
 
@@ -700,8 +1078,6 @@ namespace Frost
 			offsetX += buttonRectSize + buttonSlashRectSize;
 
 		}
-
-		//RenderBreadcrumbs(directories, offsetX, level - 1);
 	}
 
 	void ContentBrowserPanel::SearchWidget(char* searchString, const char* hint /*= "Search..."*/)
@@ -741,8 +1117,6 @@ namespace Frost
 			ImGuiLayer* layer = Application::Get().GetImGuiLayer();
 			ImTextureID texID = layer->GetImGuiTextureID(m_AssetIconMap["IconInputSearch"]->GetImage2D());
 			ImGui::Image(texID, ImVec2(searchIconSize, searchIconSize), ImVec2(0, 0), ImVec2(1, 1));
-
-			//ImGui::SetCursorPosY(ImGui::GetCursorPosY() - iconYOffset);
 
 			// Hint
 			if (!searching)

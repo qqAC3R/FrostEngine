@@ -222,7 +222,7 @@ namespace Frost
 
 		if (ImGui::BeginDragDropTarget())
 		{
-			auto data = ImGui::AcceptDragDropPayload(HIERARCHY_ENTITY_DRAG_DROP);
+			auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
 			if (data)
 			{
 				entity = *(Entity*)data->Data;

@@ -13,6 +13,8 @@
 
 namespace Frost
 {
+	enum class CursorMode;
+
 	enum class CameraMode
 	{
 		NONE, FLYCAM, ARCBALL
@@ -62,6 +64,9 @@ namespace Frost
 		void MousePan(const glm::vec2& delta);
 		void MouseRotate(const glm::vec2& delta);
 		void MouseZoom(float delta);
+
+		void EnableMouse();
+		void DisableMouse();
 
 		glm::vec3 CalculatePosition() const;
 

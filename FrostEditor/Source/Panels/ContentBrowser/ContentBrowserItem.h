@@ -18,6 +18,10 @@ namespace Frost
 		NavigateToThis		= BIT(5),
 		ShowInExplorer		= BIT(6),
 		OpenExternal		= BIT(7),
+		Renamed				= BIT(8),
+		Copy				= BIT(9),
+		Delete				= BIT(10),
+		ReloadAsset			= BIT(11),
 	};
 
 	struct ContentBrowserItemAction
@@ -47,7 +51,7 @@ namespace Frost
 		virtual ~ContentBrowserItem() {}
 
 		void OnRenderBegin();
-		ContentBrowserItemAction OnRender(float thumbnailSize, bool displayAssetType);
+		ContentBrowserItemAction OnRender(float thumbnailSize, bool displayAssetType, bool isItemCutAndPasted);
 		void OnRenderEnd();
 
 		void SetSelected(bool value);
@@ -62,8 +66,13 @@ namespace Frost
 		void StartRenaming();
 		void StopRenaming();
 
+		bool IsRenaming() const { return m_IsRenaming; }
+		bool IsSelected() const { return m_IsSelected; }
+
 	private:
 		void OnContextMenuOpen(ContentBrowserItemAction& actionResult);
+		void OnRenamed(const std::string& newName);
+		void OnDelete();
 
 	private:
 		ContentBrowserPanel* m_ContentBrowserPanel;
@@ -74,7 +83,6 @@ namespace Frost
 		std::filesystem::path m_Filepath;
 		std::string m_Name;
 		std::string m_Extension;
-		//Ref<Texture2D> m_Icon;
 
 		bool m_IsSelected = false;
 		bool m_IsRenaming = false;

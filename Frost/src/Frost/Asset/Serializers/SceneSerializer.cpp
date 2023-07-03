@@ -20,6 +20,9 @@ namespace Frost
 
 	bool SceneSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const
 	{
+		if (!FileSystem::Exists(AssetManager::GetFileSystemPathString(metadata)))
+			return false;
+
 		Ref<Scene> scene = Ref<Scene>::Create(GetNameFromFilepath(metadata.FilePath.string()), true); // Maybe not create a new scene and leave the one passed in parameters?
 		DeserializeScene(AssetManager::GetFileSystemPathString(metadata), scene);
 
@@ -27,6 +30,16 @@ namespace Frost
 		asset->Handle = metadata.Handle;
 
 		return true;
+	}
+
+	Ref<Asset> SceneSerializer::CreateAssetRef(const AssetMetadata& metadata, void* pNext) const
+	{
+		return Ref<Scene>::Create(GetNameFromFilepath(metadata.FilePath.string()), true); // Maybe not create a new scene and leave the one passed in parameters?
+	}
+
+	void SceneSerializer::Serialize(const AssetMetadata& metadata, Ref<Asset> asset) const
+	{
+		SerializeScene(AssetManager::GetFileSystemPathString(metadata), asset.As<Scene>());
 	}
 
 	void SceneSerializer::SerializeScene(const std::string& filepath, Ref<Scene> scene)

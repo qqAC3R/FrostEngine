@@ -38,11 +38,11 @@ namespace Frost
 		m_IsActive = true;
 	}
 
-	static void DisableMouse()
+	void EditorCamera::DisableMouse()
 	{
 		Input::SetCursorMode(CursorMode::Locked);
 	}
-	static void EnableMouse()
+	void EditorCamera::EnableMouse()
 	{
 		Input::SetCursorMode(CursorMode::Normal);
 	}

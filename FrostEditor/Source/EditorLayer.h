@@ -73,6 +73,9 @@ namespace Frost
 		bool m_ShowInspectorPanel = true;
 		bool m_ShowRendererDebugger = true;
 
+		bool m_ViewPortMouseHovered = false;
+		bool m_IsViewPortFocused = false;
+
 		// Variables
 		int32_t m_GuizmoMode = -1;
 		SceneState m_SceneState = SceneState::Edit;
@@ -80,7 +83,6 @@ namespace Frost
 		bool m_EnablePhysicsVisualization = true;
 		bool m_IsGuizmoUsing = false;
 		bool m_WasMousePressedPrevFrame = false;
-		bool m_IsViewPortFocused = false;
 
 		glm::vec2 m_ViewportSize;
 		glm::vec2 m_ViewportBounds[2];

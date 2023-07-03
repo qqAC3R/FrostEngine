@@ -18,7 +18,7 @@
 namespace Frost
 {
 	Application* Application::s_Instance = nullptr;
-	std::string Application::m_ApplicationVersion = "0.7.1a";
+	std::string Application::m_ApplicationVersion = "0.7.2a";
 
 	Application::Application()
 	{

@@ -19,8 +19,8 @@ namespace Frost
 
 		virtual void SubmitCmdsToRender() override;
 
-		virtual void BeginScene(Ref<EditorCamera> camera) override;
-		virtual void BeginScene(Ref<RuntimeCamera> camera) override;
+		virtual void BeginScene(Ref<Scene> scene, Ref<EditorCamera>& camera) override;
+		virtual void BeginScene(Ref<Scene> scene, Ref<RuntimeCamera>& camera) override;
 		virtual void EndScene() override;
 
 		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform, uint32_t entityID) override;
@@ -37,7 +37,7 @@ namespace Frost
 
 		virtual uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y) override;
 		virtual uint32_t GetCurrentFrameIndex() override;
-		virtual void SetEditorActiveEntity(uint32_t selectedEntityId) override;
+		virtual Ref<Scene> GetActiveScene() override;
 
 		virtual void Resize(uint32_t width, uint32_t height) override;
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const override;

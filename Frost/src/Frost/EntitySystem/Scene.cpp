@@ -24,8 +24,6 @@ namespace Frost
 			m_Registry.on_construct<ScriptComponent>().connect<&Scene::OnScriptComponentConstruct>(this);
 			m_Registry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptComponentDestroy>(this);
 		}
-		//m_Registry.on_construct<ScriptComponent>().connect<&Scene::OnScriptComponentConstruct>(this);
-		//m_Registry.on_destroy<ScriptComponent>().connect<&Scene::OnScriptComponentDestroy>(this);
 	}
 
 	Scene::~Scene()
@@ -272,6 +270,13 @@ namespace Frost
 				return Entity(entity, this);
 		}
 		return Entity{};
+	}
+
+	bool Scene::ReloadData(const std::string& filepath)
+	{
+		ClearScene();
+		//SceneSerializer::DeserializeScene(filepath, )
+		return false;
 	}
 
 	CameraComponent* Scene::GetPrimaryCamera()
@@ -911,16 +916,27 @@ namespace Frost
 		//});
 	}
 
+#if 1
 	void Scene::SetSelectedEntity(Entity entity)
 	{
-		m_SelectedEntity = entity.Raw();
-		Renderer::SetEditorActiveEntity((uint32_t)m_SelectedEntity);
+		//m_SelectedEntity = entity.Raw();
+		//Renderer::SetEditorActiveEntity((uint32_t)m_SelectedEntity);
+		m_SelectedEntity = entity;
+
 		//if (entity)
 		//{
 		//	if (m_EntityIDMap.find(entity.GetUUID()) != m_EntityIDMap.end())
 		//	{
 		//	}
 		//}
+	}
+#endif
+
+	void Scene::ClearScene()
+	{
+		m_EntityIDMap.clear();
+		m_SelectedEntity = {};
+		m_Registry.clear();
 	}
 
 	Ref<Scene> Scene::CreateEmpty()

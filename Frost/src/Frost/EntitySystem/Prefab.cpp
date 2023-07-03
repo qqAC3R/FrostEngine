@@ -2,6 +2,8 @@
 #include "Prefab.h"
 
 #include "Frost/Asset/AssetImporter.h"
+#include "Frost/Asset/AssetManager.h"
+#include "Frost/Asset/Serializers/SceneSerializer.h"
 
 namespace Frost
 {
@@ -26,6 +28,19 @@ namespace Frost
 	{
 		m_Scene = Scene::CreateEmpty();
 		m_Entity = CreatePrefabFromEntity(entity);
+	}
+
+	bool Prefab::ReloadData(const std::string& filepath)
+	{
+		std::string totalFilepath = AssetManager::GetFileSystemPathString(AssetManager::GetMetadata(filepath));
+
+		if (!FileSystem::Exists(totalFilepath))
+			return false;
+
+		m_Scene->ClearScene();
+
+		SceneSerializer::DeserializeEntities(totalFilepath, m_Scene);
+		return true;
 	}
 
 	Entity Prefab::CreatePrefabFromEntity(Entity entity)

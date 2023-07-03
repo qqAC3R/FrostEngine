@@ -25,6 +25,7 @@ namespace Frost
 	public:
 		virtual void Serialize(const AssetMetadata& metadata, Ref<Asset> asset) const override;
 		virtual bool TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const override;
+		static bool TryLoadDataStatic(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext);
 		virtual Ref<Asset> CreateAssetRef(const AssetMetadata& metadata, void* pNext) const override;
 	};
 
@@ -41,6 +42,7 @@ namespace Frost
 	public:
 		virtual void Serialize(const AssetMetadata& metadata, Ref<Asset> asset) const override;
 		virtual bool TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const override;
+		static bool TryLoadDataStatic(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext);
 		virtual Ref<Asset> CreateAssetRef(const AssetMetadata& metadata, void* pNext) const override;
 	};
 

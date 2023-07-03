@@ -39,6 +39,8 @@ namespace Frost
 			FROST_ASSERT_INTERNAL((m_DescriptorInfo.find(imageType) != m_DescriptorInfo.end()));
 			return m_DescriptorInfo[imageType];
 		}
+
+		virtual bool ReloadData(const std::string& filepath) override;
 	private:
 		Ref<Image2D> m_Image = nullptr;
 		Buffer m_TextureData;

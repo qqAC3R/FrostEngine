@@ -4,6 +4,8 @@
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/Renderer/BindlessAllocator.h"
 
+#include "Frost/Asset/AssetManager.h"
+
 namespace Frost
 {
 	MaterialAsset::MaterialAsset()
@@ -264,6 +266,40 @@ namespace Frost
 		}
 
 		FROST_ASSERT_MSG("Texture slot index not valid!");
+	}
+
+	void MaterialAsset::CopyFrom(MaterialAsset* materialAsset)
+	{
+		Ref<DataStorage> materialData = materialAsset->m_MaterialData;
+
+		SetAlbedoMap(materialAsset->GetAlbedoMap());
+		SetRoughnessMap(materialAsset->GetRoughnessMap());
+		SetMetalnessMap(materialAsset->GetMetalnessMap());
+		SetNormalMap(materialAsset->GetNormalMap());
+
+		uint32_t useNormalMap = materialData->Get<uint32_t>("UseNormalMap");
+		materialAsset->SetUseNormalMap(useNormalMap);
+
+		const glm::vec4& albedoColor = materialData->Get<glm::vec4>("AlbedoColor");
+		SetAlbedoColor(albedoColor);
+
+		float roughness = materialData->Get<float>("RoughnessFactor");
+		SetRoughness(roughness);
+
+		float metalness = materialData->Get<float>("MetalnessFactor");
+		SetMetalness(metalness);
+
+		float emission = materialData->Get<float>("EmissionFactor");
+		SetEmission(emission);
+
+	}
+
+	bool MaterialAsset::ReloadData(const std::string& filepath)
+	{
+		Ref<Asset> newMaterialAsset;
+		MaterialAssetSerializer::TryLoadDataStatic(AssetManager::GetMetadata(filepath), newMaterialAsset, nullptr);
+		CopyFrom(newMaterialAsset.As<MaterialAsset>().Raw());
+		return true;
 	}
 
 }

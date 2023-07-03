@@ -17,6 +17,8 @@ namespace Frost
 		static AssetType GetStaticType() { return AssetType::Prefab; }
 		virtual AssetType GetAssetType() const override { return AssetType::Prefab; }
 
+		virtual bool ReloadData(const std::string& filepath) override;
+
 	private:
 		Entity CreatePrefabFromEntity(Entity entity);
 	private:

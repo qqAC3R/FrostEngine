@@ -7,6 +7,7 @@ namespace Frost
 	struct SelectionData
 	{
 		UUID Handle;
+		ContentBrowserItem::ItemType ItemType;
 		AssetType AssetType;
 		std::filesystem::path FilePath;
 	};
@@ -19,12 +20,17 @@ namespace Frost
 			m_Selections.reserve(64);
 		}
 
-		void Select(UUID handle, AssetType assetType, const std::filesystem::path& filePath)
+		void CopyFrom(const SelectionStack& other)
+		{
+			m_Selections.assign(other.begin(), other.end());
+		}
+
+		void Select(UUID handle, ContentBrowserItem::ItemType itemType, AssetType assetType, const std::filesystem::path& filePath)
 		{
 			if (IsSelected(handle))
 				return;
 
-			m_Selections.push_back({ handle, assetType, filePath});
+			m_Selections.push_back({ handle, itemType, assetType, filePath});
 		}
 
 		bool IsSelected(UUID handle) const

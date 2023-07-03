@@ -9,6 +9,8 @@
 #include "Frost/Renderer/UserInterface/Font.h"
 #include "Frost/EntitySystem/Components.h"
 
+#include "Frost/EntitySystem/Scene.h"
+
 #include <glm/glm.hpp>
 
 namespace Frost
@@ -34,8 +36,8 @@ namespace Frost
 
 		virtual void SubmitCmdsToRender() = 0;
 
-		virtual void BeginScene(Ref<EditorCamera> camera) = 0;
-		virtual void BeginScene(Ref<RuntimeCamera> camera) = 0;
+		virtual void BeginScene(Ref<Scene> scene, Ref<EditorCamera>& camera) = 0;
+		virtual void BeginScene(Ref<Scene> scene, Ref<RuntimeCamera>& camera) = 0;
 		virtual void EndScene() = 0;
 
 		virtual void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform, uint32_t entityID) = 0;
@@ -52,7 +54,7 @@ namespace Frost
 
 		virtual uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y) = 0;
 		virtual uint32_t GetCurrentFrameIndex() = 0;
-		virtual void SetEditorActiveEntity(uint32_t selectedEntityId) = 0;
+		virtual Ref<Scene> GetActiveScene() = 0;
 
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const = 0;
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
@@ -67,9 +69,9 @@ namespace Frost
 		RenderQueue();
 		~RenderQueue();
 
+		void SetActiveScene(Ref<Scene> scene);
 		void SetCamera(Ref<EditorCamera> camera);
 		void SetCamera(Ref<RuntimeCamera> camera);
-		void SetEditorActiveEntity(uint32_t selectedEntityId) { m_SelectedEntityID = selectedEntityId; }
 
 		void Add(Ref<Mesh> mesh, const glm::mat4& transform, uint32_t entityID = UINT32_MAX);
 		void AddWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.0f), float lineWidth = 1.0f);
@@ -86,7 +88,10 @@ namespace Frost
 		void Reset();
 		uint32_t GetQueueSize() const { return static_cast<uint32_t>(m_Data.size()); }
 		uint32_t GetSceneSubmeshCount() const { return m_SubmeshCount; }
+		uint32_t GetActiveEntity() const;
 	public:
+		Ref<Scene> m_ActiveScene;
+
 		struct RenderData
 		{
 			Ref<Mesh> Mesh = nullptr;
@@ -95,7 +100,7 @@ namespace Frost
 		};
 		Vector<RenderQueue::RenderData> m_Data;
 		HashMap<UUID, uint32_t> m_MeshInstanceCount;
-		uint32_t m_SelectedEntityID;
+		//uint32_t m_SelectedEntityID;
 
 		struct LightData
 		{

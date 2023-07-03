@@ -87,8 +87,8 @@ namespace Frost
 		// Submit rendering commands to the graphics queue
 		static void SubmitCmdsToRender() { s_RendererAPI->SubmitCmdsToRender(); }
 
-		static void BeginScene(Ref<EditorCamera>& camera) { s_RendererAPI->BeginScene(camera); }
-		static void BeginScene(Ref<RuntimeCamera>& camera) { s_RendererAPI->BeginScene(camera); }
+		static void BeginScene(Ref<Scene> scene, Ref<EditorCamera>& camera) { s_RendererAPI->BeginScene(scene, camera); }
+		static void BeginScene(Ref<Scene> scene, Ref<RuntimeCamera>& camera) { s_RendererAPI->BeginScene(scene, camera); }
 		static void EndScene() { s_RendererAPI->EndScene(); }
 
 		static void Submit(const Ref<Mesh>& mesh, const glm::mat4& transform, uint32_t entityID = UINT32_MAX);
@@ -106,7 +106,7 @@ namespace Frost
 
 		static uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y);
 		static uint32_t GetCurrentFrameIndex();
-		static void SetEditorActiveEntity(uint32_t selectedEntityId);
+		static Ref<Scene> GetActiveScene();
 
 		// We must request a function returning a texture, instead of texture,
 		// because the renderer has 3 frames in flight

@@ -224,10 +224,10 @@ namespace Frost
 	{
 		return s_RendererAPI->GetCurrentFrameIndex();
 	}
-
-	void Renderer::SetEditorActiveEntity(uint32_t selectedEntityId)
+	
+	Ref<Scene> Renderer::GetActiveScene()
 	{
-		s_RendererAPI->SetEditorActiveEntity(selectedEntityId);
+		return s_RendererAPI->GetActiveScene();
 	}
 
 	void Renderer::SubmitImageToOutputImageMap(const std::string& name, const std::function<Ref<Image2D>()>& func)

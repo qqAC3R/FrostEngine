@@ -60,8 +60,11 @@ namespace Frost
 		const std::string& GetMaterialName() const { return m_MaterialName; }
 		void SetMaterialName(const std::string& materiaName) { m_MaterialName = materiaName; }
 
+		void CopyFrom(MaterialAsset* materialAsset);
+
 		static AssetType GetStaticType() { return AssetType::Material; }
 		virtual AssetType GetAssetType() const override { return GetStaticType(); }
+		virtual bool ReloadData(const std::string& filepath) override;
 	private:
 		Ref<DataStorage> m_MaterialData;
 		std::string m_MaterialName;
@@ -74,5 +77,6 @@ namespace Frost
 		Ref<Texture2D> m_NormalTexture;
 
 		friend class Mesh;
+		friend class AssetManager;
 	};
 }

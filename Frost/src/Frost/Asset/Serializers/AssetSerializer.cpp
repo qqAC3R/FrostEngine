@@ -65,6 +65,11 @@ namespace Frost
 
 	bool MaterialAssetSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const
 	{
+		return TryLoadDataStatic(metadata, asset, pNext);
+	}
+
+	bool MaterialAssetSerializer::TryLoadDataStatic(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) 
+	{
 		Ref<MaterialAsset> materialAsset = Ref<MaterialAsset>::Create();
 		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();
 		std::string filepath = AssetManager::GetFileSystemPathString(metadata);
@@ -108,7 +113,7 @@ namespace Frost
 			textureSpec.UseMips = true;
 			textureSpec.FlipTexture = true;
 
-			AssetMetadata metadata = AssetManager::GetMetadata(AssetHandle(in["AlbedoTexture"]));
+			const AssetMetadata& metadata = AssetManager::GetMetadata(AssetHandle(in["AlbedoTexture"]));
 			Ref<Texture2D> albedoTexture = AssetManager::GetOrLoadAsset<Texture2D>(metadata.FilePath.string(), (void*)&textureSpec);
 
 
@@ -136,7 +141,7 @@ namespace Frost
 			textureSpec.Usage = ImageUsage::ReadOnly;
 			textureSpec.FlipTexture = true;
 
-			AssetMetadata metadata = AssetManager::GetMetadata(AssetHandle(in["NormalTexture"]));
+			const AssetMetadata& metadata = AssetManager::GetMetadata(AssetHandle(in["NormalTexture"]));
 			Ref<Texture2D> normalTexture = AssetManager::GetOrLoadAsset<Texture2D>(metadata.FilePath.string(), (void*)&textureSpec);
 
 			if (normalTexture)
@@ -162,7 +167,7 @@ namespace Frost
 			textureSpec.Usage = ImageUsage::ReadOnly;
 			textureSpec.FlipTexture = true;
 
-			AssetMetadata metadata = AssetManager::GetMetadata(AssetHandle(in["RoughnessTexture"]));
+			const AssetMetadata& metadata = AssetManager::GetMetadata(AssetHandle(in["RoughnessTexture"]));
 			Ref<Texture2D> roughnessTexture = AssetManager::GetOrLoadAsset<Texture2D>(metadata.FilePath.string(), (void*)&textureSpec);
 
 			if (roughnessTexture)
@@ -188,7 +193,7 @@ namespace Frost
 			textureSpec.Usage = ImageUsage::ReadOnly;
 			textureSpec.FlipTexture = true;
 
-			AssetMetadata metadata = AssetManager::GetMetadata(AssetHandle(in["MetalnessTexture"]));
+			const AssetMetadata& metadata = AssetManager::GetMetadata(AssetHandle(in["MetalnessTexture"]));
 			Ref<Texture2D> metalnessTexture = AssetManager::GetOrLoadAsset<Texture2D>(metadata.FilePath.string(), (void*)&textureSpec);
 
 			if (metalnessTexture)
@@ -253,6 +258,11 @@ namespace Frost
 	}
 
 	bool PhysicsMaterialSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext) const
+	{
+		return TryLoadDataStatic(metadata, asset, pNext);
+	}
+
+	bool PhysicsMaterialSerializer::TryLoadDataStatic(const AssetMetadata& metadata, Ref<Asset>& asset, void* pNext)
 	{
 		Ref<PhysicsMaterial> physicsMaterial = Ref<PhysicsMaterial>::Create();
 		Ref<Texture2D> whiteTexture = Renderer::GetWhiteLUT();

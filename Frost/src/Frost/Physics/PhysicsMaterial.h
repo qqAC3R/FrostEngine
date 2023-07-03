@@ -18,6 +18,16 @@ namespace Frost
 		{
 		}
 
+		void CopyFrom(PhysicsMaterial* physicsMaterial)
+		{
+			StaticFriction = physicsMaterial->StaticFriction;
+			DynamicFriction = physicsMaterial->DynamicFriction;
+			Bounciness = physicsMaterial->Bounciness;
+			m_MaterialName = physicsMaterial->m_MaterialName;
+		}
+
+		virtual bool ReloadData(const std::string& filepath) override;
+
 		static AssetType GetStaticType() { return AssetType::PhysicsMat; }
 		virtual AssetType GetAssetType() const override { return AssetType::PhysicsMat;; }
 	};
