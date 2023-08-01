@@ -489,7 +489,7 @@ namespace Frost
 
 		bool entityFound = false;
 
-		m_SceneContext->GetRegistry().each([&](auto entity)
+		m_SceneContext->GetRegistry().each([&, entityID](auto entity)
 		{
 			Entity ent = { entity, m_SceneContext.Raw() };
 			if ((uint32_t)entity == entityID)
@@ -506,15 +506,12 @@ namespace Frost
 
 	void SceneHierarchyPanel::AddLateFunction(const std::function<void()>& func)
 	{
-		m_LateDeletionFunctions.push_back(func);
+		m_LateDeletionFunctions.AddFunction(func);
 	}
 
 	void SceneHierarchyPanel::ExecuteLateFunctions()
 	{
-		for (auto& func : m_LateDeletionFunctions)
-			func();
-
-		m_LateDeletionFunctions.clear();
+		m_LateDeletionFunctions.Execute();
 	}
 
 	void SceneHierarchyPanel::Shutdown()

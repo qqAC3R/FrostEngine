@@ -101,12 +101,17 @@ namespace Frost
 		AnimationComponent() = default;
 
 		AnimationComponent(const MeshComponent* mesh)
-			: Controller(CreateRef<AnimationController>()), MeshComponentPtr(mesh)
+			: Controller(CreateRef<AnimationController>(mesh->Mesh)), MeshComponentPtr(mesh)
 		{}
 
 		AnimationComponent(Ref<AnimationController> animationController, const MeshComponent* mesh)
 			: Controller(animationController), MeshComponentPtr(mesh)
 		{}
+
+		void ResetAnimationBlueprint()
+		{
+			Controller = CreateRef<AnimationController>(MeshComponentPtr->Mesh);
+		}
 
 		const MeshComponent* MeshComponentPtr;
 		Ref<AnimationController> Controller;
@@ -251,8 +256,17 @@ namespace Frost
 		Ref<MeshAsset> DebugMesh;
 
 		BoxColliderComponent()
-			: DebugMesh(MeshAsset::GetDefaultMeshes().Cube) {}
+			: DebugMesh(MeshAsset::GetDefaultMeshes().Cube)
+		{
+			ResetPhysicsMaterial();
+		}
 		BoxColliderComponent(const BoxColliderComponent & other) = default;
+
+		void ResetPhysicsMaterial()
+		{
+			MaterialHandle = Ref<PhysicsMaterial>::Create();
+			MaterialHandle->Handle = 0;
+		}
 	};
 
 	struct SphereColliderComponent
@@ -270,8 +284,17 @@ namespace Frost
 		Ref<ColliderShape> ColliderHandle;
 
 		SphereColliderComponent()
-			: DebugMesh(MeshAsset::GetDefaultMeshes().Sphere) {}
+			: DebugMesh(MeshAsset::GetDefaultMeshes().Sphere)
+		{
+			ResetPhysicsMaterial();
+		}
 		SphereColliderComponent(const SphereColliderComponent& other) = default;
+
+		void ResetPhysicsMaterial()
+		{
+			MaterialHandle = Ref<PhysicsMaterial>::Create();
+			MaterialHandle->Handle = 0;
+		}
 	};
 
 	struct CapsuleColliderComponent
@@ -290,8 +313,17 @@ namespace Frost
 		Ref<ColliderShape> ColliderHandle;
 
 		CapsuleColliderComponent()
-			: DebugMesh(MeshAsset::GetDefaultMeshes().Capsule) {}
+			: DebugMesh(MeshAsset::GetDefaultMeshes().Capsule)
+		{
+			ResetPhysicsMaterial();
+		}
 		CapsuleColliderComponent(const CapsuleColliderComponent& other) = default;
+
+		void ResetPhysicsMaterial()
+		{
+			MaterialHandle = Ref<PhysicsMaterial>::Create();
+			MaterialHandle->Handle = 0;
+		}
 	};
 
 	struct MeshColliderComponent
@@ -307,13 +339,22 @@ namespace Frost
 		// Currently we don't have any other method of obtaning the collider handle, apart from this one
 		Ref<ColliderShape> ColliderHandle;
 
-		MeshColliderComponent() = default;
+		MeshColliderComponent()
+		{
+			ResetPhysicsMaterial();
+		}
 		MeshColliderComponent(const MeshColliderComponent& other) = default;
 		
 		void ResetMesh()
 		{
 			CollisionMesh = nullptr;
 			ProcessedMeshes.clear();
+		}
+
+		void ResetPhysicsMaterial()
+		{
+			MaterialHandle = Ref<PhysicsMaterial>::Create();
+			MaterialHandle->Handle = 0;
 		}
 	};
 

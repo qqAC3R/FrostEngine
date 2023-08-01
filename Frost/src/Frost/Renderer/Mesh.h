@@ -95,7 +95,6 @@ namespace Frost
 		Math::BoundingBox BoundingBox;
 
 		glm::mat4 Transform{ 1.0f };
-		glm::mat4 MeshTransform{ 1.0f };
 
 		std::string MeshName;
 	};
@@ -139,6 +138,7 @@ namespace Frost
 
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
 		const Vector<Ref<Animation>>& GetAnimations() const { return m_Animations; }
+		const Ref<MeshSkeleton>& GetMeshSkeleton() const { return m_Skeleton; }
 
 		static AssetType GetStaticType() { return AssetType::MeshAsset; }
 		virtual AssetType GetAssetType() const override { return AssetType::MeshAsset; }

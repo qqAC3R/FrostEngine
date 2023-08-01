@@ -147,29 +147,14 @@ namespace Frost
 
 		if (entity.HasComponent<AnimationComponent>())
 		{
-			int32_t animationIndex = -1;
-
 			AnimationComponent& animationController = entity.GetComponent<AnimationComponent>();
 
-			// Check whether the entity has a mesh component or not. If it does then search for the animation index
+			// Check whether the entity has a mesh component or not
+			AssetHandle blueprintHandle = 0;
 			if (entity.HasComponent<MeshComponent>())
-			{
-				MeshComponent& meshComponent = entity.GetComponent<MeshComponent>();
-				Ref<MeshAsset> mesh = meshComponent.Mesh->GetMeshAsset();
+				blueprintHandle = animationController.Controller->GetAnimationBlueprint()->Handle;
 
-				if (mesh)
-				{
-					for (uint32_t i = 0; i < mesh->m_Animations.size(); i++)
-					{
-						if (mesh->m_Animations[i].Raw() == animationController.Controller->GetActiveAnimation().Raw())
-						{
-							animationIndex = i;
-							break;
-						}
-					}
-				}
-			}
-			entityOut["AnimationComponent"]["AnimationIndex"] = animationIndex;
+			entityOut["AnimationComponent"]["BlueprintHandle"] = blueprintHandle.Get();
 		}
 
 		if (entity.HasComponent<SkyLightComponent>())
@@ -492,24 +477,26 @@ namespace Frost
 			// Animation Component
 			if (!entity["AnimationComponent"].is_null())
 			{
-				AnimationComponent& animationComponent = ent.AddComponent<AnimationComponent>(nullptr);
-				nlohmann::json cloudVolumeIn = entity["AnimationComponent"];
+				AnimationComponent& animationComponent = ent.AddComponent<AnimationComponent>();
+				nlohmann::json animationComponentIn = entity["AnimationComponent"];
 
 				if (ent.HasComponent<MeshComponent>())
 				{
 					MeshComponent& meshComponent = ent.GetComponent<MeshComponent>();
-					Ref<MeshAsset> mesh = meshComponent.Mesh->GetMeshAsset();
+					Ref<MeshAsset> meshAsset = meshComponent.Mesh->GetMeshAsset();
 
-					if (mesh)
+					if (meshAsset)
 					{
 						animationComponent.MeshComponentPtr = &meshComponent;
-						animationComponent.Controller = nullptr;
 
-						if (entity["AnimationComponent"]["AnimationIndex"] != -1)
-						{
-							animationComponent.Controller = CreateRef<AnimationController>();
-							animationComponent.Controller->SetActiveAnimation(mesh->GetAnimations()[entity["AnimationComponent"]["AnimationIndex"]]);
-						}
+						animationComponent.Controller = CreateRef<AnimationController>(meshComponent.Mesh);
+
+						const AssetMetadata& materialAssetMetadata = AssetManager::GetMetadata(UUID(animationComponentIn["BlueprintHandle"]));
+						Ref<AnimationBlueprint> animBlueprint = AssetManager::GetOrLoadAsset<AnimationBlueprint>(materialAssetMetadata.FilePath.string(), (void*)meshAsset.Raw());
+						if (animBlueprint)
+							animationComponent.Controller->SetAnimationBlueprint(animBlueprint);
+						else
+							FROST_CORE_ERROR("Could not load Blueprint! Invalid Handle!");
 					}
 					else
 					{
@@ -569,7 +556,7 @@ namespace Frost
 				BoxColliderComponent& boxColliderComponent = ent.AddComponent<BoxColliderComponent>();
 				nlohmann::json boxColliderIn = entity["BoxColliderComponent"];
 
-				boxColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
+				//boxColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
 				boxColliderComponent.Size = { boxColliderIn["Size"][0], boxColliderIn["Size"][1], boxColliderIn["Size"][2] };
 				boxColliderComponent.Offset = { boxColliderIn["Offset"][0], boxColliderIn["Offset"][1], boxColliderIn["Offset"][2] };
 				boxColliderComponent.IsTrigger = boxColliderIn["IsTrigger"];
@@ -599,7 +586,7 @@ namespace Frost
 				SphereColliderComponent& sphereColliderComponent = ent.AddComponent<SphereColliderComponent>();
 				nlohmann::json sphereColliderIn = entity["SphereColliderComponent"];
 
-				sphereColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
+				//sphereColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
 				sphereColliderComponent.Radius = sphereColliderIn["Radius"];
 				sphereColliderComponent.Offset = { sphereColliderIn["Offset"][0], sphereColliderIn["Offset"][1], sphereColliderIn["Offset"][2] };
 				sphereColliderComponent.IsTrigger = sphereColliderIn["IsTrigger"];
@@ -627,7 +614,7 @@ namespace Frost
 				CapsuleColliderComponent& capsuleColliderComponent = ent.AddComponent<CapsuleColliderComponent>();
 				nlohmann::json capsuleColliderIn = entity["CapsuleColliderComponent"];
 
-				capsuleColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
+				//capsuleColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
 				capsuleColliderComponent.Radius = capsuleColliderIn["Radius"];
 				capsuleColliderComponent.Height = capsuleColliderIn["Height"];
 				capsuleColliderComponent.Offset = { capsuleColliderIn["Offset"][0], capsuleColliderIn["Offset"][1], capsuleColliderIn["Offset"][2] };
@@ -656,7 +643,7 @@ namespace Frost
 				MeshColliderComponent& meshColliderComponent = ent.AddComponent<MeshColliderComponent>();
 				nlohmann::json meshColliderIn = entity["MeshColliderComponent"];
 
-				meshColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
+				//meshColliderComponent.MaterialHandle = nullptr; // We will check later if the component has a physics material
 				meshColliderComponent.IsConvex = meshColliderIn["IsConvex"];
 				meshColliderComponent.IsTrigger = meshColliderIn["IsTrigger"];
 

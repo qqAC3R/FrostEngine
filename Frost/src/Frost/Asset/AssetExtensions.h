@@ -11,6 +11,7 @@ namespace Frost
 		{ ".fmat",  AssetType::Material },
 		{ ".fprefab",  AssetType::Prefab },
 		{ ".fpmat",  AssetType::PhysicsMat },
+		{ ".fanim", AssetType::AnimationBlueprint },
 
 		// Meshes
 		{ ".fbx",  AssetType::MeshAsset },
@@ -25,6 +26,7 @@ namespace Frost
 		{ ".png",  AssetType::Texture },
 		{ ".jpg",  AssetType::Texture },
 
-		{ ".hdr", AssetType::EnvMap }
+		{ ".hdr", AssetType::EnvMap },
+
 	};
 }

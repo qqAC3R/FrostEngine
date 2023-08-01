@@ -77,6 +77,10 @@ namespace Frost
 		m_ViewportPanel->SetScenePlayFunction(std::bind(&EditorLayer::OnScenePlay, this));
 		m_ViewportPanel->SetSceneStopFunction(std::bind(&EditorLayer::OnSceneStop, this));
 
+		m_AnimationNodeEditor = Ref<AnimationNoteEditor>::Create();
+		m_AnimationNodeEditor->Init(nullptr);
+		m_AnimationNodeEditor->SetVisibility(false);
+
 		//m_MaterialEditor = Ref<MaterialEditor>::Create();
 		//m_MaterialEditor->Init(nullptr);
 
@@ -243,6 +247,7 @@ namespace Frost
 				{
 					ImGui::MenuItem("Scene Hierarchy", "", &m_ShowSceneHierarchyPanel);
 					ImGui::MenuItem("Inspector Panel", "", &m_ShowInspectorPanel);
+					ImGui::MenuItem("Content Browser", "", &m_ShowContentBrowser);
 					ImGui::MenuItem("Renderer Debugger", "", &m_ShowRendererDebugger);
 
 					ImGui::EndPopup();
@@ -254,6 +259,7 @@ namespace Frost
 			
 			m_SceneHierarchyPanel->SetVisibility(m_ShowSceneHierarchyPanel);
 			m_InspectorPanel->SetVisibility(m_ShowInspectorPanel);
+			m_ContentBrowser->SetVisibility(m_ShowContentBrowser);
 
 
 			if (opt_fullscreen)
@@ -308,6 +314,9 @@ namespace Frost
 
 			// Content browser rendering
 			m_ContentBrowser->Render();
+
+			// Animation Node Editor
+			m_AnimationNodeEditor->Render();
 
 
 			if (m_ShowRendererDebugger)
@@ -431,7 +440,7 @@ namespace Frost
 	{
 		if (m_SceneState == SceneState::Play) return;
 
-		AssetManager::RemoveAssetFromMemory(m_EditorScene->Handle);
+		AssetManager::RemoveAssetFromMemory(m_EditorScene->Handle, false);
 
 		m_EditorScene = Ref<Scene>::Create("New Empty Scene");
 		m_SceneHierarchyPanel->SetSceneContext(m_EditorScene);
@@ -537,15 +546,14 @@ namespace Frost
 		else
 		{
 
-			if (!m_ContentBrowser->IsContentBrowserFocused())
-			{
-				m_SceneHierarchyPanel->OnEvent(event);
-				m_InspectorPanel->OnEvent(event);
-			}
-			else
-			{
+			if (m_ContentBrowser->IsContentBrowserFocused())
 				m_ContentBrowser->OnEvent(event);
-			}
+			else if (m_AnimationNodeEditor->IsNodeEditorFocused())
+				m_AnimationNodeEditor->OnEvent(event);
+			else if (m_InspectorPanel->IsPanelFocused())
+				m_InspectorPanel->OnEvent(event);
+			else
+				m_SceneHierarchyPanel->OnEvent(event);
 		}
 	}
 
@@ -653,6 +661,7 @@ namespace Frost
 	void EditorLayer::OnDetach()
 	{
 		m_ContentBrowser->Shutdown();
+		m_AnimationNodeEditor->Shutdown();
 		this->~EditorLayer();
 	}
 }

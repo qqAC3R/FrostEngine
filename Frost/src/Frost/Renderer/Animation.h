@@ -8,6 +8,8 @@
 #include <ozz/base/containers/vector.h>
 #include <ozz/animation/runtime/sampling_job.h>
 
+#include "Frost/Renderer/Animation/AnimationBlueprint.h"
+
 struct aiNode;
 struct aiAnimation;
 struct aiNodeAnim;
@@ -32,6 +34,7 @@ namespace math
 namespace Frost
 {
 	class MeshAsset;
+	class Mesh;
 
 	class MeshSkeleton
 	{
@@ -77,37 +80,113 @@ namespace Frost
 	class AnimationController
 	{
 	public:
-		AnimationController();
+		AnimationController(Ref<Mesh> mesh);
 		virtual ~AnimationController();
 
-		void SetActiveAnimation(Ref<Animation> animation);
-		Ref<Animation> GetActiveAnimation() { return m_ActiveAnimation ? m_ActiveAnimation : nullptr ; }
+		Ref<AnimationBlueprint> GetAnimationBlueprint() { return m_AnimationBlueprint; }
+		void SetAnimationBlueprint(Ref<AnimationBlueprint> animBlueprint) { m_AnimationBlueprint = animBlueprint; }
 
-		float* GetAnimationTime() { return &m_AnimationTime; }
 		const ozz::vector<ozz::math::Float4x4>& GetModelSpaceMatrices() const { return m_ModelSpaceTransforms; }
 
 		void OnUpdate(Timestep ts);
 		
 		void StartAnimation() { m_AnimationPlaying = true; }
 		void StopAnimation()  { m_AnimationPlaying = false; }
+	private:
+		struct AnimationNodeInternal
+		{
+			AnimationNode::NodeType Type;
+			ozz::vector<ozz::math::SoaTransform> LocalSpaceTransforms; // Result matrix
+
+			float AnimationTime = 0.0f;
+		};
+
+		struct AnimationOutputNodeInternal : public AnimationNodeInternal
+		{
+			Ref<AnimationNodeInternal> Result;
+			ozz::vector<ozz::math::Float4x4> ResultMatrix;
+		};
+
+		struct AnimationInputNodeInternal : public AnimationNodeInternal
+		{
+			ozz::animation::SamplingJob::Context SamplingContext;
+			InputNodeHandle VariableID;
+			bool IsAnimation;
+		};
+
+		struct AnimationConditionNodeInternal : public AnimationNodeInternal
+		{
+			Ref<AnimationNodeInternal> ConditionBoolean;
+			Ref<AnimationNodeInternal> ConditionTrue;
+			Ref<AnimationNodeInternal> ConditionFalse;
+		};
+
+		struct AnimationBlendNodeInternal : public AnimationNodeInternal
+		{
+			Ref<AnimationNodeInternal> BlendFactorFloat;
+			Ref<AnimationNodeInternal> AnimationA;
+			Ref<AnimationNodeInternal> AnimationB;
+		};
 
 	private:
+		struct AnimationSampler;
+
 		// Sample current animation clip (aka "state") at current animation time
-		void SampleAnimation();
+		//void SampleAnimation(AnimationSampler& animationSampler);
+		//void ComputeAnimationTime(AnimationSampler& animationSampler, Timestep ts);
+		//void BlendAnimations(AnimationSampler& animationFrom, AnimationSampler& animationTo, float weight);
+
+		void BakeAnimationGraph(Ref<AnimationBlueprint> animationBluePrint);
+		Ref<AnimationNodeInternal> TraverseNodes(Ref<AnimationNode> curretNode, Ref<AnimationBlueprint> animationBluePrint);
+		void UpdateAnimationGraph(Timestep ts);
+
 	private:
-		Ref<Animation> m_ActiveAnimation = nullptr;
+		//Ref<Animation> m_ActiveAnimation = nullptr;
+		//Ref<Animation> m_TransitionedAnimation = nullptr;
 
-		ozz::vector<ozz::math::SoaTransform> m_LocalSpaceTransforms;
-		ozz::vector<ozz::math::Float4x4> m_ModelSpaceTransforms;
+		//ozz::vector<ozz::math::SoaTransform> m_LocalSpaceTransforms;
+		//ozz::vector<ozz::math::SoaTransform> m_LocalSpaceTransforms_Transitioned;
 
-		ozz::animation::SamplingJob::Context m_SamplingContext;
+		//Ref<Mesh> m_Mesh;
 
-		float m_AnimationTime = 0.0f;
-		float m_PreviousAnimationTime = -FLT_MAX;
+		Vector<Ref<AnimationNodeInternal>> m_BakedAnimationNodes;
+
+		Ref<MeshSkeleton> m_MeshSkeleton;
+
+		Vector<Ref<Animation>> m_Animations;
+		Ref<AnimationBlueprint> m_AnimationBlueprint;
+
+		ozz::vector<ozz::math::Float4x4> m_ModelSpaceTransforms; // Output transform
+		ozz::vector<ozz::math::Float4x4> m_DefaultModelSpaceTransforms;
+		ozz::vector<ozz::math::SoaTransform> m_DefaultTransform; // Result matrix
+
+#if 0
+		struct AnimationSampler
+		{
+			Ref<Animation> AnimationHandle = nullptr;
+			ozz::vector<ozz::math::SoaTransform> LocalSpaceTransforms;
+			ozz::animation::SamplingJob::Context SamplingContext;
+			float AnimationTime;
+
+			void Copy(AnimationSampler& sampler);
+		};
+
+		AnimationSampler m_ActiveAnimation;
+		AnimationSampler m_TransitionedAnimation;
+#endif
+
+		//ozz::animation::SamplingJob::Context m_SamplingContext;
+
+		//float m_TransitionTime = 0.0f;
+		//bool m_IsTransitioning = false;
+
+
+		//float m_AnimationTime = 0.0f;
+		//float m_PreviousAnimationTime = -FLT_MAX;
+
 
 		bool m_AnimationPlaying = true;
 
-		// TODO: TEMP
 		friend class MeshAsset;
 	};
 

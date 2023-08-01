@@ -65,11 +65,11 @@ vec3 DecodePosition(ivec2 coords)
 {
 	vec2 texCoords = (vec2(coords) + vec2(0.5f)) / vec2(imageSize(u_VolumetricTex).xy);
 
-	float depth = textureLod(u_DepthTexture, texCoords, 1).r;
+	float depth = texelFetch(u_DepthTexture, ivec2(vec2(gl_GlobalInvocationID.xy) / 2.0), 1).r;
 
 	if(depth != 1.0)
 	{
-		return texture(u_PositionTexture, texCoords).rgb;
+		return texelFetch(u_PositionTexture, ivec2(gl_GlobalInvocationID.xy), 0).rgb;
 	}
 
 	vec3 clipCoords = vec3(texCoords * 2.0 - 1.0, depth);
@@ -100,7 +100,7 @@ void main()
 
 	ivec2 coords = invoke;
 
-	vec4 noise = SampleBlueNoise(coords);
+	vec4 noise = SampleBlueNoise(coords) * 0.6f;
 	vec3 worlSpacePos = DecodePosition(coords);
 
 	vec2 uv = (vec2(coords) + vec2(0.5f)) / vec2(imageSize(u_VolumetricTex).xy);

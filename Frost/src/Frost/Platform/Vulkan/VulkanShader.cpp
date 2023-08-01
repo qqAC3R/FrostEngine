@@ -336,7 +336,7 @@ namespace Frost
 		{
 			// Hashing the new shader
 			m_ShaderSourceHashCode = std::hash<std::string>{}(m_ShaderSource);
-			FROST_CORE_INFO("{0} shader hash code: {1}", m_Name, m_ShaderSourceHashCode);
+			FROST_CORE_INFO("[Shader] {0} shader hash code: {1}", m_Name, m_ShaderSourceHashCode);
 		}
 
 		{

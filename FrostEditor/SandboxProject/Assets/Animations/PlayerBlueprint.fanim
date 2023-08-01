@@ -1,0 +1,368 @@
+{
+    "MeshAsset": 4254666277973193135,
+    "Inputs": [
+        {
+            "Handle": 17127308898649426300,
+            "Type": "Float",
+            "Name": "FallingSpeed",
+            "Data": 0.0
+        },
+        {
+            "Handle": 12761246522115711531,
+            "Type": "Animation",
+            "Name": "Walk With Case",
+            "Data": "Walk With Case"
+        },
+        {
+            "Handle": 14487108481625265477,
+            "Type": "Animation",
+            "Name": "T-Pose",
+            "Data": "T-Pose"
+        },
+        {
+            "Handle": 15042929738082311739,
+            "Type": "Animation",
+            "Name": "Idle",
+            "Data": "Idle"
+        },
+        {
+            "Handle": 6510890042559243145,
+            "Type": "Float",
+            "Name": "Acceleration",
+            "Data": 0.0
+        }
+    ],
+    "Nodes": [
+        {
+            "Handle": 11013079496904409862,
+            "Type": "Output",
+            "NodePositionInGrid": [
+                255.0,
+                -55.0
+            ],
+            "InputPins": [
+                {
+                    "PinName": "Skeleton",
+                    "Handle": 10593374389149918551,
+                    "AnimationParentNode": 11013079496904409862,
+                    "PinType": "Float",
+                    "PinColor": [
+                        1.0,
+                        0.3799999952316284,
+                        0.3799999952316284,
+                        1.0
+                    ]
+                },
+                {
+                    "PinName": "Pose",
+                    "Handle": 16575561642949746641,
+                    "AnimationParentNode": 11013079496904409862,
+                    "PinType": "Animation",
+                    "PinColor": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            ],
+            "OutputPins": null
+        },
+        {
+            "Handle": 10282342551896619730,
+            "Type": "Input",
+            "NodePositionInGrid": [
+                -263.0,
+                -225.0
+            ],
+            "InputType": "Animation",
+            "InputHandle": 14487108481625265477,
+            "InputPins": null,
+            "OutputPins": [
+                {
+                    "PinName": "T-Pose",
+                    "Handle": 18272473990950846291,
+                    "AnimationParentNode": 10282342551896619730,
+                    "PinType": "Animation",
+                    "PinColor": [
+                        0.3799999952316284,
+                        0.5699999928474426,
+                        0.9100000262260437,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "Handle": 18016412193672531220,
+            "Type": "Blend",
+            "NodePositionInGrid": [
+                -309.0,
+                -43.0
+            ],
+            "InputPins": [
+                {
+                    "PinName": "A",
+                    "Handle": 3876879640913340188,
+                    "AnimationParentNode": 18016412193672531220,
+                    "PinType": "Animation",
+                    "PinColor": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                },
+                {
+                    "PinName": "Blend Factor",
+                    "Handle": 3474934963870658400,
+                    "AnimationParentNode": 18016412193672531220,
+                    "PinType": "Float",
+                    "PinColor": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                },
+                {
+                    "PinName": "B",
+                    "Handle": 9593367077369717896,
+                    "AnimationParentNode": 18016412193672531220,
+                    "PinType": "Animation",
+                    "PinColor": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            ],
+            "OutputPins": [
+                {
+                    "PinName": "Pose",
+                    "Handle": 5006568557735385532,
+                    "AnimationParentNode": 18016412193672531220,
+                    "PinType": "Animation",
+                    "PinColor": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "Handle": 14114635788432618664,
+            "Type": "Input",
+            "NodePositionInGrid": [
+                -542.0,
+                -64.0
+            ],
+            "InputType": "Animation",
+            "InputHandle": 12761246522115711531,
+            "InputPins": null,
+            "OutputPins": [
+                {
+                    "PinName": "Walk With Case",
+                    "Handle": 5641006913838280493,
+                    "AnimationParentNode": 14114635788432618664,
+                    "PinType": "Animation",
+                    "PinColor": [
+                        0.3799999952316284,
+                        0.5699999928474426,
+                        0.9100000262260437,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "Handle": 13758337801295266154,
+            "Type": "Input",
+            "NodePositionInGrid": [
+                -310.0,
+                -135.0
+            ],
+            "InputType": "Float",
+            "InputHandle": 17127308898649426300,
+            "InputPins": null,
+            "OutputPins": [
+                {
+                    "PinName": "FallingSpeed",
+                    "Handle": 8699524645301625353,
+                    "AnimationParentNode": 13758337801295266154,
+                    "PinType": "Float",
+                    "PinColor": [
+                        0.5,
+                        0.6700000166893005,
+                        0.36000001430511475,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "Handle": 3406316408968989453,
+            "Type": "Blend",
+            "NodePositionInGrid": [
+                -38.0,
+                -141.0
+            ],
+            "InputPins": [
+                {
+                    "PinName": "A",
+                    "Handle": 2442591270178686429,
+                    "AnimationParentNode": 3406316408968989453,
+                    "PinType": "Animation",
+                    "PinColor": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                },
+                {
+                    "PinName": "Blend Factor",
+                    "Handle": 16497934769397687776,
+                    "AnimationParentNode": 3406316408968989453,
+                    "PinType": "Float",
+                    "PinColor": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                },
+                {
+                    "PinName": "B",
+                    "Handle": 8845145506914994857,
+                    "AnimationParentNode": 3406316408968989453,
+                    "PinType": "Animation",
+                    "PinColor": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            ],
+            "OutputPins": [
+                {
+                    "PinName": "Pose",
+                    "Handle": 7024165721885089967,
+                    "AnimationParentNode": 3406316408968989453,
+                    "PinType": "Animation",
+                    "PinColor": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "Handle": 3638403089032373977,
+            "Type": "Input",
+            "NodePositionInGrid": [
+                -514.0,
+                111.0
+            ],
+            "InputType": "Animation",
+            "InputHandle": 15042929738082311739,
+            "InputPins": null,
+            "OutputPins": [
+                {
+                    "PinName": "Idle",
+                    "Handle": 18070135393821247685,
+                    "AnimationParentNode": 3638403089032373977,
+                    "PinType": "Animation",
+                    "PinColor": [
+                        0.3799999952316284,
+                        0.5699999928474426,
+                        0.9100000262260437,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "Handle": 5671733003921399006,
+            "Type": "Input",
+            "NodePositionInGrid": [
+                -588.0,
+                25.0
+            ],
+            "InputType": "Float",
+            "InputHandle": 6510890042559243145,
+            "InputPins": null,
+            "OutputPins": [
+                {
+                    "PinName": "New float",
+                    "Handle": 16275457017701025960,
+                    "AnimationParentNode": 5671733003921399006,
+                    "PinType": "Float",
+                    "PinColor": [
+                        0.5,
+                        0.6700000166893005,
+                        0.36000001430511475,
+                        1.0
+                    ]
+                }
+            ]
+        }
+    ],
+    "PinLinks": [
+        {
+            "LinkID": 1183993755931453059,
+            "ParentNodeA": 14114635788432618664,
+            "PinA": 5641006913838280493,
+            "ParentNodeB": 18016412193672531220,
+            "PinB": 3876879640913340188
+        },
+        {
+            "LinkID": 3288373026828243233,
+            "ParentNodeA": 3638403089032373977,
+            "PinA": 18070135393821247685,
+            "ParentNodeB": 18016412193672531220,
+            "PinB": 9593367077369717896
+        },
+        {
+            "LinkID": 4852212913251216923,
+            "ParentNodeA": 5671733003921399006,
+            "PinA": 16275457017701025960,
+            "ParentNodeB": 18016412193672531220,
+            "PinB": 3474934963870658400
+        },
+        {
+            "LinkID": 3583347806658050375,
+            "ParentNodeA": 18016412193672531220,
+            "PinA": 5006568557735385532,
+            "ParentNodeB": 3406316408968989453,
+            "PinB": 8845145506914994857
+        },
+        {
+            "LinkID": 4632882479669754480,
+            "ParentNodeA": 3406316408968989453,
+            "PinA": 7024165721885089967,
+            "ParentNodeB": 11013079496904409862,
+            "PinB": 16575561642949746641
+        },
+        {
+            "LinkID": 17888302353743610945,
+            "ParentNodeA": 13758337801295266154,
+            "PinA": 8699524645301625353,
+            "ParentNodeB": 3406316408968989453,
+            "PinB": 16497934769397687776
+        },
+        {
+            "LinkID": 16684225244973357407,
+            "ParentNodeA": 10282342551896619730,
+            "PinA": 18272473990950846291,
+            "ParentNodeB": 3406316408968989453,
+            "PinB": 2442591270178686429
+        }
+    ]
+}

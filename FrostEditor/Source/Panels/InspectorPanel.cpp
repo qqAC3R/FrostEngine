@@ -5,11 +5,11 @@
 #include "Frost/Renderer/MaterialAsset.h"
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/Renderer/UserInterface/Font.h"
+#include "Frost/Renderer/Animation/AnimationBlueprint.h"
 #include "Frost/EntitySystem/Prefab.h"
 
 #include "UserInterface/UIWidgets.h"
-#include <imgui.h>
-#include <imgui/imgui_internal.h>
+#include "Frost/ImGui/Utils/ScopedStyle.h"
 
 #include "IconsFontAwesome.hpp"
 
@@ -46,6 +46,11 @@ namespace Frost
 				DrawComponents(entity);
 			}
 		}
+
+		// Check if the window is focused (also including child window)
+		m_IsPanelFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
+		m_IsPanelHovered = ImGui::IsWindowHovered(ImGuiFocusedFlags_ChildWindows);
+
 		ImGui::End();
 
 	}
@@ -71,7 +76,7 @@ namespace Frost
 			bool open = false;
 			{
 
-				UserInterface::ScopedFontStyle fontStyle(UserInterface::ScopedFontStyle::FontType::Bold);
+				ImGui::ScopedFontStyle fontStyle(ImGui::ScopedFontStyle::FontType::Bold);
 				open = ImGui::TreeNodeEx((void*)typeid(T).hash_code(), treeNodeFlags, name.c_str());
 			}
 			ImGui::PopStyleVar();
@@ -412,7 +417,7 @@ namespace Frost
 
 				if (animationComponent != nullptr)
 				{
-					animationComponent->Controller->SetActiveAnimation(nullptr);
+					animationComponent->Controller->SetAnimationBlueprint(Ref<AnimationBlueprint>::Create(meshAsset.Raw()));
 				}
 			}
 
@@ -599,7 +604,7 @@ namespace Frost
 			}
 		});
 
-		DrawComponent<AnimationComponent>("ANIMATION CONTROLLER", entity, [](auto& component)
+		DrawComponent<AnimationComponent>("ANIMATION CONTROLLER", entity, [&](auto& component)
 		{
 			// Draw Animations
 			if (component.MeshComponentPtr->Mesh.Raw() != nullptr)
@@ -607,50 +612,144 @@ namespace Frost
 				const Mesh* mesh = component.MeshComponentPtr->Mesh.Raw();
 				if (mesh->IsAnimated())
 				{
-					const Vector<Ref<Animation>>& animations = mesh->GetMeshAsset()->GetAnimations();
-					Ref<Animation> activeAnimation = component.Controller->GetActiveAnimation();
-
-					std::string activeAnimationName = "-";
-					if (activeAnimation)
+					constexpr ImGuiTableFlags flags = ImGuiTableFlags_Resizable;
+					ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
+					if (ImGui::BeginTable("PointLightProperties", 2, flags))
 					{
-						activeAnimationName = activeAnimation->GetName();
-					}
+						ImGui::PushID(0);
 
-					ImGui::PushItemWidth(-1);
-					if (ImGui::BeginCombo("##animator", activeAnimationName.c_str()))
-					{
-						if (ImGui::Selectable("-"))
-							component.Controller->SetActiveAnimation(nullptr);
+						ImGui::TableNextColumn();
+						ImGui::Text("BluePrint");
 
-						for (auto animation : animations)
+						ImGui::TableNextColumn();
+						ImGui::SetNextItemWidth(-1);
+
+						std::string buttonName = "Default";
+						if (component.Controller->GetAnimationBlueprint()->Handle)
 						{
-							bool isSelected = (animation.Raw() == activeAnimation.Raw());
-
-							if (ImGui::Selectable(animation->GetName().c_str(), isSelected))
-								component.Controller->SetActiveAnimation(animation);
-
-							if (isSelected)
-								ImGui::SetItemDefaultFocus();
+							const AssetMetadata& metadata = AssetManager::GetMetadata(component.Controller->GetAnimationBlueprint());
+							buttonName = GetNameFromFilepath(metadata.FilePath.string());
 						}
-						ImGui::EndCombo();
+
+						if (component.Controller->GetAnimationBlueprint())
+						{
+							if (AssetManager::IsAssetHandleNonZero(component.Controller->GetAnimationBlueprint()->Handle))
+							{
+								// We are setting -38.0f to make some room for the "X" button
+								ImGui::Button(buttonName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
+							}
+							else
+							{
+								ImGui::Button(buttonName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+							}
+						}
+
+						//ImGui::Button(buttonName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+
+						if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && ImGui::IsItemHovered())
+						{
+							if (component.Controller->GetAnimationBlueprint())
+							{
+								m_Context->m_AnimationNodeEditor->SetVisibility(true);
+								m_Context->m_AnimationNodeEditor->SetActiveAnimationBlueprint(component.Controller->GetAnimationBlueprint());
+							}
+						}
+
+						// Saving Material
+						if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsItemHovered())
+						{
+							ImGui::OpenPopup("SaveBlueprint");
+						}
+
+						if (ImGui::BeginPopup("SaveBlueprint"))
+						{
+							if (ImGui::MenuItem("Save As"))
+							{
+								std::string materialPath = FileDialogs::SaveFile("");
+
+								if (!materialPath.empty())
+								{
+									bool isAssetAlreadyLoaded = true;
+
+									// Using `GetAsset` instead of `LoadOrGetAsset` because we need to check if it is loaded in memory or not
+									Ref<AnimationBlueprint> animBlueprintAsset = AssetManager::GetAsset<AnimationBlueprint>(materialPath);
+									if (!animBlueprintAsset)
+									{
+										// We are temporarily creating (or loading) a physics material asset.
+										// The only purpose of using `LoadAsset` or `CreateNewAsset` is to register the asset into the registry file and set the parameters.
+										// After that we serialize and delete the asset from memory.
+										animBlueprintAsset = AssetManager::LoadAsset<AnimationBlueprint>(materialPath);
+										if (!animBlueprintAsset)
+										{
+											animBlueprintAsset = AssetManager::CreateNewAsset<AnimationBlueprint>(materialPath, (void*)component.MeshComponentPtr->Mesh->GetMeshAsset().Raw());
+										}
+
+										isAssetAlreadyLoaded = false;
+									}
+
+									AssetImporter::Serialize(animBlueprintAsset);
+
+									if (!isAssetAlreadyLoaded)
+										AssetManager::RemoveAssetFromMemory(animBlueprintAsset->Handle);
+								}
+							}
+							ImGui::EndPopup();
+						}
+
+
+						if (ImGui::BeginDragDropSource())
+						{
+							ContentBrowserDragDropData dragDropData(
+								AssetType::AnimationBlueprint,
+								component.Controller->GetAnimationBlueprint().Raw(), sizeof(AnimationBlueprint)
+							);
+
+							ImGui::TextUnformatted(buttonName.c_str());
+							ImGui::SetDragDropPayload(CONTENT_BROWSER_DRAG_DROP, &dragDropData, sizeof(ContentBrowserDragDropData));
+							ImGui::EndDragDropSource();
+						}
+	
+						// After setting up the button for the physics material, the DragDrop feature needs to be set
+						if (ImGui::BeginDragDropTarget())
+						{
+							auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
+							if (data)
+							{
+								SelectionData selectionData = *(SelectionData*)data->Data;
+
+								if (selectionData.AssetType == AssetType::AnimationBlueprint)
+								{
+									Ref<AnimationBlueprint> animBlueprintAsset = AssetManager::GetOrLoadAsset<AnimationBlueprint>(selectionData.FilePath.string(), (void*)component.MeshComponentPtr->Mesh->GetMeshAsset().Raw());
+									component.Controller->SetAnimationBlueprint(animBlueprintAsset);
+									animBlueprintAsset->AnimationGraphNeedsToBeBaked();
+								}
+							}
+						}
+
+						// If the physics material asset is not default, there should be an option to delete it and set it to the default
+						if (component.Controller->GetAnimationBlueprint())
+						{
+							if (AssetManager::IsAssetHandleNonZero(component.Controller->GetAnimationBlueprint()->Handle))
+							{
+								ImGui::SameLine();
+								if (ImGui::Button("X", { 25.0f, 20.0f }))
+								{
+									component.ResetAnimationBlueprint();
+								}
+							}
+						}
+						
+
+						ImGui::PopID();
+
+						
+
+						ImGui::EndTable();
 					}
-
-					// Play/Stop Icons
-					{
-						if (ImGui::Button(ICON_PLAY, { 30, 30 }))
-							if (activeAnimationName != "-")
-								component.Controller->StartAnimation();
-
-						ImGui::SameLine(0.0f, 2.0f);
-
-						if (ImGui::Button(ICON_PAUSE, { 30, 30 }))
-							if (activeAnimationName != "-")
-								component.Controller->StopAnimation();
-
-						ImGui::PushItemWidth(-1);
-						ImGui::SliderFloat("##time_slider", component.Controller->GetAnimationTime(), 0.0f, 1.0f);
-					}
+					ImGui::PopStyleVar();
 					
+					
+
 
 				}
 			}
@@ -1169,8 +1268,8 @@ namespace Frost
 					{
 						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
 						{
-							const AssetMetadata& metedata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
-							materialName = GetNameFromFilepath(metedata.FilePath.string());
+							const AssetMetadata& metadata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
+							materialName = GetNameFromFilepath(metadata.FilePath.string());
 						}
 					}
 
@@ -1181,10 +1280,10 @@ namespace Frost
 							// We are setting -38.0f to make some room for the "X" button
 							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
 						}
-					}
-					else
-					{
-						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+						else
+						{
+							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+						}
 					}
 
 					// After setting up the button for the physics material, the DragDrop feature needs to be set
@@ -1239,7 +1338,7 @@ namespace Frost
 									m_PhysicsMaterialEditor->SetVisibility(true);
 									m_PhysicsMaterialEditor->SetActiveMaterialAset(component.MaterialHandle);
 								}
-								if (ImGui::MenuItem("Save"))
+								if (ImGui::MenuItem("Save To File"))
 								{
 									AssetImporter::Serialize(component.MaterialHandle);
 								}
@@ -1296,7 +1395,7 @@ namespace Frost
 							ImGui::SameLine();
 							if (ImGui::Button("X", { 25.0f, 20.0f }))
 							{
-								component.MaterialHandle = nullptr;
+								component.ResetPhysicsMaterial();
 							}
 						}
 					}
@@ -1370,8 +1469,8 @@ namespace Frost
 					{
 						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
 						{
-							const AssetMetadata& metedata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
-							materialName = GetNameFromFilepath(metedata.FilePath.string());
+							const AssetMetadata& metadata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
+							materialName = GetNameFromFilepath(metadata.FilePath.string());
 						}
 					}
 
@@ -1382,10 +1481,10 @@ namespace Frost
 							// We are setting -38.0f to make some room for the "X" button
 							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
 						}
-					}
-					else
-					{
-						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+						else
+						{
+							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+						}
 					}
 
 					// After setting up the button for the physics material, the DragDrop feature needs to be set
@@ -1501,7 +1600,7 @@ namespace Frost
 							ImGui::SameLine();
 							if (ImGui::Button("X", { 25.0f, 20.0f }))
 							{
-								component.MaterialHandle = nullptr;
+								component.ResetPhysicsMaterial();
 							}
 						}
 					}
@@ -1576,8 +1675,8 @@ namespace Frost
 					{
 						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
 						{
-							const AssetMetadata& metedata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
-							materialName = GetNameFromFilepath(metedata.FilePath.string());
+							const AssetMetadata& metadata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
+							materialName = GetNameFromFilepath(metadata.FilePath.string());
 						}
 					}
 
@@ -1588,10 +1687,10 @@ namespace Frost
 							// We are setting -38.0f to make some room for the "X" button
 							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
 						}
-					}
-					else
-					{
-						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+						else
+						{
+							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+						}
 					}
 
 					// After setting up the button for the physics material, the DragDrop feature needs to be set
@@ -1707,7 +1806,7 @@ namespace Frost
 							ImGui::SameLine();
 							if (ImGui::Button("X", { 25.0f, 20.0f }))
 							{
-								component.MaterialHandle = nullptr;
+								component.ResetPhysicsMaterial();
 							}
 						}
 					}
@@ -1777,7 +1876,7 @@ namespace Frost
 		{
 			constexpr ImGuiTableFlags flags{};
 			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, { 2.0f, 2.8f });
-			if (ImGui::BeginTable("MeshColliderProperties", 1, flags))
+			if (ImGui::BeginTable("MeshColliderProperties", 2, flags))
 			{
 
 				// Physics Material Editor
@@ -1794,8 +1893,8 @@ namespace Frost
 					{
 						if (AssetManager::IsAssetHandleNonZero(component.MaterialHandle->Handle))
 						{
-							const AssetMetadata& metedata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
-							materialName = GetNameFromFilepath(metedata.FilePath.string());
+							const AssetMetadata& metadata = AssetManager::GetMetadata(component.MaterialHandle->Handle);
+							materialName = GetNameFromFilepath(metadata.FilePath.string());
 						}
 					}
 
@@ -1806,10 +1905,10 @@ namespace Frost
 							// We are setting -38.0f to make some room for the "X" button
 							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 38.0f, 20.0f });
 						}
-					}
-					else
-					{
-						ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+						else
+						{
+							ImGui::Button(materialName.c_str(), { ImGui::GetColumnWidth() - 5.0f, 20.0f });
+						}
 					}
 
 					// After setting up the button for the physics material, the DragDrop feature needs to be set
@@ -1925,14 +2024,18 @@ namespace Frost
 							ImGui::SameLine();
 							if (ImGui::Button("X", { 25.0f, 20.0f }))
 							{
-								component.MaterialHandle = nullptr;
+								component.ResetPhysicsMaterial();
 							}
 						}
 					}
 
 					ImGui::PopID();
 				}
+				ImGui::EndTable();
+			}
 
+
+			{
 				ImGui::PushID(1);
 
 				std::string componentBodyType = "Triangle";
@@ -1957,7 +2060,7 @@ namespace Frost
 					if (ImGui::Selectable("Convex", isStaticSelected))
 						component.IsConvex = true;
 
-					if(isStaticSelected)
+					if (isStaticSelected)
 						ImGui::SetItemDefaultFocus();
 
 					if (ImGui::Selectable("Triangle", !isStaticSelected))
@@ -1969,9 +2072,6 @@ namespace Frost
 					ImGui::EndCombo();
 				}
 				ImGui::PopID();
-
-
-				ImGui::EndTable();
 			}
 
 			if (ImGui::BeginTable("MeshColliderProperties2", 2, flags))
@@ -2601,8 +2701,8 @@ namespace Frost
 									std::string prefabName = "Null";
 									if (AssetManager::IsAssetHandleValid(assetID))
 									{
-										const AssetMetadata& metedata = AssetManager::GetMetadata(assetID);//GetNameFromFilepath()
-										prefabName = GetNameFromFilepath(metedata.FilePath.string());
+										const AssetMetadata& metadata = AssetManager::GetMetadata(assetID);//GetNameFromFilepath()
+										prefabName = GetNameFromFilepath(metadata.FilePath.string());
 									}
 									
 									if (UserInterface::PropertyPrefabReference("##prefabRef", prefabName.c_str()))

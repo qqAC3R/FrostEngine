@@ -38,7 +38,9 @@ namespace Frost
 			debugName.objectType = type;
 			debugName.pObjectName = name.c_str();
 			debugName.objectHandle = (uint64_t)handle;
+#if FROST_DEBUG
 			vkSetDebugUtilsObjectNameEXT(device, &debugName);
+#endif
 		}
 
 		static bool ValidationLayersEnabled() { return m_EnableValidationLayers; }

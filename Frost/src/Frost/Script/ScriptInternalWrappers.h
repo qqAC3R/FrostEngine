@@ -85,6 +85,14 @@ namespace Frost { namespace ScriptInternalCalls
 		CursorMode GetCursorMode();
 	}
 
+	namespace Math
+	{
+		namespace Transform
+		{
+			void LookAt(TransformComponent* outTransform, glm::vec3* center, glm::vec3* eye);
+		}
+	}
+
 	namespace Log
 	{
 		enum class LogLevel : int32_t
@@ -260,7 +268,9 @@ namespace Frost { namespace ScriptInternalCalls
 		namespace Animation
 		{
 			MonoArray* GetAnimations(uint64_t entityID);
-			void SetActiveAnimation(uint64_t entityID, MonoString* animationName);
+			void SetFloatInput(uint64_t entityID, MonoString* inputName, float input);
+			void SetIntInput(uint64_t entityID, MonoString* inputName, int32_t input);
+			void SetBoolInput(uint64_t entityID, MonoString* inputName, bool input);
 		}
 
 		namespace Script

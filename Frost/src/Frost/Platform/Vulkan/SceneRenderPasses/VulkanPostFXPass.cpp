@@ -215,7 +215,7 @@ namespace Frost
 			imageSpec.Height = uint32_t(height);
 			imageSpec.Format = ImageFormat::RGBA8;
 			imageSpec.Usage = ImageUsage::Storage;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
 			m_Data->SSRTexture[i] = Image2D::Create(imageSpec);
 		}
 
@@ -241,6 +241,7 @@ namespace Frost
 			vulkanMaterial->Set("u_NormalTex", normalTexture);
 			vulkanMaterial->Set("o_FrameTex", m_Data->SSRTexture[i]);
 			vulkanMaterial->Set("u_PrefilteredColorBuffer", m_Data->BlurredColorBuffer[i]);
+			vulkanMaterial->Set("u_SpatialBlueNoiseLUT", Renderer::GetSpatialBlueNoiseLut());
 
 
 			// HZB with custum linear sampler (exclusive for SSR)
@@ -822,7 +823,9 @@ namespace Frost
 			Ref<Image2D> colorBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, i); // From the pbr shader
 			//Ref<Image2D> volumetricTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->VolumetricBlurTexture_Upsample[i];
 			Ref<Image2D> volumetricTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->VolumetricBlurTexture_DirY[i];
-			Ref<Image2D> cloudsTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->CloudComputeBlurTexture_DirY[i];
+			//Ref<Image2D> volumetricTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->VolumetricComputeTexture[i];
+			//Ref<Image2D> cloudsTexture = m_RenderPassPipeline->GetRenderPassData<VulkanVolumetricPass>()->CloudComputeBlurTexture_DirY[i];
+			Ref<Image2D> cloudsTexture = nullptr;
 
 			vulkanColorCorrectionDescriptor->Set("u_ColorFrameTexture", colorBuffer);
 			vulkanColorCorrectionDescriptor->Set("u_BloomTexture", m_Data->Bloom_UpsampledTexture[i]);
@@ -831,6 +834,7 @@ namespace Frost
 			//vulkanColorCorrectionDescriptor->Set("u_SSRTexture", m_Data->SSRTexture[i]);
 			vulkanColorCorrectionDescriptor->Set("o_Texture_ForSSR", m_Data->ColorCorrectionTexture[i]);
 			vulkanColorCorrectionDescriptor->Set("o_Texture_Final", m_Data->FinalTexture[i]);
+			vulkanColorCorrectionDescriptor->Set("u_SpatialBlueNoiseLUT", Renderer::GetSpatialBlueNoiseLut());
 
 			vulkanColorCorrectionDescriptor->UpdateVulkanDescriptorIfNeeded();
 		}
@@ -853,8 +857,9 @@ namespace Frost
 		}
 		VulkanRenderer::EndTimeStampPass("Bloom Pass");
 
-
+		VulkanRenderer::BeginTimeStampPass("Color Correction (TARGET_BLOOM)");
 		ColorCorrectionUpdate(renderQueue, TARGET_BLOOM);
+		VulkanRenderer::EndTimeStampPass("Color Correction (TARGET_BLOOM)");
 		
 
 		VulkanRenderer::BeginTimeStampPass("HZB Builder");
@@ -862,13 +867,16 @@ namespace Frost
 		VulkanRenderer::EndTimeStampPass("HZB Builder");
 		
 
-		VulkanRenderer::BeginTimeStampPass("SSCTR Pass");
 		if (m_CompositeSetings.UseSSR)
 		{
+			VulkanRenderer::BeginTimeStampPass("SSCTR Filter");
 			SSRFilterUpdate(renderQueue);
+			VulkanRenderer::EndTimeStampPass("SSCTR Filter");
+
+			VulkanRenderer::BeginTimeStampPass("SSCTR Pass");
 			SSRUpdate(renderQueue);
+			VulkanRenderer::EndTimeStampPass("SSCTR Pass");
 		}
-		VulkanRenderer::EndTimeStampPass("SSCTR Pass");
 		
 
 		VulkanRenderer::BeginTimeStampPass("AO Pass");
@@ -880,9 +888,9 @@ namespace Frost
 		VulkanRenderer::EndTimeStampPass("AO Pass");
 	
 
-		VulkanRenderer::BeginTimeStampPass("Composite Pass");
-			ColorCorrectionUpdate(renderQueue, TARGET_COMPOSITE);
-		VulkanRenderer::EndTimeStampPass("Composite Pass");
+		VulkanRenderer::BeginTimeStampPass("Color Correction (TARGET_COMPOSITE)");
+		ColorCorrectionUpdate(renderQueue, TARGET_COMPOSITE);
+		VulkanRenderer::EndTimeStampPass("Color Correction (TARGET_COMPOSITE)");
 	}
 
 	void VulkanPostFXPass::SSRFilterUpdate(const RenderQueue& renderQueue)
@@ -908,8 +916,10 @@ namespace Frost
 			}
 			currentRes.z = static_cast<float>(mipLevel);
 
-#define GAUSSIAN_MODE_ONE_PASS 0.0f
-			currentRes.w = GAUSSIAN_MODE_ONE_PASS;
+			// Only the first 2 mip should be blurred, the rest should only be downsampled
+			currentRes.w = 3;
+			if (mipLevel >= 2)
+				currentRes.w = 4;
 
 			vulkan_BlurDescriptor->Bind(cmdBuf, m_Data->BlurPipeline);
 			vulkan_BlurPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &currentRes);
@@ -970,8 +980,8 @@ namespace Frost
 
 		ssrMaterial->Bind(cmdBuf, m_Data->SSRPipeline);
 
-		uint32_t groupX = std::ceil((renderQueue.ViewPortWidth) / 32.0f);
-		uint32_t groupY = std::ceil((renderQueue.ViewPortHeight) / 32.0f);
+		uint32_t groupX = std::ceil((renderQueue.ViewPortWidth / 2.0f) / 32.0f);
+		uint32_t groupY = std::ceil((renderQueue.ViewPortHeight / 2.0f) / 32.0f);
 		ssrPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 	}
 
@@ -1902,7 +1912,7 @@ namespace Frost
 		//VisibilityInitData       (width, height);
 		AmbientOcclusionInitData (width, height);
 		SpatialDenoiserInitData  (width, height);
-		SSRInitData              (width, height);
+		SSRInitData              (width / 2.0, height / 2.0);
 
 		Renderer::SubmitImageToOutputImageMap("FinalImage", [this]() -> Ref<Image2D>
 		{

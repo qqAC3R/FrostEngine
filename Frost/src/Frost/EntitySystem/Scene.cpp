@@ -116,7 +116,7 @@ namespace Frost
 
 		UpdateSkyLight(ts);
 		UpdateMeshComponents(ts);
-		UpdateAnimationControllers(ts);
+		UpdateAnimationControllers(ts, false);
 		UpdatePointLightComponent(ts);
 		UpdateDirectionalLight(ts);
 		UpdateRectangularLightComponent(ts);
@@ -141,7 +141,7 @@ namespace Frost
 		// Rendering Part
 		UpdateSkyLight(ts);
 		UpdateMeshComponents(ts);
-		UpdateAnimationControllers(ts);
+		UpdateAnimationControllers(ts, true);
 		UpdatePointLightComponent(ts);
 		UpdateDirectionalLight(ts);
 		UpdateRectangularLightComponent(ts);
@@ -459,7 +459,7 @@ namespace Frost
 		}
 	}
 
-	void Scene::UpdateAnimationControllers(Timestep ts)
+	void Scene::UpdateAnimationControllers(Timestep ts, bool isRuntime)
 	{
 		// Animation Controllers
 		auto group = m_Registry.group<AnimationComponent>(entt::get<MeshComponent>);
@@ -755,9 +755,7 @@ namespace Frost
 			}
 		}
 
-		for (auto&& fn : m_PostUpdateQueue)
-			fn();
-		m_PostUpdateQueue.clear();
+		m_PostUpdateQueue.Execute();
 	}
 
 	void Scene::OnScriptComponentConstruct(entt::registry& registry, entt::entity entity)

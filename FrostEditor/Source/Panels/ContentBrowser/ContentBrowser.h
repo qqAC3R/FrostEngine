@@ -10,7 +10,6 @@
 #include <filesystem>
 
 #define CONTENT_BROWSER_DRAG_DROP "content_browser_drag_drop"
-//#define ASSETS_DRAG_DROP "content_browser_drag_drop"
 
 namespace Frost
 {
@@ -95,10 +94,10 @@ namespace Frost
 		bool OnKeyPressedEvent(KeyPressedEvent& e);
 
 		template<typename T, typename... Args>
-		Ref<T> CreateAsset(const std::string& filename)
+		Ref<T> CreateAsset(const std::string& filename, void* pNext = nullptr)
 		{
 			auto filePath = m_CurrentDirectory->FilePath / filename;
-			Ref<T> asset = AssetManager::CreateNewAsset<T>(filePath.string());
+			Ref<T> asset = AssetManager::CreateNewAsset<T>(filePath.string(), pNext);
 			if (!asset)
 				return nullptr;
 

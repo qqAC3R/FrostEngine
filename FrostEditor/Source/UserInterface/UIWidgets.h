@@ -46,38 +46,6 @@ namespace Frost
 		
 		static void InvisibleButtonWithNoBehaivour(const char* str_id, const ImVec2& size_arg);
 
-		class ScopedStyle
-		{
-		public:
-			ScopedStyle(ImGuiCol style, const ImVec4& vec);
-			ScopedStyle(ImGuiCol style, const ImU32& col);
-			ScopedStyle(ImGuiStyleVar style, float value);
-			ScopedStyle(ImGuiStyleVar style, const ImVec2& value);
-			~ScopedStyle();
-		private:
-			enum class ScopedStyleType
-			{
-				StyleColor,
-				StyleVar,
-			};
-			ScopedStyleType m_Type;
-		};
-
-		class ScopedFontStyle
-		{
-		public:
-			enum class FontType
-			{
-				Regular, Bold
-			};
-
-			ScopedFontStyle(FontType type);
-			~ScopedFontStyle();
-
-		private:
-			FontType m_Type;
-		};
-
 		static void ShiftCursorX(float x);
 		static void ShiftCursorY(float y);
 

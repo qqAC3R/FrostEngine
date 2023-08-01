@@ -61,6 +61,9 @@ namespace Frost
 		mono_add_internal_call("Frost.Entity::Instantiate_Native", Frost::ScriptInternalCalls::EntityScript::Instantiate);
 		mono_add_internal_call("Frost.Entity::InstantiateWithTranslation_Native", Frost::ScriptInternalCalls::EntityScript::InstantiateWithTranslation);
 		
+		// Math
+		mono_add_internal_call("Frost.Transform::LookAt_Native", Frost::ScriptInternalCalls::Math::Transform::LookAt);
+
 		// Tag Component class native methods
 		mono_add_internal_call("Frost.TagComponent::GetTag_Native", Frost::ScriptInternalCalls::Components::Tag::GetTag);
 		mono_add_internal_call("Frost.TagComponent::SetTag_Native", Frost::ScriptInternalCalls::Components::Tag::SetTag);
@@ -105,7 +108,9 @@ namespace Frost
 
 		// Animation Component class native methods
 		mono_add_internal_call("Frost.AnimationComponent::GetAnimations_Native", Frost::ScriptInternalCalls::Components::Animation::GetAnimations);
-		mono_add_internal_call("Frost.AnimationComponent::SetActiveAnimation_Native", Frost::ScriptInternalCalls::Components::Animation::SetActiveAnimation);
+		mono_add_internal_call("Frost.AnimationComponent::SetFloatInput_Native", Frost::ScriptInternalCalls::Components::Animation::SetFloatInput);
+		mono_add_internal_call("Frost.AnimationComponent::SetIntInput_Native", Frost::ScriptInternalCalls::Components::Animation::SetIntInput);
+		mono_add_internal_call("Frost.AnimationComponent::SetBoolInput_Native", Frost::ScriptInternalCalls::Components::Animation::SetBoolInput);
 
 		// Mesh Component class native methods
 		mono_add_internal_call("Frost.MeshComponent::GetMesh_Native", Frost::ScriptInternalCalls::Components::Mesh::GetMeshPtr);

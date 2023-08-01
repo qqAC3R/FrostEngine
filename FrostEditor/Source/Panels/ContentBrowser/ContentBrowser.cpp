@@ -10,6 +10,7 @@
 
 #include "UserInterface/UIWidgets.h"
 #include "Frost/ImGui/Utils/CustomTreeNode.h"
+#include "Frost/ImGui/Utils/ScopedStyle.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -102,7 +103,7 @@ namespace Frost
 
 	void ContentBrowserPanel::Render()
 	{
-		
+		if (!m_Visibility) return;
 
 		ImGui::Begin("Asset Browser", NULL, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
 
@@ -126,9 +127,9 @@ namespace Frost
 				{
 					if (ImGui::CollapsingHeader("Content", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
 					{
-						UserInterface::ScopedStyle spacing(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 4.0f));
-						UserInterface::ScopedStyle itemBg(ImGuiCol_Header, IM_COL32_DISABLE);
-						UserInterface::ScopedStyle itemBg2(ImGuiCol_HeaderActive, IM_COL32_DISABLE);
+						ImGui::ScopedStyle spacing(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 4.0f));
+						ImGui::ScopedStyle itemBg(ImGuiCol_Header, IM_COL32_DISABLE);
+						ImGui::ScopedStyle itemBg2(ImGuiCol_HeaderActive, IM_COL32_DISABLE);
 
 						RenderDirectoryHierarchy(m_BaseDirectory, 0);
 					}
@@ -156,12 +157,12 @@ namespace Frost
 
 				{
 
-					UserInterface::ScopedStyle colorChildBg(ImGuiCol_ChildBg, ImVec4(0.09f, 0.12f, 0.15f, 1.0f));
+					ImGui::ScopedStyle colorChildBg(ImGuiCol_ChildBg, ImVec4(0.09f, 0.12f, 0.15f, 1.0f));
 
 					ImGui::BeginChild("Content");
 					{
 						{
-							UserInterface::ScopedStyle frameBorderSize(ImGuiStyleVar_FrameBorderSize, 0.0f);
+							ImGui::ScopedStyle frameBorderSize(ImGuiStyleVar_FrameBorderSize, 0.0f);
 
 							const float topBarHeight = 24.0f;
 							RenderTopArea(topBarHeight);
@@ -261,11 +262,11 @@ namespace Frost
 							{
 								// TODO: Maybe: rowSpacing = 12.0f
 								const float rowSpacing = 12.0f;
-								UserInterface::ScopedStyle itemSpacing(ImGuiStyleVar_ItemSpacing, ImVec2(paddingForOutline, rowSpacing));
+								ImGui::ScopedStyle itemSpacing(ImGuiStyleVar_ItemSpacing, ImVec2(paddingForOutline, rowSpacing));
 								ImGui::Columns(columnCount, 0, false);
 
-								UserInterface::ScopedStyle border(ImGuiStyleVar_FrameBorderSize, 0.0f);
-								UserInterface::ScopedStyle padding(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+								ImGui::ScopedStyle border(ImGuiStyleVar_FrameBorderSize, 0.0f);
+								ImGui::ScopedStyle padding(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
 
 								RenderItems();
 							}
@@ -317,6 +318,8 @@ namespace Frost
 					Entity& e = *(Entity*)dragDropData.Data;
 					Ref<Prefab> prefab = CreateAsset<Prefab>("New Prefab.fprefab");
 					prefab->Create(e);
+					AssetImporter::Serialize(prefab);
+
 					break;
 				}
 				case AssetType::Material:
@@ -325,6 +328,7 @@ namespace Frost
 
 					Ref<MaterialAsset> materialAsset = CreateAsset<MaterialAsset>("New Material.fmat");
 					materialAsset->CopyFrom(materialAssetSource);
+					AssetImporter::Serialize(materialAsset);
 
 					break;
 				}
@@ -334,6 +338,17 @@ namespace Frost
 
 					Ref<PhysicsMaterial> phyiscsMatAsset = CreateAsset<PhysicsMaterial>("New Physics Material.fpmat");
 					phyiscsMatAsset->CopyFrom(phyiscsMatAssetSource);
+					AssetImporter::Serialize(phyiscsMatAsset);
+
+					break;
+				}
+				case AssetType::AnimationBlueprint:
+				{
+					AnimationBlueprint* animBlueprintAssetSource = (AnimationBlueprint*)dragDropData.Data;
+
+					Ref<AnimationBlueprint> animBlueprintAsset = CreateAsset<AnimationBlueprint>("New Animation Blueprint.fanim", (void*)animBlueprintAssetSource->GetAppropiateMeshAsset());
+					animBlueprintAsset->Copy(animBlueprintAssetSource);
+					AssetImporter::Serialize(animBlueprintAsset);
 
 					break;
 				}
@@ -382,8 +397,8 @@ namespace Frost
 	{
 		ImGuiTreeNodeFlags leafFlag = ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanFullWidth;
 
-		UserInterface::ScopedStyle framePadding(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 10.0f));
-		UserInterface::ScopedStyle headerColor(ImGuiCol_HeaderHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+		ImGui::ScopedStyle framePadding(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 10.0f));
+		ImGui::ScopedStyle headerColor(ImGuiCol_HeaderHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
 
 		// Draw directories
 		for (auto& [filepath, directoryInfo] : directoryInfo->ArrangedSubDirectories)
@@ -396,7 +411,7 @@ namespace Frost
 
 				if (directoryInfo->Handle == m_CurrentDirectory->Handle)
 				{
-					UserInterface::ScopedStyle headerColor(ImGuiCol_Header, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+					ImGui::ScopedStyle headerColor(ImGuiCol_Header, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
 					opened = UI::TreeNode(id,
 						name,
 						ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_Selected,
@@ -915,14 +930,13 @@ namespace Frost
 
 	void ContentBrowserPanel::RenderTopArea(float height)
 	{
-		UserInterface::ScopedStyle frameRounding(ImGuiStyleVar_FrameBorderSize, 3.0f);
-		UserInterface::ScopedStyle borderColor(ImGuiCol_Border, IM_COL32(50, 50, 50, 255));
+		ImGui::ScopedStyle frameRounding(ImGuiStyleVar_FrameBorderSize, 3.0f);
+		ImGui::ScopedStyle borderColor(ImGuiCol_Border, IM_COL32(50, 50, 50, 255));
 
 		ImGui::BeginChild("ContentTopBar", ImVec2(0, height + 8.0f), true);
 		{
-
-			UserInterface::ScopedStyle borderSize(ImGuiStyleVar_ChildBorderSize, 3.0f);
-			UserInterface::ScopedStyle frameBorderSize(ImGuiStyleVar_FrameBorderSize, 0.0f);
+			ImGui::ScopedStyle borderSize(ImGuiStyleVar_ChildBorderSize, 3.0f);
+			ImGui::ScopedStyle frameBorderSize(ImGuiStyleVar_FrameBorderSize, 0.0f);
 
 			auto contenBrowserButton = [height](const char* labelId, Ref<Texture2D> icon, bool disabled = false)
 			{
@@ -946,9 +960,9 @@ namespace Frost
 					hoveredButtonColor = IM_COL32(255, 255, 255, 100);
 					pressButtonColor = IM_COL32(255, 255, 255, 100);
 
-					UserInterface::ScopedStyle buttonColor(ImGuiCol_Button, ImVec4(0.05f, 0.05f, 0.05f, 0.54f));
-					UserInterface::ScopedStyle buttonColorActive(ImGuiCol_ButtonActive, ImVec4(0.05f, 0.05f, 0.05f, 0.54f));
-					UserInterface::ScopedStyle buttonColorHovered(ImGuiCol_ButtonHovered, ImVec4(0.05f, 0.05f, 0.05f, 0.54f));
+					ImGui::ScopedStyle buttonColor(ImGuiCol_Button, ImVec4(0.05f, 0.05f, 0.05f, 0.54f));
+					ImGui::ScopedStyle buttonColorActive(ImGuiCol_ButtonActive, ImVec4(0.05f, 0.05f, 0.05f, 0.54f));
+					ImGui::ScopedStyle buttonColorHovered(ImGuiCol_ButtonHovered, ImVec4(0.05f, 0.05f, 0.05f, 0.54f));
 
 					ImGui::Button(labelId, ImVec2(iconSize, iconSize));
 				}
@@ -1027,9 +1041,9 @@ namespace Frost
 		const Ref<DirectoryInfo>& directory = directories[level];
 		
 		{
-			UserInterface::ScopedFontStyle fontStyle(UserInterface::ScopedFontStyle::FontType::Bold);
+			ImGui::ScopedFontStyle fontStyle(ImGui::ScopedFontStyle::FontType::Bold);
 
-			UserInterface::ScopedStyle buttonColor(ImGuiCol_Button, ImVec4(0.05f, 0.05f, 0.05f, 0.0f));
+			ImGui::ScopedStyle buttonColor(ImGuiCol_Button, ImVec4(0.05f, 0.05f, 0.05f, 0.0f));
 
 			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
 			ImGui::SetCursorPosY(cursorPosY);
@@ -1048,6 +1062,7 @@ namespace Frost
 				if (ImGui::Button(Project::GetAssetDirectory().filename().string().c_str()))
 				{
 					m_CurrentDirectory = m_BaseDirectory;
+					ChangeCurrentDirectory(m_CurrentDirectory);
 					//RefreshContent();
 				}
 			}
@@ -1062,12 +1077,12 @@ namespace Frost
 
 				float defaultCursourPosY = ImGui::GetCursorPosY();
 
-				UserInterface::ScopedStyle buttonTransparentColor(ImGuiCol_Button, ImVec4(0.05f, 0.05f, 0.05f, 0.0f));
-				UserInterface::ScopedStyle buttonTransparentColorActive(ImGuiCol_ButtonActive, ImVec4(0.05f, 0.05f, 0.05f, 0.0f));
-				UserInterface::ScopedStyle buttonTransparentColorHovered(ImGuiCol_ButtonHovered, ImVec4(0.05f, 0.05f, 0.05f, 0.0f));
+				ImGui::ScopedStyle buttonTransparentColor(ImGuiCol_Button, ImVec4(0.05f, 0.05f, 0.05f, 0.0f));
+				ImGui::ScopedStyle buttonTransparentColorActive(ImGuiCol_ButtonActive, ImVec4(0.05f, 0.05f, 0.05f, 0.0f));
+				ImGui::ScopedStyle buttonTransparentColorHovered(ImGuiCol_ButtonHovered, ImVec4(0.05f, 0.05f, 0.05f, 0.0f));
 
 
-				UserInterface::ScopedStyle buttonTextAlign(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+				ImGui::ScopedStyle buttonTextAlign(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
 
 				ImGui::Button("/");
 
@@ -1088,8 +1103,8 @@ namespace Frost
 		const float areaPosX = ImGui::GetCursorPosX();
 		const float framePaddingY = ImGui::GetStyle().FramePadding.y;
 
-		UserInterface::ScopedStyle rounding(ImGuiStyleVar_FrameRounding, 3.0f);
-		UserInterface::ScopedStyle padding(ImGuiStyleVar_FramePadding, ImVec2(28.0f, framePaddingY + 2.0f));
+		ImGui::ScopedStyle rounding(ImGuiStyleVar_FrameRounding, 3.0f);
+		ImGui::ScopedStyle padding(ImGuiStyleVar_FramePadding, ImVec2(28.0f, framePaddingY + 2.0f));
 
 		{
 			ImGui::SetNextItemWidth(256.0f);
@@ -1126,7 +1141,7 @@ namespace Frost
 
 				constexpr ImU32 textDarker = IM_COL32(128, 128, 128, 255);
 
-				UserInterface::ScopedStyle text(ImGuiCol_Text, textDarker);
+				ImGui::ScopedStyle text(ImGuiCol_Text, textDarker);
 				ImGui::TextUnformatted(hint);
 
 			}
@@ -1134,8 +1149,4 @@ namespace Frost
 
 		}
 	}
-
-
-
-
 }

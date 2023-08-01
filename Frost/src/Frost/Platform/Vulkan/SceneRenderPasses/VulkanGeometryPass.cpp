@@ -119,9 +119,7 @@ namespace Frost
 		};
 		m_Data->GeometryRenderPass = RenderPass::Create(s_RenderPassSpec);
 
-
 		// Pipeline creations
-
 		BufferLayout bufferLayout = {
 			{ "a_ModelSpaceMatrix",           ShaderDataType::Mat4   },
 			{ "a_WorldSpaceMatrix",           ShaderDataType::Mat4   },
@@ -137,6 +135,7 @@ namespace Frost
 		pipelineCreateInfo.UseDepthWrite = true;
 		pipelineCreateInfo.UseStencil = false;
 		pipelineCreateInfo.Cull = CullMode::Back;
+		//pipelineCreateInfo.AlphaBlending = true;
 		pipelineCreateInfo.RenderPass = m_Data->GeometryRenderPass;
 		pipelineCreateInfo.VertexBufferLayout = bufferLayout;
 		if(!m_Data->GeometryPipeline)
@@ -418,6 +417,7 @@ namespace Frost
 				{
 					indirectCmdBuf.firstInstance = 0;
 				}
+				indirectCmdBuf.firstInstance += submeshIndex;
 
 				m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
 				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);

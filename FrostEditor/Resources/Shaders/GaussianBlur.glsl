@@ -18,6 +18,81 @@ layout(push_constant) uniform PushConstant {
 
 float weight[5] = float[] (0.2270270270, 0.1945945946, 0.1216216216, 0.0540540541, 0.0162162162);
 
+vec4 blur13(sampler2D image, vec2 uv, vec2 resolution, vec2 direction)
+{
+    vec4 color = vec4(0.0);
+    vec2 off1 = vec2(1.411764705882353) * direction;
+    vec2 off2 = vec2(3.2941176470588234) * direction;
+    vec2 off3 = vec2(5.176470588235294) * direction;
+    color += texture(image, uv) * 0.1964825501511404;
+    color += texture(image, uv + (off1 / resolution)) * 0.2969069646728344;
+    color += texture(image, uv - (off1 / resolution)) * 0.2969069646728344;
+    color += texture(image, uv + (off2 / resolution)) * 0.09447039785044732;
+    color += texture(image, uv - (off2 / resolution)) * 0.09447039785044732;
+    color += texture(image, uv + (off3 / resolution)) * 0.010381362401148057;
+    color += texture(image, uv - (off3 / resolution)) * 0.010381362401148057;
+    return color;
+}
+
+vec3 DownSampleBox13(sampler2D tex, vec2 uv, vec2 texelSize)
+{
+    // Center
+    vec3 A = texture(tex, uv).rgb;
+
+    texelSize *= 0.5f; // Sample from center of texels
+
+    // Inner box
+
+    //     * = texel not sampled
+    //      =========
+    //      | C * D |
+    //      | * A * |
+    //      | B * E |
+    //      =========
+    vec3 B = texture(tex, uv + texelSize * vec2(-1.0f, -1.0f)).rgb;
+    vec3 C = texture(tex, uv + texelSize * vec2(-1.0f, 1.0f)).rgb;
+    vec3 D = texture(tex, uv + texelSize * vec2(1.0f, 1.0f)).rgb;
+    vec3 E = texture(tex, uv + texelSize * vec2(1.0f, -1.0f)).rgb;
+
+    // Outer box
+    
+    
+    //     * = texel not sampled
+    //           H
+    //     L ========= I
+    //     * | C * D | *
+    //     G | * A * | K
+    //     * | B * E | *
+    //     F ========= J
+    //           M
+    vec3 F = texture(tex, uv + texelSize * vec2(-2.0f, -2.0f)).rgb;
+    vec3 G = texture(tex, uv + texelSize * vec2(-2.0f,  0.0f)).rgb;
+    vec3 H = texture(tex, uv + texelSize * vec2( 0.0f,  2.0f)).rgb;
+    vec3 I = texture(tex, uv + texelSize * vec2( 2.0f,  2.0f)).rgb;
+    vec3 J = texture(tex, uv + texelSize * vec2( 2.0f, -2.0f)).rgb;
+    vec3 K = texture(tex, uv + texelSize * vec2( 2.0f,  0.0f)).rgb;
+    vec3 L = texture(tex, uv + texelSize * vec2(-2.0f, -2.0f)).rgb;
+    vec3 M = texture(tex, uv + texelSize * vec2( 0.0f, -2.0f)).rgb;
+
+    // Weights
+    vec3 result = vec3(0.0);
+    // Inner box
+    result += (B + C + D + E) * 0.5f;
+    // Bottom-left box
+    result += (F + G + A + M) * 0.125f;
+    // Top-left box
+    result += (G + H + I + A) * 0.125f;
+    // Top-right box
+    result += (A + I + J + K) * 0.125f;
+    // Bottom-right box
+    result += (M + A + K + L) * 0.125f;
+
+    // 4 samples each
+    result *= 0.25f;
+
+    return result;
+}
+
 void main()
 {
     vec2 imgSize = vec2(imageSize(o_DstImage));
@@ -90,21 +165,16 @@ void main()
 
         case 3:
         {
-            float h = 2.0;
-
-            vec4 o = texture(i_SrcImage, s_UV + (vec2( 0, 0)/imgSize.xy));
-	        vec4 n = texture(i_SrcImage, s_UV + (vec2( 0, h)/imgSize.xy));
-            vec4 e = texture(i_SrcImage, s_UV + (vec2( h, 0)/imgSize.xy));
-            vec4 s = texture(i_SrcImage, s_UV + (vec2( 0,-h)/imgSize.xy));
-            vec4 w = texture(i_SrcImage, s_UV + (vec2(-h, 0)/imgSize.xy));
-
-            vec4 dy = (n - s)*.5;
-            vec4 dx = (e - w)*.5;
-    
-            vec4 edge = sqrt(dx*dx + dy*dy);
-            vec4 angle = atan(dy, dx);
-   
-            result = edge.xyz * 5.0;
+            result = blur13(i_SrcImage, s_UV, imgSize, vec2(2.5f, 0.0)).rgb;
+            result += blur13(i_SrcImage, s_UV, imgSize, vec2(0.0f, 2.5f)).rgb;
+            result /= 2.0f;
+            break;
+        }
+        case 4:
+        {
+            vec2 texelSize = 1.0f / imgSize;
+            result = DownSampleBox13(i_SrcImage, s_UV, texelSize).rgb;
+            break;
         }
     }
 

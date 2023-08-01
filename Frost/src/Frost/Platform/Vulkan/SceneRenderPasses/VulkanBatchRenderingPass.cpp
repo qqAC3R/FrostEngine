@@ -883,6 +883,7 @@ namespace Frost
 		uint32_t result = data[
 			(y * (subResourceLayout.rowPitch / sizeof(uint32_t))) + x
 		];
+
 		entityIDTexture_CPU->UnMapMemory();
 
 #if 0

@@ -2,6 +2,7 @@
 
 #include "Frost/Asset/Asset.h"
 #include "Frost/Core/UUID.h"
+#include "Frost/Core/FunctionQueue.h"
 #include "Frost/Renderer/EditorCamera.h"
 #include <entt.hpp>
 
@@ -72,7 +73,7 @@ namespace Frost
 		void UpdateSkyLight(Timestep ts);
 		void UpdateMeshComponents(Timestep ts);
 		void UpdateTextComponents(Timestep ts);
-		void UpdateAnimationControllers(Timestep ts);
+		void UpdateAnimationControllers(Timestep ts, bool isRuntime);
 		void UpdatePointLightComponent(Timestep ts);
 		void UpdateRectangularLightComponent(Timestep ts);
 		void UpdateDirectionalLight(Timestep ts);
@@ -90,7 +91,7 @@ namespace Frost
 		template<typename Fn>
 		void SubmitPostUpdateFunc(Fn&& func)
 		{
-			m_PostUpdateQueue.emplace_back(func);
+			m_PostUpdateQueue.AddFunction(func);
 		}
 	private:
 		UUID m_SceneID;
@@ -102,7 +103,7 @@ namespace Frost
 
 		bool m_IsScenePlaying = false;
 
-		std::vector<std::function<void()>> m_PostUpdateQueue;
+		FunctionQueue m_PostUpdateQueue;
 
 		friend class SceneSerializer;
 		friend class EditorLayer;

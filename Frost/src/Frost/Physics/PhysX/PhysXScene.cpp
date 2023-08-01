@@ -116,7 +116,7 @@ namespace Frost
 
 		if (result)
 		{
-			Ref<PhysicsActor> actor = (PhysicsActor*)hitInfo.block.actor->userData;
+			PhysicsActor* actor = (PhysicsActor*)hitInfo.block.actor->userData;
 			outHit->HitEntity = actor->GetEntity().GetUUID();
 			outHit->Position = PhysXUtils::FromPhysXVector(hitInfo.block.position);
 			outHit->Normal = PhysXUtils::FromPhysXVector(hitInfo.block.normal);

@@ -3,6 +3,7 @@
 #include "Panel.h"
 #include "Frost/EntitySystem/Scene.h"
 #include "Frost/EntitySystem/Entity.h"
+#include "Frost/Core/FunctionQueue.h"
 
 #define HIERARCHY_ENTITY_DRAG_DROP "scene_entity_hierarchy"
 
@@ -48,7 +49,7 @@ namespace Frost
 		Entity m_PreviousEntity = {};
 		Entity m_SelectedEntity = {};
 
-		Vector<std::function<void()>> m_LateDeletionFunctions;
+		FunctionQueue m_LateDeletionFunctions;
 
 		// This is optional, and only works when the selected entity has a mesh component
 		uint32_t m_SelectedSubmesh = UINT32_MAX;

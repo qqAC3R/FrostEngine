@@ -225,8 +225,13 @@ namespace Frost
 			auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
 			if (data)
 			{
-				entity = *(Entity*)data->Data;
-				receivedValidEntity = true;
+				ContentBrowserDragDropData dragDropData = *(ContentBrowserDragDropData*)data->Data;
+
+				if (dragDropData.AssetType == AssetType::Prefab)
+				{
+					entity = *(Entity*)dragDropData.Data;
+					receivedValidEntity = true;
+				}
 			}
 
 			ImGui::EndDragDropTarget();
@@ -346,55 +351,4 @@ namespace Frost
 	{
 		ImGui::DragFloat(name.c_str(), &value, speed, minValue, maxValue);
 	}
-
-	UserInterface::ScopedStyle::ScopedStyle(ImGuiCol style, const ImVec4& vec)
-	{
-		ImGui::PushStyleColor(style, vec);
-		m_Type = ScopedStyleType::StyleColor;
-	}
-
-	UserInterface::ScopedStyle::ScopedStyle(ImGuiCol style, const ImU32& col)
-	{
-		ImGui::PushStyleColor(style, ImGui::ColorConvertU32ToFloat4(col));
-		m_Type = ScopedStyleType::StyleColor;
-	}
-		
-	UserInterface::ScopedStyle::ScopedStyle(ImGuiStyleVar style, float value)
-	{
-		ImGui::PushStyleVar(style, value);
-		m_Type = ScopedStyleType::StyleVar;
-	}
-
-	UserInterface::ScopedStyle::ScopedStyle(ImGuiStyleVar style, const ImVec2& value)
-	{
-		ImGui::PushStyleVar(style, value);
-		m_Type = ScopedStyleType::StyleVar;
-	}
-
-	UserInterface::ScopedStyle::~ScopedStyle()
-	{
-		switch (m_Type)
-		{
-		case UserInterface::ScopedStyle::ScopedStyleType::StyleColor: ImGui::PopStyleColor(); break;
-		case UserInterface::ScopedStyle::ScopedStyleType::StyleVar: ImGui::PopStyleVar(); break;
-		}
-	}
-
-	UserInterface::ScopedFontStyle::ScopedFontStyle(FontType type)
-		: m_Type(type)
-	{
-		ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
-
-		if (type == FontType::Bold)
-			imguiLayer->SetBoldFont();
-	}
-
-	UserInterface::ScopedFontStyle::~ScopedFontStyle()
-	{
-		ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
-
-		if (m_Type == FontType::Bold)
-			imguiLayer->SetRegularFont();
-	}
-
 }

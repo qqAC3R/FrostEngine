@@ -14,6 +14,7 @@ namespace Frost
         public float m_MovementForce = 5.0f;
 
         public Entity m_MeshChild;
+        public Entity m_CameraController;
 
         public Prefab m_SphereBullet = null;
 
@@ -21,7 +22,10 @@ namespace Frost
         //private Mesh m_Mesh;
 
         private Vector3 m_LastPosition = new Vector3(0.0f);
-        private string[] m_Animations;
+        //private string[] m_Animations;
+
+        private float m_Acceleration = 0.0f;
+        private bool m_IsCollided = false;
 
         protected override void OnCreate()
         {
@@ -31,9 +35,14 @@ namespace Frost
             //GetComponent<RigidBodyComponent>().SetLockFlag(ActorLockFlag.RotationXYZ, true);
             //GetComponent<RigidBodyComponent>().SetLockFlag(ActorLockFlag.RotationXYZ, true);
 
-            m_Animations = Children[0].GetComponent<AnimationComponent>().Animations;
-        }
+            //m_Animations = Children[0].GetComponent<AnimationComponent>().Animations;
 
+            //m_CameraController = FindEntityByTag("Camera");
+
+
+            AddCollisionBeginCallback(o => { m_IsCollided = true; });
+            AddCollisionEndCallback(o => { m_IsCollided = false; });
+        }
 
         protected override void OnUpdate(float deltaTime)
         {
@@ -43,59 +52,86 @@ namespace Frost
             GetComponent<MeshComponent>().GetMaterial(0).Metalness = m_Metalness;
             GetComponent<MeshComponent>().GetMaterial(0).Emission = m_Emission;
 #endif
+            Vector3 velocity = GetComponent<RigidBodyComponent>().LinearVelocity;
+            Vector2 movingVelocity = new Vector2(velocity.X, velocity.Z);
+            float acceleration = movingVelocity.Length();
+            Children[0].GetComponent<AnimationComponent>().SetFloatInput("Acceleration", acceleration);
 
-            // https://catlikecoding.com/unity/tutorials/movement/orbit-camera/
+            float velocityY = (-velocity.Y) / 4.0f;
+            Children[0].GetComponent<AnimationComponent>().SetFloatInput("FallingSpeed", velocityY);
 
 
-#if true
-            if (Translation == m_LastPosition)
-            {
-                Children[0].GetComponent<AnimationComponent>().SetActiveAnimation(m_Animations[2]);
-            }
-            else if ((m_LastPosition.Y - Translation.Y) > 0.02f)
-            {
-                Children[0].GetComponent<AnimationComponent>().SetActiveAnimation(m_Animations[1]);
-                m_LastPosition = Translation;
-            }
-            else
-            {
-                Children[0].GetComponent<AnimationComponent>().SetActiveAnimation(m_Animations[0]);
-                m_LastPosition = Translation;
-            }
-#endif
-            
 
-            if (Input.IsMouseButtonPressed(MouseButton.Left))
-            {
-                Entity newEntity = Instantiate(m_SphereBullet);
-            }
+            //if (Input.IsMouseButtonPressed(MouseButton.Left))
+            //{
+            //    Entity newEntity = Instantiate(m_SphereBullet);
+            //}
 
             if (Input.IsKeyPressed(KeyCode.A))
             {
-                GetComponent<RigidBodyComponent>().AddForce(new Vector3(0, 0, -m_MovementForce * deltaTime), ForceMode.Force);
+                Vector3 cameraDirection = m_CameraController.Rotation;
+                cameraDirection.X -= 90.0f;
+                //Quaternion lookRotation = new Quaternion(cameraDirection * (Mathf.PI / 180.0f));
+                //Vector3 cameraForwardVector = lookRotation * Vector3.Forward;
 
-                m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, new Vector3(90.0f, 180.0f, 0), 0.1f);
-                //m_MeshChild.Rotation = new Vector3(90.0f, 180.0f, 0);
+                Vector3 finalRotation = new Vector3(0.0f, -cameraDirection.X + 180.0f, 0.0f);
+
+                if (Input.IsKeyPressed(KeyCode.S))
+                    finalRotation = new Vector3(0.0f, -cameraDirection.X - 180.0f, 0.0f);
+
+                m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, finalRotation, 0.1f);
+
+                float sinX = (float)Math.Sin(finalRotation.Y * (Mathf.PI / 180.0f));
+                float cosX = (float)Math.Cos(finalRotation.Y * (Mathf.PI / 180.0f));
+                Vector3 force = new Vector3(sinX * m_MovementForce * deltaTime, 0.0f, cosX * m_MovementForce * deltaTime);
+                GetComponent<RigidBodyComponent>().AddForce(force, ForceMode.Force);
+
             }
             if(Input.IsKeyPressed(KeyCode.D))
             {
-                GetComponent<RigidBodyComponent>().AddForce(new Vector3(0, 0, m_MovementForce * deltaTime), ForceMode.Force);
-                m_MeshChild.Rotation = Vector3.Lerp(Children[0].Rotation, new Vector3(90.0f, 0.0f, 0), 0.1f);
-                //m_MeshChild.Rotation = new Vector3(90.0f, 0.0f, 0);
+                Vector3 cameraDirection = m_CameraController.Rotation;
+                cameraDirection.X += 90.0f;
+                //Quaternion lookRotation = new Quaternion(cameraDirection * (Mathf.PI / 180.0f));
+                //Vector3 cameraForwardVector = lookRotation * Vector3.Forward;
+
+                Vector3 finalRotation = new Vector3(0.0f, 180.0f - cameraDirection.X, 0.0f);
+                m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, finalRotation, 0.1f);
+
+                float sinX = (float)Math.Sin(finalRotation.Y * (Mathf.PI / 180.0f));
+                float cosX = (float)Math.Cos(finalRotation.Y * (Mathf.PI / 180.0f));
+                Vector3 force = new Vector3(sinX * m_MovementForce * deltaTime, 0.0f, cosX * m_MovementForce * deltaTime);
+                GetComponent<RigidBodyComponent>().AddForce(force, ForceMode.Force);
+
             }
             if (Input.IsKeyPressed(KeyCode.S))
             {
-                GetComponent<RigidBodyComponent>().AddForce(new Vector3(-m_MovementForce * deltaTime, 0, 0), ForceMode.Force);
-                m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, new Vector3(90.0f, 270.0f, 0), 0.1f);
-                //m_MeshChild.Rotation = new Vector3(90.0f, 270.0f, 0);
+                Vector3 cameraDirection = m_CameraController.Rotation;
+                //Quaternion lookRotation = new Quaternion(cameraDirection * (Mathf.PI / 180.0f));
+                //Vector3 cameraForwardVector = lookRotation * Vector3.Forward;
+
+                Vector3 finalRotation = new Vector3(0.0f, -cameraDirection.X, 0.0f);
+                //m_MeshChild.Rotation = finalRotation;
+                m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, finalRotation, 0.1f);
+
+                float sinX = (float)Math.Sin(finalRotation.Y * (Mathf.PI / 180.0f));
+                float cosX = (float)Math.Cos(finalRotation.Y * (Mathf.PI / 180.0f));
+                Vector3 force = new Vector3(sinX * m_MovementForce * deltaTime, 0.0f, cosX * m_MovementForce * deltaTime);
+                GetComponent<RigidBodyComponent>().AddForce(force, ForceMode.Force);
+
             }
             if (Input.IsKeyPressed(KeyCode.W))
             {
-                GetComponent<RigidBodyComponent>().AddForce(new Vector3(m_MovementForce * deltaTime, 0, 0), ForceMode.Force);
-                m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, new Vector3(90.0f, 90.0f, 0), 0.1f);
-                //Vector3 t = m_MeshChild.Rotation;
-                //m_MeshChild.Rotation = new Vector3(90.0f, 90.0f, 0);
-                //m_MeshChild.Rotation = new Vector3(90.0f, t.X, 0);
+                Vector3 cameraDirection = m_CameraController.Rotation;
+                //Quaternion lookRotation = new Quaternion(cameraDirection * (Mathf.PI / 180.0f));
+                //Vector3 cameraForwardVector = lookRotation * Vector3.Forward;
+
+                Vector3 finalRotation = new Vector3(0.0f, 180.0f - cameraDirection.X, 0.0f);
+                m_MeshChild.Rotation = Vector3.Lerp(m_MeshChild.Rotation, finalRotation, 0.1f);
+
+                float sinX = (float)Math.Sin(finalRotation.Y * (Mathf.PI / 180.0f));
+                float cosX = (float)Math.Cos(finalRotation.Y * (Mathf.PI / 180.0f));
+                Vector3 force = new Vector3(sinX * m_MovementForce * deltaTime, 0.0f, cosX * m_MovementForce * deltaTime);
+                GetComponent<RigidBodyComponent>().AddForce(force, ForceMode.Force);
             }
 
             if (Input.IsKeyPressed(KeyCode.Space))

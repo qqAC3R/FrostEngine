@@ -2,6 +2,7 @@
 #include "AssetManager.h"
 
 #include <json/nlohmann/json.hpp>
+#include "Frost/Core/FunctionQueue.h"
 
 #include "Frost/Project/Project.h"
 #include "Frost/Utils/FileSystem.h"
@@ -23,23 +24,21 @@ namespace Frost
 
 	static void DeleteAllAssetsByType(HashMap<AssetHandle, Ref<Asset>>& loadedAssets, AssetType type)
 	{
-		Vector<std::function<void()>> lateFunction;
+		FunctionQueue lateFunction;
 
 		for (auto& [handle, asset] : loadedAssets)
 		{
 			if (asset->GetAssetType() == type)
 			{
 				AssetHandle assetHandle = handle;
-				lateFunction.push_back([&, assetHandle]()
+				lateFunction.AddFunction([&, assetHandle]()
 				{
 					loadedAssets.erase(assetHandle);
 				});
 			}
 		}
 
-		for (auto& func : lateFunction)
-			func();
-
+		lateFunction.Execute();
 	}
 
 	void AssetManager::Shutdown()
@@ -192,6 +191,7 @@ namespace Frost
 			}
 
 			s_AssetRegistry.Remove(relativeFilepath);
+			WriteRegistryToFile();
 		}
 	}
 
@@ -204,7 +204,7 @@ namespace Frost
 
 	void AssetManager::OnRenameFilepath(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath)
 	{
-		Vector<std::function<void()>> deleteFunction;
+		FunctionQueue deleteFunction;
 
 		std::filesystem::path oldFilepathRelative = GetRelativePathString(oldFilepath);
 		std::filesystem::path newFilepathRelative = GetRelativePathString(newFilepath);
@@ -216,7 +216,7 @@ namespace Frost
 				std::filesystem::path assetFilePath = filepath;
 				std::filesystem::path result = newFilepathRelative / filepath.filename();
 
-				deleteFunction.push_back([&, assetFilePath, result]()
+				deleteFunction.AddFunction([&, assetFilePath, result]()
 				{
 					s_AssetRegistry[result] = s_AssetRegistry[assetFilePath];
 					s_AssetRegistry[result].FilePath = result;
@@ -227,14 +227,13 @@ namespace Frost
 			}
 		}
 
-		for (auto& func : deleteFunction)
-			func();
+		deleteFunction.Execute();
 	}
 
 
 	void AssetManager::OnMoveFilepath(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath)
 	{
-		Vector<std::function<void()>> deleteFunction;
+		FunctionQueue deleteFunction;
 
 		std::filesystem::path oldFilepathRelative = GetRelativePathString(oldFilepath);
 		std::filesystem::path newFilepathRelative = GetRelativePathString(newFilepath);
@@ -270,7 +269,7 @@ namespace Frost
 				}
 
 				std::filesystem::path assetFilePath = filepath;
-				deleteFunction.push_back([&, assetFilePath, result]()
+				deleteFunction.AddFunction([&, assetFilePath, result]()
 				{
 					s_AssetRegistry[result] = s_AssetRegistry[assetFilePath];
 					s_AssetRegistry[result].FilePath = result;
@@ -281,8 +280,7 @@ namespace Frost
 			}
 		}
 
-		for (auto& func : deleteFunction)
-			func();
+		deleteFunction.Execute();
 	}
 
 	void AssetManager::OnMoveAsset(const std::filesystem::path& oldFilepath, const std::filesystem::path& newFilepath)

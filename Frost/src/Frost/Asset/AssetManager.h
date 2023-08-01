@@ -140,7 +140,7 @@ namespace Frost
 			s_LoadedAssets[asset->Handle] = asset;
 			s_AssetRegistry[metadata.FilePath.string()] = metadata;
 
-			if (!s_AssetRegistry.Find(metadata.FilePath))
+			//if (!s_AssetRegistry.Find(metadata.FilePath))
 			{
 				//s_AssetRegistry[metadata.FilePath.string()] = metadata;
 
@@ -173,13 +173,15 @@ namespace Frost
 			return asset;
 		}
 
-		static void RemoveAssetFromMemory(AssetHandle assetHandle)
+		static void RemoveAssetFromMemory(AssetHandle assetHandle, bool serialize = true)
 		{
 			if (IsAssetHandleValid(assetHandle))
 			{
 				if (IsAssetLoaded(assetHandle))
 				{
-					AssetImporter::Serialize(s_LoadedAssets[assetHandle]);
+					if(serialize)
+						AssetImporter::Serialize(s_LoadedAssets[assetHandle]);
+
 					s_LoadedAssets.erase(assetHandle);
 				}
 				else

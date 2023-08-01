@@ -85,6 +85,7 @@ namespace Frost
 
 		struct PushConstantData
 		{
+			glm::mat4 InvViewProjMatrix;
 			glm::vec4 CameraPosition;
 			glm::vec3 DirectionalLightDir;
 			float DirectionalLightIntensity;

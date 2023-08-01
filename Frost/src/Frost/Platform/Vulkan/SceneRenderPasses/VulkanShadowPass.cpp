@@ -142,10 +142,10 @@ namespace Frost
 
 			Ref<VulkanMaterial> vulkanDescriptor = m_Data->ShadowComputeDescriptor[i].As<VulkanMaterial>();
 
-			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
+			Ref<Image2D> depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(i);
 			Ref<Image2D> viewPositionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(3, i);
 
-			vulkanDescriptor->Set("u_PositionTexture", positionTexture);
+			vulkanDescriptor->Set("u_DepthBuffer", depthBuffer);
 			vulkanDescriptor->Set("u_ViewPositionTexture", viewPositionTexture);
 			vulkanDescriptor->Set("u_ShadowDepthTexture", m_Data->ShadowDepthRenderPass->GetDepthAttachment(i));
 			vulkanDescriptor->Set("u_ShadowTextureOutput", m_Data->ShadowComputeTexture[i]);
@@ -520,6 +520,7 @@ namespace Frost
 				{
 					indirectCmdBuf.firstInstance = 0;
 				}
+				indirectCmdBuf.firstInstance += submeshIndex;
 
 				m_Data->IndirectShadowCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
 				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
@@ -632,7 +633,10 @@ namespace Frost
 
 		vulkanDescriptor->Bind(cmdBuf, m_Data->ShadowComputePipeline);
 
-		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->CascadeDepthSplit[0]);
+		m_PushConstantShadowComputeData.CascadeDepthSplit = m_Data->CascadeDepthSplit;
+		m_PushConstantShadowComputeData.InvViewProjection = glm::inverse(renderQueue.m_Camera->GetViewProjectionVK());
+
+		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_PushConstantShadowComputeData);
 
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;

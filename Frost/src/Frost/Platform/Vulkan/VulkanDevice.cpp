@@ -118,6 +118,73 @@ namespace Frost
 	void VulkanDevice::Init(const Scope<VulkanPhysicalDevice>& physicalDevice)
 	{
 		m_PhysicalDevice = physicalDevice->GetVulkanPhysicalDevice();
+
+
+		FROST_CORE_INFO("Picked Physical Device, looking for extensions!");
+
+		{
+			const std::vector<const char*> extensions = {
+				VK_KHR_SWAPCHAIN_EXTENSION_NAME, // Swapchain
+				VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
+				VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+				VK_KHR_RELAXED_BLOCK_LAYOUT_EXTENSION_NAME, // It removes the errors for the scalar blocks
+				VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME, // It removes the errors for the scalar blocks
+
+				VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // Bindless
+				VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME, // Scalar block
+				VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // BDA
+
+				VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME, // Hi-Z sampling /// Not working on GTX 650 (55%)
+
+				VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME, // Voxelization // Not working on GTX 650 (18%)
+
+				VK_KHR_SHADER_CLOCK_EXTENSION_NAME, // Random numbers
+
+#if FROST_SUPPORT_RAY_TRACING
+				VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // RT
+				VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,   // RT
+				VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME	    // RT
+#endif
+
+			};
+
+
+			uint32_t count = 0;
+			VkResult result = vkEnumerateDeviceExtensionProperties(m_PhysicalDevice, nullptr, &count, nullptr);
+
+			std::vector<VkExtensionProperties> extensionProperties(count);
+
+			// Get the extensions
+			result = vkEnumerateDeviceExtensionProperties(m_PhysicalDevice, nullptr, &count, extensionProperties.data());
+
+			std::set<std::string> extensionsSuppoted;
+			for (auto& extension : extensionProperties)
+			{
+				std::string extName = extension.extensionName;
+				extensionsSuppoted.insert(extName);
+			}
+
+			for (auto& extension : extensions)
+			{
+				if (extensionsSuppoted.find(extension) != extensionsSuppoted.end())
+				{
+					FROST_CORE_INFO("[VULKAN_DEVICE] Extension {0} is supported!", extension);
+				}
+				else
+				{
+					FROST_CORE_CRITICAL("[VULKAN_DEVICE] Extension {0} is not supported!", extension);
+					std::cin.get();
+				}
+			}
+
+		}
+
+#if FROST_DEBUG_VK_ERRORS
+		FROST_CORE_INFO("If everything works fine, press ENTER!");
+		std::cin.get();
+#endif
+
+
 		CreateLogicalDevice(m_PhysicalDevice);
 
 		{
@@ -134,6 +201,9 @@ namespace Frost
 			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 			FROST_VKCHECK(vkCreateCommandPool(m_LogicalDevice, &cmdPoolInfo, nullptr, &m_ComputeCommandPool));
 		}
+
+
+		
 	}
 
 	void VulkanDevice::CreateLogicalDevice(VkPhysicalDevice physicalDevice)
@@ -179,7 +249,7 @@ namespace Frost
 
 
 		const std::vector<const char*> validationLayers = {
-				"VK_LAYER_KHRONOS_validation"
+			"VK_LAYER_KHRONOS_validation"
 		};
 
 		const std::vector<const char*> extensions = {
@@ -199,7 +269,7 @@ namespace Frost
 
 			VK_KHR_SHADER_CLOCK_EXTENSION_NAME, // Random numbers
 
-#if 1
+#if FROST_SUPPORT_RAY_TRACING
 			VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // RT
 			VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,   // RT
 			VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME	    // RT
@@ -209,9 +279,27 @@ namespace Frost
 		VkDeviceCreateInfo createInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
 		createInfo.pQueueCreateInfos = queuesCreateInfo.data();
 		createInfo.queueCreateInfoCount = queuesCreateInfo.size();
+		
 
-		// Device features
+		// Get supported 1.2 features
+		VkPhysicalDeviceVulkan12Features supportedFeatures12{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+		VkPhysicalDeviceFeatures2 supportedFeatures2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+		supportedFeatures2.pNext = &supportedFeatures12;
+		vkGetPhysicalDeviceFeatures2(physicalDevice, &supportedFeatures2);
 
+
+		// CHECK FOR THE 1.2 VULKAN FEATURES
+		if (supportedFeatures12.descriptorIndexing == false) FROST_CORE_CRITICAL("Feature 'descriptorIndexing' not supported!");
+		if (supportedFeatures12.imagelessFramebuffer == false) FROST_CORE_CRITICAL("Feature 'imagelessFramebuffer' not supported!");
+		if (supportedFeatures12.hostQueryReset == false) FROST_CORE_CRITICAL("Feature 'hostQueryReset' not supported!");
+		if (supportedFeatures12.runtimeDescriptorArray == false) FROST_CORE_CRITICAL("Feature 'runtimeDescriptorArray' not supported!");
+		if (supportedFeatures12.samplerFilterMinmax == false) FROST_CORE_CRITICAL("Feature 'samplerFilterMinmax' not supported!");
+		if (supportedFeatures12.scalarBlockLayout == false) FROST_CORE_CRITICAL("Feature 'scalarBlockLayout' not supported!");
+		if (supportedFeatures12.descriptorBindingUpdateUnusedWhilePending == false) FROST_CORE_CRITICAL("Feature 'descriptorBindingUpdateUnusedWhilePending' not supported!");
+		if (supportedFeatures12.descriptorBindingPartiallyBound == false) FROST_CORE_CRITICAL("Feature 'descriptorBindingPartiallyBound' not supported!");
+		if (supportedFeatures12.shaderSampledImageArrayNonUniformIndexing == false) FROST_CORE_CRITICAL("Feature 'shaderSampledImageArrayNonUniformIndexing' not supported!");
+		if (supportedFeatures12.bufferDeviceAddress == false) FROST_CORE_CRITICAL("Feature 'bufferDeviceAddress' not supported!");
+		
 		VkPhysicalDeviceVulkan12Features features12{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
 		features12.descriptorIndexing = true;
 		features12.imagelessFramebuffer = true;
@@ -223,6 +311,18 @@ namespace Frost
 		features12.descriptorBindingPartiallyBound = true;
 		features12.shaderSampledImageArrayNonUniformIndexing = true;
 		features12.bufferDeviceAddress = true;
+
+		// CHECK FOR THE VULKAN CORE FEATURES
+		if (supportedFeatures2.features.wideLines == false) FROST_CORE_CRITICAL("Feature 'wideLines' not supported!");
+		if (supportedFeatures2.features.textureCompressionBC == false) FROST_CORE_CRITICAL("Feature 'textureCompressionBC' not supported!");
+		if (supportedFeatures2.features.independentBlend == false) FROST_CORE_CRITICAL("Feature 'independentBlend' not supported!");
+		if (supportedFeatures2.features.fillModeNonSolid == false) FROST_CORE_CRITICAL("Feature 'fillModeNonSolid' not supported!");
+		if (supportedFeatures2.features.multiDrawIndirect == false) FROST_CORE_CRITICAL("Feature 'multiDrawIndirect' not supported!");
+		if (supportedFeatures2.features.samplerAnisotropy == false) FROST_CORE_CRITICAL("Feature 'samplerAnisotropy' not supported!");
+		if (supportedFeatures2.features.shaderStorageImageWriteWithoutFormat == false) FROST_CORE_CRITICAL("Feature 'shaderStorageImageWriteWithoutFormat' not supported!");
+		if (supportedFeatures2.features.geometryShader == false) FROST_CORE_CRITICAL("Feature 'geometryShader' not supported!");
+		if (supportedFeatures2.features.fragmentStoresAndAtomics == false) FROST_CORE_CRITICAL("Feature 'fragmentStoresAndAtomics' not supported!");
+		if (supportedFeatures2.features.shaderInt64 == false) FROST_CORE_CRITICAL("Feature 'shaderInt64' not supported!");
 
 		VkPhysicalDeviceFeatures2 features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
 		features.features.wideLines = true;
@@ -236,18 +336,31 @@ namespace Frost
 		features.features.fragmentStoresAndAtomics = true;
 		features.features.shaderInt64 = true;
 
+
+		// OPTIONAL, ONLY FOR RT
 		VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
 		rayTracingFeatures.rayTracingPipeline = true;
 
 		VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
 		accelerationStructFeatures.accelerationStructure = true;
 
-
 		// Creating the chain
 		features12.pNext = &features;
+#if FROST_SUPPORT_RAY_TRACING
 		features.pNext = &rayTracingFeatures;
 		rayTracingFeatures.pNext = &accelerationStructFeatures;
 		accelerationStructFeatures.pNext = nullptr;
+#else
+		features.pNext = nullptr;
+#endif
+
+
+#if FROST_DEBUG_VK_ERRORS
+		FROST_CORE_INFO("If everything works fine, press ENTER!");
+		std::cin.get();
+#endif
+
+
 
 		createInfo.pNext = &features12;
 		createInfo.enabledExtensionCount = extensions.size();

@@ -9,6 +9,7 @@
 
 #include "Frost/Renderer/Renderer.h"
 #include "Frost/ImGui/ImGuiLayer.h"
+#include "Frost/ImGui/Utils/ScopedStyle.h"
 
 #include "IconsFontAwesome.hpp"
 
@@ -100,7 +101,7 @@ namespace Frost
 	{
 		if (ImGui::BeginDragDropTarget())
 		{
-			UserInterface::ScopedStyle itemSpacing(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+			ImGui::ScopedStyle itemSpacing(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
 
 			auto data = ImGui::AcceptDragDropPayload(CONTENT_BROWSER_DRAG_DROP);
 			if (data)
@@ -146,10 +147,10 @@ namespace Frost
 			// Offset a bit to see the outlined border of the drag drop
 			ImGui::SetCursorPos({ 5, 5 });
 
-			UserInterface::ScopedStyle buttonColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-			UserInterface::ScopedStyle buttonColorActive(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-			UserInterface::ScopedStyle buttonColorHovered(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-			UserInterface::ScopedStyle borderColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+			ImGui::ScopedStyle buttonColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+			ImGui::ScopedStyle buttonColorActive(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+			ImGui::ScopedStyle buttonColorHovered(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+			ImGui::ScopedStyle borderColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 
 			// Same here, offset the button with 5 pixels (in both sides) to see the outlined bordered of the drag drop
 			// Also a custom function was required for InvisibleButton, because this should work as a dummy and should not add any events (only for rendering)

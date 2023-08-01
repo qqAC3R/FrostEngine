@@ -26,6 +26,7 @@ layout(binding = 1) uniform sampler2D u_ViewPosTex;
 layout(binding = 2) uniform sampler2D u_HiZBuffer;
 layout(binding = 3) uniform sampler2D u_NormalTex; // includes compressed vec2 normals + metalness + roughness
 layout(binding = 4) uniform sampler2D u_PrefilteredColorBuffer;
+layout(binding = 8) uniform sampler2D u_SpatialBlueNoiseLUT;
 //layout(binding = 5) uniform sampler2D u_VisibilityBuffer;
 
 layout(binding = 6, rgba8) uniform writeonly image2D o_FrameTex;
@@ -61,6 +62,11 @@ const float relfectionSpecularFalloffExponent = 6.0f;
 
 #define BS_DELTA_EPSILON 0.0002
 
+// ------------------------ LUTS --------------------------
+vec4 SampleBlueNoise(ivec2 coords)
+{
+	return texture(u_SpatialBlueNoiseLUT, (vec2(coords) + 0.5.xx) / vec2(textureSize(u_SpatialBlueNoiseLUT, 0).xy));
+}
 
 // ======================================================
 // Fast octahedron normal vector decoding.
@@ -257,7 +263,10 @@ vec3 IntersectCellBoundary(vec3 rayOrigin, vec3 rayDir, vec2 cellIndex, vec2 cel
 
 vec2 GetDepthPlanes(vec2 pos, float level)
 {
+	//vec2 blueNoise = (2.0 * SampleBlueNoise(ivec2(gl_GlobalInvocationID.xy)).rg - vec2(1.0));
+	//float noiseWeight = 0.00673;
 	/* Texture lookup with <linear-clamp> sampler */
+	//return textureLod(u_HiZBuffer, pos + blueNoise * noiseWeight, level).yx;
 	return textureLod(u_HiZBuffer, pos, level).yx;
 }
 
@@ -271,13 +280,123 @@ bool CrossedCellBoundary(vec2 cellIndexA, vec2 cellIndexB)
 	rayOrigin: Ray start position (in screen space).
 	rayDir: Ray reflection vector (in screen space).
 */
-vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
+vec3 HiZRayTrace_Optimized(vec3 rayOrigin, vec3 rayDir, float roughness)
 {
 	const vec2 hiZSize = vec2(textureSize(u_HiZBuffer, 0).xy);
 	//const float maxMipLevel = floor(log2(max(hiZSize.x, hiZSize.y))) - 1;
 	const float maxMipLevel = 5;
 
+	/* Check if ray points towards the camera */
+	if (rayDir.z <= HIZ_VIEWDIR_EPSILON)
+	{
+		if (LinearRayTrace(rayOrigin, rayDir))
+		{
+			return rayOrigin;
+		}
+		return INVALID_HIT_POINT;
+	}
+
 	
+	/*
+	Get the cell cross direction and a small offset
+	to enter the next cell when doing cell crossing
+	*/
+	vec2 crossStep = vec2(SIGN(rayDir.x), SIGN(rayDir.y));
+	vec2 crossOffset = crossStep * HIZ_CROSS_EPSILON;
+	crossStep = saturate(crossStep);
+	
+	/* Set hit point to the original screen coordinate and depth */
+	vec3 rayPos = rayOrigin;
+	
+	/* Scale vector such that z is 1.0 (maximum depth) */
+	rayDir = rayDir / rayDir.z;
+	
+	/* Set starting point to the point where z equals 0.0 (minimum depth) */
+	rayOrigin = rayOrigin + rayDir * -rayOrigin.z;
+	
+	/* Cross to next cell so that we don't get a self-intersection immediately */
+	float level = 2.0f;
+	
+	vec2 firstCellCount = GetCellCount(hiZSize, level);
+	vec2 rayCell = GetCell(rayPos.xy, firstCellCount);
+	rayPos = IntersectCellBoundary(rayOrigin, rayDir, rayCell, firstCellCount, crossStep, crossOffset);
+
+
+	
+	/* Main tracing iteration loop */
+	uint i = 0;
+	
+#define HIZ_STOP_LEVEL      2.0f
+#define HIZ_MAX_ITERATIONS  32
+
+	uint HiZMaxIterations = HIZ_MAX_ITERATIONS * uint(1.0 - roughness);
+
+	for (; level >= HIZ_STOP_LEVEL && i < HIZ_MAX_ITERATIONS; i++)
+	{
+		if (rayPos.x < 0.0 || rayPos.x > 1.0 || rayPos.y < 0.0 || rayPos.y > 1.0)
+		{
+			break;
+		}
+
+		/* Get cell number of our current ray */
+		vec2 cellCount = GetCellCount(hiZSize, level);
+		vec2 oldCellIndex = GetCell(rayPos.xy, cellCount);
+		
+		/* Get minimum depth plane in which the current ray resides */
+		vec2 zMinMax = GetDepthPlanes(rayPos.xy, level);
+
+
+		/* Intersect only if ray depth is between minimum and maximum depth planes */
+		vec3 tmpRay = rayOrigin + rayDir * max(rayPos.z, zMinMax.r); // MIN
+		
+		/* Get new cell number */
+		vec2 newCellIndex = GetCell(tmpRay.xy, cellCount);
+		
+		/* If the new cell number is different from the old cell number, we know we crossed a cell */
+		if(newCellIndex.x != oldCellIndex.x || newCellIndex.y != oldCellIndex.y)
+		{
+			/*
+			Intersect the boundary of that cell instead,
+			and go up a level for taking a larger step next iteration
+			*/
+			vec2 cell = oldCellIndex + crossStep;
+			cell /= cellCount;
+			cell += crossOffset;
+	
+			/* Now compute interpolation factor "t" with this cell position and the ray origin */
+			vec2 delta = cell - rayOrigin.xy;
+			delta /= rayDir.xy;
+	
+			float t = min(delta.x, delta.y);
+	
+			/* Return final ray position */
+			tmpRay = IntersectDepthPlane(rayOrigin, rayDir, t);
+
+			level = min(maxMipLevel, level + 1.0);
+		}
+		else
+		{
+			/* Go down a level in the Hi-Z */
+			level -= 1.0;
+		}
+
+		rayPos = tmpRay;
+	}
+
+	return vec3(rayPos.xy, 0.0f);
+}
+
+
+
+
+
+vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir, float roughness)
+{
+	const vec2 hiZSize = vec2(textureSize(u_HiZBuffer, 0).xy);
+	//const float maxMipLevel = floor(log2(max(hiZSize.x, hiZSize.y))) - 1;
+	const float maxMipLevel = 5;
+
+
 	/* Check if ray points towards the camera */
 	if (rayDir.z <= HIZ_VIEWDIR_EPSILON)
 	{
@@ -316,7 +435,7 @@ vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 	rayOrigin = IntersectDepthPlane(rayOrigin, rayDir, -rayOrigin.z); // rayOrigin + rayDir * (-rayOrigin.z)
 	
 	/* Cross to next cell so that we don't get a self-intersection immediately */
-	float level = 2.0f;
+	float level = 3.0f;
 	
 	vec2 firstCellCount = GetCellCount(hiZSize, level);
 	vec2 rayCell = GetCell(rayPos.xy, firstCellCount);
@@ -329,6 +448,8 @@ vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 	
 #define HIZ_STOP_LEVEL      2.0f
 #define HIZ_MAX_ITERATIONS  32
+
+	uint HiZMaxIterations = HIZ_MAX_ITERATIONS * uint(1.0 - roughness);
 
 	for (; level >= HIZ_STOP_LEVEL && i < HIZ_MAX_ITERATIONS; i++)
 	{
@@ -379,6 +500,7 @@ vec3 HiZRayTrace(vec3 rayOrigin, vec3 rayDir)
 
 	return vec3(rayPos.xy, 0.0f);
 }
+
 
 
 
@@ -589,7 +711,7 @@ void main()
 		vec3 reflectVector = normalize(reflectionDir + jitter) * max(1.0f, -viewPos.z);
 		vec3 screenReflectVector = ProjectPoint(viewPos.xyz + reflectVector * nearPlane) - currentCoords;
 
-		hitCoords = HiZRayTrace(currentCoords, normalize(screenReflectVector));
+		hitCoords = HiZRayTrace_Optimized(currentCoords, normalize(screenReflectVector), roughness);
 		reflectionColor = texture(u_PrefilteredColorBuffer, hitCoords.xy).rgb;
 	}
 	else
@@ -597,7 +719,7 @@ void main()
 		vec3 reflectVector = normalize(reflectionDir) * max(1.0f, -viewPos.z);
 		vec3 screenReflectVector = ProjectPoint(viewPos.xyz + reflectVector * nearPlane) - currentCoords;
 	
-		hitCoords = HiZRayTrace(currentCoords, normalize(screenReflectVector));
+		hitCoords = HiZRayTrace_Optimized(currentCoords, normalize(screenReflectVector), roughness);
 		reflectionColor = ConeTrace(s_UV, hitCoords.xy, roughnessFactor).xyz;
 	}
 

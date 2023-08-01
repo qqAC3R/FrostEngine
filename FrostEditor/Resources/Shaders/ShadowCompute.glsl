@@ -5,12 +5,13 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 
 layout(binding = 0) uniform sampler2D u_ShadowDepthTexture;
-layout(binding = 1) uniform sampler2D u_PositionTexture;
+layout(binding = 1) uniform sampler2D u_DepthBuffer;
 layout(binding = 2) uniform sampler2D u_ViewPositionTexture;
 layout(binding = 3, rgba8) uniform writeonly image2D u_ShadowTextureOutput;
 
 layout(push_constant) uniform PushConstant
 {
+	mat4 InvViewProjection;
 	vec4 CascadeDepthSplit;
 } u_PushConstant;
 
@@ -216,6 +217,9 @@ float PCFDirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius, 
 
 float PCSS_SampleShadowTexture(vec4 shadowCoords, uint cascadeIndex, float lightSize)
 {
+	if(cascadeIndex == 3) return PCFDirectionalLight(shadowCoords, cascadeIndex, 0.001, 0.1);
+	if(cascadeIndex == 4) return PCFDirectionalLight(shadowCoords, cascadeIndex, 0.0001, 0.5);
+
 	//float blockerDistance = FindBlockerDistance(shadowCoords, cascadeIndex, lightSize);
 	float blockerDistance = AverageBlockDepth(shadowCoords, cascadeIndex, lightSize);
 
@@ -231,6 +235,18 @@ float PCSS_SampleShadowTexture(vec4 shadowCoords, uint cascadeIndex, float light
 	return PCFDirectionalLight(shadowCoords, cascadeIndex, uvRadius, blockerDistance);
 }
 
+vec3 ComputeWorldPos(float depth)
+{
+	ivec2 invoke = ivec2(gl_GlobalInvocationID.xy);
+	vec2 coords = (vec2(invoke) + 0.5.xx) / vec2(imageSize(u_ShadowTextureOutput).xy);
+
+	vec4 clipSpacePosition = vec4(coords * 2.0 - 1.0, depth, 1.0);
+	vec4 viewSpacePosition = u_PushConstant.InvViewProjection * clipSpacePosition;
+	
+    viewSpacePosition /= viewSpacePosition.w; // Perspective division
+	return vec3(viewSpacePosition);
+}
+
 void main()
 {
 	ivec2 globalInvocation = ivec2(gl_GlobalInvocationID.xy);
@@ -242,7 +258,8 @@ void main()
 	float viewPosZ = texelFetch(u_ViewPositionTexture, globalInvocation, 0).z;
 	uint cascadeIndex = GetCascadeIndex(viewPosZ);
 
-	vec3 position = texelFetch(u_PositionTexture, globalInvocation, 0).rgb;
+	float depth = texelFetch(u_DepthBuffer, globalInvocation, 0).r; 
+	vec3 position = ComputeWorldPos(depth);
 	float lightSize = u_DirLightData.DirectionLightSize;
 
 	// Depth compare for shadowing

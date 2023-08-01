@@ -22,6 +22,9 @@ namespace Frost
 		virtual void SetVisibility(bool show) override { m_Visibility = show; }
 		virtual void Shutdown() override;
 
+		bool IsPanelFocused() const { return m_IsPanelFocused; }
+		bool IsPanelHovered() const { return m_IsPanelHovered; }
+
 		void SetHierarchy(Ref<SceneHierarchyPanel> scene)
 		{
 			FROST_ASSERT_INTERNAL(scene);
@@ -45,6 +48,9 @@ namespace Frost
 		Ref<MaterialAssetEditor> m_MaterialAssetEditor = nullptr;
 		Ref<PhysicsMaterialEditor> m_PhysicsMaterialEditor = nullptr;
 		std::string m_PanelNameImGui;
+
+		bool m_IsPanelFocused = false;
+		bool m_IsPanelHovered = false;
 
 		bool m_Visibility = true;
 	};

@@ -46,7 +46,8 @@ struct RectangularLight
 layout(binding = 0, rgba16f) uniform writeonly image2D o_Image;
 
 // Data from the material system
-layout(binding = 1) uniform sampler2D u_PositionTexture;
+//layout(binding = 1) uniform sampler2D u_PositionTexture;
+layout(binding = 1) uniform sampler2D u_DepthBuffer;
 layout(binding = 2) uniform sampler2D u_AlbedoTexture;
 layout(binding = 3) uniform sampler2D u_NormalTexture;
 
@@ -97,11 +98,12 @@ layout(binding = 16) uniform sampler2D u_LTC2Lut;
 // Push constants (general information)
 layout(push_constant) uniform PushConstant
 {
+	mat4 InvViewProjection;
     vec4 CameraPosition; // vec4 - camera position + float pointLightCount + lightCullingWorkgroup.x
 	vec3 DirectionalLightDir;
 	float DirectionalLightIntensity;
-	
 	int UseLightHeatMap;
+	
 } u_PushConstant;
 
 
@@ -577,12 +579,25 @@ vec3 DecodeNormal(vec2 e)
 }
 // =======================================================
 
+vec3 ComputeWorldPos(float depth)
+{
+	ivec2 invoke = ivec2(gl_GlobalInvocationID.xy);
+	vec2 coords = (vec2(invoke) + 0.5.xx) / vec2(imageSize(o_Image).xy);
+
+	vec4 clipSpacePosition = vec4(coords * 2.0 - 1.0, depth, 1.0);
+	vec4 viewSpacePosition = u_PushConstant.InvViewProjection * clipSpacePosition;
+	
+    viewSpacePosition /= viewSpacePosition.w; // Perspective division
+	return vec3(viewSpacePosition);
+}
+
 void main()
 {
 	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
 
     // Calculating the normals and worldPos
-    m_Surface.WorldPos =    texelFetch(u_PositionTexture, pixelCoord, 0).rgb;
+	float depth =           texelFetch(u_DepthBuffer, pixelCoord, 0).r; 
+    m_Surface.WorldPos =    ComputeWorldPos(depth);
     m_Surface.ViewVector =  normalize(vec3(u_PushConstant.CameraPosition) - m_Surface.WorldPos);
 
 	// Decode normals

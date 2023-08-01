@@ -3,6 +3,7 @@
 
 #include "Frost/Asset/AssetManager.h"
 #include "Frost/Asset/Serializers/SceneSerializer.h"
+#include "Frost/Asset/Serializers/AnimationBlueprintSerializer.h"
 
 namespace Frost
 {
@@ -17,6 +18,7 @@ namespace Frost
 		s_Serializers[AssetType::PhysicsMat] = CreateScope<PhysicsMaterialSerializer>();
 		s_Serializers[AssetType::Prefab] = CreateScope<PrefabSerializer>();
 		s_Serializers[AssetType::Font] = CreateScope<FontSerializer>();
+		s_Serializers[AssetType::AnimationBlueprint] = CreateScope<AnimationBlueprintSerializer>();
 	}
 
 	void AssetImporter::Serialize(const AssetMetadata& metadata, const Ref<Asset>& asset)

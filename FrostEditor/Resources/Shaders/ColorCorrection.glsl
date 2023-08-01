@@ -9,6 +9,7 @@ layout(binding = 2) uniform sampler2D u_SSRTexture;
 layout(binding = 3) uniform sampler2D u_AOTexture;
 layout(binding = 4) uniform sampler2D u_VolumetricTexture;
 layout(binding = 5) uniform sampler2D u_CloudComputeTex;
+layout(binding = 8) uniform sampler2D u_SpatialBlueNoiseLUT;
 
 // This texture is responsible for firstly adding up the bloom factor (without tone mapping)
 // and then in the SSR we use it for tracing. In the last stage we just add the SSR and do tone mapping.
@@ -28,6 +29,12 @@ layout(push_constant) uniform PushConstant {
 	int UseAO;
 	int UseBloom;
 } u_PushConstant;
+
+// ------------------------ LUTS --------------------------
+vec4 SampleBlueNoise(ivec2 coords)
+{
+	return texture(u_SpatialBlueNoiseLUT, (vec2(coords) + 0.5.xx) / vec2(textureSize(u_SpatialBlueNoiseLUT, 0).xy));
+}
 
 // From https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 vec3 AcesApprox(vec3 v)
@@ -109,9 +116,21 @@ void main()
 		// Contribution from the screen space reflections
 		if(u_PushConstant.UseSSR == 1)
 		{
-			vec3 reflectionContribution = texture(u_SSRTexture, uv).rgb;
-			//vec3 reflectionContribution = UpsampleTent9(u_SSRTexture, 0.0, uv, 2.0).rgb;
-			//color = mix(color, reflectionContribution.xyz, 0.4f);
+			vec2 texSize = vec2(textureSize(u_SSRTexture, 0));
+			vec2 texelSize = 1.0f / texSize;
+
+			vec2 blueNoise = SampleBlueNoise(loc).rg;
+			float noiseWeight = 0.01273;
+
+			// Sampling more directions to compensate for the fact that we are rendering SSR on half-resolution
+			//vec3 reflectionContribution = texture(u_SSRTexture, uv + blueNoise * noiseWeight).rgb;
+			vec3 reflectionContribution = vec3(0.0);
+			reflectionContribution += texture(u_SSRTexture, uv + vec2(texSize.x, 0.0) + blueNoise * 0.001).rgb;
+			reflectionContribution += texture(u_SSRTexture, uv - vec2(texSize.x, 0.0) + blueNoise * 0.001).rgb;
+			reflectionContribution += texture(u_SSRTexture, uv + vec2(0.0,texSize.y)  + blueNoise * 0.001).rgb;
+			reflectionContribution += texture(u_SSRTexture, uv - vec2(0.0,texSize.y)  + blueNoise * 0.001).rgb;
+			reflectionContribution /= 4.0;
+
 			color += reflectionContribution.xyz;
 		}
 
@@ -133,10 +152,9 @@ void main()
 			color += bloomFactor;
 		}
 
-		//vec4 cloudContribution = texture(u_CloudComputeTex, uv);
-		vec4 cloudContribution = UpsampleTent9(u_CloudComputeTex, 0.0, uv, 3.0);
-		color *= cloudContribution.a;
-		color += cloudContribution.rgb;
+		//vec4 cloudContribution = UpsampleTent9(u_CloudComputeTex, 0.0, uv, 3.0);
+		//color *= cloudContribution.a;
+		//color += cloudContribution.rgb;
 
 
 		vec4 volumetricContribution = texture(u_VolumetricTexture, uv);

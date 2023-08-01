@@ -10,8 +10,7 @@
 #include "Frost/Asset/AssetExtensions.h"
 #include "Frost/Asset/AssetManager.h"
 #include "Panels/ContentBrowser/ContentBrowser.h"
-
-#include <imgui_internal.h>
+#include "Frost/ImGui/Utils/ScopedStyle.h"
 
 #define MAX_INPUT_BUFFER_LENGTH 128
 
@@ -215,7 +214,7 @@ namespace Frost
 				ImGui::SetCursorPos(ImVec2(cursor.x + (thumbnailSize - textWidth - edgeOffset), cursor.y + (infoPanelHeight - 20.0f)));
 
 				ImU32 darkerFontText = IM_COL32(120, 120, 120, 200);
-				UserInterface::ScopedStyle textColour(ImGuiCol_Text, darkerFontText);
+				ImGui::ScopedStyle textColor(ImGuiCol_Text, darkerFontText);
 				ImGui::TextUnformatted(assetType.c_str());
 			}
 		}

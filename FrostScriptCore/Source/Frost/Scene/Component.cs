@@ -183,16 +183,33 @@ namespace Frost
             get => GetAnimations_Native(Entity.ID);
         }
 
-        public void SetActiveAnimation(string animationName)
+        public void SetFloatInput(string inputName, float input)
         {
-            SetActiveAnimation_Native(Entity.ID, animationName);
+            SetFloatInput_Native(Entity.ID, inputName, input);
+        }
+
+        public void SetIntInput(string inputName, int input)
+        {
+            SetIntInput_Native(Entity.ID, inputName, input);
+        }
+
+        public void SetBoolInput(string inputName, bool input)
+        {
+            SetBoolInput_Native(Entity.ID, inputName, input);
         }
 
         [MethodImpl(MethodImplOptions.InternalCall)]
         internal static extern string[] GetAnimations_Native(ulong entityID);
 
+
         [MethodImpl(MethodImplOptions.InternalCall)]
-        internal static extern void SetActiveAnimation_Native(ulong entityID, string animationName);
+        internal static extern void SetFloatInput_Native(ulong entityID, string inputName, float input);
+
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        internal static extern void SetIntInput_Native(ulong entityID, string inputName, int input);
+
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        internal static extern void SetBoolInput_Native(ulong entityID, string inputName, bool input);
     }
 
     public class CameraComponent : Component

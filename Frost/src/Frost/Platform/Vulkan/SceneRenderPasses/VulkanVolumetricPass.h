@@ -127,6 +127,9 @@ namespace Frost
 
 			glm::mat4 CustomProjectionMatrix;
 			float CameraFOV;
+
+			float VolumetricTileX = 16.0f;
+			float VolumetricTileY = 16.0f;
 		};
 
 		

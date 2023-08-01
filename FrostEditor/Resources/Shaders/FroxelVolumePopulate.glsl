@@ -62,7 +62,7 @@ void main()
 		return;
 
 	// Sample temporal blue noise
-	vec3 noise = (2.0 * SampleNoise(invoke.xy).rgb - vec3(1.0)) / vec3(numFroxels);
+	vec3 noise = (2.0 * SampleNoise(invoke.xy).rgb - vec3(1.0)) / vec3(numFroxels) * 0.35f;
 
 	// Center UV of the current texel
 	vec2 centerUV;
@@ -84,7 +84,6 @@ void main()
 
 	w = (float(invoke.z) + 0.5f) / float(numFroxels.z) + noise.z;
 	worldSpacePosCenter = u_PushConstant.CameraPosition + direction * w * w;
-
 
 	// Compute the contribuition of all volumes for this texel
 	vec4 scatExtParams = vec4(0.0f);

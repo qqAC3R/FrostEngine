@@ -106,7 +106,20 @@ namespace Frost
 				{
 					auto& colorAttachment = colorBlendAttachment.emplace_back();
 					colorAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-					colorAttachment.blendEnable = VK_FALSE;
+					if (createInfo.AlphaBlending)
+					{
+						colorAttachment.blendEnable = VK_TRUE;
+						colorAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+						colorAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+						colorAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+						colorAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+						colorAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+						colorAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+					}
+					else
+					{
+						colorAttachment.blendEnable = VK_FALSE;
+					}
 					colorAttachmentCount++;
 					break;
 				}

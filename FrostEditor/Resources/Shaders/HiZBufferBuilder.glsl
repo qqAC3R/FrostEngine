@@ -42,13 +42,19 @@ void main()
 	//	return;
 	//}
 
-	float depth1 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2(-1,  0)).x; // left
-	float depth2 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 1,  0)).x; // right
-	float depth3 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 0,  1)).x; // up
-	float depth4 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 0, -1)).x; // down
+	//float depth1 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2(-1,  0)).x; // left
+	//float depth2 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 1,  0)).x; // right
+	//float depth3 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 0,  1)).x; // up
+	//float depth4 = textureOffset(i_Depth, (vec2(pos) + vec2(0.5f)) / u_PushConstant.u_ImageSize, ivec2( 0, -1)).x; // down
+
+	//float depthMin = min(min(depth1, depth2), min(depth3, depth4));
+	//float depthMax = max(max(depth1, depth2), max(depth3, depth4));
+
+	vec2 uv = ((vec2(pos)) / vec2(imageSize(o_Depth)));
+	vec4 depth = textureGather(i_Depth, uv, 0);
 	
-	float depthMin = min(min(depth1, depth2), min(depth3, depth4));
-	float depthMax = max(max(depth1, depth2), max(depth3, depth4));
+	float depthMin = min(min(depth.x, depth.y), min(depth.z, depth.w));
+	float depthMax = max(max(depth.x, depth.y), max(depth.z, depth.w));
 
 	
 

@@ -87,6 +87,13 @@ namespace Frost
 		};
 		PushConstantData m_PushConstant;
 
+		struct PushConstantShadowComputeData
+		{
+			glm::mat4 InvViewProjection;
+			glm::vec4 CascadeDepthSplit;
+		};
+		PushConstantShadowComputeData m_PushConstantShadowComputeData;
+
 		InternalData* m_Data;
 		std::string m_Name;
 

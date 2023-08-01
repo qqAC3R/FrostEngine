@@ -29,7 +29,7 @@ namespace Frost
 	{
 		if (m_Visibility && m_ActiveMaterialAsset)
 		{
-			ImGui::Begin("Material Asset Editor", &m_Visibility);
+			ImGui::Begin("Material Asset Editor", &m_Visibility, ImGuiWindowFlags_NoCollapse);
 
 			// PBR values
 			{

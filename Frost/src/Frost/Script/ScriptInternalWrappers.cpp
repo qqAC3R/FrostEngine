@@ -17,6 +17,8 @@
 #include "Frost/Physics/PhysX/PhysXScene.h"
 #include "Frost/Physics/PhysX/PhysXShapes.h"
 
+#include "Frost/Math/Math.h"
+
 #include <mono/jit/jit.h>
 
 namespace Frost
@@ -1815,7 +1817,7 @@ namespace ScriptInternalCalls
 		return animationsMonoArray;
 	}
 
-	void Components::Animation::SetActiveAnimation(uint64_t entityID, MonoString* animationName)
+	void Components::Animation::SetFloatInput(uint64_t entityID, MonoString* inputName, float input)
 	{
 		Scene* scene = ScriptEngine::GetCurrentSceneContext();
 		FROST_ASSERT(scene, "No active scene!");
@@ -1824,19 +1826,38 @@ namespace ScriptInternalCalls
 
 		Entity entity = entityMap.at(entityID);
 		auto& animationComponent = entity.GetComponent<AnimationComponent>();
-		const Vector<Ref<Frost::Animation>>& animations = animationComponent.MeshComponentPtr->Mesh->GetMeshAsset()->GetAnimations();
+		animationComponent.Controller->GetAnimationBlueprint()->SetFloatInput(mono_string_to_utf8(inputName), input);
+	}
 
-		std::string activeAnimationName = mono_string_to_utf8(animationName);
+	void Components::Animation::SetIntInput(uint64_t entityID, MonoString* inputName, int32_t input)
+	{
+		Scene* scene = ScriptEngine::GetCurrentSceneContext();
+		FROST_ASSERT(scene, "No active scene!");
+		const auto& entityMap = scene->GetEntityMap();
+		FROST_ASSERT(bool(entityMap.find(entityID) != entityMap.end()), "Invalid entity ID or entity doesn't exist in scene!");
 
-		uint32_t index = 0;
-		for (auto& animation : animations)
-		{
-			if (animation->GetName() == activeAnimationName)
-			{
-				animationComponent.Controller->SetActiveAnimation(animation);
-				break;
-			}
-		}
+		Entity entity = entityMap.at(entityID);
+		auto& animationComponent = entity.GetComponent<AnimationComponent>();
+		animationComponent.Controller->GetAnimationBlueprint()->SetIntInput(mono_string_to_utf8(inputName), input);
+	}
+
+	void Components::Animation::SetBoolInput(uint64_t entityID, MonoString* inputName, bool input)
+	{
+		Scene* scene = ScriptEngine::GetCurrentSceneContext();
+		FROST_ASSERT(scene, "No active scene!");
+		const auto& entityMap = scene->GetEntityMap();
+		FROST_ASSERT(bool(entityMap.find(entityID) != entityMap.end()), "Invalid entity ID or entity doesn't exist in scene!");
+
+		Entity entity = entityMap.at(entityID);
+		auto& animationComponent = entity.GetComponent<AnimationComponent>();
+		animationComponent.Controller->GetAnimationBlueprint()->SetBoolInput(mono_string_to_utf8(inputName), input);
+	}
+
+	void Math::Transform::LookAt(TransformComponent* outTransform, glm::vec3* center, glm::vec3* eye)
+	{
+		glm::mat4 transform = glm::lookAt(*eye, *center, glm::vec3(0.0f, 0.0f, 1.0f));
+		Frost::Math::DecomposeTransform(transform, outTransform->Translation, outTransform->Rotation, outTransform->Scale);
+		outTransform->Rotation = glm::degrees(outTransform->Rotation);
 	}
 
 } }

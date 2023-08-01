@@ -717,6 +717,7 @@ namespace Frost
 				{
 					indirectCmdBuf.firstInstance = 0;
 				}
+				indirectCmdBuf.firstInstance += submeshIndex;
 
 				m_Data->IndirectVoxelCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
 				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);

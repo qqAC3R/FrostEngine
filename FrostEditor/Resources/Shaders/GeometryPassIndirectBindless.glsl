@@ -99,20 +99,22 @@ void main()
 		materialIndex = vertex.MaterialIndex;
 	}
 	
+	///////////////////////// 0.96-1.0
+
 	// Calculating the normals with the model matrix
 	mat3 normalMatrix = mat3(boneTransform * a_ModelSpaceMatrix);
 	v_Normal = normalMatrix * normalize(normal);
 	v_Tangent = normalMatrix * normalize(tangent);
-	//mat3 normalMatrix = transpose(inverse(mat3(a_ModelSpaceMatrix)));
 
 
 	// Texture Coords
 	v_TexCoord = texCoord;
 
+	vec4 positionWithBone = boneTransform * vec4(position, 1.0f);
 
 	// World position
-	v_FragmentPos = vec3(a_ModelSpaceMatrix * boneTransform * vec4(position, 1.0f));
-	v_ViewPosition = vec3(u_PushConstant.ViewMatrix * a_ModelSpaceMatrix * boneTransform * vec4(position, 1.0f));
+	v_FragmentPos = vec3(a_ModelSpaceMatrix * positionWithBone);
+	v_ViewPosition = vec3(u_PushConstant.ViewMatrix * positionWithBone);
 
 	// Material indices
 	int meshIndex = int(u_PushConstant.MaterialIndex + materialIndex);
@@ -121,7 +123,7 @@ void main()
 	v_EntityID = u_PushConstant.EntityID;
 
 	// Compute world position
-	vec4 worldPos = a_WorldSpaceMatrix * boneTransform * vec4(position, 1.0f);
+	vec4 worldPos = a_WorldSpaceMatrix * positionWithBone;
 	gl_Position = worldPos;
 }
 
@@ -132,7 +134,7 @@ void main()
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_scalar_block_layout : enable
 
-layout(location = 0) out vec4 o_WoldPos;
+//layout(location = 0) out vec4 o_WoldPos;
 layout(location = 1) out vec4 o_Normals;
 layout(location = 2) out vec4 o_Albedo;
 layout(location = 3) out vec4 o_ViewPos;
@@ -247,7 +249,7 @@ void main()
 	float emissionFactor = MaterialUniform.Data[nonuniformEXT(materialIndex)].Emission;
 
 	// World Pos
-	o_WoldPos = vec4(v_FragmentPos, 1.0f);
+	//o_WoldPos = vec4(v_FragmentPos, 1.0f);
 	
 	// View space Position
 	o_ViewPos = vec4(v_ViewPosition, 1.0f);

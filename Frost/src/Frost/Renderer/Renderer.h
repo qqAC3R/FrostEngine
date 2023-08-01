@@ -53,7 +53,7 @@ namespace Frost
 		uint32_t VoxelTextureResolution = 256;
 
 		// Volumetric Pass
-		uint32_t VoluemtricFroxelSlicesZ = 128;
+		uint32_t VoluemtricFroxelSlicesZ = 64;
 	};
 
 	// Memory Usage:

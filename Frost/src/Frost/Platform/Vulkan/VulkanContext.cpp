@@ -89,10 +89,10 @@ namespace Frost
 
 		VkApplicationInfo appInfo{ VK_STRUCTURE_TYPE_APPLICATION_INFO };
 		appInfo.pApplicationName = "Frost Engine";
-		appInfo.applicationVersion = VK_MAKE_VERSION(1, 2, 0);
+		appInfo.applicationVersion = VK_MAKE_VERSION(1, 3, 0);
 		appInfo.pEngineName = "Frost Engine";
-		appInfo.engineVersion = VK_MAKE_VERSION(1, 2, 0);
-		appInfo.apiVersion = VK_API_VERSION_1_2;
+		appInfo.engineVersion = VK_MAKE_VERSION(1, 3, 0);
+		appInfo.apiVersion = VK_API_VERSION_1_3;
 
 		VkInstanceCreateInfo createInfo{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
 		createInfo.pApplicationInfo = &appInfo;
@@ -117,7 +117,9 @@ namespace Frost
 			createInfo.pNext = nullptr;
 		}
 
+		FROST_CORE_INFO("Creating Vulkan Instance!");
 		FROST_VKCHECK(vkCreateInstance(&createInfo, nullptr, &m_Instance));
+		FROST_CORE_INFO("Vulkan Instance created!");
 	}
 
 	void VulkanContext::CreateDebugMessenger()

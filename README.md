@@ -14,5 +14,5 @@ Version: 0.4.0a (Added Unified Volumetrics)
 ![SponzaVolumetric1](https://github.com/qqAC3R/FrostEngine/blob/master/Showcase/SponzaVolumetric2.png)
 
 # User Interface
-Version: 0.7.2a (Added Voxel Based Global Illumination)
+Version: 0.7.2a
 ![GameEngineUserInterface](https://github.com/qqAC3R/FrostEngine/blob/master/Showcase/GameEngineUI.png)

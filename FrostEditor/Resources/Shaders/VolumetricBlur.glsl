@@ -1,9 +1,9 @@
 #type compute
 #version 460
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
-#define KERNEL_RADIUS 3
+#define KERNEL_RADIUS 2
 //#define SHARPNESS 5.0
 
 layout(binding = 0) uniform sampler2D u_SrcTex;

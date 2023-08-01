@@ -9,6 +9,9 @@
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
+// Unroll all loops for performance - this is important
+#pragma optionNV(unroll all)
+
 layout(binding = 0) uniform sampler3D u_CurrentVolumetricFroxel;
 layout(binding = 1) uniform sampler3D u_PreviousVolumetricFroxel;
 
@@ -75,28 +78,28 @@ void main()
 	vec3 uvw = vec3(uv, w);
 
 	// Box blur + Computing the min/max of the neighboring pixels for clamping the history buffer texel color
-	vec4 currentResult = SpatialFilter(uvw);
-	//vec4 currentResult = vec4(0.0);
-	//vec4 neighbouringTexels[8];
-	//vec4 pixelMinClamp = vec4(1.0f);
-	//vec4 pixelMaxClamp = vec4(0.0f);
-	//neighbouringTexels[0] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5, -0.5, -0.5) * texel);
-	//neighbouringTexels[1] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5, -0.5, -0.5) * texel);
-	//neighbouringTexels[2] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5,  0.5, -0.5) * texel);
-	//neighbouringTexels[3] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5,  0.5, -0.5) * texel);
-	//neighbouringTexels[4] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5, -0.5,  0.5) * texel);
-	//neighbouringTexels[5] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5, -0.5,  0.5) * texel);
-	//neighbouringTexels[6] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5,  0.5,  0.5) * texel);
-	//neighbouringTexels[7] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5,  0.5,  0.5) * texel);
+	//vec4 currentResult = SpatialFilter(uvw);
+	vec4 currentResult = vec4(0.0);
+	vec4 pixelMinClamp = vec4(1.0f);
+	vec4 pixelMaxClamp = vec4(0.0f);
+	vec4 neighbouringTexels[8];
+	neighbouringTexels[0] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5, -0.5, -0.5) * texel);
+	neighbouringTexels[1] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5, -0.5, -0.5) * texel);
+	neighbouringTexels[2] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5,  0.5, -0.5) * texel);
+	neighbouringTexels[3] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5,  0.5, -0.5) * texel);
+	neighbouringTexels[4] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5, -0.5,  0.5) * texel);
+	neighbouringTexels[5] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5, -0.5,  0.5) * texel);
+	neighbouringTexels[6] = texture(u_CurrentVolumetricFroxel, uvw + vec3(-0.5,  0.5,  0.5) * texel);
+	neighbouringTexels[7] = texture(u_CurrentVolumetricFroxel, uvw + vec3( 0.5,  0.5,  0.5) * texel);
 
-	//for(uint i = 0; i < 8; i++)
+	for(uint i = 0; i < 8; i++)
 	{
-		//currentResult += neighbouringTexels[i];
+		currentResult += neighbouringTexels[i];
 
-		//pixelMinClamp = min(pixelMinClamp, neighbouringTexels[i]);
-		//pixelMaxClamp = max(pixelMaxClamp, neighbouringTexels[i]);
+		pixelMinClamp = min(pixelMinClamp, neighbouringTexels[i]);
+		pixelMaxClamp = max(pixelMaxClamp, neighbouringTexels[i]);
 	}
-	//currentResult /= 8.0;
+	currentResult /= 8.0;
 
 	// Temporal AA
 	// Get current texel's world space position for it to be converted into
@@ -125,13 +128,13 @@ void main()
 	//// Sampling the history buffer
 	//vec4 lastFrameResult = texture(u_PreviousVolumetricFroxel, vec3(previousUV, previousZ));
 	//
-	//// Mixing it up a bit more for the edges to not flicker so much
-	//lastFrameResult = mix(clamp(lastFrameResult, pixelMinClamp, pixelMaxClamp), lastFrameResult, 0.75f);
+	// Mixing it up a bit more for the edges to not flicker so much
+	lastFrameResult = mix(clamp(lastFrameResult, pixelMinClamp, pixelMaxClamp), lastFrameResult, 0.9);
 
 	// Compute the final result
 	vec4 finalResult;
 	if(InFrustum(previousPosNDC))
-		finalResult = mix(lastFrameResult, currentResult, 0.2);
+		finalResult = mix(lastFrameResult, currentResult, 0.02);
 	else
 		finalResult = currentResult;
 		

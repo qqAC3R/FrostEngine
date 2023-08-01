@@ -43,8 +43,8 @@ namespace Frost
 		m_Data->PerlinNoiseShader = Renderer::GetShaderLibrary()->Get("CloudPerlinNoise");
 		m_Data->CloudComputeShader = Renderer::GetShaderLibrary()->Get("CloudComputeVolumetric");
 
-		CloudNoiseCompute(1600, 900);
-		CloudComputeInitData(1600, 900);
+		//CloudNoiseCompute(1600, 900);
+		//CloudComputeInitData(1600, 900);
 
 		FroxelPopulateInitData(1600, 900);
 		FroxelLightInjectInitData(1600, 900);
@@ -75,10 +75,10 @@ namespace Frost
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = uint32_t(width / 8.0f);
-			imageSpec.Height = uint32_t(height / 8.0f);
+			imageSpec.Width = uint32_t(width / m_Data->VolumetricTileX);
+			imageSpec.Height = uint32_t(height / m_Data->VolumetricTileY);
 			imageSpec.Depth = froxel_ZSlices;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			imageSpec.Format = ImageFormat::RGBA16F;
 			imageSpec.Usage = ImageUsage::Storage;
@@ -170,10 +170,10 @@ namespace Frost
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = uint32_t(width / 8.0f);
-			imageSpec.Height = uint32_t(height / 8.0f);
+			imageSpec.Width = uint32_t(width / m_Data->VolumetricTileX);
+			imageSpec.Height = uint32_t(height / m_Data->VolumetricTileY);
 			imageSpec.Depth = froxel_ZSlices;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			imageSpec.Format = ImageFormat::RGBA16F;
 			imageSpec.Usage = ImageUsage::Storage;
@@ -517,8 +517,8 @@ namespace Frost
 			auto descriptorVolumetricCompute = m_Data->VolumetricComputeDescriptor[i].As<VulkanMaterial>();
 			auto descriptorVolumetricBlurX = m_Data->VolumetricBlurXDescriptor[i].As<VulkanMaterial>();
 			auto descriptorVolumetricBlurY = m_Data->VolumetricBlurYDescriptor[i].As<VulkanMaterial>();
-			auto descriptorCloudBlurX = m_Data->CloudComputeBlurXDescriptor[i].As<VulkanMaterial>();
-			auto descriptorCloudBlurY = m_Data->CloudComputeBlurYDescriptor[i].As<VulkanMaterial>();
+			//auto descriptorCloudBlurX = m_Data->CloudComputeBlurXDescriptor[i].As<VulkanMaterial>();
+			//auto descriptorCloudBlurY = m_Data->CloudComputeBlurYDescriptor[i].As<VulkanMaterial>();
 
 			int32_t lastFrame = i - 1;
 			if (i == 0) lastFrame = framesInFlight - 1;
@@ -539,11 +539,11 @@ namespace Frost
 			descriptorVolumetricBlurY->UpdateVulkanDescriptorIfNeeded();
 
 			// Set the cloud blur descriptor
-			descriptorCloudBlurX->Set("u_DepthBuffer", depthTexture);
-			descriptorCloudBlurX->UpdateVulkanDescriptorIfNeeded();
+			//descriptorCloudBlurX->Set("u_DepthBuffer", depthTexture);
+			//descriptorCloudBlurX->UpdateVulkanDescriptorIfNeeded();
 
-			descriptorCloudBlurY->Set("u_DepthBuffer", depthTexture);
-			descriptorCloudBlurY->UpdateVulkanDescriptorIfNeeded();
+			//descriptorCloudBlurY->Set("u_DepthBuffer", depthTexture);
+			//descriptorCloudBlurY->UpdateVulkanDescriptorIfNeeded();
 
 		}
 	}
@@ -556,7 +556,7 @@ namespace Frost
 			glm::radians(renderQueue.m_Camera->GetCameraFOV()),
 			float(renderQueue.m_Camera->GetViewportWidth()) / float(renderQueue.m_Camera->GetViewportHeight()),
 			renderQueue.m_Camera->GetNearClip(),
-			renderQueue.m_Camera->GetFarClip()
+			renderQueue.m_Camera->GetFarClip() / 2.0f
 		);
 
 #if 0
@@ -568,9 +568,9 @@ namespace Frost
 		m_Data->CameraFOV = renderQueue.m_Camera->GetCameraFOV();
 #endif
 
-		VulkanRenderer::BeginTimeStampPass("Cloud Compute Pass");
-		CloudComputeUpdate(renderQueue);
-		VulkanRenderer::EndTimeStampPass("Cloud Compute Pass");
+		//VulkanRenderer::BeginTimeStampPass("Cloud Compute Pass");
+		//CloudComputeUpdate(renderQueue);
+		//VulkanRenderer::EndTimeStampPass("Cloud Compute Pass");
 
 		if (rendererSettings.Volumetrics.EnableVolumetrics)
 		{
@@ -596,8 +596,8 @@ namespace Frost
 
 			VulkanRenderer::BeginTimeStampPass("Volumetric Pass (Compute)");
 			VolumetricComputeUpdate(renderQueue);
-			VulkanRenderer::EndTimeStampPass("Volumetric Pass (Compute)");
 			VolumetricBlurUpdate(renderQueue);
+			VulkanRenderer::EndTimeStampPass("Volumetric Pass (Compute)");
 		}
 	}
 
@@ -642,8 +642,8 @@ namespace Frost
 
 
 		// Dispatch
-		float width = (renderQueue.ViewPortWidth / 8.0f);
-		float height = (renderQueue.ViewPortHeight / 8.0f);
+		float width = (renderQueue.ViewPortWidth / m_Data->VolumetricTileX);
+		float height = (renderQueue.ViewPortHeight / m_Data->VolumetricTileY);
 
 		uint32_t groupX = std::ceil(width / 8.0f);
 		uint32_t groupY = std::ceil(height / 8.0f);
@@ -716,8 +716,8 @@ namespace Frost
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VolumetricLightInjectPushConstant);
 
 		// Dispatch
-		float width = (renderQueue.ViewPortWidth / 8.0f);
-		float height = (renderQueue.ViewPortHeight / 8.0f);
+		float width = (renderQueue.ViewPortWidth / m_Data->VolumetricTileX);
+		float height = (renderQueue.ViewPortHeight / m_Data->VolumetricTileY);
 
 		uint32_t groupX = std::ceil(width / 8.0f);
 		uint32_t groupY = std::ceil(height / 8.0f);
@@ -767,8 +767,8 @@ namespace Frost
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VolumetricTAAPushConstant);
 
 		// Dispatch
-		float width = (renderQueue.ViewPortWidth / 8.0f);
-		float height = (renderQueue.ViewPortHeight / 8.0f);
+		float width = (renderQueue.ViewPortWidth / m_Data->VolumetricTileX);
+		float height = (renderQueue.ViewPortHeight / m_Data->VolumetricTileY);
 
 		uint32_t groupX = std::ceil(width / 8.0f);
 		uint32_t groupY = std::ceil(height / 8.0f);
@@ -795,8 +795,8 @@ namespace Frost
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VolumetricLightInjectPushConstant); // The same push constant as in the `FroxelLightInject` pass
 
 		// Dispatch
-		float width = (renderQueue.ViewPortWidth / 8.0f);
-		float height = (renderQueue.ViewPortHeight / 8.0f);
+		float width = (renderQueue.ViewPortWidth / m_Data->VolumetricTileX);
+		float height = (renderQueue.ViewPortHeight / m_Data->VolumetricTileY);
 
 		uint32_t groupX = std::ceil(width / 8.0f);
 		uint32_t groupY = std::ceil(height / 8.0f);
@@ -864,9 +864,9 @@ namespace Frost
 
 		
 		/// We firstly blur in the X direction
-		s_VolumetricPushConstant.BlurDirection = { 1.0f, 0.0f };
+		s_VolumetricPushConstant.BlurDirection = { 0.5f, 0.0f };
 		s_VolumetricPushConstant.DepthMipSample = 1;
-		s_VolumetricPushConstant.Sharpness = 3.0;
+		s_VolumetricPushConstant.Sharpness = 0.5;
 
 		vulkanBlurXDescriptor->Bind(cmdBuf, m_Data->VolumetricBlurPipeline);
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_VolumetricPushConstant);
@@ -875,8 +875,8 @@ namespace Frost
 		// Dispatch
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
-		uint32_t groupX = std::ceil((width  / 1.0f) / 16.0f);
-		uint32_t groupY = std::ceil((height / 1.0f) / 16.0f);
+		uint32_t groupX = std::ceil((width  / 1.0f) / 32.0f);
+		uint32_t groupY = std::ceil((height / 1.0f) / 32.0f);
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 

@@ -140,8 +140,8 @@ namespace Frost
 
 			Submesh& submesh = m_Submeshes.emplace_back();
 			submesh.BaseVertex = vertexCount;             // Vertices information
-			submesh.VertexCount = mesh->mNumVertices;     // Vertices information
 			submesh.BaseIndex = indexCount;				  // Indices information
+			submesh.VertexCount = mesh->mNumVertices;     // Vertices information
 			submesh.IndexCount = mesh->mNumFaces * 3;     // Indices information
 			submesh.MaterialIndex = mesh->mMaterialIndex;
 			submesh.MeshName = mesh->mName.C_Str();
@@ -333,7 +333,9 @@ namespace Frost
 			meshInfo.SubmeshIndexBuffer = m_SubmeshIndexBuffers;
 			meshInfo.SubMeshes = m_Submeshes;
 
+#if FROST_SUPPORT_RAY_TRACING
 			m_AccelerationStructure = BottomLevelAccelerationStructure::Create(meshInfo);
+#endif
 		}
 
 		// Materials
@@ -745,6 +747,7 @@ namespace Frost
 		{
 			uint32_t mesh = node->mMeshes[i];
 			auto& submesh = m_Submeshes[mesh];
+			submesh.MeshName = node->mName.C_Str();
 			submesh.Transform = transform;
 		}
 

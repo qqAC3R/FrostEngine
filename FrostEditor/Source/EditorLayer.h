@@ -10,6 +10,7 @@
 #include "Panels/TitlebarPanel.h"
 #include "Panels/MaterialAssetEditor.h"
 #include "Panels/PhysicsMaterialEditor.h"
+#include "Panels/AnimationNodeEditor/AnimationNodeEditor.h"
 
 namespace Frost
 {
@@ -68,9 +69,11 @@ namespace Frost
 		Ref<ContentBrowserPanel> m_ContentBrowser;
 		Ref<MaterialAssetEditor> m_MaterialAssetEditor;
 		Ref<PhysicsMaterialEditor> m_PhysicsMaterialEditor;
+		Ref<AnimationNoteEditor> m_AnimationNodeEditor;
 
 		bool m_ShowSceneHierarchyPanel = true;
 		bool m_ShowInspectorPanel = true;
+		bool m_ShowContentBrowser = true;
 		bool m_ShowRendererDebugger = true;
 
 		bool m_ViewPortMouseHovered = false;

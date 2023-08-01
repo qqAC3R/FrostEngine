@@ -11,6 +11,7 @@
 
 #include "Frost/Core/Input.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
+#include "Frost/Utils/PlatformUtils.h"
 #include "Frost/Utils/Timer.h"
 
 #include <GLFW/glfw3.h>
@@ -34,6 +35,8 @@ namespace Frost
 		m_ImGuiLayer = ImGuiLayer::Create();
 		PushOverlay(m_ImGuiLayer);
 
+		//std::string filepath = FileDialogs::OpenFile("");
+		//Ref<Project> project = Project::Deserialize(filepath); // Hardcoded currently
 		Ref<Project> project = Project::Deserialize("D:\\Visual Studio\\FrostEngine\\master\\FrostEditor\\SandboxProject\\Sandbox.fproj"); // Hardcoded currently
 		Project::SetActive(project);
 		Application::Get().GetWindow().SetWindowProjectName(Project::GetProjectName());

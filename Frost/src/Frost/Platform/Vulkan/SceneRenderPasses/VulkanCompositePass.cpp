@@ -17,7 +17,9 @@
 #include "Frost/Platform/Vulkan/VulkanSceneEnvironment.h"
 
 //#include "Frost/Renderer/AreaLightLUT.h"
+#pragma warning(push, 0)
 #include "../../FrostEditor/Resources/LUT/AreaLightLUT.h"
+#pragma warning(pop)
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -118,7 +120,7 @@ namespace Frost
 
 			auto descriptor = m_Data->CompositeDescriptor[i];
 
-			Ref<Image2D> positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
+			Ref<Image2D> depthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(i);
 			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
 			Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(2, i);
 			Ref<Image2D> shadowTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowComputeDenoiseTexture[i];
@@ -129,7 +131,7 @@ namespace Frost
 
 			descriptor->Set("UniformBuffer.CameraGamma", 2.2f);
 
-			descriptor->Set("u_PositionTexture", positionTexture);
+			descriptor->Set("u_DepthBuffer", depthTexture);
 			descriptor->Set("u_NormalTexture", normalTexture);
 			descriptor->Set("u_AlbedoTexture", albedoTexture);
 			descriptor->Set("u_ShadowTexture", shadowTexture);
@@ -338,7 +340,9 @@ namespace Frost
 
 		VulkanRenderer::BeginTimeStampPass("Lightning Pass (PBR)");
 
+
 		m_PushConstantData.CameraPosition.w = static_cast<float>(pointLightCount);
+		m_PushConstantData.InvViewProjMatrix = glm::inverse(renderQueue.m_Camera->GetViewProjectionVK());
 
 		//vulkanComputePipeline->Bind(cmdBuf);
 		vulkanCompositePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_PushConstantData);

@@ -37,6 +37,7 @@ IncludeDir["entt"] = "Frost/vendor/entt/include"
 IncludeDir["Mono"] = "Frost/vendor/mono/include"
 IncludeDir["msdfgen"] = "Frost/vendor/msdf/msdfgen"
 IncludeDir["msdf_atlas_gen"] = "Frost/vendor/msdf/msdf-atlas-gen"
+IncludeDir["imgui_node_editor"] = "Frost/vendor/imgui-node-editor"
 
 LibraryDir = {}
 
@@ -94,10 +95,10 @@ project "Frost"
 
 		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.h",
 		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.cpp",
-	}
 
-	--filter "files:vendor/ImGuizmo/**.cpp"
-	--flags { "NoPCH" }
+		"%{prj.name}/vendor/imgui-node-editor/**.h",
+		"%{prj.name}/vendor/imgui-node-editor/**.cpp",
+	}
 
 	defines
 	{
@@ -121,6 +122,7 @@ project "Frost"
 		"%{IncludeDir.vma}",
 		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.ImGuizmo}",
+		"%{IncludeDir.imgui_node_editor}",
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.SPIRV_Cross}",
 		"%{IncludeDir.OZZ_Animation}",
@@ -179,6 +181,12 @@ project "Frost"
 		"%{LibraryDir.shaderc}",
 		"%{LibraryDir.PhysX}"
 	}
+
+	filter "files:Frost/vendor/ImGuizmo/**.cpp"
+		flags { "NoPCH" }
+
+	filter "files:Frost/vendor/imgui-node-editor/**.cpp"
+		flags { "NoPCH" }
 
 	filter "system:windows"
 		systemversion "latest"
@@ -269,6 +277,7 @@ project "FrostEditor"
 		"%{IncludeDir.vma}",
 		"%{IncludeDir.OZZ_Animation}",
 		"%{IncludeDir.ImGui}",
+		"%{IncludeDir.imgui_node_editor}",
 		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.spdlog}",
 		"%{IncludeDir.assimp}",
