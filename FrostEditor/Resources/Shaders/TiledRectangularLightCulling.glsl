@@ -31,11 +31,20 @@ layout(push_constant) uniform PushConstant
 {
     mat4 ViewMatrix;
     mat4 ProjectionMatrix;
-    mat4 ViewProjectionMatrix;
+    //mat4 ViewProjectionMatrix;
+    //
+    //vec2 ScreenSize;
+    //int NumberOfLights;
+} u_PushConstant;
+
+layout(binding = 4) uniform UniformBuffer
+{
+	mat4 ViewProjectionMatrix;
 
     vec2 ScreenSize;
     int NumberOfLights;
-} u_PushConstant;
+
+} u_UniformBuffer;
 
 
 layout(binding = 3) uniform sampler2D u_DepthBuffer;
@@ -77,7 +86,7 @@ void main()
     barrier();
 
     // Calculate the minimum and maximum depth values (from the depth buffer) for this group's tile
-    vec2 textureCoord = vec2(location) / u_PushConstant.ScreenSize;
+    vec2 textureCoord = vec2(location) / u_UniformBuffer.ScreenSize;
     float depth = texture(u_DepthBuffer, textureCoord).x;
     depth = u_PushConstant.ProjectionMatrix[3][2] / (depth + u_PushConstant.ProjectionMatrix[2][2]);
 
@@ -126,7 +135,7 @@ void main()
         // Transform the first four planes to the camera's perspective
         for (uint i = 0; i < 4; i++)
         {
-            frustumPlanes[i] *= u_PushConstant.ViewProjectionMatrix;
+            frustumPlanes[i] *= u_UniformBuffer.ViewProjectionMatrix;
             frustumPlanes[i] /= length(frustumPlanes[i].xyz);
 
             frustumPlanesNoDepth[i] = frustumPlanes[i];
@@ -151,11 +160,11 @@ void main()
     // Parallelize the threads against the lights now
     // Can handle 256(TILE_SIZE * TILE_SIZE) simultaniously
     uint threadCount = TILE_SIZE * TILE_SIZE;
-    uint passCount = (u_PushConstant.NumberOfLights + threadCount - 1) / threadCount;
+    uint passCount = (u_UniformBuffer.NumberOfLights + threadCount - 1) / threadCount;
     for (uint i = 0; i < passCount; i++)
     {
         uint lightIndex = i * threadCount + gl_LocalInvocationIndex;
-        if(lightIndex >= u_PushConstant.NumberOfLights)
+        if(lightIndex >= u_UniformBuffer.NumberOfLights)
             break;
 
         vec3 center = ( LightData.u_RectangularLights[lightIndex].Vertex0.xyz +

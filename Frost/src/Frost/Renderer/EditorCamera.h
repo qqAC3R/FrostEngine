@@ -27,7 +27,7 @@ namespace Frost
 		EditorCamera(float fov, float aspectRatio, float nearClip, float farClip);
 
 		void Focus(const glm::vec3& focusPoint);
-		void OnUpdate(Timestep ts);
+		void OnUpdate(Timestep ts, bool disableMovement = false);
 		void OnEvent(Event& e);
 
 		bool IsActive() const { return m_IsActive; }
@@ -67,6 +67,9 @@ namespace Frost
 
 		void EnableMouse();
 		void DisableMouse();
+
+		// Jittering the camera for Temporal Anti-Aliasing
+		void JitterProjectionMatrix();
 
 		glm::vec3 CalculatePosition() const;
 

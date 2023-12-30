@@ -7,6 +7,8 @@
 #include "Frost/InputCodes/KeyCodes.h"
 #include "Frost/InputCodes/MouseButtonCodes.h"
 
+#include "Frost/Renderer/Renderer.h"
+
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -42,76 +44,110 @@ namespace Frost
 	{
 		Input::SetCursorMode(CursorMode::Locked);
 	}
+
+	void EditorCamera::JitterProjectionMatrix()
+	{
+		float screenWidth = (float)m_ViewportWidth;
+		float screenHeight = (float)m_ViewportHeight;
+		uint64_t frameCount = Renderer::GetFrameCount();
+
+		auto GetJitter = [](const uint64_t frameCount, float screenWidth, float screenHeight) {
+			auto HaltonSeq = [](int32_t prime, int32_t idx) {
+				float r = 0;
+				float f = 1;
+				while (idx > 0) {
+					f /= prime;
+					r += f * (idx % prime);
+					idx /= prime;
+				}
+				return r;
+			};
+			float u = HaltonSeq(2, (frameCount % 8) + 1) - 0.5f;
+			float v = HaltonSeq(3, (frameCount % 8) + 1) - 0.5f;
+			return glm::vec2(u, v) * glm::vec2(1.0 / screenWidth, 1. / screenHeight) * 2.f;
+		};
+		
+		auto JitterProjection = [&GetJitter, screenWidth, screenHeight](const glm::mat4& proj, const uint64_t frameCount) {
+			const glm::vec2 jitter = GetJitter(frameCount, screenWidth, screenHeight);
+			return glm::translate(glm::identity<glm::mat4>(), glm::vec3(jitter, 0)) * proj;
+		};
+		m_ProjectionMatrix = JitterProjection(m_InitialProjectionMatrix, frameCount);
+	}
+
 	void EditorCamera::EnableMouse()
 	{
 		Input::SetCursorMode(CursorMode::Normal);
 	}
 
-	void EditorCamera::OnUpdate(const Timestep ts)
+	void EditorCamera::OnUpdate(const Timestep ts, bool disableMovement)
 	{
 		const glm::vec2& mouse{ Input::GetMouseX(), Input::GetMouseY() };
 		const glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.002f;
 
 		if (m_IsActive)
 		{
-			if (Input::IsMouseButtonPressed(Mouse::ButtonRight) && !Input::IsKeyPressed(Key::LeftAlt))
+			if (!disableMovement)
 			{
-				m_CameraMode = CameraMode::FLYCAM;
-				DisableMouse();
-				const float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
 
-				if (Input::IsKeyPressed(Key::Q))
-					m_PositionDelta -= ts.GetMilliseconds() * m_Speed * glm::vec3{ 0.f, yawSign, 0.f };
-				if (Input::IsKeyPressed(Key::E))
-					m_PositionDelta += ts.GetMilliseconds() * m_Speed * glm::vec3{ 0.f, yawSign, 0.f };
-				if (Input::IsKeyPressed(Key::S))
-					m_PositionDelta -= ts.GetMilliseconds() * m_Speed * m_WorldRotation;
-				if (Input::IsKeyPressed(Key::W))
-					m_PositionDelta += ts.GetMilliseconds() * m_Speed * m_WorldRotation;
-				if (Input::IsKeyPressed(Key::A))
-					m_PositionDelta -= ts.GetMilliseconds() * m_Speed * m_RightDirection;
-				if (Input::IsKeyPressed(Key::D))
-					m_PositionDelta += ts.GetMilliseconds() * m_Speed * m_RightDirection;
-
-				constexpr float maxRate{ 0.12f };
-				m_YawDelta += glm::clamp(yawSign * delta.x * RotationSpeed(), -maxRate, maxRate);
-				m_PitchDelta += glm::clamp(delta.y * RotationSpeed(), -maxRate, maxRate);
-
-				// Right vector
-				m_RightDirection = glm::cross(m_WorldRotation, glm::vec3{ 0.f, yawSign, 0.f });
-
-				// Up vector
-				m_UpDirection = glm::vec3{ 0.f, yawSign, 0.f };
-
-				// Front vector
-				m_WorldRotation = glm::rotate(glm::normalize(glm::cross(glm::angleAxis(-m_PitchDelta, m_RightDirection),
-					glm::angleAxis(-m_YawDelta, glm::vec3{ 0.f, yawSign, 0.f }))), m_WorldRotation);
-			}
-			else if (Input::IsKeyPressed(Key::LeftAlt))
-			{
-				m_CameraMode = CameraMode::ARCBALL;
-
-				if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
+				if (Input::IsMouseButtonPressed(Mouse::ButtonRight) && !Input::IsKeyPressed(Key::LeftAlt))
 				{
+					m_CameraMode = CameraMode::FLYCAM;
 					DisableMouse();
-					MousePan(delta);
+					const float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
+
+					if (Input::IsKeyPressed(Key::Q))
+						m_PositionDelta -= ts.GetMilliseconds() * m_Speed * glm::vec3{ 0.f, yawSign, 0.f };
+					if (Input::IsKeyPressed(Key::E))
+						m_PositionDelta += ts.GetMilliseconds() * m_Speed * glm::vec3{ 0.f, yawSign, 0.f };
+					if (Input::IsKeyPressed(Key::S))
+						m_PositionDelta -= ts.GetMilliseconds() * m_Speed * m_WorldRotation;
+					if (Input::IsKeyPressed(Key::W))
+						m_PositionDelta += ts.GetMilliseconds() * m_Speed * m_WorldRotation;
+					if (Input::IsKeyPressed(Key::A))
+						m_PositionDelta -= ts.GetMilliseconds() * m_Speed * m_RightDirection;
+					if (Input::IsKeyPressed(Key::D))
+						m_PositionDelta += ts.GetMilliseconds() * m_Speed * m_RightDirection;
+
+					constexpr float maxRate{ 0.12f };
+					m_YawDelta += glm::clamp(yawSign * delta.x * RotationSpeed(), -maxRate, maxRate);
+					m_PitchDelta += glm::clamp(delta.y * RotationSpeed(), -maxRate, maxRate);
+
+					// Right vector
+					m_RightDirection = glm::cross(m_WorldRotation, glm::vec3{ 0.f, yawSign, 0.f });
+
+					// Up vector
+					m_UpDirection = glm::vec3{ 0.f, yawSign, 0.f };
+
+					// Front vector
+					m_WorldRotation = glm::rotate(glm::normalize(glm::cross(glm::angleAxis(-m_PitchDelta, m_RightDirection),
+						glm::angleAxis(-m_YawDelta, glm::vec3{ 0.f, yawSign, 0.f }))), m_WorldRotation);
 				}
-				else if (Input::IsMouseButtonPressed(Mouse::ButtonLeft))
+				else if (Input::IsKeyPressed(Key::LeftAlt))
 				{
-					DisableMouse();
-					MouseRotate(delta);
-				}
-				else if (Input::IsMouseButtonPressed(Mouse::ButtonRight))
-				{
-					DisableMouse();
-					MouseZoom(delta.x + delta.y);
+					m_CameraMode = CameraMode::ARCBALL;
+
+					if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
+					{
+						DisableMouse();
+						MousePan(delta);
+					}
+					else if (Input::IsMouseButtonPressed(Mouse::ButtonLeft))
+					{
+						DisableMouse();
+						MouseRotate(delta);
+					}
+					else if (Input::IsMouseButtonPressed(Mouse::ButtonRight))
+					{
+						DisableMouse();
+						MouseZoom(delta.x + delta.y);
+					}
+					else
+						EnableMouse();
 				}
 				else
+				{
 					EnableMouse();
-			}
-			else
-			{
-				EnableMouse();
+				}
 			}
 		}
 		m_InitialMousePosition = mouse;
@@ -124,7 +160,7 @@ namespace Frost
 			m_Position = CalculatePosition();
 
 		UpdateCameraView();
-
+		JitterProjectionMatrix();
 		m_ViewProjecitonMatrix = m_ProjectionMatrix * m_ViewMatrix;
 
 		m_ViewProjecitonMatrix_Vk = m_ProjectionMatrix;

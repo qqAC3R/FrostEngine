@@ -99,6 +99,13 @@ namespace Frost
 		std::string MeshName;
 	};
 
+	struct SubmeshLOD
+	{
+		uint32_t BaseIndex;
+		uint32_t IndexCount;
+	};
+	using IndicesLOD = uint32_t;
+
 	struct SubmeshInstanced
 	{
 		glm::mat4 ModelSpaceMatrix;
@@ -137,6 +144,7 @@ namespace Frost
 		const Vector<Index>& GetIndices() const { return m_Indices; }
 
 		const Vector<Submesh>& GetSubMeshes() const { return m_Submeshes; }
+		const Vector<SubmeshLOD>& GetSubMeshesLOD(uint32_t lod) { return m_SubmeshLODs[lod]; }
 		const Vector<Ref<Animation>>& GetAnimations() const { return m_Animations; }
 		const Ref<MeshSkeleton>& GetMeshSkeleton() const { return m_Skeleton; }
 
@@ -159,6 +167,7 @@ namespace Frost
 
 		Ref<BottomLevelAccelerationStructure> GetAccelerationStructure() const { return m_AccelerationStructure; }
 		Ref<IndexBuffer> GetSubmeshIndexBuffer() const { return m_SubmeshIndexBuffers; }
+		Ref<IndexBuffer> GetGlobalSubmeshIndexBuffer() const { return m_GlobalSubmeshIndexBuffers; }
 
 		bool IsLoaded() const { return m_IsLoaded; }
 		bool IsAnimated() const { return m_IsAnimated; }
@@ -188,7 +197,12 @@ namespace Frost
 		Vector<Vertex> m_Vertices;
 		Vector<AnimatedVertex> m_SkinnedVertices;
 		Vector<Index> m_Indices;
+		Vector<Index> m_SubmeshIndices; // Same index buffer, but all grouped into a single mesh (for RT)
+		Vector<Index> m_GlobalSubmeshIndices; // Index buffer containing all indices offsetted + all LODs
 		Vector<Submesh> m_Submeshes;
+
+		HashMap<IndicesLOD, Vector<Index>> m_IndicesLODs;
+		HashMap<IndicesLOD, Vector<SubmeshLOD>> m_SubmeshLODs;
 
 		// Bone/Animation information
 		uint32_t m_BoneCount = 0;
@@ -220,6 +234,7 @@ namespace Frost
 		// Acceleration structure + custom index buffer (Ray Tracing)
 		Ref<BottomLevelAccelerationStructure> m_AccelerationStructure;
 		Ref<IndexBuffer> m_SubmeshIndexBuffers; // Same index buffer, but all grouped into a single mesh (for RT)
+		Ref<IndexBuffer> m_GlobalSubmeshIndexBuffers; // Index buffer containing all indices offsetted + all LODs
 
 		struct TextureMaterialFilepaths
 		{

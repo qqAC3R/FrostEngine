@@ -20,6 +20,9 @@ layout(push_constant) uniform PushConstant
 	vec3 AO_Data; // ProjectionScale || ScreenSize
 	int AO_Mode;
 
+	int FrameIndex;
+	float CameraFOV;
+
 } u_PushConstant;
 
 #define PI				3.1415926535897932
@@ -27,7 +30,6 @@ layout(push_constant) uniform PushConstant
 #define HALF_PI			1.5707963267948966
 #define ONE_OVER_PI		0.3183098861837906
 
-#define NUM_DIRECTIONS	16
 #define NUM_STEPS		8
 #define RADIUS			2.0		// in world space
 
@@ -67,7 +69,7 @@ vec4 GetViewPosition(vec2 uv, float currStep)
 {
 	int mipLevel = clamp(int(floor(log2(currStep / PREFETCH_CACHE_SIZE))), 1, NUM_MIP_LEVELS - 1);
 	
-	vec2 baseSize = vec2(textureSize(u_DepthPyramid, 0));
+	vec2 baseSize = vec2(textureSize(u_DepthPyramid, 1));
 	vec2 mipCoord = (uv / baseSize);
 	
 	float depth = textureLod(u_DepthPyramid, mipCoord, mipLevel).r;
@@ -112,6 +114,20 @@ float ComputeAO(vec3 P, vec3 N, vec3 S)
   return clamp(NdotV - NDotVBias, 0, 1) * clamp(Falloff2(VdotV),0,1);
 }
 
+// max absolute error 9.0x10^-3
+// Eberly's polynomial degree 1 - respect bounds
+// 4 VGPR, 12 FR (8 FR, 1 QR), 1 scalar
+// input [-1, 1] and output [0, PI]
+#define kPI 3.141592653589793
+float acosFast(float inX) 
+{
+    float x = abs(inX);
+    float res = -0.156583f * x + (0.5 * kPI);
+    res *= sqrt(1.0f - x);
+    return (inX >= 0) ? res : kPI - res;
+}
+
+
 float ComputeHBAO(vec3 vpos, vec3 vnorm, vec3 vdir)
 {
 	ivec2 loc = ivec2(gl_GlobalInvocationID.xy);
@@ -124,13 +140,13 @@ float ComputeHBAO(vec3 vpos, vec3 vnorm, vec3 vdir)
 	vec2 noises	= texelFetch(u_NoiseTex, loc % 4, 0).rg;
 	vec2 offset;
 
-	float radius = (RADIUS * u_PushConstant.AO_Data.x) / (1.0 - vpos.z);
+	float radius = (RADIUS * u_PushConstant.AO_Data.x) / (-vpos.z);
 	radius = max(float(NUM_STEPS), radius);
 		
 	float stepSize	= radius / NUM_STEPS;
 	float phi		= noises.x * PI;
 	float division	= noises.y * stepSize;
-	float currStep	= 1.0 + division;
+	float currStep	= 1.0 + division + 0.25 * stepSize;
 
 
 	float cosh, falloff, dist, invdist;
@@ -192,32 +208,33 @@ float ComputeHBAO(vec3 vpos, vec3 vnorm, vec3 vdir)
 	ao = (1.0 - ao);
 
 
-	vnorm.x *= -1;
-
-	horizons = acos(horizons);
-
-	// calculate gamma
-	vec3 bitangent	= normalize(cross(normalize(vdir), normalize(dir)));
-	vec3 tangent	= normalize(cross(bitangent, vdir));
-	vec3 nx			= vnorm - bitangent * dot(vnorm, bitangent);
-
-	float nnx		= length(nx);
-	float invnnx	= 1.0 / (nnx + 1e-6);			// to avoid division with zero
-	float cosxi		= dot(nx, tangent) * invnnx;	// xi = gamma + HALF_PI
-	float gamma		= acos(cosxi) - HALF_PI;
-	float cosgamma	= dot(nx, vdir) * invnnx;
-	float singamma2	= -2.0 * cosxi;					// cos(x + HALF_PI) = -sin(x)
-
-	// clamp to normal hemisphere
-	horizons.y = gamma + max(-horizons.y - gamma, -HALF_PI);
-	horizons.x = gamma + min( horizons.x - gamma,  HALF_PI);
-
-	// Riemann integral is additive
-	ao += nnx * 0.25 * (
-		(horizons.y * singamma2 + cosgamma - cos(2.0 * horizons.y - gamma)) +
-		(horizons.x * singamma2 + cosgamma - cos(2.0 * horizons.x - gamma)));
-
-	ao /= 2.0;
+	//vnorm.x *= -1;
+	//
+	//horizons.x = acosFast(clamp(horizons.x, -1.0, 1.0));
+    //horizons.y = acosFast(clamp(horizons.y, -1.0, 1.0));
+	//
+	//// calculate gamma
+	//vec3 bitangent	= normalize(cross(normalize(vdir), normalize(dir)));
+	//vec3 tangent	= normalize(cross(bitangent, vdir));
+	//vec3 nx			= vnorm - bitangent * dot(vnorm, bitangent);
+	//
+	//float nnx		= length(nx);
+	//float invnnx	= 1.0 / (nnx + 1e-6);			// to avoid division with zero
+	//float cosxi		= dot(nx, tangent) * invnnx;	// xi = gamma + HALF_PI
+	//float gamma		= acosFast(cosxi) - HALF_PI;
+	//float cosgamma	= dot(nx, vdir) * invnnx;
+	//float singamma2	= -2.0 * cosxi;					// cos(x + HALF_PI) = -sin(x)
+	//
+	//// clamp to normal hemisphere
+	//horizons.y = gamma + max(-horizons.y - gamma, -HALF_PI);
+	//horizons.x = gamma + min( horizons.x - gamma,  HALF_PI);
+	//
+	//// Riemann integral is additive
+	//ao += nnx * 0.25 * (
+	//	(horizons.y * singamma2 + cosgamma - cos(2.0 * horizons.y - gamma)) +
+	//	(horizons.x * singamma2 + cosgamma - cos(2.0 * horizons.x - gamma)));
+	//
+	//ao /= 2.0;
 
 	return ao;
 }
@@ -345,8 +362,8 @@ void main()
 	ivec2 imgSize = imageSize(o_AOTexture).xy;
 	vec2 s_UV = (vec2(loc) + 0.5.xx) / vec2(imgSize);
 	//vec4 vpos = GetViewPosition(loc, 0.0);
-	//vec4 vpos = texture(u_ViewPositionTex, s_UV);
-	vec4 vpos = texelFetch(u_ViewPositionTex, ivec2(gl_GlobalInvocationID.xy), 0);
+	vec4 vpos = texture(u_ViewPositionTex, s_UV);
+	//vec4 vpos = texelFetch(u_ViewPositionTex, ivec2(gl_GlobalInvocationID.xy), 0);
 	
 	//if (vpos.w == 1.0) {
 	//	imageStore(o_AOTexture, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(1.0f), 1.0f));

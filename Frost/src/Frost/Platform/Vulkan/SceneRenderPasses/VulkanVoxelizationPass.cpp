@@ -238,9 +238,12 @@ namespace Frost
 			VulkanRenderer::EndTimeStampPass("Voxel Filter Pass");
 		}
 
-		VulkanRenderer::BeginTimeStampPass("Voxel Cone Tracing Pass");
-		VoxelConeTracingUpdate(renderQueue);
-		VulkanRenderer::EndTimeStampPass("Voxel Cone Tracing Pass");
+		if (rendererSettings.VoxelGI.EnableGlobalIllumination)
+		{
+			VulkanRenderer::BeginTimeStampPass("Voxel Cone Tracing Pass");
+			VoxelConeTracingUpdate(renderQueue);
+			VulkanRenderer::EndTimeStampPass("Voxel Cone Tracing Pass");
+		}
 	}
 
 	void VulkanVoxelizationPass::VoxelConeTracingInit(uint32_t width, uint32_t height)
@@ -281,11 +284,13 @@ namespace Frost
 
 			auto descriptor = m_Data->VoxelConeTracingDescriptor[i].As<VulkanMaterial>();
 
-			auto positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
-			auto normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
+			//auto positionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
+			auto depthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(i);
+			auto normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
 
 			descriptor->Set("u_VoxelTexture", m_Data->VoxelizationTexture[i]);
-			descriptor->Set("u_PositionTexture", positionTexture);
+			//descriptor->Set("u_PositionTexture", positionTexture);
+			descriptor->Set("u_DepthTexture", depthTexture);
 			descriptor->Set("u_NormalTexture", normalTexture);
 			descriptor->Set("u_IndirectDiffuseTexture", m_Data->VCT_IndirectDiffuseTexture[i]);
 			descriptor->Set("u_IndirectSpecularTexture", m_Data->VCT_IndirectSpecularTexture[i]);
@@ -990,6 +995,7 @@ namespace Frost
 		m_VCTPushConstant.CameraPosition = renderQueue.CameraPosition;
 		m_VCTPushConstant.VoxelSampleOffset = m_Data->VoxelCameraPosition;
 		m_VCTPushConstant.VoxelGrid = glm::round(m_Data->m_VoxelGrid * rendererSettings.VoxelGI.VoxelSize);
+		m_VCTPushConstant.InvViewProjMatrix = glm::inverse(renderQueue.m_Camera->GetViewProjectionVK());
 
 		vulkanDescriptor->Bind(cmdBuf, m_Data->VoxelConeTracingPipeline);
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_VCTPushConstant);
@@ -1012,6 +1018,7 @@ namespace Frost
 		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 		if (ImGui::CollapsingHeader("Voxelization Pass (Experimental)"))
 		{
+			ImGui::SliderInt("Enable Global Illumination", &rendererSettings.VoxelGI.EnableGlobalIllumination, 0, 1);
 			ImGui::SliderInt("Enable Voxelization", &rendererSettings.VoxelGI.EnableVoxelization, 0, 1);
 			ImGui::Separator();
 			ImGui::SliderInt("Atomic Operation (bool)", &m_VoxelizationPushConstant.AtomicOperation, 0, 1);

@@ -23,6 +23,7 @@ namespace Frost
 	static RendererConfig s_RendererConfig = Renderer::GetRendererConfig();
 
 	VulkanSwapChain::VulkanSwapChain(GLFWwindow* window)
+		: m_VSync(true)
 	{
 		VkInstance instance = VulkanContext::GetInstance();
 		Utils::CreateSurface(instance, window, m_Surface);
@@ -80,12 +81,12 @@ namespace Frost
 		VkSurfaceFormatKHR pickedFormat = availableFormats[0]; // Default one is `availableFormats[0]`
 		for (const auto& availableFormat : availableFormats)
 		{
-			if (availableFormat.format == VK_FORMAT_R8G8B8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+			//if (availableFormat.format == VK_FORMAT_R8G8B8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+			if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 			{
 				pickedFormat = availableFormat;
 			}
 		}
-
 
 		// Getting all swapchain presentModes
 		uint32_t availablePresentModeCount = 0;

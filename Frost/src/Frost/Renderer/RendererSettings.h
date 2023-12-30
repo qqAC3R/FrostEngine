@@ -23,6 +23,7 @@ namespace Frost
 			float CascadesFadeFactor;
 			int32_t m_ShowCascadesDebug;
 			int32_t UsePCSS;
+			int32_t CascadeCount;
 		} ShadowPass;
 
 		struct BloomSettings
@@ -44,10 +45,12 @@ namespace Frost
 			int32_t UseConeTracing;
 			int32_t RayStepCount;
 			float RayStepSize;
+			int32_t UseHizTracing;
 		} SSR;
 
 		struct VoxelGISettings
 		{
+			int32_t EnableGlobalIllumination;
 			int32_t EnableVoxelization;
 
 			float VoxelSize;

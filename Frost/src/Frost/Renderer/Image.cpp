@@ -18,7 +18,7 @@ namespace Frost
 		return nullptr;
 	}
 
-	Ref<Image2D> Image2D::Create(const ImageSpecification& specification, const void* data)
+	Ref<Image2D> Image2D::Create(const ImageSpecification& specification, const Buffer& data)
 	{
 		switch (Renderer::GetAPI())
 		{

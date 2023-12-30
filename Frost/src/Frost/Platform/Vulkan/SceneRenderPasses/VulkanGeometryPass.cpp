@@ -21,6 +21,9 @@
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanPostFXPass.h"
 
 #include "Frost/Asset/AssetManager.h"
+#include "Frost/Math/Math.h"
+
+#include <imgui.h>
 
 namespace Frost
 {
@@ -38,14 +41,15 @@ namespace Frost
 
 	void VulkanGeometryPass::Init(SceneRenderPassPipeline* renderPassPipeline)
 	{
-		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
+		uint64_t MaxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 		m_RenderPassPipeline = renderPassPipeline;
 		m_Data = new InternalData();
 
 		m_Data->GeometryShader = Renderer::GetShaderLibrary()->Get("GeometryPassIndirectInstancedBindless");
-		m_Data->LateCullShader = Renderer::GetShaderLibrary()->Get("OcclusionCulling_V2");
+		m_Data->LateCullShader = Renderer::GetShaderLibrary()->Get("OcclusionCulling_V3");
 
 
 		GeometryDataInit(1600, 900);
@@ -53,8 +57,17 @@ namespace Frost
 		Renderer::SubmitImageToOutputImageMap("Albedo", [this]() -> Ref<Image2D>
 		{
 			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-			return this->m_Data->GeometryRenderPass->GetColorAttachment(2, currentFrameIndex);
+			return this->m_Data->GeometryRenderPass->GetColorAttachment(1, currentFrameIndex);
 		});
+
+		m_Data->OcclusionQueryPools.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			VkQueryPoolCreateInfo queryPoolInfo { VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
+			queryPoolInfo.queryType = VK_QUERY_TYPE_OCCLUSION;
+			queryPoolInfo.queryCount = MaxCountMeshes;
+			vkCreateQueryPool(device, &queryPoolInfo, NULL, &m_Data->OcclusionQueryPools[i]);
+		}
 	}
 
 
@@ -66,7 +79,7 @@ namespace Frost
 	/// Geometry pass initialization
 	void VulkanGeometryPass::GeometryDataInit(uint32_t width, uint32_t height)
 	{
-		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
+		uint64_t MaxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 
 
@@ -74,37 +87,37 @@ namespace Frost
 		{
 			width, height, framesInFlight,
 			{
-				// Position Attachment // Attachment 0
+				// Normals Attachment // Attachment 0
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
-				// Normals Attachment // Attachment 1
+				// Albedo Attachment // Attachment 1
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
-				// Albedo Attachment // Attachment 2
+				// View-space Position Attachment // Attachment 2
 				{
 					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
 
-				// View-space Position Attachment // Attachment 3
-				{
-					FramebufferTextureFormat::RGBA16F, ImageUsage::Storage,
-					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
-					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
-				},
-
-				// Id Entity Attachment // Attachment 4
+				// Id Entity Attachment // Attachment 3
 				{
 					FramebufferTextureFormat::R32I, ImageUsage::Storage,
+					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
+					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
+				},
+
+				// Velocity Attachment // Attachment 4
+				{
+					FramebufferTextureFormat::RG16F, ImageUsage::Storage,
 					OperationLoad::Clear,    OperationStore::Store,    // Color attachment
 					OperationLoad::DontCare, OperationStore::DontCare, // Depth attachment
 				},
@@ -118,14 +131,20 @@ namespace Frost
 			}
 		};
 		m_Data->GeometryRenderPass = RenderPass::Create(s_RenderPassSpec);
+		//m_Data->GeometryRenderPass->GetColorAttachment(0, )
 
 		// Pipeline creations
 		BufferLayout bufferLayout = {
 			{ "a_ModelSpaceMatrix",           ShaderDataType::Mat4   },
 			{ "a_WorldSpaceMatrix",           ShaderDataType::Mat4   },
+			{ "a_PreviousWorldSpaceMatrix",   ShaderDataType::Mat4   },
+			{ "a_BoneInformationBDA",         ShaderDataType::UInt64 },
 			{ "a_MaterialIndexGlobalOffset",  ShaderDataType::UInt   },
-			{ "a_EntityID",                   ShaderDataType::UInt   },
-			{ "a_BoneInformationBDA",         ShaderDataType::UInt64 }
+			{ "a_EntityID",                   ShaderDataType::UInt   }
+			//{ "IsMeshVisible",                ShaderDataType::UInt   },
+			//{ "a_Padding0",                   ShaderDataType::UInt   },
+			//{ "a_Padding1",                   ShaderDataType::UInt   },
+			//{ "a_Padding2",                   ShaderDataType::UInt   },
 		};
 		bufferLayout.m_InputType = InputType::Instanced;
 
@@ -156,9 +175,9 @@ namespace Frost
 			for (auto& indirectCmdBuffer : m_Data->IndirectCmdBuffer)
 			{
 				// Allocating a heap block
-				indirectCmdBuffer.DeviceBuffer = BufferDevice::Create(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes, { BufferUsage::Storage, BufferUsage::Indirect });
+				indirectCmdBuffer.DeviceBuffer = BufferDevice::Create(sizeof(VkDrawIndexedIndirectCommand) * MaxCountMeshes, { BufferUsage::Storage, BufferUsage::Indirect });
 
-				indirectCmdBuffer.HostBuffer.Allocate(sizeof(VkDrawIndexedIndirectCommand) * maxCountMeshes);
+				indirectCmdBuffer.HostBuffer.Allocate(sizeof(VkDrawIndexedIndirectCommand) * MaxCountMeshes);
 			}
 
 			/// Instance data storage buffer
@@ -168,8 +187,8 @@ namespace Frost
 				auto& instanceSpec = m_Data->MaterialSpecs[i];
 
 				// Allocating a heap block
-				instanceSpec.DeviceBuffer = BufferDevice::Create(sizeof(MaterialData) * maxCountMeshes, { BufferUsage::Storage });
-				instanceSpec.HostBuffer.Allocate(sizeof(MaterialData) * maxCountMeshes);
+				instanceSpec.DeviceBuffer = BufferDevice::Create(sizeof(MaterialData) * MaxCountMeshes, { BufferUsage::Storage });
+				instanceSpec.HostBuffer.Allocate(sizeof(MaterialData) * MaxCountMeshes);
 
 				// Setting the storage buffer into the descriptor
 				m_Data->GeometryDescriptor[i]->Set("u_MaterialUniform", instanceSpec.DeviceBuffer);
@@ -182,8 +201,8 @@ namespace Frost
 				auto& instancdVertexBuffer = m_Data->GlobalInstancedVertexBuffer[i];
 
 				// Allocating a heap block
-				instancdVertexBuffer.DeviceBuffer = BufferDevice::Create(sizeof(MeshInstancedVertexBuffer) * maxCountMeshes, { BufferUsage::Vertex });
-				instancdVertexBuffer.HostBuffer.Allocate(sizeof(MeshInstancedVertexBuffer) * maxCountMeshes);
+				instancdVertexBuffer.DeviceBuffer = BufferDevice::Create(sizeof(MeshInstancedVertexBuffer) * MaxCountMeshes, { BufferUsage::Vertex, BufferUsage::Storage });
+				instancdVertexBuffer.HostBuffer.Allocate(sizeof(MeshInstancedVertexBuffer) * MaxCountMeshes);
 			}
 		}
 
@@ -191,12 +210,13 @@ namespace Frost
 
 	void VulkanGeometryPass::OcclusionCullDataInit(uint32_t width, uint32_t height)
 	{
-		uint64_t maxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
+		uint64_t MaxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 
-		m_Data->ComputeShaderPushConstant.DepthPyramidSize.x = width;
-		m_Data->ComputeShaderPushConstant.DepthPyramidSize.y = height;
+		//m_Data->ComputeShaderPushConstant.DepthPyramidSize.x = width;
+		//m_Data->ComputeShaderPushConstant.DepthPyramidSize.y = height;
 
 		//////////////////////////////////////////////
 		// LATE CULLING //////////////////////////////
@@ -208,33 +228,55 @@ namespace Frost
 				computePipelineCreateInfo.Shader = m_Data->LateCullShader;
 				m_Data->LateCullPipeline = ComputePipeline::Create(computePipelineCreateInfo);
 
-				m_Data->DebugDeviceBuffer = BufferDevice::Create(sizeof(glm::mat4) * 1024, { BufferUsage::Storage });
+				//m_Data->DebugDeviceBuffer = BufferDevice::Create(sizeof(glm::mat4) * 1024, { BufferUsage::Storage });
 
-				m_Data->MeshSpecs.DeviceBuffer = BufferDevice::Create(sizeof(MeshData_OC) * maxCountMeshes, { BufferUsage::Storage });
-				m_Data->MeshSpecs.HostBuffer.Allocate(sizeof(MeshData_OC) * maxCountMeshes);
+				m_Data->MeshSpecs.resize(framesInFlight);
+				for (uint32_t i = 0; i < framesInFlight; i++)
+				{
+					m_Data->MeshSpecs[i].DeviceBuffer = BufferDevice::Create(sizeof(MeshData_OC) * MaxCountMeshes, { BufferUsage::Storage });
+					m_Data->MeshSpecs[i].HostBuffer.Allocate(sizeof(MeshData_OC) * MaxCountMeshes);
+				}
 			}
 
 			m_Data->LateCullDescriptor.resize(framesInFlight);
 			for (uint32_t i = 0; i < m_Data->LateCullDescriptor.size(); i++)
 			{
 				auto& computeDescriptor = m_Data->LateCullDescriptor[i];
+				if (!computeDescriptor)
+					computeDescriptor = Material::Create(m_Data->LateCullShader, "OcclusionCulling");
+
+				auto& computeVulkanDescriptor = m_Data->LateCullDescriptor[i].As<VulkanMaterial>();
+				VkDescriptorSet descriptorSet = computeVulkanDescriptor->GetVulkanDescriptorSet(0);
 
 				int32_t previousFrameIndex = (int32_t)i - 1;
 				if (previousFrameIndex < 0)
 					previousFrameIndex = Renderer::GetRendererConfig().FramesInFlight - 1;
 
+
+				computeDescriptor->Set("InstancedVertexBuffer", m_Data->GlobalInstancedVertexBuffer[i].DeviceBuffer);
+				computeDescriptor->Set("MeshSpecs", m_Data->MeshSpecs[i].DeviceBuffer);
+
 				auto lastFrameDepthPyramid = m_RenderPassPipeline->GetRenderPassData<VulkanPostFXPass>()->DepthPyramid[previousFrameIndex];
+				Ref<VulkanImage2D> vulkanLastDepthPyramid = lastFrameDepthPyramid.As<VulkanImage2D>();
 
-				if(!computeDescriptor)
-					computeDescriptor = Material::Create(m_Data->LateCullShader, "OcclusionCulling");
+				VkSampler lastFrameDepthPyramidSampler = m_RenderPassPipeline->GetRenderPassData<VulkanPostFXPass>()->HZBNearestSampler[previousFrameIndex];
 
-				computeDescriptor->Set("DepthPyramid", lastFrameDepthPyramid);
-				computeDescriptor->Set("MeshSpecs", m_Data->MeshSpecs.DeviceBuffer);
-				computeDescriptor->Set("DrawCommands", m_Data->IndirectCmdBuffer[i].DeviceBuffer);
-				computeDescriptor->Set("DebugBuffer", m_Data->DebugDeviceBuffer);
+				// HZB with custum linear sampler (exclusive for SSR)
+				VkDescriptorImageInfo imageDescriptorInfo{};
+				imageDescriptorInfo.imageView = vulkanLastDepthPyramid->GetVulkanImageView();
+				imageDescriptorInfo.imageLayout = vulkanLastDepthPyramid->GetVulkanImageLayout();
+				imageDescriptorInfo.sampler = lastFrameDepthPyramidSampler;
 
+				VkWriteDescriptorSet writeDescriptorSet{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				writeDescriptorSet.dstBinding = 2; // layout(binding = 2) uniform sampler2D u_DepthPyramid;
+				writeDescriptorSet.dstArrayElement = 0;
+				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				writeDescriptorSet.pImageInfo = &imageDescriptorInfo;
+				writeDescriptorSet.descriptorCount = 1;
+				writeDescriptorSet.dstSet = descriptorSet;
 
-				auto& computeVulkanDescriptor = m_Data->LateCullDescriptor[i].As<VulkanMaterial>();
+				vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, 0);
+
 				computeVulkanDescriptor->UpdateVulkanDescriptorIfNeeded();
 			}
 		}
@@ -247,6 +289,8 @@ namespace Frost
 		if (renderQueue.GetQueueSize() == 0) return;
 
 
+		//GetOcclusionQueryResults();
+
 		VulkanRenderer::BeginTimeStampPass("Geometry Pass");
 		//GeometryPrepareIndirectData(renderQueue);
 		GeometryPrepareIndirectDataWithInstacing(renderQueue);
@@ -255,6 +299,10 @@ namespace Frost
 	}
 
 
+	bool Within(float min, float value, float max)
+	{
+		return value >= min && value <= max;
+	}
 
 	struct MeshInstanceListGeometryPass // This is reponsible for grouping all the mesh instances into one array
 	{
@@ -268,6 +316,215 @@ namespace Frost
 	// Declaring it here to not allocate a new hashmap every frame
 	static HashMap<AssetHandle, Vector<MeshInstanceListGeometryPass>> s_GroupedMeshesCached;
 	static Vector<NewIndirectMeshData> s_GeometryMeshIndirectData; // Made a static variable, to not allocate new data everyframe
+	static glm::mat4 s_PreviousViewProjectioMatrix = glm::mat4(1.0f);
+	static glm::mat4 s_CurrentViewProjectioMatrix = glm::mat4(1.0f);
+	static uint64_t s_TotalSubmeshSubmitted = 0;
+#if 0
+	void VulkanGeometryPass::ObjectCullingPrepareData(const RenderQueue& renderQueue)
+	{
+		for (auto& [handle, groupedMeshes] : s_GroupedMeshesCached)
+		{
+			Ref<MeshAsset> meshAsset = groupedMeshes[0].Mesh->GetMeshAsset();
+			const Vector<Submesh>& submeshes = meshAsset->GetSubMeshes();
+
+			// Set up the instanced vertex buffer (per submesh, per instance)
+			for (uint32_t submeshIndex = 0; submeshIndex < submeshes.size(); submeshIndex++)
+			{
+				MeshInstancedVertexBuffer meshInstancedVertexBuffer{};
+				uint32_t meshInstanceNr = 0;
+				for (auto& meshInstance : groupedMeshes)
+				{
+					glm::mat4 modelMatrix = meshInstance.Transform * meshInstance.Mesh->GetSkeletalSubmeshes()[submeshIndex].Transform;
+
+					// TEMP!!!!
+					const Submesh& submesh = meshInstance.Mesh->GetMeshAsset()->GetSubMeshes()[submeshIndex];
+
+					if (!mFreezeCameraFrustum)
+						m_LastViewProjMatrix = s_CurrentViewProjectioMatrix;
+
+					glm::mat4 worldSpaceMatrix = m_LastViewProjMatrix * modelMatrix;
+
+					glm::vec3 scaleFactor = glm::vec3(
+						submesh.BoundingBox.Max.x - submesh.BoundingBox.Min.x,
+						submesh.BoundingBox.Max.y - submesh.BoundingBox.Min.y,
+						submesh.BoundingBox.Max.z - submesh.BoundingBox.Min.z
+					);
+
+
+
+					// Use our Min Max to define eight corners
+					glm::vec4 corners[8] = {
+						{submesh.BoundingBox.Min.x, submesh.BoundingBox.Min.y, submesh.BoundingBox.Min.z, 1.0}, // x y z
+						{submesh.BoundingBox.Max.x, submesh.BoundingBox.Min.y, submesh.BoundingBox.Min.z, 1.0}, // X y z
+						{submesh.BoundingBox.Min.x, submesh.BoundingBox.Max.y, submesh.BoundingBox.Min.z, 1.0}, // x Y z
+						{submesh.BoundingBox.Max.x, submesh.BoundingBox.Max.y, submesh.BoundingBox.Min.z, 1.0}, // X Y z
+
+						{submesh.BoundingBox.Min.x, submesh.BoundingBox.Min.y, submesh.BoundingBox.Max.z, 1.0}, // x y Z
+						{submesh.BoundingBox.Max.x, submesh.BoundingBox.Min.y, submesh.BoundingBox.Max.z, 1.0}, // X y Z
+						{submesh.BoundingBox.Min.x, submesh.BoundingBox.Max.y, submesh.BoundingBox.Max.z, 1.0}, // x Y Z
+						{submesh.BoundingBox.Max.x, submesh.BoundingBox.Max.y, submesh.BoundingBox.Max.z, 1.0}, // X Y Z
+					};
+
+					bool inside = false;
+
+					for (size_t corner_idx = 0; corner_idx < 8; corner_idx++) {
+						// Transform vertex
+						glm::vec4 corner = worldSpaceMatrix * corners[corner_idx];
+						// Check vertex against clip space bounds
+						inside = inside ||
+							Within(-corner.w, corner.x, corner.w) &&
+							Within(-corner.w, corner.y, corner.w) &&
+							Within(0.0f, corner.z, corner.w);
+					}
+					//currentIndirectMeshData->SubMeshIndexCulled.push_back(inside);
+
+				}
+			}
+		}
+	}
+#endif
+
+
+	struct Plane
+	{
+		glm::vec3 Normal = { 0.0f, 1.0f, 0.0f };// unit vector
+		float Distance = 0.0f;// distance from origin to the nearest point in the plane
+
+		Plane() = default;
+
+		Plane(const glm::vec3& distance, const glm::vec3& normal)
+			: Normal(glm::normalize(normal)), Distance(glm::dot(Normal, distance))
+		{}
+
+		float GetSignedDistanceToPlane(const glm::vec3& point) const
+		{
+			return glm::dot(Normal, point) - Distance;
+		}
+	};
+
+	struct Frustum
+	{
+		Plane TopFace;
+		Plane BottomFace;
+
+		Plane RightFace;
+		Plane LeftFace;
+
+		Plane FarFace;
+		Plane NearFace;
+	};
+
+	struct AABB
+	{
+		glm::vec3 Center{ 0.0f, 0.0f, 0.0f };
+		glm::vec3 Extents{ 0.0f, 0.0f, 0.0f };
+
+		AABB(const glm::vec3& min, const glm::vec3& max)
+			: Center{ (max + min) * 0.5f },
+			Extents{ max.x - Center.x, max.y - Center.y, max.z - Center.z }
+		{}
+
+		AABB(const glm::vec3& inCenter, float iI, float iJ, float iK)
+			: Center{ inCenter }, Extents{ iI, iJ, iK }
+		{}
+
+		//see https://gdbooks.gitbooks.io/3dcollisions/content/Chapter2/static_aabb_plane.html
+		bool IsOnOrForwardPlane(const Plane& plane)
+		{
+			// Compute the projection interval radius of b onto L(t) = b.c + t * p.n
+			const float r = Extents.x * std::abs(plane.Normal.x) +
+				            Extents.y * std::abs(plane.Normal.y) +
+				            Extents.z * std::abs(plane.Normal.z);
+
+			return -r <= plane.GetSignedDistanceToPlane(Center);
+		}
+
+		bool IsOnFrustum(const Frustum& camFrustum, const glm::mat4& modelMatrix)
+		{
+			//Get global scale thanks to our transform
+			const glm::vec3 globalCenter{ modelMatrix * glm::vec4(Center, 1.0f) };
+			
+			glm::vec3 translation, rotation, scale;
+			Math::DecomposeTransform(modelMatrix, translation, rotation, scale);
+
+			glm::vec3 upVector = glm::quat(rotation) * glm::vec3(0.0f, 1.0f, 0.0f);
+			glm::vec3 rightVector = glm::quat(rotation) * glm::vec3(1.0f, 0.0f, 0.0f);
+			glm::vec3 frontVector = glm::quat(rotation) * glm::vec3(0.0f, 0.0f, -1.0f);
+
+			// Scaled orientation
+			const glm::vec3 right = rightVector * Extents.x * scale;
+			const glm::vec3 up = upVector * Extents.y * scale;
+			const glm::vec3 forward = frontVector * Extents.z * scale;
+
+			//const glm::vec3 right = modelMatrix[0];
+			//const glm::vec3 up = modelMatrix[1];
+			//const glm::vec3 forward = -modelMatrix[2];
+
+			const float newIi = std::abs(glm::dot(glm::vec3{ 1.0f, 0.0f, 0.0f }, right)) +
+				                std::abs(glm::dot(glm::vec3{ 1.0f, 0.0f, 0.0f }, up)) +
+				                std::abs(glm::dot(glm::vec3{ 1.0f, 0.0f, 0.0f }, forward));
+
+			const float newIj = std::abs(glm::dot(glm::vec3{ 0.0f, 1.0f, 0.0f }, right)) +
+				                std::abs(glm::dot(glm::vec3{ 0.0f, 1.0f, 0.0f }, up)) +
+				                std::abs(glm::dot(glm::vec3{ 0.0f, 1.0f, 0.0f }, forward));
+
+			const float newIk = std::abs(glm::dot(glm::vec3{ 0.0f, 0.0f, 1.0f }, right)) +
+				                std::abs(glm::dot(glm::vec3{ 0.0f, 0.0f, 1.0f }, up)) +
+				                std::abs(glm::dot(glm::vec3{ 0.0f, 0.0f, 1.0f }, forward));
+
+			AABB globalAABB(globalCenter, newIi, newIj, newIk);
+
+			return (globalAABB.IsOnOrForwardPlane(camFrustum.LeftFace) &&
+				    globalAABB.IsOnOrForwardPlane(camFrustum.RightFace) &&
+				    globalAABB.IsOnOrForwardPlane(camFrustum.TopFace) &&
+				    globalAABB.IsOnOrForwardPlane(camFrustum.BottomFace) &&
+				    globalAABB.IsOnOrForwardPlane(camFrustum.NearFace) &&
+				    globalAABB.IsOnOrForwardPlane(camFrustum.FarFace));
+		};
+	};
+	
+	static Frustum CreateFrustum(const RenderQueue& renderQueue)
+	{
+		Ref<EditorCamera> sceneCamera = renderQueue.m_Camera.As<EditorCamera>();
+
+		float screenAspectRatio = (float)renderQueue.ViewPortWidth / (float)renderQueue.ViewPortHeight;
+		glm::vec3 frontVector = sceneCamera->GetForwardDirection();
+		glm::vec3 rightVector = glm::normalize(glm::cross(frontVector, glm::vec3(0.0f, 1.0f, 0.0f)));
+		glm::vec3 upVector = glm::normalize(glm::cross(rightVector, frontVector));
+		//glm::vec3 rightVector = sceneCamera->GetRightDirection();
+		//glm::vec3 upVector = sceneCamera->GetUpDirection();
+		glm::vec3 cameraPosition = sceneCamera->GetPosition();
+
+		//glm::vec3 CamRight = glm::normalize(glm::cross(mCameraFront, glm::vec3(0.0f, 1.0f, 0.0f)));
+		//glm::vec3 CamUp = glm::normalize(glm::cross(CamRight, mCameraFront));
+
+		Frustum frustum;
+		const float halfHeightSide = sceneCamera->GetFarClip() * tanf(glm::radians(sceneCamera->GetCameraFOV() * 0.5f));
+		const float halfWidthSide = halfHeightSide * screenAspectRatio;
+		const glm::vec3 farPlaneDirection = sceneCamera->GetFarClip() * frontVector;
+
+		frustum.NearFace = { cameraPosition + sceneCamera->GetNearClip() * frontVector, frontVector };
+		frustum.FarFace = { cameraPosition + farPlaneDirection, -frontVector };
+		
+		frustum.RightFace = { cameraPosition, glm::cross(farPlaneDirection - rightVector * halfWidthSide, upVector) };
+		frustum.LeftFace = { cameraPosition,  glm::cross(upVector, farPlaneDirection + rightVector * halfWidthSide) };
+
+		frustum.TopFace = { cameraPosition,      glm::cross(rightVector, farPlaneDirection - upVector * halfHeightSide) };
+		frustum.BottomFace = { cameraPosition,   glm::cross(farPlaneDirection + upVector * halfHeightSide, rightVector) };
+
+		return frustum;
+	}
+
+	static bool ComputeFrustumCulling(const RenderQueue& renderQueue, const glm::mat4& modelMatrix, const Math::BoundingBox& boundingBox)
+	{
+		Frustum cameraFrustum = CreateFrustum(renderQueue);
+
+		glm::vec3 translation, rotation, scale;
+		Math::DecomposeTransform(modelMatrix, translation, rotation, scale);
+
+		AABB meshAABB(boundingBox.Min, boundingBox.Max);
+		return meshAABB.IsOnFrustum(cameraFrustum, modelMatrix);
+	}
 
 	void VulkanGeometryPass::GeometryPrepareIndirectDataWithInstacing(const RenderQueue& renderQueue)
 	{
@@ -275,10 +532,13 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 
+		MeshData_OC meshdataForOcclusionCulling{};
+
 		// Get the needed matricies from the camera
-		glm::mat4 projectionMatrix = renderQueue.CameraProjectionMatrix;
-		projectionMatrix[1][1] *= -1; // GLM uses opengl style of rendering, where the y coordonate is inverted
-		glm::mat4 viewProjectionMatrix = projectionMatrix * renderQueue.CameraViewMatrix;
+		//glm::mat4 projectionMatrix = renderQueue.CameraProjectionMatrix;
+		//projectionMatrix[1][1] *= -1; // GLM uses opengl style of rendering, where the y coordonate is inverted
+		s_PreviousViewProjectioMatrix = s_CurrentViewProjectioMatrix;
+		s_CurrentViewProjectioMatrix = renderQueue.m_Camera->GetViewProjectionVK();
 
 		/*
 			Each mesh might have a set of submeshes which are sent to render individualy.
@@ -288,6 +548,7 @@ namespace Frost
 		*/
 		s_GeometryMeshIndirectData.clear();
 		s_GroupedMeshesCached.clear();
+		s_TotalSubmeshSubmitted = 0;
 
 		// Allocate all the neccesary array buffers before, so we won't waste cpus cycles on reallocating memory
 		for (auto& [meshAssetUUID, instanceCount] : renderQueue.m_MeshInstanceCount)
@@ -304,6 +565,9 @@ namespace Frost
 
 			s_GroupedMeshesCached[mesh->GetMeshAsset()->Handle].push_back({ mesh.Raw(), renderQueue.m_Data[i].Transform, i, renderQueue.m_Data[i].EntityID});
 		}
+
+		//ObjectCullingPrepareData(renderQueue);
+
 
 		// `Indirect draw commands` offset
 		uint64_t indirectCmdsOffset = 0;
@@ -374,7 +638,8 @@ namespace Frost
 
 					// Adding the neccesary Matricies for the shader
 					meshInstancedVertexBuffer.ModelSpaceMatrix = modelMatrix;
-					meshInstancedVertexBuffer.WorldSpaceMatrix = viewProjectionMatrix * modelMatrix;
+					meshInstancedVertexBuffer.WorldSpaceMatrix = s_CurrentViewProjectioMatrix * modelMatrix;
+					meshInstancedVertexBuffer.PreviousWorldSpaceMatrix = s_PreviousViewProjectioMatrix * modelMatrix;
 					/////////////////////////////////////////////////////
 					
 					// Doing `MaterialOffset` because we are indicating it to the whole material buffer (so the index should be global)
@@ -390,10 +655,116 @@ namespace Frost
 						meshInstancedVertexBuffer.BoneInformationBDA = 0;
 					/////////////////////////////////////////////////////
 
+					
+
+#if 1
+					// TEMP!!!!
+					const Submesh& submesh = meshInstance.Mesh->GetMeshAsset()->GetSubMeshes()[submeshIndex];
+					
+					
+
+#if 0
+					// Use our Min Max to define eight corners
+					glm::vec4 corners[8] = {
+						{submesh.BoundingBox.Min.x, submesh.BoundingBox.Min.y, submesh.BoundingBox.Min.z, 1.0},
+						{submesh.BoundingBox.Max.x, submesh.BoundingBox.Min.y, submesh.BoundingBox.Min.z, 1.0},
+						{submesh.BoundingBox.Min.x, submesh.BoundingBox.Max.y, submesh.BoundingBox.Min.z, 1.0},
+						{submesh.BoundingBox.Max.x, submesh.BoundingBox.Max.y, submesh.BoundingBox.Min.z, 1.0},
+
+						{submesh.BoundingBox.Min.x, submesh.BoundingBox.Min.y, submesh.BoundingBox.Max.z, 1.0},
+						{submesh.BoundingBox.Max.x, submesh.BoundingBox.Min.y, submesh.BoundingBox.Max.z, 1.0},
+						{submesh.BoundingBox.Min.x, submesh.BoundingBox.Max.y, submesh.BoundingBox.Max.z, 1.0},
+						{submesh.BoundingBox.Max.x, submesh.BoundingBox.Max.y, submesh.BoundingBox.Max.z, 1.0},
+					};
+
+					bool inside = false;
+					for (size_t cornerIndex = 0; cornerIndex < 8; cornerIndex++) {
+						// Transform vertex
+						glm::vec4 corner = worldSpaceMatrix * corners[cornerIndex];
+						// Check vertex against clip space bounds
+						inside = inside ||
+							(Within(-corner.w, corner.x, corner.w) &&
+							Within(-corner.w, corner.y, corner.w) &&
+							Within(0.0f, corner.z, corner.w));
+					}
+#endif
+					
+					bool inside = ComputeFrustumCulling(renderQueue, modelMatrix, submesh.BoundingBox);
+					meshInstancedVertexBuffer.ModelSpaceMatrix[3][3] = (float)inside;
+					//inside = 1;
+
+#if 0
+					// Transform the AABB into 2D screen space
+					glm::vec4 minScreenSpace = meshInstancedVertexBuffer.WorldSpaceMatrix * glm::vec4(submesh.BoundingBox.Min, 1.0f);
+					glm::vec4 maxScreenSpace = meshInstancedVertexBuffer.WorldSpaceMatrix * glm::vec4(submesh.BoundingBox.Max, 1.0f);
+					minScreenSpace /= minScreenSpace.w;
+					maxScreenSpace /= maxScreenSpace.w;
+
+					glm::vec4 minViewPos = renderQueue.m_Camera->GetViewMatrix() * glm::vec4(submesh.BoundingBox.Min, 1.0f);
+					glm::vec4 maxViewPos = renderQueue.m_Camera->GetViewMatrix() * glm::vec4(submesh.BoundingBox.Max, 1.0f);
+
+					// clip objects behind near plane
+#if 0
+					//minScreenSpace.z *= glm::step(minViewPos.z, renderQueue.m_Camera->GetNearClip());
+					//maxScreenSpace.z *= glm::step(maxViewPos.z, renderQueue.m_Camera->GetNearClip());
+
+					//minScreenSpace.z = glm::clamp(minScreenSpace.z, 0.0f, 1.0f);
+					//maxScreenSpace.z = glm::clamp(maxScreenSpace.z, 0.0f, 1.0f);
+#endif
+
+					// Convert to pixel coordinates
+					glm::vec2 uvMin = (glm::clamp(glm::vec2(minScreenSpace), glm::vec2(-1.0), glm::vec2(1.0)) * glm::vec2(0.5) + glm::vec2(0.5));
+					glm::vec2 uvMax = (glm::clamp(glm::vec2(maxScreenSpace), glm::vec2(-1.0), glm::vec2(1.0)) * glm::vec2(0.5) + glm::vec2(0.5));
+
+					glm::vec2 screenPosMin = uvMin * glm::vec2(renderQueue.ViewPortWidth, renderQueue.ViewPortHeight);
+					glm::vec2 screenPosMax = uvMax * glm::vec2(renderQueue.ViewPortWidth, renderQueue.ViewPortHeight);
+
+#if 0
+					//if (minScreenSpace.z > 1.0 && maxScreenSpace.z > 1.0)
+					//{
+					//	screenPosMin = glm::vec2(0.0f);
+					//	screenPosMax = glm::vec2(0.0f);
+					//}
+#endif
+
+					// Calculate the number of pixels
+					glm::vec2 screenRect = glm::abs(glm::vec2(screenPosMax - screenPosMin));
+					screenRect.x = glm::clamp(screenRect.x, 0.0f, (float)renderQueue.ViewPortWidth);
+					screenRect.y = glm::clamp(screenRect.y, 0.0f, (float)renderQueue.ViewPortHeight);
+					int32_t pixels = int32_t(abs(screenRect.x) * abs(screenRect.y));
+
+					//FROST_CORE_INFO("{0}, {1}", screenRect.x, screenRect.y);
+#endif
+
+					
 					m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].HostBuffer.Write((void*)&meshInstancedVertexBuffer, sizeof(MeshInstancedVertexBuffer), instanceVertexOffset);
 					instanceVertexOffset += sizeof(MeshInstancedVertexBuffer);
 
+					// Setting up `Mesh data` for the occlusion culling compute shader
+					meshdataForOcclusionCulling.Transform = modelMatrix;
+					meshdataForOcclusionCulling.AABB_Min = glm::vec4(submesh.BoundingBox.Min, 1.0f);
+					meshdataForOcclusionCulling.AABB_Max = glm::vec4(submesh.BoundingBox.Max, 1.0f);
+					m_Data->MeshSpecs[currentFrameIndex].HostBuffer.Write(
+						(void*)&meshdataForOcclusionCulling,
+						sizeof(MeshData_OC),
+						s_TotalSubmeshSubmitted * sizeof(MeshData_OC)
+					);
+					s_TotalSubmeshSubmitted++;
 					meshInstanceNr++;
+
+					//glm::vec3 translation, rotation, scale;
+					//Math::DecomposeTransform(modelMatrix, translation, rotation, scale);
+					//
+					// 
+					//glm::vec3 scaleFactor = glm::vec3(
+					//	submesh.BoundingBox.Max.x - submesh.BoundingBox.Min.x,
+					//	submesh.BoundingBox.Max.y - submesh.BoundingBox.Min.y,
+					//	submesh.BoundingBox.Max.z - submesh.BoundingBox.Min.z
+					//);
+					// 
+					//glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation) * glm::scale(glm::mat4(1.0f), scaleFactor * scale);
+					//Renderer::SubmitWireframeMesh(MeshAsset::GetDefaultMeshes().Cube, transform, glm::vec4(0.8f, 0.5f, 0.4f, 1.0f), 2.0f);
+#endif
 				}
 			}
 
@@ -405,7 +776,16 @@ namespace Frost
 				VkDrawIndexedIndirectCommand indirectCmdBuf{};
 				indirectCmdBuf.firstIndex = submesh.BaseIndex;
 				indirectCmdBuf.indexCount = submesh.IndexCount;
-				indirectCmdBuf.vertexOffset = submesh.BaseVertex;
+#if 0
+				indirectCmdBuf.firstIndex = meshAsset->GetSubMeshesLOD(1)[submeshIndex].BaseIndex;
+				indirectCmdBuf.indexCount = meshAsset->GetSubMeshesLOD(1)[submeshIndex].IndexCount;
+#endif
+
+				// Vertexoffset:  basically adds what offset you want to the indices before they are actually rendered.
+				// TODO: Previously, each index was using its own scale, from 0 to n
+				// TODO: Now, the index buffer is global, so we do not need to add any offset to the indices
+				//indirectCmdBuf.vertexOffset = submesh.BaseVertex;
+				indirectCmdBuf.vertexOffset = 0;
 
 				indirectCmdBuf.instanceCount = groupedMeshes.size();
 
@@ -419,10 +799,29 @@ namespace Frost
 				}
 				indirectCmdBuf.firstInstance += submeshIndex;
 
+				// Frustum Cull
+				//if (!currentIndirectMeshData->SubMeshIndexCulled[submeshIndex])
+				//{
+				//	indirectCmdBuf.indexCount = 0;
+				//	indirectCmdBuf.instanceCount = 1;
+				//	indirectCmdBuf.firstIndex = 0;
+				//	indirectCmdBuf.vertexOffset = 0;
+				//	indirectCmdBuf.firstInstance = 0;
+				//}
+
 				m_Data->IndirectCmdBuffer[currentFrameIndex].HostBuffer.Write((void*)&indirectCmdBuf, sizeof(VkDrawIndexedIndirectCommand), indirectCmdsOffset);
 				indirectCmdsOffset += sizeof(VkDrawIndexedIndirectCommand);
 			}
 		}
+
+		//FROST_CORE_INFO("FINISH!!");
+
+		//VulkanRenderer::BeginTimeStampPass("Occlusion Culling");
+		OcclusionCullUpdate(renderQueue, indirectCmdsOffset);
+		//VulkanRenderer::EndTimeStampPass("Occlusion Culling");
+
+
+
 		// Sending the data into the gpu buffer
 		// Indirect draw commands
 		auto vulkanIndirectCmdBuffer = m_Data->IndirectCmdBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
@@ -438,16 +837,48 @@ namespace Frost
 		auto vulkanInstancedVertexBuffer = m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
 		void* instancedVertexBufferPointer = m_Data->GlobalInstancedVertexBuffer[currentFrameIndex].HostBuffer.Data;
 		vulkanInstancedVertexBuffer->SetData(instanceVertexOffset, instancedVertexBufferPointer);
+
+
+		auto meshSpecificationBuffer = m_Data->MeshSpecs[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+		void* meshSpecificationBufferPointer = m_Data->MeshSpecs[currentFrameIndex].HostBuffer.Data;
+		meshSpecificationBuffer->SetData(s_TotalSubmeshSubmitted * sizeof(MeshData_OC), meshSpecificationBufferPointer);
 	}
 
 	void VulkanGeometryPass::GeometryUpdateWithInstancing(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		uint64_t MaxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		Ref<Framebuffer> framebuffer = m_Data->GeometryRenderPass->GetFramebuffer(currentFrameIndex);
 		Ref<VulkanPipeline> vulkanPipeline = m_Data->GeometryPipeline.As<VulkanPipeline>();
 		auto vulkanIndirectCmdBuffer = m_Data->IndirectCmdBuffer[currentFrameIndex].DeviceBuffer.As<VulkanBufferDevice>();
+
+		// Setting up the geometry pass push constant buffer
+		m_GeometryPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
+
+		auto GetJitter = [](const uint64_t frameCount, float screenWidth, float screenHeight) {
+			auto HaltonSeq = [](int32_t prime, int32_t idx) {
+				float r = 0;
+				float f = 1;
+				while (idx > 0) {
+					f /= prime;
+					r += f * (idx % prime);
+					idx /= prime;
+				}
+				return r;
+			};
+			float u = HaltonSeq(2, (frameCount % 8) + 1) - 0.5f;
+			float v = HaltonSeq(3, (frameCount % 8) + 1) - 0.5f;
+			return glm::vec2(u, v) * glm::vec2(1.0 / screenWidth, 1. / screenHeight) * 2.f;
+		};
+		uint64_t currentFrameCount = Renderer::GetFrameCount();
+		m_GeometryPushConstant.JitterCurrent = GetJitter(currentFrameCount, renderQueue.ViewPortWidth, renderQueue.ViewPortHeight);
+		m_GeometryPushConstant.JitterPrevious = GetJitter(currentFrameCount - 1, renderQueue.ViewPortWidth, renderQueue.ViewPortHeight);
+
+
+		// Reset the occlusion query before actually performing the drawings
+		vkCmdResetQueryPool(cmdBuf, m_Data->OcclusionQueryPools[currentFrameIndex], 0, s_TotalSubmeshSubmitted);
 
 		// Bind the pipeline and renderpass
 		m_Data->GeometryRenderPass->Bind();
@@ -465,6 +896,8 @@ namespace Frost
 		scissor.extent = { framebuffer->GetSpecification().Width, framebuffer->GetSpecification().Height };
 		scissor.offset = { 0, 0 };
 		vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
+
+		
 
 
 		// TODO: This is so bad, pls fix this
@@ -495,17 +928,37 @@ namespace Frost
 			Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(assetMetadata.FilePath.string());
 
 			// Bind the index buffer
-			meshAsset->GetIndexBuffer()->Bind();
+			//meshAsset->GetIndexBuffer()->Bind(); // TODO: Also this is changed
+			meshAsset->GetSubmeshIndexBuffer()->Bind(); // TODO: Also this is changed
+			//meshAsset->GetGlobalSubmeshIndexBuffer()->Bind(); // TODO: Also this is changed
 
 			m_GeometryPushConstant.VertexBufferBDA = meshAsset->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress();
-			m_GeometryPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 			m_GeometryPushConstant.IsAnimated = static_cast<uint32_t>(meshAsset->IsAnimated());
 
 			vulkanPipeline->BindVulkanPushConstant("u_PushConstant", (void*)&m_GeometryPushConstant);
 
-			uint32_t submeshCount = indirectPerMeshData.SubmeshCount;
+#if 1
 			uint32_t offset = indirectPerMeshData.CmdOffset * sizeof(VkDrawIndexedIndirectCommand);
-			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, submeshCount, sizeof(VkDrawIndexedIndirectCommand));
+
+			vkCmdBeginQuery(cmdBuf, m_Data->OcclusionQueryPools[currentFrameIndex], indirectPerMeshData.TotalMeshOffset, 0);
+			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, indirectPerMeshData.SubmeshCount, sizeof(VkDrawIndexedIndirectCommand));
+			vkCmdEndQuery(cmdBuf, m_Data->OcclusionQueryPools[currentFrameIndex], indirectPerMeshData.TotalMeshOffset);
+
+#else
+			Vector<Submesh> submeshes = meshAsset->GetSubMeshes();
+			for (uint32_t submeshIndex = 0; submeshIndex < submeshes.size(); submeshIndex++)
+			{
+				//auto& submesh = submeshes[i];
+				uint32_t submeshCount = indirectPerMeshData.SubmeshCount;
+				uint32_t offset = indirectPerMeshData.CmdOffset * sizeof(VkDrawIndexedIndirectCommand) + (sizeof(VkDrawIndexedIndirectCommand) * submeshIndex);
+
+				//if (std::find(indirectPerMeshData.SubMeshIndexCulled.begin(), indirectPerMeshData.SubMeshIndexCulled.end(), (uint64_t)submeshIndex) != indirectPerMeshData.SubMeshIndexCulled.end())
+				if (indirectPerMeshData.SubMeshIndexCulled[submeshIndex])
+				{
+					vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, 1, sizeof(VkDrawIndexedIndirectCommand));
+				}
+			}
+#endif
 		}
 		// End the renderpass
 		m_Data->GeometryRenderPass->Unbind();
@@ -576,8 +1029,8 @@ namespace Frost
 
 				// Setting up `Mesh data` for the occlusion culling compute shader
 				meshData.Transform = modelMatrix;
-				meshData.AABB_Min = glm::vec4(submesh.BoundingBox.Min, 1.0f);
-				meshData.AABB_Max = glm::vec4(submesh.BoundingBox.Max, 1.0f);
+				meshData.submesh.BoundingBox_Min = glm::vec4(submesh.BoundingBox.Min, 1.0f);
+				meshData.submesh.BoundingBox_Max = glm::vec4(submesh.BoundingBox.Max, 1.0f);
 				m_Data->MeshSpecs.HostBuffer.Write((void*)&meshData, sizeof(MeshData_OC), meshDataOffset);
 
 				// Adding up the offset
@@ -666,8 +1119,8 @@ namespace Frost
 		VkViewport viewport{};
 		viewport.width = (float)framebuffer->GetSpecification().Width;
 		viewport.height = (float)framebuffer->GetSpecification().Height;
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
+		viewport.MinDepth = 0.0f;
+		viewport.MaxDepth = 1.0f;
 		vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
 
 		VkRect2D scissor{};
@@ -737,8 +1190,15 @@ namespace Frost
 
 	void VulkanGeometryPass::OnRenderDebug()
 	{
-
 	}
+
+	struct OcclusionCullingPushConstant
+	{
+		glm::mat4 ProjectionMatrix;
+		glm::mat4 ViewMatrix;
+		uint32_t NumberOfSubmeshes;
+		float CameraNearClip;
+	} s_PushConstant_OcclusionCulling;
 
 	void VulkanGeometryPass::OcclusionCullUpdate(const RenderQueue& renderQueue, uint64_t indirectCmdsOffset)
 	{
@@ -756,6 +1216,15 @@ namespace Frost
 			vulkanComputeDescriptor->Bind(cmdBuf, m_Data->LateCullPipeline);
 
 
+			//s_PushConstant_OcclusionCulling.ViewProjectionMatrix = m_LastViewProjMatrix;
+			s_PushConstant_OcclusionCulling.ProjectionMatrix = renderQueue.m_Camera->GetProjectionMatrix();
+			s_PushConstant_OcclusionCulling.ProjectionMatrix[1][1] *= -1;
+
+			s_PushConstant_OcclusionCulling.ViewMatrix = renderQueue.m_Camera->GetViewMatrix();
+			s_PushConstant_OcclusionCulling.NumberOfSubmeshes = (indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand));
+			s_PushConstant_OcclusionCulling.CameraNearClip = renderQueue.m_Camera->GetNearClip();
+
+#if 0
 			m_Data->ComputeShaderPushConstant.DepthPyramidSize.z = indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand);
 
 			m_Data->ComputeShaderPushConstant.CamFar = renderQueue.m_Camera->GetFarClip();
@@ -763,10 +1232,11 @@ namespace Frost
 			m_Data->ComputeShaderPushConstant.ViewMatrix = renderQueue.m_Camera->GetViewMatrix();
 			m_Data->ComputeShaderPushConstant.ProjectionMaxtrix = renderQueue.m_Camera->GetProjectionMatrix();
 			m_Data->ComputeShaderPushConstant.ProjectionMaxtrix[1][1] *= -1;
+#endif
 
-			vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_Data->ComputeShaderPushConstant);
+			vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &s_PushConstant_OcclusionCulling);
 
-			uint32_t workGroupsX = std::floor((indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand)) / 64.0f) + 1;
+			uint32_t workGroupsX = std::ceil((indirectCmdsOffset / sizeof(VkDrawIndexedIndirectCommand)) / 64.0f);
 			vulkanComputePipeline->Dispatch(cmdBuf, workGroupsX, 1, 1);
 
 			vulkanIndirectCmdBuffer->SetMemoryBarrier(cmdBuf,
@@ -777,6 +1247,37 @@ namespace Frost
 		}
 	}
 
+	void VulkanGeometryPass::GetOcclusionQueryResults()
+	{
+		if (s_TotalSubmeshSubmitted == 0) return;
+
+		uint64_t MaxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
+		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		//VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+
+		int32_t previousFrameIndex = (int32_t)currentFrameIndex - 1;
+		if (previousFrameIndex < 0)
+			previousFrameIndex = Renderer::GetRendererConfig().FramesInFlight - 1;
+
+		Vector<uint64_t> occlusionQueriesOfLastFrame(s_TotalSubmeshSubmitted);
+
+		// We use vkGetQueryResults to copy the results into a host visible buffer
+		vkGetQueryPoolResults(
+			device,
+			m_Data->OcclusionQueryPools[previousFrameIndex],
+			0,
+			2,
+			s_TotalSubmeshSubmitted * sizeof(uint64_t),
+			occlusionQueriesOfLastFrame.data(),
+			sizeof(uint64_t),
+			// Store results a 64 bit values and wait until the results have been finished
+			// If you don't want to wait, you can use VK_QUERY_RESULT_WITH_AVAILABILITY_BIT
+			// which also returns the state of the result (ready) in the result
+			VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+	}
+
 	void VulkanGeometryPass::OnResize(uint32_t width, uint32_t height)
 	{
 		GeometryDataInit(width, height);
@@ -784,7 +1285,7 @@ namespace Frost
 		Renderer::SubmitImageToOutputImageMap("Albedo", [this]() -> Ref<Image2D>
 		{
 			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-			return this->m_Data->GeometryRenderPass->GetColorAttachment(2, currentFrameIndex);
+			return this->m_Data->GeometryRenderPass->GetColorAttachment(1, currentFrameIndex);
 		});
 	}
 

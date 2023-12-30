@@ -414,8 +414,10 @@ namespace Frost
 				if (posePinInfo->ConnectedPin == nullptr)
 				{
 					outputNodeInternal->Result = nullptr;
+					return outputNodeInternal;
 					break;
 				}
+
 				Ref<AnimationNode> resultPoseNode = m_AnimationBlueprint->m_NodeMap[posePinInfo->ConnectedPin->AnimationParentNode];
 				outputNodeInternal->Result = TraverseNodes(resultPoseNode, m_AnimationBlueprint);
 

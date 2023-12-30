@@ -14,8 +14,8 @@ layout(binding = 8) uniform sampler2D u_SpatialBlueNoiseLUT;
 // This texture is responsible for firstly adding up the bloom factor (without tone mapping)
 // and then in the SSR we use it for tracing. In the last stage we just add the SSR and do tone mapping.
 // We need 2 textures, because if we had only 1, then we would do tone mapping twice (once for the basic image, then when tracing we will be using the tone mapped texture, and so when we add the SSR on the final tone mapped texture, it will add the tone mapping twice).
-layout(binding = 6, rgba8) uniform writeonly image2D o_Texture_ForSSR;
-layout(binding = 7, rgba8) uniform writeonly image2D o_Texture_Final;
+layout(binding = 6, rgba8) uniform restrict writeonly image2D o_Texture_ForSSR;
+layout(binding = 7, rgba8) uniform restrict writeonly image2D o_Texture_Final;
 
 #define TONE_MAP_FRAME          0
 #define TONE_MAP_FRAME_WITH_SSR 1
@@ -117,19 +117,22 @@ void main()
 		if(u_PushConstant.UseSSR == 1)
 		{
 			vec2 texSize = vec2(textureSize(u_SSRTexture, 0));
-			vec2 texelSize = 1.0f / texSize;
+			vec2 texelSize = 2.0f / texSize;
 
-			vec2 blueNoise = SampleBlueNoise(loc).rg;
-			float noiseWeight = 0.01273;
+			//vec2 blueNoise = SampleBlueNoise(loc).rg;
+			//float noiseWeight = 0.01273;
 
 			// Sampling more directions to compensate for the fact that we are rendering SSR on half-resolution
 			//vec3 reflectionContribution = texture(u_SSRTexture, uv + blueNoise * noiseWeight).rgb;
 			vec3 reflectionContribution = vec3(0.0);
-			reflectionContribution += texture(u_SSRTexture, uv + vec2(texSize.x, 0.0) + blueNoise * 0.001).rgb;
-			reflectionContribution += texture(u_SSRTexture, uv - vec2(texSize.x, 0.0) + blueNoise * 0.001).rgb;
-			reflectionContribution += texture(u_SSRTexture, uv + vec2(0.0,texSize.y)  + blueNoise * 0.001).rgb;
-			reflectionContribution += texture(u_SSRTexture, uv - vec2(0.0,texSize.y)  + blueNoise * 0.001).rgb;
-			reflectionContribution /= 4.0;
+
+			reflectionContribution += texture(u_SSRTexture, uv).rgb;
+
+			//reflectionContribution += texture(u_SSRTexture, uv + vec2(texSize.x, 0.0) + blueNoise * 0.001).rgb;
+			//reflectionContribution += texture(u_SSRTexture, uv - vec2(texSize.x, 0.0) + blueNoise * 0.001).rgb;
+			//reflectionContribution += texture(u_SSRTexture, uv + vec2(0.0, texSize.y)  + blueNoise * 0.001).rgb;
+			//reflectionContribution += texture(u_SSRTexture, uv - vec2(0.0, texSize.y)  + blueNoise * 0.001).rgb;
+			//reflectionContribution /= 4.0;
 
 			color += reflectionContribution.xyz;
 		}
@@ -140,8 +143,8 @@ void main()
 		if(u_PushConstant.UseAO == 1)
 		{
 			float ao = texture(u_AOTexture, uv).r;
-			vec3 ao_contribution = AO_MultiBounce(ao, color);
-			color = color * ao_contribution;
+			//vec3 ao_contribution = AO_MultiBounce(ao, color);
+			color = color * ao;
 		}
 
 		

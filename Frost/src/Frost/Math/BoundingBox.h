@@ -32,7 +32,7 @@ namespace Frost::Math
 			Min = {  FLT_MAX,  FLT_MAX,  FLT_MAX };
 			Max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 		}
-
+#if 0
 		//see https://gdbooks.gitbooks.io/3dcollisions/content/Chapter2/static_aabb_plan.html
 		bool IsOnOrForwardPlan(const Plane& plane) const
 		{
@@ -96,8 +96,10 @@ namespace Frost::Math
 			vertices[7] = { Center.x + Extents.x, Center.y + Extents.y, Center.z + Extents.z };
 			return vertices;
 		}
+#endif
 	};
 
+#if 0
 	inline Vector<glm::vec3> ExpandAABB(BoundingBox bb)
 	{
 		Vector<glm::vec3> b(8);
@@ -111,4 +113,5 @@ namespace Frost::Math
 		b[7] = { bb.Min.x, bb.Max.y, bb.Max.z };
 		return b;
 	}
+#endif
 }

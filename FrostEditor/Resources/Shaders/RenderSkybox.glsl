@@ -5,7 +5,6 @@ layout(push_constant) uniform Constants
 {
 	mat4 ProjectionMatrix;
 	mat4 ViewMatrix;
-	mat4 InvProjectionViewMatrix;
 } u_PushConstant;
 
 layout(location = 0) out vec3 v_FragmentPos;
@@ -509,7 +508,7 @@ void main()
 			//color *= comp * groundTrans / spaceTrans;
 
 
-			float skyIntensity = 3.0f;
+			float skyIntensity = m_CameraData.SunIntensity;
 
 			if (length(viewPos) < atmosphereRadius * 1.0)
 			{

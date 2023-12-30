@@ -20,6 +20,7 @@ namespace Frost
 		virtual ~Camera() = default;
 
 		const glm::mat4& GetProjectionMatrix() const { return m_ProjectionMatrix; }
+		const glm::mat4& GetNonJitteredProjectionMatrix() const { return m_InitialProjectionMatrix; }
 		void SetProjectionMatrix(const glm::mat4& projectionMatrix) { m_ProjectionMatrix = projectionMatrix; }
 
 		virtual const glm::mat4& GetViewMatrix() const = 0;
@@ -56,14 +57,15 @@ namespace Frost
 	public:
 		void RecalculateProjectionMatrix();
 	protected:
-		glm::mat4 m_ProjectionMatrix = glm::mat4(1.0f);
+		glm::mat4 m_ProjectionMatrix = glm::mat4(1.0f); // This projection is gonna be used by the whole rendering pipeline, and it should be jittered
+		glm::mat4 m_InitialProjectionMatrix = glm::mat4(1.0f); // This projection keeps the original one
 
 		uint32_t m_ViewportWidth = 1600, m_ViewportHeight = 900;
 
 		float m_FOV = 70.0f;
 		float m_NearClip, m_FarClip, m_AspectRatio;
 
-		float m_Exposure = 0.7f;
+		float m_Exposure = 1.1f;
 		float m_DOF = 0.0f; // This is just the lod of the skybox ("dof" is a fancy name here)
 
 		Camera::Type m_CameraType = Camera::Type::None;

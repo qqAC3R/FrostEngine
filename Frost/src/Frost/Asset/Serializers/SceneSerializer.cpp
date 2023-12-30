@@ -255,6 +255,7 @@ namespace Frost
 			entityOut["RectangularLightComponent"]["Intensity"] = rectLightComponent.Intensity;
 			entityOut["RectangularLightComponent"]["Radius"] = rectLightComponent.Radius;
 			entityOut["RectangularLightComponent"]["TwoSided"] = rectLightComponent.TwoSided;
+			entityOut["RectangularLightComponent"]["VolumetricContribution"] = rectLightComponent.VolumetricContribution;
 		}
 
 		if (entity.HasComponent<FogBoxVolumeComponent>())
@@ -720,6 +721,7 @@ namespace Frost
 				rectLightComponent.Intensity = rectLightIn["Intensity"];
 				rectLightComponent.Radius = rectLightIn["Radius"];
 				rectLightComponent.TwoSided = rectLightIn["TwoSided"];
+				rectLightComponent.VolumetricContribution = rectLightIn["VolumetricContribution"];
 			}
 
 			// Fog Box Volume Component

@@ -54,6 +54,7 @@ namespace Frost
 
 		virtual uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y) = 0;
 		virtual uint32_t GetCurrentFrameIndex() = 0;
+		virtual uint64_t GetFrameCount() = 0;
 		virtual Ref<Scene> GetActiveScene() = 0;
 
 		virtual Ref<Image2D> GetFinalImage(uint32_t id) const = 0;
@@ -123,7 +124,7 @@ namespace Frost
 				float Intensity;
 				glm::vec4 Vertex0; // W component stores the TwoSided bool
 				glm::vec4 Vertex1; // W component stores the Radius for it to be culled
-				glm::vec4 Vertex2;
+				glm::vec4 Vertex2; // W component stores the Volumetric Contribution
 				glm::vec4 Vertex3;
 			};
 

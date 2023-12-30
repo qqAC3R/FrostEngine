@@ -73,7 +73,7 @@ namespace Frost
 			switch (renderPassSpecs.RenderPassSpec[i].FramebufferAttachmentSpec.TextureFormat)
 			{
 			case FramebufferTextureFormat::R8:
-			case FramebufferTextureFormat::R32:
+			case FramebufferTextureFormat::R32F:
 			case FramebufferTextureFormat::R32I:
 				clearValue.color.uint32[0] = UINT32_MAX;
 				clearValue.color.uint32[1] = UINT32_MAX;
@@ -236,8 +236,11 @@ namespace Frost
 			switch (format)
 			{
 				case FramebufferTextureFormat::R8:	             return VK_FORMAT_R8_UNORM;
-				case FramebufferTextureFormat::R32:	             return VK_FORMAT_R32_SFLOAT;
+				case FramebufferTextureFormat::R16F:	         return VK_FORMAT_R16_SFLOAT;
+				case FramebufferTextureFormat::R32F:	         return VK_FORMAT_R32_SFLOAT;
 				case FramebufferTextureFormat::R32I:	         return VK_FORMAT_R32_UINT;
+				case FramebufferTextureFormat::RG16F:	         return VK_FORMAT_R16G16_SFLOAT;
+				case FramebufferTextureFormat::RG32F:	         return VK_FORMAT_R32G32_SFLOAT;
 				case FramebufferTextureFormat::RGBA8:	         return VK_FORMAT_R8G8B8A8_UNORM;
 				case FramebufferTextureFormat::RGBA16F:	         return VK_FORMAT_R16G16B16A16_SFLOAT;
 				case FramebufferTextureFormat::RGBA32F:	         return VK_FORMAT_R32G32B32A32_SFLOAT;

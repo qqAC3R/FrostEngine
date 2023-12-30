@@ -8,8 +8,11 @@
 #include "Frost/Asset/AssetManager.h"
 
 #include <stb_image.h>
+//#include <dds.hpp>
+//#include <dds_loader.h>
 
-//#include <CMP/compressonator.h>
+#include <compressonator.h>
+#include <helpers/dds_helpers.h>
 
 namespace Frost
 {
@@ -23,30 +26,176 @@ namespace Frost
 		int width, height, channels;
 		ImageFormat imageFormat;
 
-		stbi_set_flip_vertically_on_load(textureSpec.FlipTexture);
+		std::filesystem::path systenFilepath = filepath;
+		std::string extension = systenFilepath.extension().string();
 
-		if (stbi_is_hdr(filepath.c_str()))
-		{
-			m_TextureData.Data = (void*)stbi_loadf(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-			m_TextureData.Size = width * height * 4 * sizeof(float);
-			imageFormat = ImageFormat::RGBA32F;
-		}
-		else
-		{
-			m_TextureData.Data = (void*)stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-			m_TextureData.Size = width * height * 4;
-			imageFormat = ImageFormat::RGBA8;
-		}
+		ImageSpecification imageSpec{};
 
-		if (m_TextureData.Data == nullptr)
+
+		//dds::readFile
+		CMP_Texture compressedTexture{};
+
+		if (extension == ".dds")
 		{
-			FROST_CORE_WARN("Texture with filepath '{0}' hasn't been found", filepath);
-			m_IsLoaded = false;
-			return;
-		}
-		else
-		{
+			//CMP_InitializeBCLibrary();
+			LoadDDSFile(filepath.c_str(), compressedTexture);
+
+			switch (compressedTexture.format)
+			{
+				case CMP_FORMAT_DXT1:
+				case CMP_FORMAT_BC1: 
+				{
+					imageFormat = compressedTexture.nAlphaChannelSupport ?  ImageFormat::RGBA_BC1 : ImageFormat::RGB_BC1;
+					break;
+				}
+
+				case CMP_FORMAT_DXT3: imageFormat = ImageFormat::BC2; break;
+				case CMP_FORMAT_DXT5: imageFormat = ImageFormat::BC3; break;
+
+				case CMP_FORMAT_ATI2N_XY:
+				case CMP_FORMAT_BC5: imageFormat = ImageFormat::BC5; break;
+
+				default:
+				{
+					imageFormat = ImageFormat::RGBA8;
+					FROST_ASSERT_MSG("Unknown format!"); break;
+				}
+			}
+
+			m_TextureData.Data = (void*)compressedTexture.pData;
+			m_TextureData.Size = compressedTexture.dwDataSize;
+
+			width = compressedTexture.dwWidth;
+			height = compressedTexture.dwHeight;
+
 			m_IsLoaded = true;
+		}
+		else if (textureSpec.Format == ImageFormat::RGB_BC1 ||
+				 textureSpec.Format == ImageFormat::RGBA_BC1 ||
+				 textureSpec.Format == ImageFormat::BC2 ||
+				 textureSpec.Format == ImageFormat::BC3 ||
+				 textureSpec.Format == ImageFormat::BC4 ||
+				 textureSpec.Format == ImageFormat::BC5)
+		{
+
+			CMP_MipSet textureMipSet;
+			CMP_LoadTexture(filepath.c_str(), &textureMipSet);
+
+
+			// Generate the mips before compressing, so when it will compress, it will do the mips as well.
+			{
+				uint32_t totalMipMapLevels = Utils::CalculateMipMapLevels(textureMipSet.dwWidth, textureMipSet.dwHeight);
+				uint32_t compressedMipMapLevels = (uint32_t)glm::max((int32_t)totalMipMapLevels - 2, 0);
+				CMP_GenerateMIPLevels(&textureMipSet, compressedMipMapLevels);
+			}
+
+
+
+			// Initialize the compressed mip set and compress the mips.
+			CMP_MipSet compresstedMipSet;
+			{
+				compresstedMipSet.m_nWidth = textureMipSet.m_nWidth;
+				compresstedMipSet.m_nHeight = textureMipSet.m_nHeight;
+				compresstedMipSet.m_nDepth = textureMipSet.m_nDepth;
+
+				// Set the compression parameters
+				CMP_CompressOptions options = { 0 };
+				options.dwSize = sizeof(options);
+				options.fquality = 0.05f;
+				options.dwnumThreads = 8;
+
+				switch (textureSpec.Format)
+				{
+					case ImageFormat::RGB_BC1:
+					case ImageFormat::RGBA_BC1:  options.DestFormat = CMP_FORMAT_BC1; break;
+					case ImageFormat::BC2:		 options.DestFormat = CMP_FORMAT_BC2; break;
+					case ImageFormat::BC3:		 options.DestFormat = CMP_FORMAT_BC3; break;
+					case ImageFormat::BC4:		 options.DestFormat = CMP_FORMAT_BC4; break;
+					case ImageFormat::BC5:		 options.DestFormat = CMP_FORMAT_BC5; break;
+					default: FROST_ASSERT_MSG("Something is wrong! :(");
+				}
+
+				// Compress
+				CMP_ERROR status = CMP_ConvertMipTexture(&textureMipSet, &compresstedMipSet, &options, nullptr);
+			}
+
+			
+			// Pack all the compressed mip set into a single buffer for it to copy more efficiently into the image buffer
+			Buffer compressedMipSetBuffer{};
+			{
+				// Compute the total buffer size required
+				uint64_t totalBufferSize = 0;
+				for (uint32_t i = 0; i < compresstedMipSet.m_nMipLevels; i++)
+				{
+					totalBufferSize += Utils::CalculateImageBufferSize(
+						compresstedMipSet.m_pMipLevelTable[i]->m_nWidth,
+						compresstedMipSet.m_pMipLevelTable[i]->m_nHeight,
+						textureSpec.Format
+					);
+				}
+
+				// Allocate the whole buffer
+				compressedMipSetBuffer.Allocate(totalBufferSize);
+				
+
+				uint64_t bufferOffset = 0;
+				for (uint32_t i = 0; i < compresstedMipSet.m_nMipLevels; i++)
+				{
+					// Get the current mip image buffer size
+					uint64_t mipBufferSize = Utils::CalculateImageBufferSize(
+						compresstedMipSet.m_pMipLevelTable[i]->m_nWidth,
+						compresstedMipSet.m_pMipLevelTable[i]->m_nHeight,
+						textureSpec.Format
+					);
+					
+					// Write into the buffer with an offset
+					compressedMipSetBuffer.Write(compresstedMipSet.m_pMipLevelTable[i]->m_pbData, mipBufferSize, bufferOffset);
+
+					// Add the current mip buffer size to the buffer offset
+					bufferOffset += mipBufferSize;
+				}
+			}
+
+			m_TextureData.Data = (void*)compressedMipSetBuffer.Data;
+			m_TextureData.Size = compressedMipSetBuffer.GetSize();
+
+			width = compresstedMipSet.m_pMipLevelTable[0]->m_nWidth;
+			height = compresstedMipSet.m_pMipLevelTable[0]->m_nHeight;
+			imageFormat = textureSpec.Format;
+
+			m_IsLoaded = true;
+
+			// After copying the buffers into our own packed mip buffer, we do not those anymore
+			CMP_FreeMipSet(&textureMipSet);
+			CMP_FreeMipSet(&compresstedMipSet);
+		}
+		else
+		{
+			stbi_set_flip_vertically_on_load(textureSpec.FlipTexture);
+
+			if (stbi_is_hdr(filepath.c_str()))
+			{
+				m_TextureData.Data = (void*)stbi_loadf(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+				m_TextureData.Size = width * height * 4 * sizeof(float);
+				imageFormat = ImageFormat::RGBA32F;
+			}
+			else
+			{
+				m_TextureData.Data = (void*)stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+				m_TextureData.Size = width * height * sizeof(float);
+				imageFormat = ImageFormat::RGBA8;
+			}
+
+			if (m_TextureData.Data == nullptr)
+			{
+				FROST_CORE_WARN("Texture with filepath '{0}' hasn't been found", filepath);
+				m_IsLoaded = false;
+				return;
+			}
+			else
+			{
+				m_IsLoaded = true;
+			}
 		}
 
 		m_Width = width;
@@ -55,92 +204,19 @@ namespace Frost
 
 		if (textureSpec.UseMips)
 			m_MipMapLevels = Utils::CalculateMipMapLevels(width, height);
-
-		ImageSpecification imageSpec{};
+				
 		imageSpec.Width = width;
 		imageSpec.Height = height;
-		imageSpec.UseMipChain = textureSpec.UseMips;
-		imageSpec.Sampler.SamplerFilter = textureSpec.Sampler.SamplerFilter;
-		imageSpec.Sampler.SamplerWrap = textureSpec.Sampler.SamplerWrap;
-		imageSpec.Usage = textureSpec.Usage;
-		imageSpec.Format = imageFormat;
-		m_Image = Image2D::Create(imageSpec, m_TextureData.Data);
+		imageSpec.UseMipChain = m_TextureSpecification.UseMips;
+		imageSpec.Sampler.SamplerFilter = m_TextureSpecification.Sampler.SamplerFilter;
+		imageSpec.Sampler.SamplerWrap = m_TextureSpecification.Sampler.SamplerWrap;
+		imageSpec.Usage = m_TextureSpecification.Usage;
+		imageSpec.Format = m_TextureSpecification.Format;
+		m_Image = Image2D::Create(imageSpec, m_TextureData);
 
 		Ref<VulkanImage2D> vulkanImage = m_Image.As<VulkanImage2D>();
 		m_DescriptorInfo[DescriptorImageType::Sampled] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Sampled);
 		m_DescriptorInfo[DescriptorImageType::Storage] = vulkanImage->GetVulkanDescriptorInfo(DescriptorImageType::Storage);
-
-#if 0
-		if (isTrue)
-		{
-
-			///////////////////////////////////////////////////////////////////////
-			CMP_MipSet MipSetIn;
-			memset(&MipSetIn, 0, sizeof(CMP_MipSet));
-			auto cmp_status = CMP_LoadTexture(filepath.c_str(), &MipSetIn);
-			if (cmp_status != CMP_OK)
-			{
-				FROST_CORE_ERROR("Error %d: Loading source file!\n", cmp_status);
-			}
-
-			//----------------------------------------------------------------------
-			// generate mipmap level for the source image, if not already generated
-			//----------------------------------------------------------------------
-			if (MipSetIn.m_nMipLevels <= 1)
-			{
-				CMP_INT requestLevel = 10; // Request 10 miplevels for the source image
-
-				//------------------------------------------------------------------------
-				// Checks what the minimum image size will be for the requested mip levels
-				// if the request is too large, a adjusted minimum size will be returned
-				//------------------------------------------------------------------------
-				CMP_INT nMinSize = CMP_CalcMinMipSize(MipSetIn.m_nHeight, MipSetIn.m_nWidth, 10);
-
-				//--------------------------------------------------------------
-				// now that the minimum size is known, generate the miplevels
-				// users can set any requested minumum size to use. The correct
-				// miplevels will be set acordingly.
-				//--------------------------------------------------------------
-				CMP_GenerateMIPLevels(&MipSetIn, nMinSize);
-			}
-
-			//==========================
-			// Set Compression Options
-			//==========================
-			KernelOptions   kernel_options;
-			memset(&kernel_options, 0, sizeof(KernelOptions));
-
-			float fQuality = 0.05f;
-			CMP_FORMAT destFormat = CMP_FORMAT_BC7;
-
-			kernel_options.format = destFormat;   // Set the format to process
-			kernel_options.fquality = fQuality;     // Set the quality of the result
-			kernel_options.threads = 0;            // Auto setting
-
-			//--------------------------------------------------------------
-			// Setup a results buffer for the processed file,
-			// the content will be set after the source texture is processed
-			// in the call to CMP_ProcessTexture()
-			//--------------------------------------------------------------
-			CMP_MipSet MipSetCmp;
-			memset(&MipSetCmp, 0, sizeof(CMP_MipSet));
-
-			//===============================================
-			// Compress the texture using Framework Lib
-			//===============================================
-			cmp_status = CMP_ProcessTexture(&MipSetIn, &MipSetCmp, kernel_options, nullptr);
-			if (cmp_status != CMP_OK)
-			{
-				FROST_CORE_ERROR("Texture couldn't be compressed. Message: {0}", cmp_status);
-			}
-
-			FROST_CORE_INFO(MipSetCmp.dwDataSize);
-
-
-			CMP_FreeMipSet(&MipSetIn);
-			CMP_FreeMipSet(&MipSetCmp);
-		}
-#endif
 	}
 
 	VulkanTexture2D::VulkanTexture2D(uint32_t width, uint32_t height, const TextureSpecification& textureSpec, const void* data)
@@ -161,7 +237,11 @@ namespace Frost
 		
 		if (data)
 		{
-			m_Image = Image2D::Create(imageSpec, data);
+			Buffer copyByffer{};
+			copyByffer.Data = const_cast<void*>(data); // This is kind of a lifehack and could lead to various bugs if the data passed was initially intended to be const
+			copyByffer.Size = Utils::CalculateImageBufferSize(width, height, imageSpec.Format);
+
+			m_Image = Image2D::Create(imageSpec, copyByffer);
 			m_IsLoaded = true;
 		}
 		else
@@ -237,6 +317,14 @@ namespace Frost
 
 	void VulkanTexture2D::GenerateMipMaps()
 	{
+		bool isCompressed = m_TextureSpecification.Format == ImageFormat::RGB_BC1 || 
+							m_TextureSpecification.Format == ImageFormat::RGBA_BC1 ||
+							m_TextureSpecification.Format == ImageFormat::BC2 ||
+							m_TextureSpecification.Format == ImageFormat::BC3 ||
+							m_TextureSpecification.Format == ImageFormat::BC5;
+
+		if (!m_TextureSpecification.UseMips || isCompressed) return;
+
 		// TODO: Im not sure if this works while another command buffer is being recorded
 		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
 		auto vulkanImage = m_Image.As<VulkanImage2D>();

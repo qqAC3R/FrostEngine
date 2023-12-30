@@ -4,127 +4,144 @@
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 precision highp float;
-
-const float PI = 3.141592;
 const float TWO_PI = 6.283185307179586;
 
-layout(binding = 0) uniform sampler2D u_SourceTex;
-layout(binding = 1, rgba16f) uniform image2D u_DstTex;
+layout(binding = 0) uniform sampler2D u_ThresholdTex;
+layout(binding = 1, rgba16f) uniform image2D u_FFTTex;
 
 layout(push_constant) uniform PushConstant
 {
-    vec2 Resolution; // Resolution of screen
-	float SubtransformSize; // The subpixels that we are calculating
-	float Horizontal; // Horizontal or vertical pass
-	float IsNotInverse; // FFT or Inverse-FFT
-	float Normalization; // Normalization oftenly is performed once while we invert the texture from frequency to image
+    vec2 Resolution;
+	float SubtransformSize;
+	float Horizontal;
+	float IsNotInverse;
+	float Normalization;
 } u_PushConstant;
 
-
-vec2 multiplyComplex (vec2 a, vec2 b) {
-	return vec2(a[0] * b[0] - a[1] * b[1], a[1] * b[0] + a[0] * b[1]);
+vec2 multiplyComplex (vec2 a, vec2 b)
+{
+    return vec2(a[0] * b[0] - a[1] * b[1], a[1] * b[0] + a[0] * b[1]);
 }
 
-vec4 FFT(sampler2D src, vec2 resolution, float subPixelSize, float horizontal, float isNotInverse, float normalization)
-{
+const float TWOPI = 6.283185307179586;
+vec4 fft_2 (sampler2D src, vec2 resolution, float subtransformSize, float horizontal, float forward, float normalization) {
+    
 	vec2 fragCoord = vec2(gl_GlobalInvocationID.xy);
-	//fragCoord.x = u_PushConstant.Resolution.x - fragCoord.x;
-	//fragCoord.y = u_PushConstant.Resolution.y - fragCoord.y;
+	fragCoord.y = resolution.y - fragCoord.y;
+
+	vec2 evenPos, oddPos, twiddle, outputA, outputB;
+    vec4 even, odd;
+    
+	float index, evenIndex, twiddleArgument;
+    
+	index = (horizontal == 1.0 ? fragCoord.x : fragCoord.y) - 0.5;
+
+    evenIndex = floor(index / subtransformSize) *
+		(subtransformSize * 0.5) +
+		mod(index, subtransformSize * 0.5) +
+		0.5;
 
 
-	float index = 0.0;
-    if (horizontal == 1.0)
-        index = fragCoord.x - 0.5;
-	else
+    if (horizontal == 1.0) {
+        evenPos = vec2(evenIndex, fragCoord.y);
+        oddPos = vec2(evenIndex, fragCoord.y);
+    }
+    else {
+        evenPos = vec2(fragCoord.x, evenIndex);
+        oddPos = vec2(fragCoord.x, evenIndex);
+    }
+
+    evenPos *= (1.0 / resolution);
+    oddPos *=  (1.0 / resolution);
+    
+	if (horizontal == 1.0)
+        oddPos.x += 0.5;
+    else
+        oddPos.y += 0.5;
+
+    even = texture(src, evenPos);
+    odd = texture(src, oddPos);
+
+    twiddleArgument = (forward == 1.0 ? TWOPI : -TWOPI) * (index / subtransformSize);
+    twiddle = vec2(cos(twiddleArgument), sin(twiddleArgument));
+    
+
+	float normalizationFactor = 1.0;
+	if(normalization == 1.0)
 	{
-        index = fragCoord.y - 0.5;
+		normalizationFactor = 1.0 / sqrt(resolution.x * resolution.y);
 	}
 
-	float evenIndex = floor(index / subPixelSize) * (subPixelSize / 2.0) + mod(index, subPixelSize / 2.0);
+	return (even.rgba + vec4(
+		twiddle.x * odd.xz - twiddle.y * odd.yw,
+		twiddle.y * odd.xz + twiddle.x * odd.yw).xzyw) * normalizationFactor;
+}
 
-	vec4 even = vec4(0.0), odd = vec4(0.0);
+vec4 FFT(sampler2D src, vec2 resolution, float subtransformSize, float horizontal, float forward, float normalization)
+{
+	vec2 fragCoord = vec2(gl_GlobalInvocationID.xy);
+	fragCoord.y = resolution.y - fragCoord.y;
+
+	float index = (horizontal == 1.0 ? fragCoord.x : fragCoord.y) - 0.5;
+
+	float evenIndex = floor(index / subtransformSize) *
+				      (subtransformSize * 0.5) +
+				      mod(index, subtransformSize * 0.5) +
+				      0.5; // CCCCCCCCCCCCCCC
+
+	vec2 evenPos, oddPos;
 
 	if (horizontal == 1.0)
 	{
-		even = texture(src, vec2(evenIndex + 0.5, fragCoord.y) / resolution.x);
-		odd = texture(src, vec2(evenIndex + resolution.x * 0.5 + 0.5, fragCoord.y) / resolution.y);
-    }
+		evenPos = vec2(evenIndex, fragCoord.y);
+		oddPos = vec2(evenIndex, fragCoord.y);
+	}
 	else
 	{
-		even = texture(src, vec2(fragCoord.x, evenIndex + 0.5) / resolution.x);
-        odd = texture(src, vec2(fragCoord.x, evenIndex + resolution.y * 0.5 + 0.5) / resolution.y);
+		evenPos = vec2(fragCoord.x, evenIndex);
+		oddPos = vec2(fragCoord.x, evenIndex);
 	}
 
-	//normalisation
-	//if (normalization == 1.0) {
-	//    even /= (resolution.x * resolution.y);
-	//    odd /= (resolution.x * resolution.y);
-	//}
-
-	//fragCoord.x = u_PushConstant.Resolution.x - fragCoord.x;
-
-	float twiddleArgument = 0.0;
-    if (isNotInverse == 1.0)
-        twiddleArgument = 2.0 * PI * (index / subPixelSize);
+	evenPos *= (1.0 / resolution);
+	oddPos  *= (1.0 / resolution);
+	
+	if (horizontal == 1.0)
+	  oddPos.x += 0.5;
 	else
-        twiddleArgument = -2.0 * PI * (index / subPixelSize);
+	  oddPos.y += 0.5;
+	
+	vec4 even = texture(src, evenPos); // CCCCCCCCCCCCCCC
+	vec4 odd = texture(src, oddPos);   // CCCCCCCCCCCCCCC
 
+	float normalizationFactor = 1.0;
+	if(normalization == 1.0)
+	{
+		//even /= resolution.x * resolution.x;
+		//odd	 /= resolution.x * resolution.x;
+		normalizationFactor = 1.0 / sqrt(resolution.x * resolution.y); // CCCCCCCCCCCCCCC
+	}
+
+
+	float twiddleArgument = (forward == 1.0 ? TWO_PI : -TWO_PI) * (index / subtransformSize);
 	vec2 twiddle = vec2(cos(twiddleArgument), sin(twiddleArgument));
 
-	if(subPixelSize == 2.0 && horizontal == 1.0)
-	{
-		if (isNotInverse == 1.0)
-			twiddleArgument = 2.0 * PI * (index / subPixelSize);
-		else
-			twiddleArgument = -2.0 * PI * (index / subPixelSize);
-
-		twiddle = vec2(sin(twiddleArgument), cos(twiddleArgument));
-	}
-
-
-
-    //vec2 twiddle = vec2(cos(PI * (index / subPixelSize)), sin(PI * (index / subPixelSize)));
-
-
-	vec2 outputA = even.rg + multiplyComplex(twiddle, odd.rg);
-    vec2 outputB = even.ba + multiplyComplex(twiddle, odd.ba);
-
-	float optional1 = 0.0;
-    float optional2 = 0.0;
-
+	//vec2 outputA = even.rg + multiplyComplex(twiddle, odd.rg);
+    //vec2 outputB = even.ba + multiplyComplex(twiddle, odd.ba);
 	
+	//return vec4(outputA, outputB);
+	//return vec4(twiddleArgument / 10.0, 0.0, 0.0, 1.0);
 
-    if(twiddle.x < 0.0)
-    {
-        optional1 = 1.0;
-    }
+	return (even.rgba + vec4(
+          twiddle.x * odd.xz - twiddle.y * odd.yw,
+          twiddle.y * odd.xz + twiddle.x * odd.yw
+    ).xzyw) * normalizationFactor;
 
-    if(twiddle.y < 0.0)
-    {
-        optional2 = 1.0;
-    }
-
-
-	
-	return normalize(vec4(outputA, 0.0, 0.0));
-	//return vec4(odd);
 }
 
 
 void main()
 {
-	vec4 fft = FFT(
-		u_SourceTex,
-		u_PushConstant.Resolution,
-		u_PushConstant.SubtransformSize,
-		u_PushConstant.Horizontal,
-		u_PushConstant.IsNotInverse,
-		u_PushConstant.Normalization
-	);
+	vec4 fft = fft_2(u_ThresholdTex, u_PushConstant.Resolution, u_PushConstant.SubtransformSize, u_PushConstant.Horizontal, u_PushConstant.IsNotInverse, u_PushConstant.Normalization);
 
-	
-
-	imageStore(u_DstTex, ivec2(gl_GlobalInvocationID.xy), vec4(fft));
+	imageStore(u_FFTTex, ivec2(gl_GlobalInvocationID.xy), fft);
 }
-
-

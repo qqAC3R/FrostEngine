@@ -37,6 +37,7 @@ namespace Frost
 
 		virtual uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y) override;
 		virtual uint32_t GetCurrentFrameIndex() override;
+		virtual uint64_t GetFrameCount() override;
 		virtual Ref<Scene> GetActiveScene() override;
 
 		virtual void Resize(uint32_t width, uint32_t height) override;

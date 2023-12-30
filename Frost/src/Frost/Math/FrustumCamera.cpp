@@ -5,6 +5,7 @@
 
 namespace Frost
 {
+#if 0
 	void FrustumCamera::UpdateFrustum(const EditorCamera& camera)
 	{
 		*this = CreateFrustumFromCamera(camera);
@@ -33,4 +34,5 @@ namespace Frost
 
 		return frustum;
 	}
+#endif
 }

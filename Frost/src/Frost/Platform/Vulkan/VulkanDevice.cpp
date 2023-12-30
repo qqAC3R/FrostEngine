@@ -91,7 +91,8 @@ namespace Frost
 
 		for (const auto& physicalDevice : physicalDevices)
 		{
-			if (HasAllQueuesNeeded(physicalDevice) && HasAllFeatures(physicalDevice))
+			//if (HasAllQueuesNeeded(physicalDevice) && HasAllFeatures(physicalDevice))
+			if (HasAllFeatures(physicalDevice))
 			{
 				m_PhysicalDevice = physicalDevice;
 				break;

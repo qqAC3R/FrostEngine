@@ -10,7 +10,7 @@ namespace Frost
 
 	struct AtmosphereParams
 	{
-		glm::vec4 RayleighScattering = glm::vec4(5.802f, 13.558f, 33.1f, 8.0f);
+		glm::vec4 RayleighScattering = glm::vec4(14.802f, 35.558f, 65.1f, 10.0f);
 		glm::vec4 RayleighAbsorption = glm::vec4(0.0f, 0.0f, 0.0f, 8.0f);
 		glm::vec4 MieScattering = glm::vec4(3.996f, 3.996f, 3.996f, 1.2f);
 		glm::vec4 MieAbsorption = glm::vec4(4.4f, 4.4f, 4.4f, 1.2f);

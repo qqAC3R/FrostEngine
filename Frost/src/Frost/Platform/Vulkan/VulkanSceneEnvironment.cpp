@@ -23,6 +23,9 @@ namespace Frost
 		SkyIrradiance_InitData();
 		SkyPrefilter_InitData();
 
+		//m_AtmosphereParams.RayleighScattering = glm::vec4(14.802f, 35.558f, 65.1f, 10.0f);
+		//m_AtmosphereParams.RayleighScattering = glm::vec4(5.802f, 13.558f, 33.1f, 12.0f);
+
 		//AerialPerspective_InitData();
 	}
 
@@ -548,11 +551,11 @@ namespace Frost
 
 
 		m_SkyboxDescriptor->Bind(m_SkyboxPipeline);
-		Vector<glm::mat4> pushConstant(3);
+		Vector<glm::mat4> pushConstant(2);
 		pushConstant[0] = renderQueue.m_Camera->GetProjectionMatrix();
 		pushConstant[0][1][1] *= -1;
 		pushConstant[1] = renderQueue.m_Camera->GetViewMatrix();
-		pushConstant[2] = glm::inverse(renderQueue.m_Camera->GetViewProjectionVK());
+		//pushConstant[2] = glm::inverse(renderQueue.m_Camera->GetViewProjectionVK());
 
 		vulkanSkyboxPipeline->BindVulkanPushConstant("u_PushConstant", pushConstant.data());
 
@@ -569,8 +572,8 @@ namespace Frost
 
 		glm::vec4 sunDir_Intensity = { sunDir.x, sunDir.y, sunDir.z, renderQueue.m_LightData.DirLight.Specification.Intensity };
 
-//#define DYNAMIC_SKY
-#ifdef DYNAMIC_SKY
+//#define DYNAMIC_SKY 0
+#if 0
 		float viewPosX = (renderQueue.CameraPosition.x / 100000.0f);
 		float viewPosY = (atmosphereParams.PlanetAbledo_Radius.w + 0.0002f) + (renderQueue.CameraPosition.y / 100000.0f);
 		float viewPosZ = (renderQueue.CameraPosition.z / 100000.0f);
@@ -585,10 +588,11 @@ namespace Frost
 			return;
 		}
 
+#endif
 		atmosphereParams.SunDirection_Intensity = sunDir_Intensity;
 		float sunSize = renderQueue.m_LightData.DirLight.Specification.Size;
 		atmosphereParams.ViewPos_SunSize.w = sunSize;
-#endif
+
 
 		if (glm::length(glm::vec3(atmosphereParams.ViewPos_SunSize)) < atmosphereParams.PlanetAbledo_Radius.w)
 		{

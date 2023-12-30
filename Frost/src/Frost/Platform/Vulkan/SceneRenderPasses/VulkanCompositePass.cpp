@@ -46,15 +46,14 @@ namespace Frost
 		m_Data->PointLightCullingShader = Renderer::GetShaderLibrary()->Get("TiledPointLightCulling");
 		m_Data->RectLightCullingShader = Renderer::GetShaderLibrary()->Get("TiledRectangularLightCulling");
 
-		ImageSpecification imageSpec{};
-		imageSpec.Format = ImageFormat::RGBA32F;
-		imageSpec.Width = 64;
-		imageSpec.Height = 64;
-		imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
-		imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
-		imageSpec.UseMipChain = false;
-		m_Data->LTC1_Lut = Image2D::Create(imageSpec, &LTC1);
-		m_Data->LTC2_Lut = Image2D::Create(imageSpec, &LTC2);
+		TextureSpecification textureSpec{};
+		textureSpec.Format = ImageFormat::RGBA32F;
+		textureSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+		textureSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+		textureSpec.UseMips = false;
+
+		m_Data->LTC1_Lut = Texture2D::Create(64, 64, textureSpec, &LTC1);
+		m_Data->LTC2_Lut = Texture2D::Create(64, 64, textureSpec, &LTC2);
 
 		// Initialize the renderpass
 		TiledPointLightCullingInitData(1600, 900);
@@ -121,9 +120,10 @@ namespace Frost
 			auto descriptor = m_Data->CompositeDescriptor[i];
 
 			Ref<Image2D> depthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(i);
-			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
-			Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(2, i);
-			Ref<Image2D> shadowTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowComputeDenoiseTexture[i];
+			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
+			Ref<Image2D> albedoTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(1, i);
+			//Ref<Image2D> shadowTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowComputeTexture[i];
+			Ref<Image2D> shadowTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowComputeTexture[i];
 			Ref<Image2D> voxelIndirectDiffuseTex = m_RenderPassPipeline->GetRenderPassData<VulkanVoxelizationPass>()->VCT_IndirectDiffuseTexture[i];
 			Ref<Image2D> voxelIndirectSpecularTex = m_RenderPassPipeline->GetRenderPassData<VulkanVoxelizationPass>()->VCT_IndirectSpecularTexture[i];
 
@@ -356,6 +356,9 @@ namespace Frost
 		float workGroupX = std::ceil(renderQueue.ViewPortWidth / 16.0f);
 		m_Data->CompositeDescriptor[currentFrameIndex]->Set("UniformBuffer.LightCullingWorkgroup", workGroupX);
 
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+		m_Data->CompositeDescriptor[currentFrameIndex]->Set("UniformBuffer.UseGlobalIllumination", rendererSettings.VoxelGI.EnableGlobalIllumination);
+
 
 		// Drawing a quad
 		vulkanCompositeDescriptor->Bind(cmdBuf, m_Data->CompositePipeline);
@@ -402,13 +405,17 @@ namespace Frost
 
 
 		// Updating the data for the tiled light culling shader
-		m_TiledLightCullPushConstant.ScreenSize = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
-		m_TiledLightCullPushConstant.NumberOfLights = static_cast<uint32_t>(renderQueue.m_LightData.PointLights.size());
+		//m_TiledLightCullPushConstant.ScreenSize = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
+		//m_TiledLightCullPushConstant.NumberOfLights = static_cast<uint32_t>(renderQueue.m_LightData.PointLights.size());
 		
 		m_TiledLightCullPushConstant.ProjectionMatrix = renderQueue.CameraProjectionMatrix;
 		m_TiledLightCullPushConstant.ProjectionMatrix[1][1] *= -1;
 		m_TiledLightCullPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
-		m_TiledLightCullPushConstant.ViewProjectionMatrix = m_TiledLightCullPushConstant.ProjectionMatrix * renderQueue.CameraViewMatrix;
+		
+		//m_TiledLightCullPushConstant.ViewProjectionMatrix = m_TiledLightCullPushConstant.ProjectionMatrix * renderQueue.CameraViewMatrix;
+		vulkanDescriptor->Set("UniformBuffer.NumberOfLights", static_cast<uint32_t>(renderQueue.m_LightData.PointLights.size()));
+		vulkanDescriptor->Set("UniformBuffer.ScreenSize", glm::vec2(renderQueue.ViewPortWidth, renderQueue.ViewPortHeight));
+		vulkanDescriptor->Set("UniformBuffer.ViewProjectionMatrix", m_TiledLightCullPushConstant.ProjectionMatrix * renderQueue.CameraViewMatrix);
 
 		//vulkanDescriptor->Set("UniformBuffer.NumberOfLights", static_cast<uint32_t>(renderQueue.m_LightData.PointLights.size()));
 
@@ -439,12 +446,17 @@ namespace Frost
 
 		// Updating the data for the tiled light culling shader
 		//m_TiledLightCullPushConstant.ScreenSize = { renderQueue.ViewPortWidth, renderQueue.ViewPortHeight };
-		m_TiledLightCullPushConstant.NumberOfLights = static_cast<uint32_t>(renderQueue.m_LightData.RectangularLights.size());
+		//m_TiledLightCullPushConstant.NumberOfLights = static_cast<uint32_t>(renderQueue.m_LightData.RectangularLights.size());
 		//
 		//m_TiledLightCullPushConstant.ProjectionMatrix = renderQueue.CameraProjectionMatrix;
 		//m_TiledLightCullPushConstant.ProjectionMatrix[1][1] *= -1;
 		//m_TiledLightCullPushConstant.ViewMatrix = renderQueue.CameraViewMatrix;
 		//m_TiledLightCullPushConstant.ViewProjectionMatrix = m_TiledLightCullPushConstant.ProjectionMatrix * renderQueue.CameraViewMatrix;
+
+		vulkanDescriptor->Set("UniformBuffer.NumberOfLights", static_cast<uint32_t>(renderQueue.m_LightData.RectangularLights.size()));
+		vulkanDescriptor->Set("UniformBuffer.ScreenSize", glm::vec2(renderQueue.ViewPortWidth, renderQueue.ViewPortHeight));
+		vulkanDescriptor->Set("UniformBuffer.ViewProjectionMatrix", m_TiledLightCullPushConstant.ProjectionMatrix * renderQueue.CameraViewMatrix);
+
 
 		// Setting up the rendererData
 		vulkanComputePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_TiledLightCullPushConstant);

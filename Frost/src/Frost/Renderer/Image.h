@@ -1,21 +1,36 @@
 #pragma once
 
+#include "Frost/Core/Buffer.h"
+
 namespace Frost
 {
-
 	enum class ImageFormat
 	{
 		None = 0,
 
-		// Color
-		R8, R32, R32I,
-		RG32F,
-		RGBA8, RGBA16F, RGBA16UNORM, RGBA32F,
+		// F - float
+		// I - int
+		R8 = 1, R16F = 2, R32F = 3, R32I = 4,
+		RG16F = 5, RG32F = 6,
 
-		RGBA_BC7,
+		// F - float
+		// UNORM - float with range [0, 1]
+		RGBA8 = 7, RGBA16F = 8, RGBA16UNORM = 9, RGBA32F = 10,
+
+		SRGBA8 = 11,
+
+		// The BC1/BC3 format should used mostly for albedo maps
+		RGB_BC1 = 12, RGBA_BC1 = 13, BC2 = 14, BC3 = 15,
+		
+		// This format is mainly used for tangent space and normals maps.
+		// Because of that, it stores the compressed data in a high quality format.
+		// The RG compononents are the only channel in the texture,
+		// and the B component should be computed independetly in the pixel shader.
+		// The formula: B = sqrt(1 - R^2 - G^2);
+		BC4 = 16, BC5 = 17,
 
 		// Depth/Stencil
-		Depth24Stencil8, Depth32
+		Depth24Stencil8 = 18, Depth32 = 19
 	};
 
 	enum class ImageUsage
@@ -89,6 +104,10 @@ namespace Frost
 		uint32_t Depth = 1;
 		bool UseMipChain = true;
 		bool MutableFormat = false; // Optional: Currently works only for 3D textures
+		//bool UseCompression = false;
+
+		//  This is mostly used for the compression textures, in which case, the vulkan api needs a pointer to access the necesarry data
+		void* AdditionalHandle = nullptr; 
 
 		// Optional (Advanced users), currently supported only by Image2D
 		ImageTiling Tiling = ImageTiling::Optimal;
@@ -119,7 +138,7 @@ namespace Frost
 	{
 	public:
 		static Ref<Image2D> Create(const ImageSpecification& specification);
-		static Ref<Image2D> Create(const ImageSpecification& specification, const void* data);
+		static Ref<Image2D> Create(const ImageSpecification& specification, const Buffer& data);
 	};
 
 	namespace Utils

@@ -77,8 +77,8 @@ namespace Frost
 			Ref<ComputePipeline> RectLightCullingPipeline;
 			Vector<Ref<Material>> RectLightCullingDescriptor;
 
-			Ref<Image2D> LTC1_Lut;
-			Ref<Image2D> LTC2_Lut;
+			Ref<Texture2D> LTC1_Lut;
+			Ref<Texture2D> LTC2_Lut;
 		};
 		InternalData* m_Data;
 
@@ -97,10 +97,10 @@ namespace Frost
 		{
 			glm::mat4 ViewMatrix;
 			glm::mat4 ProjectionMatrix;
-			glm::mat4 ViewProjectionMatrix;
+			//glm::mat4 ViewProjectionMatrix;
 
-			glm::vec2 ScreenSize;
-			int NumberOfLights;
+			//glm::vec2 ScreenSize;
+			//int NumberOfLights;
 		};
 		TiledLightCullPushConstant m_TiledLightCullPushConstant;
 

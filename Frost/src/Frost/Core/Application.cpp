@@ -37,7 +37,7 @@ namespace Frost
 
 		//std::string filepath = FileDialogs::OpenFile("");
 		//Ref<Project> project = Project::Deserialize(filepath); // Hardcoded currently
-		Ref<Project> project = Project::Deserialize("D:\\Visual Studio\\FrostEngine\\master\\FrostEditor\\SandboxProject\\Sandbox.fproj"); // Hardcoded currently
+		Ref<Project> project = Project::Deserialize("D:\\Visual Studio\\FrostEngine\\master\\FrostEditor\\GameProject\\GameProject.fproj"); // Hardcoded currently
 		Project::SetActive(project);
 		Application::Get().GetWindow().SetWindowProjectName(Project::GetProjectName());
 

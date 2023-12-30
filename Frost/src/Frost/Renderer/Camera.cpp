@@ -29,6 +29,7 @@ namespace Frost
 	void Camera::RecalculateProjectionMatrix()
 	{
 		m_ProjectionMatrix = glm::perspective(glm::radians(m_FOV), m_AspectRatio, m_NearClip, m_FarClip);
+		m_InitialProjectionMatrix = m_ProjectionMatrix;
 	}
 
 }

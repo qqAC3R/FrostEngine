@@ -990,6 +990,19 @@ namespace Frost
 					ImGui::PushID(3);
 
 					ImGui::TableNextColumn();
+					ImGui::Text("Volumetric Contribution");
+
+					ImGui::TableNextColumn();
+					ImGui::PushItemWidth(-1);
+					UserInterface::DragFloat("", component.VolumetricContribution, 0.001f, 0.0f, 1.0f);
+
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::PushID(4);
+
+					ImGui::TableNextColumn();
 					ImGui::Text("Two Sided");
 
 					ImGui::TableNextColumn();

@@ -59,6 +59,7 @@ namespace Frost
 	}
 
 	static uint32_t s_ImageIndex = 0;
+	static uint64_t s_FrameCount = 0;
 	static RenderQueue s_RenderQueue[FRAMES_IN_FLIGHT];
 	static Vulkan::RenderData* s_Data;
 	static Vulkan::RenderDebugData* s_DebugData;
@@ -118,7 +119,7 @@ namespace Frost
 		}
 
 
-		const uint32_t maxUserQueries = 20;
+		const uint32_t maxUserQueries = 40;
 		s_DebugData->QueryCount = 2 + 2 * maxUserQueries;
 
 		s_DebugData->TimestampQueryPools.resize(Renderer::GetRendererConfig().FramesInFlight);
@@ -219,6 +220,8 @@ namespace Frost
 
 			s_DebugData->NextAvailableQueryID = 2;
 		});
+		s_FrameCount++;
+		if (s_FrameCount == ~0) s_FrameCount = 0;
 	}
 
 	void VulkanRenderer::EndFrame()
@@ -405,11 +408,12 @@ namespace Frost
 
 	void VulkanRenderer::SubmitWireframeMesh(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color, float lineWidth)
 	{
+		// TODO: Add Renderer Submittion back!! (only tested for mesh AABB)
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		Renderer::Submit([&, currentFrameIndex, mesh, transform, color, lineWidth]()
-		{
+		//Renderer::Submit([&, currentFrameIndex, mesh, transform, color, lineWidth]()
+		//{
 			s_RenderQueue[currentFrameIndex].AddWireframeMesh(mesh, transform, color, lineWidth);
-		});
+		//});
 	}
 
 	uint32_t VulkanRenderer::ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y)
@@ -420,6 +424,11 @@ namespace Frost
 	uint32_t VulkanRenderer::GetCurrentFrameIndex()
 	{
 		return VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+	}
+
+	uint64_t VulkanRenderer::GetFrameCount()
+	{
+		return s_FrameCount;
 	}
 
 	Ref<Scene> VulkanRenderer::GetActiveScene()

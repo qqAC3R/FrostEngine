@@ -4,6 +4,9 @@
 #include "VulkanContext.h"
 #include "Frost/Platform/Vulkan/VulkanRenderer.h"
 
+//#include <dds.hpp>
+#include <compressonator.h>
+
 namespace Frost
 {
 
@@ -17,7 +20,7 @@ namespace Frost
 
 		// Calculate the mip chain levels
 		if (specification.UseMipChain)
-			CalculateMipSizes();
+			CalculateMipSizes(false);
 		else
 			m_MipLevelCount = 1;
 
@@ -102,30 +105,36 @@ namespace Frost
 		UpdateDescriptor();
 	}
 
-	VulkanImage2D::VulkanImage2D(const ImageSpecification& specification, const void* data)
+	VulkanImage2D::VulkanImage2D(const ImageSpecification& specification, const Buffer& bufferData)
 		: m_ImageSpecification(specification), m_ImageLayout(VK_IMAGE_LAYOUT_UNDEFINED)
 	{
 		VkFormat textureFormat = Utils::GetImageFormat(specification.Format);
 		VkImageUsageFlags usageFlags = Utils::GetImageUsageFlags(specification.Usage);
 		VkImageLayout newImageLayout = Utils::GetImageLayout(specification.Usage);
 
-		uint32_t imageSize = Utils::CalculateImageBufferSize(specification.Width, specification.Height, specification.Format);
+		bool useCompression = specification.Format == ImageFormat::RGB_BC1 ||
+			specification.Format == ImageFormat::RGBA_BC1 ||
+			specification.Format == ImageFormat::BC2 ||
+			specification.Format == ImageFormat::BC3 ||
+			specification.Format == ImageFormat::BC4 ||
+			specification.Format == ImageFormat::BC5;
+
 
 		// Calculate the mip chain levels
 		if (specification.UseMipChain)
-			CalculateMipSizes();
+			CalculateMipSizes(useCompression);
 		else
 			m_MipLevelCount = 1;
 
 		// Making a staging buffer to copy the data
 		VkBuffer stagingBuffer;
 		VulkanMemoryInfo stagingBufferMemory;
-		VulkanAllocator::AllocateBuffer(imageSize, { BufferUsage::TransferSrc }, MemoryUsage::CPU_TO_GPU, stagingBuffer, stagingBufferMemory);
+		VulkanAllocator::AllocateBuffer(bufferData.Size, { BufferUsage::TransferSrc }, MemoryUsage::CPU_TO_GPU, stagingBuffer, stagingBufferMemory);
 
 		// Copying the data
 		void* copyData;
 		VulkanAllocator::BindBuffer(stagingBuffer, stagingBufferMemory, &copyData);
-		memcpy(copyData, data, static_cast<size_t>(imageSize));
+		memcpy(copyData, bufferData.Data, static_cast<size_t>(bufferData.Size));
 		VulkanAllocator::UnbindBuffer(stagingBufferMemory);
 
 
@@ -146,7 +155,33 @@ namespace Frost
 		// Changing the layout for copying the staging buffer to the image
 		TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 						VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, Utils::GetPipelineStageFlagsFromLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
-		Utils::CopyBufferToImage(cmdBuf, stagingBuffer, m_Image, m_ImageSpecification.Width, m_ImageSpecification.Height, 1);
+
+		if (specification.UseMipChain && useCompression)
+		{
+			uint32_t maxMipLevel = m_MipLevelCount;
+			
+			uint64_t currentOffset = 0;
+			uint32_t currentWidth = specification.Width;
+			uint32_t currentHeight = specification.Height;
+
+			
+
+			for (uint32_t mipLevel = 0; mipLevel < maxMipLevel; mipLevel++)
+			{
+				Utils::CopyBufferToImage(cmdBuf, stagingBuffer, m_Image, currentWidth, currentHeight, 1, mipLevel, currentOffset);
+				
+				//currentOffset += computeMipmapSize(specification.Format, currentWidth, currentHeight);
+				currentOffset += Utils::CalculateImageBufferSize(currentWidth, currentHeight, specification.Format);
+
+				currentWidth = glm::max(uint32_t(currentWidth / 2.0), 1u);
+				currentHeight = glm::max(uint32_t(currentHeight / 2.0), 1u);
+			}
+		}
+		else
+		{
+			Utils::CopyBufferToImage(cmdBuf, stagingBuffer, m_Image, m_ImageSpecification.Width, m_ImageSpecification.Height, 1);
+		}
+
 
 
 		// Generating mip maps if the mip count is higher than 1, else just transition to user's input `VkImageLayout`
@@ -271,7 +306,7 @@ namespace Frost
 		VkImageAspectFlags imageAspectMask{};
 		switch (m_ImageSpecification.Format)
 		{
-		case ImageFormat::R32:
+		case ImageFormat::R32F:
 		case ImageFormat::R32I:
 			imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			blitFilter = VK_FILTER_NEAREST;
@@ -373,7 +408,7 @@ namespace Frost
 		VkImageAspectFlags imageAspectMask{};
 		switch (m_ImageSpecification.Format)
 		{
-		case ImageFormat::R32:
+		case ImageFormat::R32F:
 		case ImageFormat::R32I:
 			imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			blitFilter = VK_FILTER_NEAREST;
@@ -485,7 +520,7 @@ namespace Frost
 		VkImageAspectFlags imageAspectMask{};
 		switch (m_ImageSpecification.Format)
 		{
-		case ImageFormat::R32:
+		case ImageFormat::R32F:
 		case ImageFormat::R32I:
 			imageAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			break;
@@ -602,9 +637,13 @@ namespace Frost
 		m_DescriptorInfo[DescriptorImageType::Storage].sampler = nullptr;
 	}
 
-	void VulkanImage2D::CalculateMipSizes()
+	void VulkanImage2D::CalculateMipSizes(bool useCompression)
 	{
 		m_MipLevelCount = Utils::CalculateMipMapLevels(m_ImageSpecification.Width, m_ImageSpecification.Height);
+
+		// Set it by "-2" because the BCn format compresses 1 pixel by 4x4, so it cannot compress anything smaller than that.
+		if (useCompression)
+			m_MipLevelCount = (uint32_t)glm::max(int32_t(m_MipLevelCount) - 2, 0);
 
 		uint32_t mipWidth = m_ImageSpecification.Width;
 		uint32_t mipHeight = m_ImageSpecification.Height;
@@ -703,6 +742,7 @@ namespace Frost
 			samplerInfo.minFilter = filtering;
 
 			samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			//samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST; // TODO: Temporary
 			
 			samplerInfo.addressModeU = samplerAdressMode;
 			samplerInfo.addressModeV = samplerAdressMode;
@@ -733,23 +773,15 @@ namespace Frost
 			FROST_VKCHECK(vkCreateSampler(device, &samplerInfo, nullptr, &sampler));
 		}
 
-#if 0
-		void ChangeImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t depthMap, uint32_t mipLevels)
-		{
-			VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(true);
-
-		}
-#endif
-
-		void CopyBufferToImage(VkCommandBuffer cmdBuf, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t depth)
+		void CopyBufferToImage(VkCommandBuffer cmdBuf, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevel, uint64_t bufferOffset)
 		{
 			VkBufferImageCopy region{};
-			region.bufferOffset = 0;
+			region.bufferOffset = bufferOffset;
 			region.bufferRowLength = 0;
 			region.bufferImageHeight = 0;
 
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			region.imageSubresource.mipLevel = 0;
+			region.imageSubresource.mipLevel = mipLevel;
 			region.imageSubresource.layerCount = 1;
 			region.imageSubresource.baseArrayLayer = 0;
 
@@ -769,19 +801,64 @@ namespace Frost
 			switch (imageFormat)
 			{
 				case ImageFormat::R8:               return VK_FORMAT_R8_UNORM;
-				case ImageFormat::R32:              return VK_FORMAT_R32_SFLOAT;
+				case ImageFormat::R16F:             return VK_FORMAT_R16_SFLOAT;
+				case ImageFormat::R32F:             return VK_FORMAT_R32_SFLOAT;
 				case ImageFormat::R32I:             return VK_FORMAT_R32_UINT;
+				case ImageFormat::RG16F:			return VK_FORMAT_R16G16_SFLOAT;
+				case ImageFormat::SRGBA8:			return VK_FORMAT_R8G8B8A8_SRGB;
 				case ImageFormat::RG32F:			return VK_FORMAT_R32G32_SFLOAT;
 				case ImageFormat::RGBA8:            return VK_FORMAT_R8G8B8A8_UNORM;
-				case ImageFormat::RGBA_BC7:         return VK_FORMAT_BC7_UNORM_BLOCK;
 				case ImageFormat::RGBA16F:          return VK_FORMAT_R16G16B16A16_SFLOAT;
 				case ImageFormat::RGBA16UNORM:      return VK_FORMAT_R16G16B16A16_UNORM;
 				case ImageFormat::RGBA32F:          return VK_FORMAT_R32G32B32A32_SFLOAT;
+
+				case ImageFormat::RGB_BC1:          return VK_FORMAT_BC1_RGB_UNORM_BLOCK;
+				case ImageFormat::RGBA_BC1:         return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+				case ImageFormat::BC2:              return VK_FORMAT_BC2_UNORM_BLOCK;
+				case ImageFormat::BC3:              return VK_FORMAT_BC3_UNORM_BLOCK;
+				case ImageFormat::BC4:              return VK_FORMAT_BC4_UNORM_BLOCK;
+				case ImageFormat::BC5:              return VK_FORMAT_BC5_UNORM_BLOCK;
+
 				case ImageFormat::Depth24Stencil8:  return VK_FORMAT_D24_UNORM_S8_UINT;
 				case ImageFormat::Depth32:          return VK_FORMAT_D32_SFLOAT;
 				case ImageFormat::None:             FROST_ASSERT_MSG("ImageFormat::None is invalid!");
 			}
 			return VkFormat();
+		}
+
+		uint32_t GetBlockSizeFromCompressedImageFormat(ImageFormat imageFormat)
+		{
+			switch (imageFormat)
+			{
+				case ImageFormat::RGB_BC1:
+				case ImageFormat::RGBA_BC1:
+				case ImageFormat::BC4:
+					return 8;
+				case ImageFormat::BC2:
+				case ImageFormat::BC3:
+				case ImageFormat::BC5:
+					return 16;
+				case ImageFormat::None: FROST_ASSERT_MSG("ImageFormat::None is invalid!");
+			}
+			return uint32_t();
+		}
+
+		uint32_t GetBitsPerPixelFromCompressedImageFormat(ImageFormat imageFormat)
+		{
+			switch (imageFormat)
+			{
+				case ImageFormat::RGB_BC1:
+				case ImageFormat::RGBA_BC1:
+				case ImageFormat::BC4:
+					return 4;
+
+				case ImageFormat::BC2:
+				case ImageFormat::BC3:
+				case ImageFormat::BC5:
+					return 8;
+				case ImageFormat::None: FROST_ASSERT_MSG("ImageFormat::None is invalid!");
+			}
+			return uint32_t();
 		}
 
 		VkFilter GetImageFiltering(ImageFilter imageFiltering)
@@ -912,10 +989,41 @@ namespace Frost
 		{
 			switch (imageFormat)
 			{
-				case ImageFormat::RGBA_BC7:  return width * height * sizeof(float);
 				case ImageFormat::RGBA8:     return width * height * sizeof(float);
 				case ImageFormat::RGBA16F:   return width * height * sizeof(float) * 2;
 				case ImageFormat::RGBA32F:   return width * height * sizeof(float) * 4;
+
+				case ImageFormat::RGB_BC1:
+				case ImageFormat::RGBA_BC1:
+				case ImageFormat::BC4:
+	#if 0
+				{
+					//uint32_t dwChannels = 1;
+					//uint32_t dwBitsPerChannel = 4;
+					//uint32_t dwWidth = ((width + 3) / 4) * 4;
+					//uint32_t dwHeight = ((height + 3) / 4) * 4;
+					//return (dwWidth * dwHeight * dwChannels * dwBitsPerChannel) / 8;
+
+				}
+	#endif
+				case ImageFormat::BC2:
+				case ImageFormat::BC3:
+				case ImageFormat::BC5:
+				{
+					const auto blockSizeBytes = Utils::GetBlockSizeFromCompressedImageFormat(imageFormat);
+					const auto bitsPerPixel = Utils::GetBitsPerPixelFromCompressedImageFormat(imageFormat);
+
+					// Instead of checking each format enum each we'll check for the range in
+						// which the BCn compressed formats are.
+					if ((imageFormat >= ImageFormat::RGB_BC1 && imageFormat <= ImageFormat::BC5))
+					{
+						auto pitch = glm::max(1u, (width + 3) / 4) * blockSizeBytes;
+						return pitch * glm::max(1u, (height + 3) / 4);
+					}
+
+					return glm::max(1u, static_cast<uint32_t>((width * bitsPerPixel + 7) / 8)) * height;
+				}
+
 				case ImageFormat::None:      FROST_ASSERT_MSG("ImageFormat::None is invalid!");
 			}
 			return 0;

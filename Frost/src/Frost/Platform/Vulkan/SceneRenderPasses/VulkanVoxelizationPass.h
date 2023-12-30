@@ -110,6 +110,8 @@ namespace Frost
 
 		struct VCTPushConstant
 		{
+			glm::mat4 InvViewProjMatrix;
+
 			glm::vec3 VoxelSampleOffset;
 			float VoxelGrid;
 

@@ -51,7 +51,7 @@ struct RectangularLight
 	float Intensity;
 	vec4 Vertex0; // W component stores the TwoSided bool
 	vec4 Vertex1; // W component stores the Radius for it to be culled
-	vec4 Vertex2;
+	vec4 Vertex2; // W component stores the Volumetric Contribution
 	vec4 Vertex3;
 };
 
@@ -300,7 +300,9 @@ vec3 ComputeRectangularLightContribution(RectangularLight rectLight, vec3 center
 		phase
 	);
 
-	return rectLight.Radiance * rectLight.Intensity * radiance * attenuation;
+	float volumetricContribution = rectLight.Vertex2.w;
+
+	return rectLight.Radiance * rectLight.Intensity * volumetricContribution * radiance * attenuation;
 }
 
 // Sample a dithering function.

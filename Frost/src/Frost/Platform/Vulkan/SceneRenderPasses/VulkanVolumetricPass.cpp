@@ -136,7 +136,7 @@ namespace Frost
 			Ref<BufferDevice> rectLightBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RectLightBufferData[i];
 			Ref<BufferDevice> rectLightIndicesBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RectLightIndicesVolumetric[i];
 
-			Ref<Image2D> ltc2Lut = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->LTC2_Lut;
+			Ref<Texture2D> ltc2Lut = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->LTC2_Lut;
 
 			descriptor->Set("u_TemporalBlueNoiseLUT", temporalBlueNoiseLUT);
 			descriptor->Set("u_ShadowDepthTexture", shadowDepthTexture);
@@ -524,11 +524,11 @@ namespace Frost
 			if (i == 0) lastFrame = framesInFlight - 1;
 
 			Ref<Image2D> depthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanPostFXPass>()->DepthPyramid[lastFrame];
-			Ref<Image2D> worldPositionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, lastFrame);
+			//Ref<Image2D> worldPositionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, lastFrame);
 
 			// Set the volumetric compute descriptor
 			descriptorVolumetricCompute->Set("u_DepthTexture", depthTexture);
-			descriptorVolumetricCompute->Set("u_PositionTexture", worldPositionTexture);
+			//descriptorVolumetricCompute->Set("u_PositionTexture", worldPositionTexture);
 			descriptorVolumetricCompute->UpdateVulkanDescriptorIfNeeded();
 
 			// Set the volumetric blur descriptor
@@ -556,7 +556,7 @@ namespace Frost
 			glm::radians(renderQueue.m_Camera->GetCameraFOV()),
 			float(renderQueue.m_Camera->GetViewportWidth()) / float(renderQueue.m_Camera->GetViewportHeight()),
 			renderQueue.m_Camera->GetNearClip(),
-			renderQueue.m_Camera->GetFarClip() / 2.0f
+			renderQueue.m_Camera->GetFarClip() / 1.0f
 		);
 
 #if 0
@@ -732,8 +732,8 @@ namespace Frost
 	struct VolumetricTAAPushConstant
 	{
 		glm::mat4 InvViewProjMatrix{ 0.0f };
-		glm::mat4 PreviousViewProjMatrix{ 0.0f };
-		glm::mat4 PreviousInvViewProjMatrix{ 0.0f };
+		//glm::mat4 PreviousViewProjMatrix{ 0.0f };
+		//glm::mat4 PreviousInvViewProjMatrix{ 0.0f };
 
 		glm::vec3 CameraPosition;
 		float Padding0 = 0.0f;
@@ -757,8 +757,10 @@ namespace Frost
 		// // Updating push constant
 		// Previous frame stuff
 		s_VolumetricTAAPushConstant.PreviousCameraPosition = s_VolumetricTAAPushConstant.CameraPosition;
-		s_VolumetricTAAPushConstant.PreviousInvViewProjMatrix = s_VolumetricTAAPushConstant.InvViewProjMatrix;
-		s_VolumetricTAAPushConstant.PreviousViewProjMatrix = glm::inverse(s_VolumetricTAAPushConstant.InvViewProjMatrix);
+		//s_VolumetricTAAPushConstant.PreviousInvViewProjMatrix = s_VolumetricTAAPushConstant.InvViewProjMatrix;
+		//s_VolumetricTAAPushConstant.PreviousViewProjMatrix = glm::inverse(s_VolumetricTAAPushConstant.InvViewProjMatrix);
+		vulkanDescriptor->Set("PreviousCameraData.PreviousInvViewProjMatrix", s_VolumetricTAAPushConstant.InvViewProjMatrix);
+		vulkanDescriptor->Set("PreviousCameraData.PreviousViewProjMatrix", glm::inverse(s_VolumetricTAAPushConstant.InvViewProjMatrix));
 
 		// Current frame stuff
 		s_VolumetricTAAPushConstant.InvViewProjMatrix = s_FroxelPopulatePushConstant.InvViewProjMatrix;

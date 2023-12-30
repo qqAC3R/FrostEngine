@@ -53,6 +53,9 @@ namespace Frost
 
 		void SpatialDenoiserInitData(uint32_t width, uint32_t height);
 		void SpatialDenoiserUpdate(const RenderQueue& renderQueue);
+
+		void AmbientOcclusionTAAInitData(uint32_t width, uint32_t height);
+		void AmbientOcclusionTAAUpdate(const RenderQueue& renderQueue);
 		// --------------------------------------------------------
 
 
@@ -61,10 +64,26 @@ namespace Frost
 		void BloomUpdate(const RenderQueue& renderQueue);
 		// --------------------------------------------------------
 
-#if 0
+		// ------------------- FXAA ------------------------------
+		void FXAAInitData(uint32_t width, uint32_t height);
+		void FXAAUpdate(const RenderQueue& renderQueue);
+		// --------------------------------------------------------
+
+		// ----------- Temporal Anti-Aliasing ---------------------
+		void TAAInitData(uint32_t width, uint32_t height);
+		void TAAUpdate(const RenderQueue& renderQueue);
+		// --------------------------------------------------------
+
+
+#if 1
 		// ------------------- Bloom Convolution ------------------------------
 		void BloomConvolutionInitData(uint32_t width, uint32_t height);
 		void BloomConvolutionUpdate(const RenderQueue& renderQueue);
+		// --------------------------------------------------------
+
+		// ---------------- Bloom Convolution Filter  -------------------------
+		void BloomConvolutionFilterInitData(uint32_t width, uint32_t height);
+		void BloomConvolutionFilterUpdate(const RenderQueue& renderQueue);
 		// --------------------------------------------------------
 #endif
 
@@ -109,7 +128,9 @@ namespace Frost
 			Ref<ComputePipeline> HZBPipeline;
 			Vector<Vector<Ref<Material>>> HZBDescriptor;
 			Vector<Ref<Image2D>> DepthPyramid;
-			Vector<VkSampler> HZBLinearSampler; // For SSR
+			Vector<VkSampler> HZBNearestSampler; // For Occlusion Culling
+			Vector<VkSampler> HZBMinReductionSampler; // For Occlusion Culling
+			Vector<VkSampler> HZBMaxReductionSampler; // For Occlusion Culling
 
 			// Visibility buffer
 			Ref<Shader> VisibilityShader;
@@ -128,6 +149,14 @@ namespace Frost
 			Ref<ComputePipeline> DenoiserPipeline;
 			Vector<Ref<Material>> DenoiserDescriptor;
 			Vector<Ref<Image2D>> DenoiserImage;
+			Vector<Ref<Material>> DenoiserUpsampledDescriptor;
+			Vector<Ref<Image2D>> DenoiserUpsampledImage;
+
+			// Ambient occlusion accumulation
+			Ref<Shader> AmbientOcclusionTAAShader;
+			Ref<ComputePipeline> AmbientOcclusionTAAPipeline;
+			Vector<Ref<Material>> AmbientOcclusionTAADescriptor;
+			Vector<Ref<Image2D>> AmbientOcclusionTAAImage;
 
 			// Bloom pass
 			Ref<Shader> BloomShader;
@@ -137,13 +166,19 @@ namespace Frost
 			Vector<Ref<Image2D>> Bloom_UpsampledTexture;
 
 
-#if 0
+#if 1
 			// Bloom Convolution pass
 			Ref<Shader> BloomConvolutionShader;
 			Ref<ComputePipeline> BloomConvPipeline;
 			Ref<Material> BloomConvDescriptor;
 			Vector<Ref<Image2D>> BloomConv_PingTexture;
 			Vector<Ref<Image2D>> BloomConv_PongTexture;
+
+			// Bloom Convolution Filter pass
+			Ref<Shader> BloomConvolutionFilterShader;
+			Ref<ComputePipeline> BloomConvFilterPipeline;
+			Vector<Ref<Material>> BloomConvFilterDescriptor;
+			Vector<Ref<Image2D>> BloomConvFilterTexture;
 #endif
 
 
@@ -159,6 +194,18 @@ namespace Frost
 			Vector<Ref<Material>> ColorCorrectionDescriptor;
 			Vector<Ref<Image2D>> ColorCorrectionTexture;
 			Vector<Ref<Image2D>> FinalTexture;
+
+			// FXAA
+			Ref<Shader> FXAAShader;
+			Ref<ComputePipeline> FXAAPipeline;
+			Vector<Ref<Material>> FXAADescriptor;
+			Vector<Ref<Image2D>> FXAAImage;
+
+			// TAA
+			Ref<Shader> TAAShader;
+			Ref<ComputePipeline> TAAPipeline;
+			Vector<Ref<Material>> TAADescriptor;
+			Vector<Ref<Image2D>> TAATextureAcummulation;
 		};
 
 		InternalData* m_Data;

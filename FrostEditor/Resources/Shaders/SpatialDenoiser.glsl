@@ -53,10 +53,56 @@ float Sample2x2(sampler2D tex, vec2 loc)
 	return (color.x + color.y + color.z + color.w) / 4.0f;
 }
 
+float Gaussian(float sigma, float x)
+{
+    return exp(-(x*x) / (2.0 * sigma*sigma));
+}
+
+float g_sigmaX = 3.0;
+float g_sigmaY = 3.0;
+float g_sigmaV = 1.0;
+
+vec2 g_pixelSize = vec2(0.001);
+vec2 g_pixelSizeGuide = vec2(0.001);
+
+float JoinedBilateralGaussianBlur(vec2 uv)
+{   
+    const float c_halfSamplesX = 1.0;
+	const float c_halfSamplesY = 1.0;
+
+    float total = 0.0;
+    float ret = 0.0;
+
+    float pivot = texture(i_Texture, uv).r;
+    
+    for (float iy = -c_halfSamplesY; iy <= c_halfSamplesY; iy++)
+    {
+        float fy = Gaussian( g_sigmaY, iy );
+        float offsety = iy * g_pixelSize.y;
+
+        for (float ix = -c_halfSamplesX; ix <= c_halfSamplesX; ix++)
+        {
+            float fx = Gaussian( g_sigmaX, ix );
+            float offsetx = ix * g_pixelSize.x;
+            
+            float value = texture(i_Texture, uv + vec2(offsetx, offsety)).r;
+                        
+            float fv = Gaussian( g_sigmaV, abs(value - pivot) );
+            
+            float weight = fx*fy*fv;
+            total += weight;
+            ret += weight * value.r;
+        }
+    }
+        
+    return ret / total;
+}
+
+
 void main()
 {
 	// NOTE: 4x4 filter offsets image
-	ivec2 loc = ivec2(gl_GlobalInvocationID.xy) - ivec2(2);
+	ivec2 loc = ivec2(gl_GlobalInvocationID.xy);
 	float totalao = 0.0;
 
 	vec2 baseSize = vec2(textureSize(i_Texture, 0));
@@ -67,10 +113,16 @@ void main()
 
 	// NOTE: textureGather requires GL 4
 
-	totalao += Sample2x2(i_Texture, uv + texelSize * vec2(0, 0));
-	totalao += Sample2x2(i_Texture, uv + texelSize * vec2(2, 0));
-	totalao += Sample2x2(i_Texture, uv + texelSize * vec2(0, 2));
-	totalao += Sample2x2(i_Texture, uv + texelSize * vec2(2, 2));
+    //totalao = texture(i_Texture, uv).r;
+	//totalao += Sample2x2(i_Texture, uv + texelSize * vec2(0, 0));
+	//totalao += Sample2x2(i_Texture, uv + texelSize * vec2(2, 0));
+	//totalao += Sample2x2(i_Texture, uv + texelSize * vec2(0, 2));
+	//totalao += Sample2x2(i_Texture, uv + texelSize * vec2(2, 2));
+    //totalao /= 4.0;
+
+    g_sigmaV += 0.001;
+    g_sigmaV      = 0.6;
+    totalao = JoinedBilateralGaussianBlur(uv);
 
 	//totalao += texture(i_Texture, uv + texelSize * vec2(0.0, 0.0)).r;
 	//totalao += texture(i_Texture, uv + texelSize * vec2(1.0, 0.0)).r;
@@ -92,5 +144,5 @@ void main()
 	//totalao += texture(i_Texture, uv + texelSize * vec2(2.0, 3.0)).r;
 	//totalao += texture(i_Texture, uv + texelSize * vec2(3.0, 3.0)).r;
 
-	imageStore(o_Texture, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(totalao / 4.0f), 1.0f));
+	imageStore(o_Texture, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(totalao), 1.0f));
 }

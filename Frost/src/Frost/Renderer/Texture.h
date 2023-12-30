@@ -8,6 +8,10 @@ namespace Frost
 {
 	struct TextureSpecification
 	{
+		// This Image format is not really necessary, since the importer will automatically set it by the texture's internal format.
+		// However, there are 2 cases where it is useful:
+		//  1) When the importer does not know what format it is, it will automatically set the one that is here.
+		//  2) When the texture is uncompressed, and we set the format to a BCn format, it will automatically compress it.
 		ImageFormat Format = ImageFormat::RGBA8;
 		ImageUsage Usage = ImageUsage::Storage;
 		SamplerProperties Sampler{};

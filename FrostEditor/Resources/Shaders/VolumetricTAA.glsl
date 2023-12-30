@@ -15,19 +15,28 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout(binding = 0) uniform sampler3D u_CurrentVolumetricFroxel;
 layout(binding = 1) uniform sampler3D u_PreviousVolumetricFroxel;
 
-layout(binding = 2) writeonly uniform image3D u_ResolveVolumetricFroxel; // The same froxel as `u_CurrentVolumetricFroxel`, we don't more because we are only reading and writting at one texel per wrap (gpu core)
+layout(binding = 2, rgba16f) restrict writeonly uniform image3D u_ResolveVolumetricFroxel; // The same froxel as `u_CurrentVolumetricFroxel`, we don't more because we are only reading and writting at one texel per wrap (gpu core)
 
 layout(push_constant) uniform PushConstant
 {
 	mat4 InvViewProjMatrix;
-	mat4 PreviousViewProjMatrix;
-	mat4 PreviousInvViewProjMatrix;
+	//mat4 PreviousViewProjMatrix;
+	//mat4 PreviousInvViewProjMatrix;
 
 	vec3 CameraPosition;
 	float Padding0;
 	vec3 PreviousCameraPosition;
 
 } u_PushConstant;
+
+layout(binding = 3) uniform PreviousCameraData
+{
+	//mat4 InvViewProjMatrix;
+	mat4 PreviousViewProjMatrix;
+	mat4 PreviousInvViewProjMatrix;
+
+} u_UniformBuffer;
+
 
 bool InFrustum(vec3 ndc)
 {
@@ -110,12 +119,12 @@ void main()
 	vec3 worldSpacePosition = u_PushConstant.CameraPosition + direction * w * w;
 
 	// Project the current world space position into the previous frame
-	worldSpaceMax = u_PushConstant.PreviousViewProjMatrix * vec4(worldSpacePosition, 1.0);
+	worldSpaceMax = u_UniformBuffer.PreviousViewProjMatrix * vec4(worldSpacePosition, 1.0);
 	vec3 previousPosNDC = (worldSpaceMax.xyz / worldSpaceMax.w);
 	vec2 previousUV = 0.5 * previousPosNDC.xy + 0.5.xx;
 
 	// Also, compute the z component
-	worldSpaceMax = u_PushConstant.PreviousInvViewProjMatrix * vec4(previousUV * 2.0 - vec2(1.0), 1.0, 1.0);;
+	worldSpaceMax = u_UniformBuffer.PreviousInvViewProjMatrix * vec4(previousUV * 2.0 - vec2(1.0), 1.0, 1.0);;
 	vec3 previousWorldSpaceMax = (worldSpaceMax.xyz / worldSpaceMax.w);
 	float previousFarPlaneLength = length(previousWorldSpaceMax - u_PushConstant.PreviousCameraPosition);
 	float previousZ = length(worldSpacePosition - u_PushConstant.PreviousCameraPosition);
@@ -134,7 +143,8 @@ void main()
 	// Compute the final result
 	vec4 finalResult;
 	if(InFrustum(previousPosNDC))
-		finalResult = mix(lastFrameResult, currentResult, 0.02);
+		finalResult = mix(lastFrameResult, currentResult, 0.15);
+		//finalResult = mix(lastFrameResult, currentResult, 0.02);
 	else
 		finalResult = currentResult;
 		

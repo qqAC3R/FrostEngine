@@ -14,7 +14,7 @@ namespace Frost
 	{
 	public:
 		VulkanImage2D(const ImageSpecification& specification);
-		VulkanImage2D(const ImageSpecification& specification, const void* data);
+		VulkanImage2D(const ImageSpecification& specification, const Buffer& bufferData);
 		virtual ~VulkanImage2D();
 
 		virtual void Destroy() override;
@@ -58,7 +58,7 @@ namespace Frost
 		}
 	private:
 		void UpdateDescriptor();
-		void CalculateMipSizes();
+		void CalculateMipSizes(bool useCompression);
 	private:
 		VkImage m_Image = VK_NULL_HANDLE;
 		VulkanMemoryInfo m_ImageMemory;
@@ -88,7 +88,7 @@ namespace Frost
 		void CreateImageView(VkImageView& imageView, VkImage image, VkImageUsageFlags imageUsage, VkFormat format, uint32_t mipLevels, uint32_t textureDepth);
 		void CreateImageSampler(VkSampler& sampler, VkFilter filtering, VkSamplerAddressMode samplerAdressMode, VkSamplerMipmapMode samplerMipMapMode, uint32_t mipLevels, VkSamplerReductionMode reductionMode = VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE);
 
-		void CopyBufferToImage(VkCommandBuffer cmdBuf, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t depth);
+		void CopyBufferToImage(VkCommandBuffer cmdBuf, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevel = 0, uint64_t bufferOffset = 0);
 
 		VkFormat GetImageFormat(ImageFormat imageFormat);
 		VkFilter GetImageFiltering(ImageFilter imageFiltering);
@@ -102,5 +102,7 @@ namespace Frost
 		VkSamplerReductionMode GetSamplerReductionMode(ReductionMode reductionMode);
 		VkPipelineStageFlags GetPipelineStageFlagsFromLayout(VkImageLayout imageLayout);
 		VkDeviceSize CalculateImageBufferSize(uint32_t width, uint32_t height, ImageFormat imageFormat);
+		uint32_t GetBlockSizeFromCompressedImageFormat(ImageFormat imageFormat);
+		uint32_t GetBitsPerPixelFromCompressedImageFormat(ImageFormat imageFormat);
 	}
 }

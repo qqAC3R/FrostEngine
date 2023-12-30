@@ -3,8 +3,6 @@
 #include "Frost/Renderer/SceneRenderPass.h"
 #include "Frost/Renderer/Renderer.h"
 
-#define SHADOW_MAP_CASCADE_COUNT 4
-
 namespace Frost
 {
 	class VulkanShadowPass : public SceneRenderPass
@@ -72,11 +70,11 @@ namespace Frost
 			// Global Instaced Vertex Buffer
 			Vector<HeapBlock> GlobalInstancedVertexBuffer;
 
-			glm::mat4 CascadeViewProjMatrix[SHADOW_MAP_CASCADE_COUNT];
+			glm::mat4 CascadeViewProjMatrix[4];
 			glm::vec4 CascadeDepthSplit;
 
-			glm::vec2 MinResCascade[SHADOW_MAP_CASCADE_COUNT];
-			glm::vec2 MaxResCascade[SHADOW_MAP_CASCADE_COUNT];
+			glm::vec2 MinResCascade[4];
+			glm::vec2 MaxResCascade[4];
 		};
 
 		struct PushConstantData
@@ -91,6 +89,8 @@ namespace Frost
 		{
 			glm::mat4 InvViewProjection;
 			glm::vec4 CascadeDepthSplit;
+			float NearCameraClip;
+			float FarCameraClip;
 		};
 		PushConstantShadowComputeData m_PushConstantShadowComputeData;
 

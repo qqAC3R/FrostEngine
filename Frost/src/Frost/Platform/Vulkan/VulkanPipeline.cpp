@@ -91,11 +91,21 @@ namespace Frost
 			switch (attachment->GetSpecification().Format)
 			{
 				case ImageFormat::R8:
-				case ImageFormat::R32:
+				case ImageFormat::R16F:
+				case ImageFormat::R32F:
 				case ImageFormat::R32I:
 				{
 					auto& colorAttachment = colorBlendAttachment.emplace_back();
 					colorAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT;
+					colorAttachment.blendEnable = VK_FALSE;
+					colorAttachmentCount++;
+					break;
+				}
+				case ImageFormat::RG16F:
+				case ImageFormat::RG32F:
+				{
+					auto& colorAttachment = colorBlendAttachment.emplace_back();
+					colorAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
 					colorAttachment.blendEnable = VK_FALSE;
 					colorAttachmentCount++;
 					break;

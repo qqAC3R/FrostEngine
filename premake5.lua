@@ -38,6 +38,8 @@ IncludeDir["Mono"] = "Frost/vendor/mono/include"
 IncludeDir["msdfgen"] = "Frost/vendor/msdf/msdfgen"
 IncludeDir["msdf_atlas_gen"] = "Frost/vendor/msdf/msdf-atlas-gen"
 IncludeDir["imgui_node_editor"] = "Frost/vendor/imgui-node-editor"
+IncludeDir["Compressonator"] = "Frost/vendor/Compressonator/include"
+IncludeDir["meshoptimizer"] = "Frost/vendor/meshoptimizer/include"
 
 LibraryDir = {}
 
@@ -68,6 +70,8 @@ group "Dependencies"
 	include "Frost/vendor/ozz-animation"
 	include "Frost/vendor/ImGui"
 	include "Frost/vendor/msdf"
+	include "Frost/vendor/Compressonator"
+	include "Frost/vendor/meshoptimizer"
 group ""
 
 group "Core"
@@ -132,6 +136,8 @@ project "Frost"
 		"%{IncludeDir.json}/json",
 		"%{IncludeDir.PhysX}",
 		"%{IncludeDir.FontAwesome}",
+		"%{IncludeDir.Compressonator}",
+		"%{IncludeDir.meshoptimizer}",
 		"%{IncludeDir.Mono}"
 	}
 
@@ -147,6 +153,8 @@ project "Frost"
 		"SPIR-V_Cross",
 		"OZZ-Animation",
 		"msdf-atlas-gen",
+		"Compressonator",
+		"MeshOptimizer",
 
 		"%{Library.Vulkan}", -- vulkan-1.lib
 		"shaderc_shared.lib",

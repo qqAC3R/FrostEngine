@@ -53,7 +53,7 @@ namespace Frost
 		uint32_t VoxelTextureResolution = 256;
 
 		// Volumetric Pass
-		uint32_t VoluemtricFroxelSlicesZ = 64;
+		uint32_t VoluemtricFroxelSlicesZ = 128;
 	};
 
 	// Memory Usage:
@@ -106,6 +106,7 @@ namespace Frost
 
 		static uint32_t ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y);
 		static uint32_t GetCurrentFrameIndex();
+		static uint64_t GetFrameCount();
 		static Ref<Scene> GetActiveScene();
 
 		// We must request a function returning a texture, instead of texture,

@@ -4,6 +4,8 @@
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
+#pragma optionNV(unroll all)
+
 // Constants
 const float PI = 3.141592;
 const float Epsilon = 0.00001;
@@ -42,8 +44,7 @@ struct RectangularLight
 };
 
 // Output color
-//layout(location = 1) out vec4 o_Color;
-layout(binding = 0, rgba16f) uniform writeonly image2D o_Image;
+layout(binding = 0, rgba16f) uniform restrict writeonly image2D o_Image;
 
 // Data from the material system
 //layout(binding = 1) uniform sampler2D u_PositionTexture;
@@ -73,6 +74,7 @@ layout(binding = 9) uniform UniformBuffer
 	float PointLightCount;
 	float LightCullingWorkgroup;
 	float RectangularLightCount;
+	int UseGlobalIllumination;
 } u_UniformBuffer;
 
 // Voxel Cone Tracing
@@ -187,7 +189,7 @@ float nGGX(float nDotH, float actualRoughness)
 {
 	float a = nDotH * actualRoughness;
 	float k = actualRoughness / (1.0 - nDotH * nDotH + a * a);
-	return k * k * (1.0 / PI);
+	return clamp(k * k * (1.0 / PI), 0.0, 1.0);
 }
 
 // Fast visibility term. Incorrect as it approximates the two square roots.
@@ -219,7 +221,7 @@ vec3 Fs_CookTorrance(float nDotH,
 	float D = nGGX(nDotH, actualRoughness);
 	vec3 F = sFresnel(vDotH, f0, f90);
 	float V = vGGXFast(nDotV, nDotL, actualRoughness);
-	return D * F * V;
+	return vec3(D * F * V);
 }
 
 //   for the diffuse component of the BRDF. Corrected to guarantee
@@ -594,6 +596,9 @@ vec3 ComputeWorldPos(float depth)
 void main()
 {
 	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 imgSize = imageSize(o_Image).xy;
+	vec2 uv = (vec2(pixelCoord) + 0.5.xx) / vec2(imgSize);
+
 
     // Calculating the normals and worldPos
 	float depth =           texelFetch(u_DepthBuffer, pixelCoord, 0).r; 
@@ -616,8 +621,11 @@ void main()
 
 
 	// Sample the Voxel Cone Tracing textures
-	s_IndirectDiffuse = texelFetch(u_VoxelIndirectDiffuseTex, pixelCoord, 0).rgb;
-	s_IndirectSpecular = texelFetch(u_VoxelIndirectSpecularTex, pixelCoord, 0).rgb;
+	if(u_UniformBuffer.UseGlobalIllumination == 1)
+	{
+		s_IndirectDiffuse = texelFetch(u_VoxelIndirectDiffuseTex, pixelCoord, 0).rgb;
+		s_IndirectSpecular = texelFetch(u_VoxelIndirectSpecularTex, pixelCoord, 0).rgb;
+	}
 
 
 	// Calculating all point lights contribution
@@ -651,7 +659,7 @@ void main()
 	vec3 Ld = ComputeDirectionalLightContribution(dirLight);
 
 	// Adding up the point light and directional light contribution
-    vec3 result = Lo + (Ld * texelFetch(u_ShadowTexture, pixelCoord, 0).rgb);
+    vec3 result = Lo + (Ld * texture(u_ShadowTexture, uv).rgb);
 
 	// Adding up the ibl
 	float IBLIntensity = 3.0f;

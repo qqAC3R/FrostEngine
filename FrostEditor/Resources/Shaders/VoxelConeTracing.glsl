@@ -5,7 +5,8 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler3D u_VoxelTexture;
 
-layout(binding = 1) uniform sampler2D u_PositionTexture;
+//layout(binding = 1) uniform sampler2D u_PositionTexture;
+layout(binding = 1) uniform sampler2D u_DepthTexture;
 layout(binding = 2) uniform sampler2D u_NormalTexture;
 
 layout(binding = 3, rgba16f) uniform writeonly image2D u_IndirectDiffuseTexture;
@@ -13,6 +14,8 @@ layout(binding = 4, rgba16f) uniform writeonly image2D u_IndirectSpecularTexture
 
 layout(push_constant) uniform PushConstant
 {
+	mat4 InvViewProjMatrix;
+
 	vec3 VoxelSampleOffset;
 	float VoxelGrid;
 
@@ -245,7 +248,16 @@ vec3 DecodeNormal(vec2 e)
 	return normalize(v);
 }
 // =======================================================
-
+// Decodes the worldspace position of the fragment from depth.
+vec3 DecodePosition(ivec2 coords)
+{
+	vec2 texCoords = (vec2(coords) + vec2(0.5f)) / vec2(imageSize(u_IndirectDiffuseTexture).xy);
+	float depth = texelFetch(u_DepthTexture, coords, 0).r;
+	vec3 clipCoords = vec3(texCoords * 2.0 - 1.0, depth);
+	
+	vec4 temp = u_PushConstant.InvViewProjMatrix * vec4(clipCoords, 1.0);
+	return temp.xyz / temp.w;
+}
 
 void main()
 {
@@ -254,7 +266,7 @@ void main()
 
 
 	// World Pos
-	vec3 worldPos = texture(u_PositionTexture, uv).rgb;
+	vec3 worldPos = DecodePosition(globalInvocation);
 
 	// Decode normals
 	vec2 encodedNormal =   texture(u_NormalTexture, uv).rg;

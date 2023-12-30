@@ -1,21 +1,25 @@
 #type compute
 #version 460 
 
-layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
+#pragma optionNV(unroll all)
 
 layout(binding = 0) uniform sampler2D u_ShadowDepthTexture;
 layout(binding = 1) uniform sampler2D u_DepthBuffer;
 layout(binding = 2) uniform sampler2D u_ViewPositionTexture;
-layout(binding = 3, rgba8) uniform writeonly image2D u_ShadowTextureOutput;
+layout(binding = 3) uniform sampler2D u_NormalTexture;
+layout(binding = 4, rgba8) uniform restrict writeonly image2D u_ShadowTextureOutput;
 
 layout(push_constant) uniform PushConstant
 {
 	mat4 InvViewProjection;
 	vec4 CascadeDepthSplit;
+	float NearCameraClip;
+	float FarCameraClip;
 } u_PushConstant;
 
-layout(binding = 4) uniform DirectionaLightData
+layout(binding = 5) uniform DirectionaLightData
 {
 	mat4 LightViewProjMatrix0;
 	mat4 LightViewProjMatrix1;
@@ -39,13 +43,6 @@ float GLOBAL_BIAS = 0.002;
 float delta = 0.0;
 const float PI = 3.141592;
 
-const mat4 BIAS_MAT = mat4( 
-	0.5, 0.0, 0.0, 0.0,
-	0.0, 0.5, 0.0, 0.0,
-	0.0, 0.0, 1.0, 0.0,
-	0.5, 0.5, 0.0, 1.0 
-);
-
 
 vec2 SamplePoisson(int index);
 
@@ -54,7 +51,8 @@ uint GetCascadeIndex(float viewPosZ);
 
 vec2 ComputeShadowCoord(vec2 coord, uint cascadeIndex);
 float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex);
-
+vec4 SampleShadowMap_Gather(vec2 shadowCoords, uint cascadeIndex);
+float AverageBlockDepth(vec4 projCoords, uint cascadeIndex, float w_light);
 
 float HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 {
@@ -73,6 +71,21 @@ float HardShadows_SampleShadowTexture(vec4 shadowCoord, uint cascadeIndex)
 	return shadow;
 }
 
+// Fast octahedron normal vector decoding.
+// https://jcgt.org/published/0003/02/01/
+vec2 SignNotZero(vec2 v)
+{
+	return vec2((v.x >= 0.0) ? 1.0 : -1.0, (v.y >= 0.0) ? 1.0 : -1.0);
+}
+vec3 DecodeNormal(vec2 e)
+{
+	vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
+	if (v.z < 0)
+		v.xy = (1.0 - abs(v.yx)) * SignNotZero(v.xy);
+	return normalize(v);
+}
+
+
 
 
 // Interleaved gradient noise from:
@@ -86,10 +99,10 @@ float InterleavedGradientNoise(vec2 uvs)
 // Create a rotation matrix with the noise function above.
 mat2 RandomRotation(vec2 uvs)
 {
-  float theta = 2.0 * PI * InterleavedGradientNoise(uvs);
-  float sinTheta = sin(theta);
-  float cosTheta = cos(theta);
-  return mat2(cosTheta, sinTheta, -sinTheta, cosTheta);
+	float theta = 2.0 * PI * InterleavedGradientNoise(uvs);
+	float sinTheta = sin(theta);
+	float cosTheta = cos(theta);
+	return mat2(cosTheta, sinTheta, -sinTheta, cosTheta);
 }
 
 float SearchRegionRadiusUV(float zWorld)
@@ -103,9 +116,9 @@ int GetRequiredPCFSamplesForCascade(uint cascadeIndex)
 {
 	switch(cascadeIndex)
 	{
-		case 1: return 32;
-		case 2: return 16;
-		case 3: return 8;
+		case 1: return 8;
+		case 2: return 6;
+		case 3: return 4;
 		case 4: return 4;
 	}
 	return 0;
@@ -121,6 +134,177 @@ int GetRequiredBlockerSamplesForCascade(uint cascadeIndex)
 		case 4: return 6;
 	}
 	return 0;
+}
+
+// Depth Aware Contact harden pcf. See GDC2021: "Shadows of Cold War" for tech detail.
+// Use cache occluder dist to fit one curve similar to tonemapper, to get some effect like pcss.
+// can reduce tiny acne natively.
+float contactHardenPCFKernal(
+    const float occluders, 
+    const float occluderDistSum, 
+    const float compareDepth,
+    const uint shadowSampleCount)
+{
+    // Normalize occluder dist.
+    float occluderAvgDist = occluderDistSum / occluders;
+
+//#if SHADOW_DEPTH_GATHER
+    float w = 1.0 / float(4 * shadowSampleCount); // We gather 4 pixels.
+//#else
+//    float w = 1.0f / (1 * shadowSampleCount); 
+//#endif
+    
+    float pcfWeight = clamp(occluderAvgDist / compareDepth, 0.0, 1.0);
+    
+    // Normalize occluders.
+    float percentageOccluded = clamp(occluders * w, 0.0, 1.0);
+
+    // S curve fit.
+    percentageOccluded = 2.0 * percentageOccluded - 1.0;
+    float occludedSign = sign(percentageOccluded);
+    percentageOccluded = 1.0 - (occludedSign * percentageOccluded);
+    percentageOccluded = mix(percentageOccluded * percentageOccluded * percentageOccluded, percentageOccluded, pcfWeight);
+    percentageOccluded = 1.0 - percentageOccluded;
+    percentageOccluded *= occludedSign;
+    percentageOccluded = 0.5 * percentageOccluded + 0.5;
+
+#define SHADOW_COLOR 1
+
+    return percentageOccluded * SHADOW_COLOR;
+}
+
+
+// Auto bias by cacsade and NoL, some magic number here.
+float AutoBias(float NoL, float biasMul)
+{
+    return 1e-3f + (1.0f - NoL) * biasMul * 2e-3f;
+}
+
+float NewPCF(vec4 shadowCoords, uint cascadeIndex, float lightSize)
+{
+	// TODO: Add DPCF
+	// https://github.com/google/filament/blob/main/shaders/src/shadowing.fs#L257
+	// https://github.com/google/filament/blob/main/shaders/src/shadowing.fs#L257
+
+
+	float bias = GLOBAL_BIAS;
+	
+	float compareDepth = shadowCoords.z + bias;
+
+	int numPCFSamples = 64;
+	//int requiredPCFSamples = GetRequiredPCFSamplesForCascade(cascadeIndex);
+	int requiredPCFSamples = 12;
+	int additionFactor = numPCFSamples / requiredPCFSamples;
+
+	mat2 rot = RandomRotation(vec2(gl_GlobalInvocationID.xy));
+	vec2 texelSize = 1.0 / (textureSize(u_ShadowDepthTexture, 0) / 2.0);
+
+	float occluders = 0.0;
+	float occluderDistSum = 0.0;
+
+	//const float NEAR = 0.001;
+	//float uvRadius = lightSize * NEAR * 2.0;
+
+	//float blockerDistance = AverageBlockDepth(shadowCoords, cascadeIndex, lightSize);
+	float receiverDepth = shadowCoords.z;
+	float penumbraWidth = pow(0.5, float(cascadeIndex));
+	//float penumbraWidth = 0.1;
+	const float NEAR = 0.01;
+	float uvRadius = penumbraWidth * lightSize * NEAR / receiverDepth;
+
+
+
+	float sum = 0.0;
+	for (int i = 0; i < numPCFSamples; i += additionFactor)
+	{
+		vec2 offset;
+		offset = (rot) * SamplePoisson(i) * uvRadius;
+
+		
+		//float z = SampleShadowMap((shadowCoords.xy) + offset, cascadeIndex);
+		//{
+		//	float dist = z - compareDepth;
+		//	float occluder = step(0.0, dist); // reverse z.
+		//
+		//	// Collect occluders.
+		//	occluders += occluder;
+		//	occluderDistSum += dist * occluder;
+		//}
+
+		vec4 depths = SampleShadowMap_Gather((shadowCoords.xy) + offset, cascadeIndex);
+		//for (uint j = 0; j < 4; j++)
+		//{
+		//	float dist = depths[j] - compareDepth;
+		//	float occluder = step(0.0, dist); // reverse z.
+		//
+		//	// Collect occluders.
+		//	occluders += occluder;
+		//	occluderDistSum += dist * occluder;
+		//}
+
+		float z = (depths.x + depths.y + depths.z + depths.w) / 4.0;
+
+		sum += step(shadowCoords.z - bias, z);
+
+	}
+	return sum / float(requiredPCFSamples);
+	//return contactHardenPCFKernal(occluders, occluderDistSum, compareDepth, requiredPCFSamples);
+}
+
+
+
+
+// Poisson disk generated with 'poisson-disk-generator' tool from
+// https://github.com/corporateshark/poisson-disk-generator by Sergey Kosarevsky
+/*const*/ mediump vec2 poissonDisk[64] = vec2[]( // don't use 'const' b/c of OSX GL compiler bug
+    vec2(0.511749, 0.547686), vec2(0.58929, 0.257224), vec2(0.165018, 0.57663), vec2(0.407692, 0.742285),
+    vec2(0.707012, 0.646523), vec2(0.31463, 0.466825), vec2(0.801257, 0.485186), vec2(0.418136, 0.146517),
+    vec2(0.579889, 0.0368284), vec2(0.79801, 0.140114), vec2(-0.0413185, 0.371455), vec2(-0.0529108, 0.627352),
+    vec2(0.0821375, 0.882071), vec2(0.17308, 0.301207), vec2(-0.120452, 0.867216), vec2(0.371096, 0.916454),
+    vec2(-0.178381, 0.146101), vec2(-0.276489, 0.550525), vec2(0.12542, 0.126643), vec2(-0.296654, 0.286879),
+    vec2(0.261744, -0.00604975), vec2(-0.213417, 0.715776), vec2(0.425684, -0.153211), vec2(-0.480054, 0.321357),
+    vec2(-0.0717878, -0.0250567), vec2(-0.328775, -0.169666), vec2(-0.394923, 0.130802), vec2(-0.553681, -0.176777),
+    vec2(-0.722615, 0.120616), vec2(-0.693065, 0.309017), vec2(0.603193, 0.791471), vec2(-0.0754941, -0.297988),
+    vec2(0.109303, -0.156472), vec2(0.260605, -0.280111), vec2(0.129731, -0.487954), vec2(-0.537315, 0.520494),
+    vec2(-0.42758, 0.800607), vec2(0.77309, -0.0728102), vec2(0.908777, 0.328356), vec2(0.985341, 0.0759158),
+    vec2(0.947536, -0.11837), vec2(-0.103315, -0.610747), vec2(0.337171, -0.584), vec2(0.210919, -0.720055),
+    vec2(0.41894, -0.36769), vec2(-0.254228, -0.49368), vec2(-0.428562, -0.404037), vec2(-0.831732, -0.189615),
+    vec2(-0.922642, 0.0888026), vec2(-0.865914, 0.427795), vec2(0.706117, -0.311662), vec2(0.545465, -0.520942),
+    vec2(-0.695738, 0.664492), vec2(0.389421, -0.899007), vec2(0.48842, -0.708054), vec2(0.760298, -0.62735),
+    vec2(-0.390788, -0.707388), vec2(-0.591046, -0.686721), vec2(-0.769903, -0.413775), vec2(-0.604457, -0.502571),
+    vec2(-0.557234, 0.00451362), vec2(0.147572, -0.924353), vec2(-0.0662488, -0.892081), vec2(0.863832, -0.407206)
+);
+
+void blockerSearchAndFilter(vec4 shadowPosition, uint cascadeIndex, const mat2 randomRotation, vec2 filterRadii, float shadowBulbRadius, const uint tapCount, out float occludedCount, out float z_occSum)
+{
+    occludedCount = 0.0;
+    z_occSum = 0.0;
+
+    for (uint i = 0; i < tapCount; i++)
+	{
+        vec2 duv = randomRotation * (poissonDisk[i] * filterRadii);
+		vec2 uv = shadowPosition.xy;
+        vec2 tc = uv + duv;
+
+        //float z_occ = SampleShadowMap(tc, cascadeIndex);
+        vec4 z_occs = SampleShadowMap_Gather(tc, cascadeIndex);
+		float z_occ = (z_occs.x + z_occs.y + z_occs.z + z_occs.w) / 4.0;
+		float z_rec = shadowPosition.z;
+
+        // note: z_occ and z_rec are not necessarily linear here, comparing them is always okay for
+        // the regular PCF, but the "distance" is meaningless unless they are actually linear
+        // (e.g.: for the directional light).
+        // Either way, if we assume that all the samples are close to each other we can take their
+        // average regardless, and the average depth value of the occluders
+        // becomes: z_occSum / occludedCount.
+
+        // receiver plane depth bias
+        float z_bias = 0.003;
+		float dz = z_rec - z_occ;
+        float occluded = step(z_bias, dz);
+        occludedCount += occluded;
+        z_occSum += z_occ * occluded;
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -204,34 +388,57 @@ float PCFDirectionalLight(vec4 shadowCoords, uint cascadeIndex, float uvRadius, 
 	for (int i = 0; i < numPCFSamples; i += additionFactor)
 	{
 		vec2 offset;
-		if(cascadeIndex <= 2)
+		//if(cascadeIndex <= 2)
 			offset = (rot * blockerDistance) * SamplePoisson(i) * uvRadius;
-		else
-			offset = SamplePoisson(i) * uvRadius;
+		//else
+		//	offset = SamplePoisson(i) * uvRadius;
 
+		
 		float z = SampleShadowMap((shadowCoords.xy) + offset, cascadeIndex);
+		//vec4 depths = SampleShadowMap_Gather((shadowCoords.xy) + offset, cascadeIndex);
+		//for (uint j = 0; j < 4; j++)
+		//{
+		//	float dist = depths[j] - compareDepth;
+		//	float occluder = step(0.0, dist); // reverse z.
+		//
+		//	// Collect occluders.
+		//	occluders += occluder;
+		//	occluderDistSum += dist * occluder;
+		//}
+
 		sum += step(shadowCoords.z - bias, z);
 	}
 	return sum / float(requiredPCFSamples);
 }
 
-float PCSS_SampleShadowTexture(vec4 shadowCoords, uint cascadeIndex, float lightSize)
+float PCSS_SampleShadowTexture(vec4 shadowCoords, uint cascadeIndex, float lightSize, float customDepth)
 {
-	if(cascadeIndex == 3) return PCFDirectionalLight(shadowCoords, cascadeIndex, 0.001, 0.1);
-	if(cascadeIndex == 4) return PCFDirectionalLight(shadowCoords, cascadeIndex, 0.0001, 0.5);
+	if(cascadeIndex >= 3) return PCFDirectionalLight(shadowCoords, cascadeIndex, 0.0001, 0.5);
+
+	vec2 texelSize = vec2(1.0) / (vec2(textureSize(u_ShadowDepthTexture, 0).xy) / 2.0);
+
+	// Custom function (https://www.desmos.com/calculator/6wqdtlndfm)
+	lightSize = -3.0 * exp(-1.1 * lightSize) + 3.0;
 
 	//float blockerDistance = FindBlockerDistance(shadowCoords, cascadeIndex, lightSize);
-	float blockerDistance = AverageBlockDepth(shadowCoords, cascadeIndex, lightSize);
+	//float blockerDistance = AverageBlockDepth(shadowCoords, cascadeIndex, lightSize);
 
-	if(blockerDistance == -1.0) return 1.0; // No occlusion
+	float occludedCount, occlusionSum;
+	//float blockerDistance = AverageBlockDepth(shadowCoords, cascadeIndex, lightSize, x1, x2);
+
+	mat2 rot = RandomRotation(vec2(gl_GlobalInvocationID.xy));
+	blockerSearchAndFilter(
+		shadowCoords, cascadeIndex, rot, texelSize * lightSize, lightSize, 12u, occludedCount, occlusionSum
+	);
+	float blockerDistance = occlusionSum / occludedCount;
+	
+	if(blockerDistance == 0.0) return 0.0; // No occlusion
 
 	float receiverDepth = shadowCoords.z;
 	float penumbraWidth = (receiverDepth - blockerDistance) / blockerDistance;
 	const float NEAR = 0.01;
 	float uvRadius = penumbraWidth * lightSize * NEAR / receiverDepth;
 
-	//uvRadius = min(uvRadius, 0.002);
-	//return blockerDistance;
 	return PCFDirectionalLight(shadowCoords, cascadeIndex, uvRadius, blockerDistance);
 }
 
@@ -246,6 +453,8 @@ vec3 ComputeWorldPos(float depth)
     viewSpacePosition /= viewSpacePosition.w; // Perspective division
 	return vec3(viewSpacePosition);
 }
+
+
 
 void main()
 {
@@ -262,6 +471,7 @@ void main()
 	vec3 position = ComputeWorldPos(depth);
 	float lightSize = u_DirLightData.DirectionLightSize;
 
+	
 	// Depth compare for shadowing
 	vec4 shadowCoord = ((GetCascadeMatrix(cascadeIndex))) * vec4(position, 1.0);
 	shadowCoord /= shadowCoord.w;
@@ -308,7 +518,8 @@ void main()
 		shadowFactor = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
 	}
 	*/
-	shadowFactor = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
+	shadowFactor = u_DirLightData.UsePCSS == 1 ? PCSS_SampleShadowTexture(shadowCoord, cascadeIndex, lightSize, 1.0) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
+	//shadowFactor = u_DirLightData.UsePCSS == 1 ? NewPCF(shadowCoord, cascadeIndex, lightSize) : HardShadows_SampleShadowTexture(shadowCoord, cascadeIndex);
 
 	
 	vec3 shadow = vec3(clamp(shadowFactor, 0.0f, 1.0f));
@@ -421,6 +632,13 @@ float SampleShadowMap(vec2 shadowCoords, uint cascadeIndex)
 	vec2 coords = ComputeShadowCoord(shadowCoords.xy, cascadeIndex);
 	float dist = texture(u_ShadowDepthTexture, coords).r;
 	return dist;
+}
+
+vec4 SampleShadowMap_Gather(vec2 shadowCoords, uint cascadeIndex)
+{
+	vec2 coords = ComputeShadowCoord(shadowCoords.xy, cascadeIndex);
+	vec4 depths = textureGather(u_ShadowDepthTexture, coords, 0);
+	return depths;
 }
 
 mat4 GetCascadeMatrix(uint cascadeIndex)

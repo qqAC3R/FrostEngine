@@ -130,6 +130,8 @@ namespace Frost
 		ScriptEngine::OnHotReload(Project::GetScriptModulePath().string());
 
 
+		//FROST_CORE_INFO("{0}, {1}", m_ViewportPanel->GetViewportPanelSize().x, m_ViewportPanel->GetViewportPanelSize().y);
+
 		m_CurrentScene->SetSelectedEntity(m_SceneHierarchyPanel->GetSelectedEntity());
 
 		if (m_SceneState == SceneState::Play)
@@ -147,8 +149,8 @@ namespace Frost
 			}
 			else
 			{
-				if (m_ViewPortMouseHovered || Input::GetCursorMode() == CursorMode::Locked)
-					m_EditorCamera->OnUpdate(ts);
+				bool disableCameraMovement = m_ViewPortMouseHovered || Input::GetCursorMode() == CursorMode::Locked;
+				m_EditorCamera->OnUpdate(ts, disableCameraMovement);
 
 				Renderer::BeginScene(m_CurrentScene, m_EditorCamera);
 				m_CurrentScene->Update(ts);
@@ -158,8 +160,8 @@ namespace Frost
 		}
 		else
 		{
-			if (m_ViewPortMouseHovered || Input::GetCursorMode() == CursorMode::Locked)
-				m_EditorCamera->OnUpdate(ts);
+			bool disableCameraMovement = !(m_ViewPortMouseHovered || Input::GetCursorMode() == CursorMode::Locked);
+			m_EditorCamera->OnUpdate(ts, disableCameraMovement);
 
 			Renderer::BeginScene(m_CurrentScene, m_EditorCamera);
 			m_CurrentScene->Update(ts);
@@ -370,7 +372,7 @@ namespace Frost
 					ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, windowWidth, windowHeight);
 
 					// Camera
-					const glm::mat4& cameraProjection = m_EditorCamera->GetProjectionMatrix();
+					const glm::mat4& cameraProjection = m_EditorCamera->GetNonJitteredProjectionMatrix();
 					glm::mat4 cameraView = glm::inverse(glm::translate(glm::mat4(1.0f),
 						m_EditorCamera->GetPosition()) * glm::toMat4(m_EditorCamera->GetOrientation())
 					);

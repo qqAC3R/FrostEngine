@@ -125,11 +125,11 @@ namespace Frost
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width / 1.0f;
+			imageSpec.Width = width /   1.0f;
 			imageSpec.Height = height / 1.0f;
 			imageSpec.Format = ImageFormat::RGBA8;
 			imageSpec.Usage = ImageUsage::Storage;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
 			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			m_Data->ShadowComputeTexture[i] = Image2D::Create(imageSpec);
 		}
@@ -143,10 +143,12 @@ namespace Frost
 			Ref<VulkanMaterial> vulkanDescriptor = m_Data->ShadowComputeDescriptor[i].As<VulkanMaterial>();
 
 			Ref<Image2D> depthBuffer = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(i);
-			Ref<Image2D> viewPositionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(3, i);
+			Ref<Image2D> viewPositionTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(2, i);
+			Ref<Image2D> normalTexture = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(0, i);
 
 			vulkanDescriptor->Set("u_DepthBuffer", depthBuffer);
 			vulkanDescriptor->Set("u_ViewPositionTexture", viewPositionTexture);
+			//vulkanDescriptor->Set("u_NormalTexture", normalTexture);
 			vulkanDescriptor->Set("u_ShadowDepthTexture", m_Data->ShadowDepthRenderPass->GetDepthAttachment(i));
 			vulkanDescriptor->Set("u_ShadowTextureOutput", m_Data->ShadowComputeTexture[i]);
 
@@ -168,7 +170,7 @@ namespace Frost
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width / 1.0f;
+			imageSpec.Width = width /   1.0f;
 			imageSpec.Height = height / 1.0f;
 			imageSpec.Format = ImageFormat::RGBA8;
 			imageSpec.Usage = ImageUsage::Storage;
@@ -208,8 +210,8 @@ namespace Frost
 
 		VulkanRenderer::BeginTimeStampPass("Shadow Pass (Compute)");
 		ShadowComputeUpdate(renderQueue);
-		ShadowComputeDenoiseUpdate(renderQueue);
 		VulkanRenderer::EndTimeStampPass("Shadow Pass (Compute)");
+		//ShadowComputeDenoiseUpdate(renderQueue);
 	}
 
 
@@ -635,14 +637,16 @@ namespace Frost
 
 		m_PushConstantShadowComputeData.CascadeDepthSplit = m_Data->CascadeDepthSplit;
 		m_PushConstantShadowComputeData.InvViewProjection = glm::inverse(renderQueue.m_Camera->GetViewProjectionVK());
+		m_PushConstantShadowComputeData.NearCameraClip = renderQueue.m_Camera->GetNearClip();
+		m_PushConstantShadowComputeData.FarCameraClip = renderQueue.m_Camera->GetFarClip();
 
 		vulkanPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &m_PushConstantShadowComputeData);
 
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
 
-		uint32_t groupX = static_cast<uint32_t>(std::ceil((width / 1.0f) / 32.0f));
-		uint32_t groupY = static_cast<uint32_t>(std::ceil((height / 1.0f) / 32.0f));
+		uint32_t groupX = static_cast<uint32_t>(std::ceil((width /  1.0f) / 8.0f));
+		uint32_t groupY = static_cast<uint32_t>(std::ceil((height / 1.0f) / 8.0f));
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 		// Barrier
@@ -665,7 +669,7 @@ namespace Frost
 		float width = renderQueue.ViewPortWidth;
 		float height = renderQueue.ViewPortHeight;
 
-		uint32_t groupX = static_cast<uint32_t>(std::ceil((width / 1.0f) / 32.0f));
+		uint32_t groupX = static_cast<uint32_t>(std::ceil((width /  1.0f) / 32.0f));
 		uint32_t groupY = static_cast<uint32_t>(std::ceil((height / 1.0f) / 32.0f));
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
@@ -678,7 +682,10 @@ namespace Frost
 	{
 		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 
-		float cascadeSplits[SHADOW_MAP_CASCADE_COUNT];
+		//const int32_t CASCADE_COUNT = Renderer::GetRendererSettings().ShadowPass.CascadeCount;
+		int32_t CASCADE_COUNT = Renderer::GetRendererSettings().ShadowPass.CascadeCount;
+
+		Vector<float> cascadeSplits(CASCADE_COUNT);
 		float shadowTextureRes = Renderer::GetRendererConfig().ShadowTextureResolution;
 
 		float nearClip = renderQueue.m_Camera->GetNearClip();
@@ -696,9 +703,9 @@ namespace Frost
 
 		// Calculate split depths based on view camera frustum
 		// Based on method presented in https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch10.html
-		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
+		for (uint32_t i = 0; i < CASCADE_COUNT; i++)
 		{
-			float p = (i + 1) / static_cast<float>(SHADOW_MAP_CASCADE_COUNT);
+			float p = (i + 1) / static_cast<float>(CASCADE_COUNT);
 			float log = minZ * std::pow(ratio, p);
 			float uniform = minZ + range * p;
 			float d = rendererSettings.ShadowPass.CascadeSplitLambda * (log - uniform) + uniform;
@@ -710,7 +717,7 @@ namespace Frost
 
 		// Calculate orthographic projection matrix for each cascade
 		float lastSplitDist = 0.0;
-		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
+		for (uint32_t i = 0; i < CASCADE_COUNT; i++)
 		{
 			float splitDist = cascadeSplits[i];
 
@@ -759,7 +766,7 @@ namespace Frost
 				float distance = glm::length(glm::vec3(frustumCorner) - frustumCenter);
 				radius = glm::max(radius, distance);
 			}
-			radius = std::ceil(radius * 16.0f) / 16.0f;
+			radius = std::ceil(radius);
 
 			glm::vec3 maxExtents = glm::vec3(radius);
 			glm::vec3 minExtents = -maxExtents;

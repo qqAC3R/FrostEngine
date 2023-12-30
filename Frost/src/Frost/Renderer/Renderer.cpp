@@ -53,8 +53,8 @@ namespace Frost
 		// Init the shaders
 		s_Data->m_ShaderLibrary = Ref<ShaderLibrary>::Create();
 
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirectBindless.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPass.glsl");
+		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirectBindless.glsl");
+		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPass.glsl");
 		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/PBRDeffered.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PBRDeffered_Compute.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PreethamSky.glsl");
@@ -63,16 +63,20 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentIrradiance.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentMipFilter.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/RenderSkybox.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirect.glsl");
+		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirect.glsl");
 		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling_V2.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/OcclusionCulling_V3.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/HiZBufferBuilder.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledPointLightCulling.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TiledRectangularLightCulling.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ScreenSpaceReflections.glsl");
+		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/ScreenSpaceReflections.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SSR.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GaussianBlur.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VisibilityBuffer.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/AmbientOcclusion.glsl");
+		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/AmbientOcclusion.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/AO.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/AmbientOcclusionDenoiser.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/AmbientOcclusionTAA.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SpatialDenoiser.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Bloom.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ColorCorrection.glsl");
@@ -104,7 +108,10 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EntityGlow.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/LineDetection.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirectInstancedBindless.glsl");
-		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolution.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolution.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolutionFilter.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/FXAA.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TAA.glsl");
 
 		
 		// Init the pools
@@ -225,6 +232,11 @@ namespace Frost
 		return s_RendererAPI->GetCurrentFrameIndex();
 	}
 	
+	uint64_t Renderer::GetFrameCount()
+	{
+		return s_RendererAPI->GetFrameCount();
+	}
+
 	Ref<Scene> Renderer::GetActiveScene()
 	{
 		return s_RendererAPI->GetActiveScene();

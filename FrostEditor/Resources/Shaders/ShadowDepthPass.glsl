@@ -76,6 +76,9 @@ void main()
 		position = vertex.Position;
 	}
 
+	//mat4 modelSpaceMatrix = a_ModelSpaceMatrix;
+	//modelSpaceMatrix[3][3] = 1.0;
+
 	vec4 worldPos = u_PushConstant.LightViewProjectionMatrix * a_ModelSpaceMatrix * boneTransform * vec4(position, 1.0f);
 	gl_Position = worldPos;
 }

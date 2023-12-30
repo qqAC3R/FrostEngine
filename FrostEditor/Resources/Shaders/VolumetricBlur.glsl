@@ -8,7 +8,7 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler2D u_SrcTex;
 layout(binding = 1) uniform sampler2D u_DepthBuffer; // Preferred to be a depth pyramid
-layout(binding = 2) writeonly uniform image2D u_DstTex;
+layout(binding = 2, rgba16f) restrict writeonly uniform image2D u_DstTex;
 
 layout(push_constant) uniform PushConstant {
 	vec2 BlurDirection; // For the blur, we should do 2 blur passes, one vertical and one horizontal

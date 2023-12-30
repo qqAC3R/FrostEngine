@@ -33,7 +33,7 @@ namespace Frost
 	private:
 		static const uint32_t m_DescriptorSetNumber = 1;
 		static const uint32_t m_DefaultTextureID = 0; // For white texture
-		static const uint32_t m_TextureMaxStorage = 2048; // 2048
+		static const uint32_t m_TextureMaxStorage = 4096; // 2048
 	};
 
 }

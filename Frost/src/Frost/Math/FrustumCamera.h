@@ -4,9 +4,9 @@
 
 namespace Frost
 {
+#if 0
 	// Forward declaration
 	class EditorCamera;
-
 	struct Plane
 	{
 		// Distance from origin to the nearest point in the plan
@@ -41,4 +41,5 @@ namespace Frost
 		Plane m_FarFace;
 		Plane m_NearFace;
 	};
+#endif
 }

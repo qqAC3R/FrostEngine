@@ -22,6 +22,8 @@
 #include <ozz/animation/offline/skeleton_builder.h>
 #include <ozz/base/maths/simd_math.h>
 
+#include <meshoptimizer/meshoptimizer.h>
+
 #include <glm/gtc/type_ptr.hpp>
 
 #include <filesystem>
@@ -44,7 +46,7 @@ namespace Frost
 
 	void MeshAsset::InitDefaultMeshes()
 	{
-		s_DefaultMeshStorage.Cube = MeshAsset::Load("Resources/Meshes/.Default/Cube.fbx");
+		s_DefaultMeshStorage.Cube = MeshAsset::Load("Resources/Meshes/.Default/Cube2.fbx");
 		s_DefaultMeshStorage.Sphere = MeshAsset::Load("Resources/Meshes/.Default/Sphere.fbx");
 		s_DefaultMeshStorage.Capsule = MeshAsset::Load("Resources/Meshes/.Default/Capsule.fbx");
 	}
@@ -107,8 +109,9 @@ namespace Frost
 
 		m_Scene = scene;
 		m_IsLoaded = true;
-		m_IsAnimated = scene->mAnimations != nullptr;
-
+		m_IsAnimated = scene->HasAnimations();
+		//m_IsAnimated = false;
+		
 		if (m_IsAnimated)
 		{
 			m_Skeleton = CreateRef<MeshSkeleton>(scene);
@@ -131,7 +134,7 @@ namespace Frost
 		uint32_t vertexCount = 0;
 		uint32_t indexCount = 0;
 
-		Vector<Index> submeshIndices;
+		//Vector<Index> submeshIndices;
 		uint32_t maxIndex = 0;
 		m_Submeshes.reserve(scene->mNumMeshes);
 		for (unsigned m = 0; m < scene->mNumMeshes; m++)
@@ -166,6 +169,14 @@ namespace Frost
 
 					vertex.MeshIndex = (float)mesh->mMaterialIndex;
 
+					// Setting up the bounding box into the animated submesh
+					aabb.Min.x = glm::min(vertex.Position.x, aabb.Min.x);
+					aabb.Min.y = glm::min(vertex.Position.y, aabb.Min.y);
+					aabb.Min.z = glm::min(vertex.Position.z, aabb.Min.z);
+					aabb.Max.x = glm::max(vertex.Position.x, aabb.Max.x);
+					aabb.Max.y = glm::max(vertex.Position.y, aabb.Max.y);
+					aabb.Max.z = glm::max(vertex.Position.z, aabb.Max.z);
+
 					if (mesh->HasTangentsAndBitangents())
 					{
 						vertex.Tangent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
@@ -187,16 +198,14 @@ namespace Frost
 
 					vertex.MeshIndex = (float)mesh->mMaterialIndex;
 
+					// Setting up the bounding box into the submesh
 					aabb.Min.x = glm::min(vertex.Position.x, aabb.Min.x);
 					aabb.Min.y = glm::min(vertex.Position.y, aabb.Min.y);
 					aabb.Min.z = glm::min(vertex.Position.z, aabb.Min.z);
 					aabb.Max.x = glm::max(vertex.Position.x, aabb.Max.x);
 					aabb.Max.y = glm::max(vertex.Position.y, aabb.Max.y);
 					aabb.Max.z = glm::max(vertex.Position.z, aabb.Max.z);
-
-					// Setting up the bounding box into the submesh
-					submesh.BoundingBox = Math::BoundingBox(aabb.Min, aabb.Max);
-
+					
 					if (mesh->HasTangentsAndBitangents())
 					{
 						vertex.Tangent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
@@ -211,7 +220,12 @@ namespace Frost
 					m_Vertices.push_back(vertex);
 				}
 			}
+			submesh.BoundingBox = Math::BoundingBox(aabb.Min, aabb.Max);
 
+
+
+
+			uint64_t lastSubmeshIndicesSize = m_SubmeshIndices.size();
 			uint32_t subMeshLastIndex = 0;
 
 			// Indices
@@ -221,24 +235,111 @@ namespace Frost
 				Index index = { mesh->mFaces[i].mIndices[0], mesh->mFaces[i].mIndices[1], mesh->mFaces[i].mIndices[2] };
 				m_Indices.push_back(index);
 
-				//m_TriangleCache[m].emplace_back(
-				//	m_Vertices[index.V1 + submesh.BaseVertex], m_Vertices[index.V2 + submesh.BaseVertex], m_Vertices[index.V3 + submesh.BaseVertex]
-				//);
-
+				// For Bottom-Level Accelerated Structure
 				// ------------------------------
 				index = { maxIndex + mesh->mFaces[i].mIndices[0], maxIndex + mesh->mFaces[i].mIndices[1], maxIndex + mesh->mFaces[i].mIndices[2] };
-				submeshIndices.push_back(index);
-
-
+				m_SubmeshIndices.push_back(index);
 
 				if (subMeshLastIndex < index.V1) subMeshLastIndex = index.V1;
 				if (subMeshLastIndex < index.V2) subMeshLastIndex = index.V2;
 				if (subMeshLastIndex < index.V3) subMeshLastIndex = index.V3;
 			}
+
+
+			// Optimizing the vertex cache for every submesh and remove any overdraw
+			{
+				uint32_t indexCount = mesh->mNumFaces * 3;
+				Index* lastIndexPointer = m_SubmeshIndices.data() + lastSubmeshIndicesSize;
+
+
+				void* verticesData = nullptr;
+				size_t verticesSize = 0;
+				size_t verticesDataStructureSize = 0;
+
+				if (m_IsAnimated)
+				{
+					verticesData = m_SkinnedVertices.data();
+					verticesSize = m_SkinnedVertices.size();
+					verticesDataStructureSize = sizeof(AnimatedVertex);
+				}
+				else
+				{
+					verticesData = m_Vertices.data();
+					verticesSize = m_Vertices.size();
+					verticesDataStructureSize = sizeof(Vertex);
+				}
+	
+				meshopt_optimizeVertexCache((uint32_t*)lastIndexPointer, (uint32_t*)lastIndexPointer, indexCount, verticesSize);
+				meshopt_optimizeOverdraw((uint32_t*)lastIndexPointer, (uint32_t*)lastIndexPointer,
+					indexCount,
+					(float*)verticesData,
+					verticesSize,
+					verticesDataStructureSize,
+					1.1f
+				);
+
+#if 0
+				float currentThreshold = 1.0f;
+
+				Vector<Index> lodIndices(indexCount);
+				for (uint32_t lod = 1; lod <= 2; lod++)
+				{
+					currentThreshold = currentThreshold / 2.0f;
+					size_t targetIndexCount = size_t(indexCount * currentThreshold);
+					float targetError = 0.01f;
+					unsigned int options = meshopt_SimplifyLockBorder; // meshopt_SimplifyX flags, 0 is a safe default
+
+
+					float lodError = 0.0f;
+					size_t finalIndicesCount = meshopt_simplify(
+						(uint32_t*)lodIndices.data(), (uint32_t*)lastIndexPointer, indexCount,
+						(float*)verticesData, verticesSize, verticesDataStructureSize,
+						targetIndexCount, targetError, options, &lodError
+					);
+
+					lodIndices.resize(finalIndicesCount / 3);
+
+					meshopt_optimizeVertexCache((uint32_t*)lodIndices.data(), (uint32_t*)lodIndices.data(), finalIndicesCount, verticesSize);
+
+					m_IndicesLODs[lod].insert(m_IndicesLODs[lod].end(), lodIndices.begin(), lodIndices.end());
+
+
+					SubmeshLOD& submeshLOD = m_SubmeshLODs[lod].emplace_back();
+					submeshLOD.BaseIndex = 0; // TODO:??
+					submeshLOD.IndexCount = finalIndicesCount;
+				}
+#endif
+			}
 			maxIndex = subMeshLastIndex + 1;
 
+			//FROST_CORE_INFO(m);
 		}
-		m_SubmeshIndexBuffers = IndexBuffer::Create(submeshIndices.data(), (uint32_t)submeshIndices.size() * sizeof(Index));
+
+#if 0
+		{
+			// Add the LOD 0
+			m_GlobalSubmeshIndices.insert(m_GlobalSubmeshIndices.end(), m_SubmeshIndices.begin(), m_SubmeshIndices.end());
+
+			// Set the offset from the LOD 0 of the mesh
+			uint32_t submeshLODIndicesOffset = m_SubmeshIndices.size() * 3;
+
+			// Add the rest of LODs
+			for (uint32_t lod = 1; lod <= 1; lod++)
+			{
+				// Offset the indices of the submesh to the global index buffer
+				for (uint32_t submeshIndex = 0; submeshIndex < m_SubmeshLODs[lod].size(); submeshIndex++)
+				{
+					SubmeshLOD& submeshLOD = m_SubmeshLODs[lod][submeshIndex];
+					submeshLOD.BaseIndex = submeshLODIndicesOffset;
+
+					submeshLODIndicesOffset += submeshLOD.IndexCount;
+				}
+
+				m_GlobalSubmeshIndices.insert(m_GlobalSubmeshIndices.end(), m_IndicesLODs[lod].begin(), m_IndicesLODs[lod].end());
+			}
+		}
+#endif
+
 
 
 		// Traverse over every mesh to get the transforms
@@ -312,14 +413,17 @@ namespace Frost
 			}
 		}
 
+		
 
-
+		m_SubmeshIndexBuffers = IndexBuffer::Create(m_SubmeshIndices.data(), (uint32_t)m_SubmeshIndices.size() * sizeof(Index));
+		//m_GlobalSubmeshIndexBuffers = IndexBuffer::Create(m_GlobalSubmeshIndices.data(), (uint32_t)m_GlobalSubmeshIndices.size() * sizeof(Index));
 
 		// Vertex/Index buffer
 		if (m_IsAnimated)
 			m_VertexBuffer = VertexBuffer::Create(m_SkinnedVertices.data(), m_SkinnedVertices.size() * sizeof(AnimatedVertex));
 		else
 			m_VertexBuffer = VertexBuffer::Create(m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
+
 
 		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)m_Indices.size() * sizeof(Index));
 
@@ -436,15 +540,23 @@ namespace Frost
 					std::replace(texturePath.begin(), texturePath.end(), '/', '\\'); // This is the standart rule of paths in this engine
 
 					TextureSpecification textureSpec{};
-					textureSpec.Format = ImageFormat::RGBA8;
 					textureSpec.Usage = ImageUsage::ReadOnly;
+					textureSpec.Format = ImageFormat::RGBA8;
 					textureSpec.UseMips = true;
-					textureSpec.FlipTexture = true;
+					textureSpec.FlipTexture = false;
 					Ref<Texture2D> texture = AssetManager::GetOrLoadAsset<Texture2D>(texturePath, (void*)&textureSpec);
-					if (texture->Loaded())
+					if (texture)
 					{
-						texture->GenerateMipMaps();
-						m_TexturesList[albedoTextureIndex] = texture;
+						if (texture->Loaded())
+						{
+							texture->GenerateMipMaps();
+							m_TexturesList[albedoTextureIndex] = texture;
+						}
+						else
+						{
+							FROST_CORE_ERROR("Couldn't load texture: {0}", texturePath);
+							m_TexturesList[albedoTextureIndex] = whiteTexture;
+						}
 					}
 					else
 					{
@@ -469,14 +581,29 @@ namespace Frost
 					std::replace(texturePath.begin(), texturePath.end(), '/', '\\'); // This is the standart rule of paths in this engine
 
 					TextureSpecification textureSpec{};
-					textureSpec.Format = ImageFormat::RGBA8;
 					textureSpec.Usage = ImageUsage::ReadOnly;
 					textureSpec.FlipTexture = true;
 					Ref<Texture2D> texture = AssetManager::GetOrLoadAsset<Texture2D>(texturePath, (void*)&textureSpec);
-					if (texture->Loaded())
+					if (texture)
 					{
-						m_TexturesList[normalMapTextureIndex] = texture;
-						m_MaterialData[i].Set("UseNormalMap", uint32_t(1));
+						if (texture->Loaded())
+						{
+							m_TexturesList[normalMapTextureIndex] = texture;
+							m_MaterialData[i].Set("UseNormalMap", uint32_t(1));
+
+							// If the normal map uses BC5 compression, then we should indicate that in the pixel shader,
+							// the Blue channel will be computed with R and G channel.
+							if (texture->GetSpecification().Format == ImageFormat::BC5)
+							{
+								m_MaterialData[i].Set("UseNormalMap", uint32_t(2));
+							}
+						}
+						else
+						{
+							FROST_CORE_ERROR("Couldn't load normal texture: {0}", texturePath);
+							m_TexturesList[normalMapTextureIndex] = whiteTexture;
+							m_MaterialData[i].Set("UseNormalMap", uint32_t(0));
+						}
 					}
 					else
 					{
@@ -503,13 +630,20 @@ namespace Frost
 					std::replace(texturePath.begin(), texturePath.end(), '/', '\\'); // This is the standart rule of paths in this engine
 
 					TextureSpecification textureSpec{};
-					textureSpec.Format = ImageFormat::RGBA8;
 					textureSpec.Usage = ImageUsage::ReadOnly;
 					textureSpec.FlipTexture = true;
 					Ref<Texture2D> texture = AssetManager::GetOrLoadAsset<Texture2D>(texturePath, (void*)&textureSpec);
-					if (texture->Loaded())
+					if (texture)
 					{
-						m_TexturesList[roughnessTextureIndex] = texture;
+						if (texture->Loaded())
+						{
+							m_TexturesList[roughnessTextureIndex] = texture;
+						}
+						else
+						{
+							FROST_CORE_ERROR("Couldn't load roughess texture: {0}", texturePath);
+							m_TexturesList[roughnessTextureIndex] = whiteTexture;
+						}
 					}
 					else
 					{
@@ -543,15 +677,21 @@ namespace Frost
 							std::replace(texturePath.begin(), texturePath.end(), '/', '\\'); // This is the standart rule of paths in this engine
 
 							TextureSpecification textureSpec{};
-							textureSpec.Format = ImageFormat::RGBA8;
 							textureSpec.Usage = ImageUsage::ReadOnly;
 							textureSpec.FlipTexture = true;
 							Ref<Texture2D> texture = AssetManager::GetOrLoadAsset<Texture2D>(texturePath, (void*)&textureSpec);
-							if (texture->Loaded())
+							if (texture)
 							{
-								metalnessTextureFound = true;
+								if (texture->Loaded())
+								{
+									metalnessTextureFound = true;
 
-								m_TexturesList[metalnessTextureIndex] = whiteTexture;
+									m_TexturesList[metalnessTextureIndex] = whiteTexture;
+								}
+								else
+								{
+									FROST_CORE_ERROR("Couldn't load metalness texture: {0}", texturePath);
+								}
 							}
 							else
 							{

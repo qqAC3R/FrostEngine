@@ -91,7 +91,7 @@ namespace Frost
 			rectangularLight.Intensity,
 			glm::vec4(v0, float(rectangularLight.TwoSided)),
 			glm::vec4(v1, rectangularLight.Radius), // Radius
-			glm::vec4(v2, 1.0f),
+			glm::vec4(v2, rectangularLight.VolumetricContribution),
 			glm::vec4(v3, 1.0f),
 		});
 	}

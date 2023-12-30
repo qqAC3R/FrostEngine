@@ -7,10 +7,12 @@
 
 #include "Frost/Core/Buffer.h"
 
+typedef struct VkQueryPool_T* VkQueryPool;
+
 namespace Frost
 {
 
-#if 1
+#if 0
 	struct IndirectMeshData
 	{
 		IndirectMeshData() = default;
@@ -47,6 +49,8 @@ namespace Frost
 		uint64_t MaterialCount;	     /// DONE
 		uint64_t MaterialOffset;     /// DONE
 
+		Vector<uint64_t> SubMeshIndexCulled;
+
 		AssetHandle MeshAssetHandle; /// DONE
 	};
 
@@ -80,7 +84,10 @@ namespace Frost
 		// ------------------- Occlusion Culling ---------------------
 		void OcclusionCullDataInit(uint32_t width, uint32_t height);
 		void OcclusionCullUpdate(const RenderQueue& renderQueue, uint64_t indirectCmdsOffset);
+		void GetOcclusionQueryResults();
 		// -----------------------------------------------------------
+
+		//void ObjectCullingPrepareData(const RenderQueue& renderQueue);
 
 	private:
 		SceneRenderPassPipeline* m_RenderPassPipeline;
@@ -108,6 +115,7 @@ namespace Frost
 			glm::vec4 AABB_Max;
 		};
 
+#if 0
 		struct ComputeShaderPS // Push constant
 		{
 			glm::vec4 DepthPyramidSize;
@@ -118,14 +126,20 @@ namespace Frost
 			float Padding1;
 			float Padding2;
 		};
+#endif
 
 		struct MeshInstancedVertexBuffer // `MeshInstancedVertexBuffer` For Geometry Pass
 		{
 			glm::mat4 ModelSpaceMatrix;
 			glm::mat4 WorldSpaceMatrix;
+			glm::mat4 PreviousWorldSpaceMatrix;
+			uint64_t BoneInformationBDA;
 			uint32_t MaterialIndexOffset;
 			uint32_t EntityID;
-			uint64_t BoneInformationBDA;
+			//uint32_t IsMeshVisible;
+			//uint32_t a_Padding0;
+			//uint32_t a_Padding1;
+			//uint32_t a_Padding2;
 		};
 
 		struct InternalData
@@ -142,10 +156,10 @@ namespace Frost
 			Ref<ComputePipeline> LateCullPipeline;
 			Vector<Ref<Material>> LateCullDescriptor;
 			
-			HeapBlock MeshSpecs; 
+			Vector<HeapBlock> MeshSpecs; 
 
-			Ref<BufferDevice> DebugDeviceBuffer; // Debug
-			ComputeShaderPS ComputeShaderPushConstant; // Push constant data for the occlusion culling shader
+			//Ref<BufferDevice> DebugDeviceBuffer; // Debug
+			//ComputeShaderPS ComputeShaderPushConstant; // Push constant data for the occlusion culling shader
 
 
 			// Indirect drawing
@@ -154,11 +168,16 @@ namespace Frost
 
 			// Global Instaced Vertex Buffer
 			Vector<HeapBlock> GlobalInstancedVertexBuffer;
+
+
+			Vector<VkQueryPool> OcclusionQueryPools;
 		};
 
 		struct PushConstant
 		{
 			glm::mat4 ViewMatrix;
+			glm::vec2 JitterCurrent;
+			glm::vec2 JitterPrevious;
 			uint64_t VertexBufferBDA;
 			uint32_t IsAnimated = 0;
 		} m_GeometryPushConstant;

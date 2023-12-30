@@ -13,9 +13,9 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler3D u_FinalGatherFroxel;
 layout(binding = 1) uniform sampler2D u_DepthTexture;
-layout(binding = 2) uniform sampler2D u_PositionTexture;
-layout(binding = 3) uniform sampler2D u_SpatialBlueNoiseLUT;
-layout(binding = 4) uniform writeonly image2D u_VolumetricTex;
+//layout(binding = 2) uniform sampler2D u_PositionTexture;
+layout(binding = 2) uniform sampler2D u_SpatialBlueNoiseLUT;
+layout(binding = 3, rgba16f) restrict writeonly uniform image2D u_VolumetricTex;
 
 layout(push_constant) uniform PushConstant
 {
@@ -67,10 +67,10 @@ vec3 DecodePosition(ivec2 coords)
 
 	float depth = texelFetch(u_DepthTexture, ivec2(vec2(gl_GlobalInvocationID.xy) / 2.0), 1).r;
 
-	if(depth != 1.0)
-	{
-		return texelFetch(u_PositionTexture, ivec2(gl_GlobalInvocationID.xy), 0).rgb;
-	}
+	//if(depth != 1.0)
+	//{
+	//	return texelFetch(u_PositionTexture, ivec2(gl_GlobalInvocationID.xy), 0).rgb;
+	//}
 
 	vec3 clipCoords = vec3(texCoords * 2.0 - 1.0, depth);
 	

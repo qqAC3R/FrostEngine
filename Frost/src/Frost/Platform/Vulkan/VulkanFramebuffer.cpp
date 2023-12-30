@@ -11,34 +11,37 @@ namespace Frost
 
 	namespace Utils
 	{
+#if 0
+		// TODO: Delete this, it is useless
 		std::pair<VkImageUsageFlags, VkFormat> FBFormatToVK(FramebufferTextureFormat format)
 		{
 			switch (format)
 			{
-				case FramebufferTextureFormat::R8:	 
-					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R8_UNORM);
+			case FramebufferTextureFormat::R8:
+				return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R8_UNORM);
 
-				case FramebufferTextureFormat::R32:	 
-					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R32_SINT);
-				case FramebufferTextureFormat::R32I:	 
-					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R32_UINT);
+			case FramebufferTextureFormat::R32F:
+				return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R32_SINT);
+			case FramebufferTextureFormat::R32I:
+				return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R32_UINT);
 
-				case FramebufferTextureFormat::RGBA8:	 
-					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R8G8B8A8_UNORM);
+			case FramebufferTextureFormat::RGBA8:
+				return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R8G8B8A8_UNORM);
 
-				case FramebufferTextureFormat::RGBA16F:	
-					return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R16G16B16A16_SFLOAT);
+			case FramebufferTextureFormat::RGBA16F:
+				return std::make_pair(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R16G16B16A16_SFLOAT);
 
-				case FramebufferTextureFormat::DEPTH32: 
-					return std::make_pair(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_D32_SFLOAT);
+			case FramebufferTextureFormat::DEPTH32:
+				return std::make_pair(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_D32_SFLOAT);
 
-				case FramebufferTextureFormat::DEPTH24STENCIL8:
-					return std::make_pair(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_D24_UNORM_S8_UINT);
+			case FramebufferTextureFormat::DEPTH24STENCIL8:
+				return std::make_pair(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_D24_UNORM_S8_UINT);
 			}
 
 			FROST_ASSERT_MSG("FramebufferTextureFormat is invalid!")
-			return {};
+				return {};
 		}
+#endif
 
 		bool IsDepthFormat(FramebufferTextureFormat format)
 		{
@@ -56,8 +59,11 @@ namespace Frost
 			switch (framebufferFormat)
 			{
 				case FramebufferTextureFormat::R8:				 return ImageFormat::R8;
-				case FramebufferTextureFormat::R32:				 return ImageFormat::R32;
+				case FramebufferTextureFormat::R32F:			 return ImageFormat::R32F;
+				case FramebufferTextureFormat::R16F:			 return ImageFormat::R16F;
 				case FramebufferTextureFormat::R32I:			 return ImageFormat::R32I;
+				case FramebufferTextureFormat::RG16F:			 return ImageFormat::RG16F;
+				case FramebufferTextureFormat::RG32F:			 return ImageFormat::RG32F;
 				case FramebufferTextureFormat::RGBA8:            return ImageFormat::RGBA8;
 				case FramebufferTextureFormat::RGBA16F:          return ImageFormat::RGBA16F;
 				case FramebufferTextureFormat::RGBA32F:          return ImageFormat::RGBA32F;
@@ -118,7 +124,9 @@ namespace Frost
 			spec.UseMipChain = false;
 
 			if (attachment.TextureFormat == FramebufferTextureFormat::Depth || attachment.TextureFormat == FramebufferTextureFormat::DepthStencil)
+			{
 				spec.Usage = ImageUsage::DepthStencil;
+			}
 			else
 				spec.Usage = ImageUsage::Storage;
 

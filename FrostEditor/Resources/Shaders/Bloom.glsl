@@ -3,6 +3,8 @@
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
+#pragma optionNV(unroll all)
+
 layout(binding = 0, rgba16f) writeonly uniform image2D o_Image;
 
 layout(binding = 1) uniform sampler2D u_Texture;
