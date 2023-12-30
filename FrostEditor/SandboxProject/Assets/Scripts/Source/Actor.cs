@@ -46,12 +46,7 @@ namespace Frost
 
         protected override void OnUpdate(float deltaTime)
         {
-#if false
-            GetComponent<MeshComponent>().GetMaterial(0).AlbedoColor = m_Abledo;
-            GetComponent<MeshComponent>().GetMaterial(0).Roughness = m_Roughness;
-            GetComponent<MeshComponent>().GetMaterial(0).Metalness = m_Metalness;
-            GetComponent<MeshComponent>().GetMaterial(0).Emission = m_Emission;
-#endif
+
             Vector3 velocity = GetComponent<RigidBodyComponent>().LinearVelocity;
             Vector2 movingVelocity = new Vector2(velocity.X, velocity.Z);
             float acceleration = movingVelocity.Length();
@@ -60,12 +55,6 @@ namespace Frost
             float velocityY = (-velocity.Y) / 4.0f;
             Children[0].GetComponent<AnimationComponent>().SetFloatInput("FallingSpeed", velocityY);
 
-
-
-            //if (Input.IsMouseButtonPressed(MouseButton.Left))
-            //{
-            //    Entity newEntity = Instantiate(m_SphereBullet);
-            //}
 
             if (Input.IsKeyPressed(KeyCode.A))
             {
@@ -138,6 +127,13 @@ namespace Frost
             {
                 GetComponent<RigidBodyComponent>().AddForce(new Vector3(0, 2000.0f * deltaTime, 0), ForceMode.Force);
             }
+
+#if false
+            GetComponent<MeshComponent>().GetMaterial(0).AlbedoColor = m_Abledo;
+            GetComponent<MeshComponent>().GetMaterial(0).Roughness = m_Roughness;
+            GetComponent<MeshComponent>().GetMaterial(0).Metalness = m_Metalness;
+            GetComponent<MeshComponent>().GetMaterial(0).Emission = m_Emission;
+#endif
         }
     }
 
