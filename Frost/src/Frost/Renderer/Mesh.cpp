@@ -46,7 +46,7 @@ namespace Frost
 
 	void MeshAsset::InitDefaultMeshes()
 	{
-		s_DefaultMeshStorage.Cube = MeshAsset::Load("Resources/Meshes/.Default/Cube2.fbx");
+		s_DefaultMeshStorage.Cube = MeshAsset::Load("Resources/Meshes/.Default/Cube.fbx");
 		s_DefaultMeshStorage.Sphere = MeshAsset::Load("Resources/Meshes/.Default/Sphere.fbx");
 		s_DefaultMeshStorage.Capsule = MeshAsset::Load("Resources/Meshes/.Default/Capsule.fbx");
 	}

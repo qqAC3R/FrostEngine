@@ -8,7 +8,7 @@
 
 #include "Frost/Renderer/Renderer.h"
 
-#include "stb_image.h"
+#include <stb_image.h>
 
 namespace Frost
 {

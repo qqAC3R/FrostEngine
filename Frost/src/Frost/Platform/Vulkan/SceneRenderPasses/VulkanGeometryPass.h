@@ -7,8 +7,6 @@
 
 #include "Frost/Core/Buffer.h"
 
-typedef struct VkQueryPool_T* VkQueryPool;
-
 namespace Frost
 {
 
@@ -84,7 +82,6 @@ namespace Frost
 		// ------------------- Occlusion Culling ---------------------
 		void OcclusionCullDataInit(uint32_t width, uint32_t height);
 		void OcclusionCullUpdate(const RenderQueue& renderQueue, uint64_t indirectCmdsOffset);
-		void GetOcclusionQueryResults();
 		// -----------------------------------------------------------
 
 		//void ObjectCullingPrepareData(const RenderQueue& renderQueue);
@@ -168,9 +165,6 @@ namespace Frost
 
 			// Global Instaced Vertex Buffer
 			Vector<HeapBlock> GlobalInstancedVertexBuffer;
-
-
-			Vector<VkQueryPool> OcclusionQueryPools;
 		};
 
 		struct PushConstant

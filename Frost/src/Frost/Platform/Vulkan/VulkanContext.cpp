@@ -143,9 +143,21 @@ namespace Frost
 
 		vk::DynamicLoader dl;
 		PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+#if 0
 		VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 		VULKAN_HPP_DEFAULT_DISPATCHER.init(m_Instance);
 		VULKAN_HPP_DEFAULT_DISPATCHER.init(m_LogicalDevice->GetVulkanDevice());
+#endif
+		VULKAN_HPP_DEFAULT_DISPATCHER.init(m_Instance, vkGetInstanceProcAddr, m_LogicalDevice->GetVulkanDevice());
+
+
+#if 0
+		// This interface does not require a linked vulkan library.
+		void init(VkInstance                instance,
+			PFN_vkGetInstanceProcAddr getInstanceProcAddr,
+			VkDevice                  device = {},
+			PFN_vkGetDeviceProcAddr /*getDeviceProcAddr*/ = nullptr) VULKAN_HPP_NOEXCEPT
+#endif
 	}
 
 

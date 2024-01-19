@@ -29,8 +29,12 @@ namespace Frost
 		struct BloomSettings
 		{
 			int32_t Enabled;
+			int32_t UseConvolutionBloom;
 			float Threshold;
 			float Knee;
+			float BloomConvolutionExposure;
+			float BloomConvolutionAmount;
+			float BloomDirtContribution;
 		} Bloom;
 
 		struct AmbientOcclussionSettings

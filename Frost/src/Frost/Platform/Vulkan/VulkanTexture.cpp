@@ -8,8 +8,7 @@
 #include "Frost/Asset/AssetManager.h"
 
 #include <stb_image.h>
-//#include <dds.hpp>
-//#include <dds_loader.h>
+#include <tinyexr/tinyexr.h>
 
 #include <compressonator.h>
 #include <helpers/dds_helpers.h>
@@ -168,6 +167,24 @@ namespace Frost
 			// After copying the buffers into our own packed mip buffer, we do not those anymore
 			CMP_FreeMipSet(&textureMipSet);
 			CMP_FreeMipSet(&compresstedMipSet);
+		}
+		else if (extension == ".exr")
+		{
+			const char* err = nullptr;
+			float* data = nullptr;
+			int ret = LoadEXR(&data, &width, &height, filepath.c_str(), &err);
+			if (ret != TINYEXR_SUCCESS)
+			{
+				if (err)
+				{
+					FROST_CORE_ERROR("(TinyEXR) Loading Error: {0}", err);
+					FreeEXRErrorMessage(err);
+				}
+			}
+
+			m_TextureData.Data = (void*)data;
+			m_TextureData.Size = width * height * 4 * sizeof(float);
+			imageFormat = ImageFormat::RGBA32F;
 		}
 		else
 		{

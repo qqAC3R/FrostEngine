@@ -94,6 +94,7 @@ project "Frost"
 		"%{prj.name}/src/**.cpp",
 		"%{prj.name}/vendor/stb_image/**.h",
 		"%{prj.name}/vendor/stb_image/**.cpp",
+		"%{prj.name}/vendor/stb_image/**.c",
 		"%{prj.name}/vendor/glm/glm/**.hpp",
 		"%{prj.name}/vendor/glm/glm/**.inl",
 
@@ -194,6 +195,9 @@ project "Frost"
 		flags { "NoPCH" }
 
 	filter "files:Frost/vendor/imgui-node-editor/**.cpp"
+		flags { "NoPCH" }
+		
+	filter "files:Frost/vendor/stb_image/**.c"
 		flags { "NoPCH" }
 
 	filter "system:windows"

@@ -22,8 +22,12 @@ namespace Frost
 
 		// Bloom
 		Bloom.Enabled = 1;
-		Bloom.Threshold = 1.0f;
+		Bloom.UseConvolutionBloom = 1;
+		Bloom.Threshold = 2.0f;
 		Bloom.Knee = 0.3f;
+		Bloom.BloomConvolutionExposure = 0.3f;
+		Bloom.BloomConvolutionAmount = 0.05f;
+		Bloom.BloomDirtContribution = 0.3f;
 
 		// AO
 		AmbientOcclusion.Enabled = 1;

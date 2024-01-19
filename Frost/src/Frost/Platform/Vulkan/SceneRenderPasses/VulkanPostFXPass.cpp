@@ -13,6 +13,8 @@
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanCompositePass.h"
 #include "Frost/Platform/Vulkan/SceneRenderPasses/VulkanVolumetricPass.h"
 
+#include "Frost/Utils/PlatformUtils.h"
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -48,14 +50,21 @@ namespace Frost
 		m_Data->BloomShader = Renderer::GetShaderLibrary()->Get("Bloom");
 		m_Data->ApplyAerialShader = Renderer::GetShaderLibrary()->Get("ApplyAerial");
 		m_Data->ColorCorrectionShader = Renderer::GetShaderLibrary()->Get("ColorCorrection");
-		m_Data->BloomConvolutionShader = Renderer::GetShaderLibrary()->Get("BloomConvolution");
+		
 		m_Data->FXAAShader = Renderer::GetShaderLibrary()->Get("FXAA");
 		m_Data->TAAShader = Renderer::GetShaderLibrary()->Get("TAA");
-		m_Data->BloomConvolutionFilterShader = Renderer::GetShaderLibrary()->Get("BloomConvolutionFilter");
+		
+		//m_Data->BloomConvolutionFilterShader = Renderer::GetShaderLibrary()->Get("BloomConvolutionFilter");
+		m_Data->BloomExandImageShader = Renderer::GetShaderLibrary()->Get("ExpandImageToPowerTwo");
+		m_Data->BloomKernelConvertShader = Renderer::GetShaderLibrary()->Get("BloomKernelConvertToRGBA8");
+		m_Data->BloomConvolutionShader[512] = Renderer::GetShaderLibrary()->Get("BloomConvolutionRadix2_512");
+		m_Data->BloomConvolutionShader[1024] = Renderer::GetShaderLibrary()->Get("BloomConvolutionRadix2_1024");
+		m_Data->BloomConvolutionShader[2048] = Renderer::GetShaderLibrary()->Get("BloomConvolutionRadix2_2048");
+		m_Data->BloomConvolutionShader[4096] = Renderer::GetShaderLibrary()->Get("BloomConvolutionRadix4_4096");
 
 		CalculateMipLevels(1600, 900);
 		BloomInitData(1600, 900);
-		//BloomConvolutionInitData (1600, 900);
+		BloomConvolutionInitData(1600, 900, true);
 		//BloomConvolutionFilterInitData (1600, 900);
 		//ApplyAerialInitData      (1600, 900);
 		ColorCorrectionInitData(1600, 900);
@@ -68,6 +77,8 @@ namespace Frost
 		SSRInitData(1600 / 1.0, 900 / 1.0);
 		TAAInitData(1600, 900);
 		FXAAInitData(1600, 900);
+
+		LoadBloomDirtImage("Resources/LUT/BloomDirtMasks/DirtMaskTextureExample.png");
 
 		Renderer::SubmitImageToOutputImageMap("FinalImage", [this]() -> Ref<Image2D>
 		{
@@ -867,41 +878,345 @@ namespace Frost
 		}
 	}
 
-#if 1
-	void VulkanPostFXPass::BloomConvolutionInitData(uint32_t width, uint32_t height)
+	void VulkanPostFXPass::BloomConvolutionInitData(uint32_t width, uint32_t height, bool initalizeData)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
+		
 		// Pipeline creation
 		ComputePipeline::CreateInfo computePipelineCreateInfo{};
-		computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader;
-		if (!m_Data->BloomConvPipeline)
-			m_Data->BloomConvPipeline = ComputePipeline::Create(computePipelineCreateInfo);
+		computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader[512];
+		if (!m_Data->BloomConvPipeline[512])
+			m_Data->BloomConvPipeline[512] = ComputePipeline::Create(computePipelineCreateInfo);
 
-		m_Data->BloomConv_PingTexture.resize(framesInFlight);
-		m_Data->BloomConv_PongTexture.resize(framesInFlight);
+		computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader[1024];
+		if (!m_Data->BloomConvPipeline[1024])
+			m_Data->BloomConvPipeline[1024] = ComputePipeline::Create(computePipelineCreateInfo);
+
+		computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader[2048];
+		if (!m_Data->BloomConvPipeline[2048])
+			m_Data->BloomConvPipeline[2048] = ComputePipeline::Create(computePipelineCreateInfo);
+
+		computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader[4096];
+		if (!m_Data->BloomConvPipeline[4096])
+			m_Data->BloomConvPipeline[4096] = ComputePipeline::Create(computePipelineCreateInfo);
+
+		computePipelineCreateInfo.Shader = m_Data->BloomExandImageShader;
+		if (!m_Data->BloomExandImagePipeline)
+			m_Data->BloomExandImagePipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+		computePipelineCreateInfo.Shader = m_Data->BloomKernelConvertShader;
+		if (!m_Data->BloomKernelConvertPipeline)
+			m_Data->BloomKernelConvertPipeline = ComputePipeline::Create(computePipelineCreateInfo);
+
+
+		if(initalizeData)
+			BloomConvolutionComputeKernel("Resources/LUT/BloomKernels/Default1024.exr", width, height);
+		else
+			BloomConvolutionComputeKernel("", width, height);
+		
+
+		// Clamp the values so the minimum possible resolution is 512
+		uint32_t powerOfTwoWidth = 1 << uint32_t(glm::ceil(glm::log2(double(width))));
+		uint32_t powerOfTwoHeight = 1 << uint32_t(glm::ceil(glm::log2(double(height))));
+		powerOfTwoWidth = glm::max(powerOfTwoWidth, m_Data->BloomKernelImage->GetWidth());
+		powerOfTwoHeight = glm::max(powerOfTwoHeight, m_Data->BloomKernelImage->GetHeight());
+
+
+
+		m_Data->BloomExandImage.resize(framesInFlight);
 		for (uint32_t i = 0; i < framesInFlight; i++)
 		{
 			ImageSpecification imageSpec{};
-			imageSpec.Width = width;
-			imageSpec.Height = height;
-			imageSpec.Sampler.SamplerFilter = ImageFilter::Linear;
-			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+			imageSpec.Width = powerOfTwoWidth;
+			imageSpec.Height = powerOfTwoHeight;
 
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+			imageSpec.Format = ImageFormat::RGBA32F;
+			imageSpec.Usage = ImageUsage::Storage;
+			imageSpec.UseMipChain = false;
+			
+			bool createImage = false;
+			if (!m_Data->BloomExandImage[i])
+				createImage = true;
+			else if (m_Data->BloomExandImage[i]->GetWidth() != powerOfTwoWidth || m_Data->BloomExandImage[i]->GetHeight() != powerOfTwoHeight)
+				createImage = true;
+
+			if(createImage)
+				m_Data->BloomExandImage[i] = Image2D::Create(imageSpec);
+		}
+
+		m_Data->BloomExandImageDescriptor.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			if (!m_Data->BloomExandImageDescriptor[i])
+				m_Data->BloomExandImageDescriptor[i] = Material::Create(m_Data->BloomExandImageShader, "BloomExpandImage");
+
+			Ref<Image2D> inputImage = m_RenderPassPipeline->GetRenderPassData<VulkanCompositePass>()->RenderPass->GetColorAttachment(0, i);
+
+			auto& vulkanDescriptor = m_Data->BloomExandImageDescriptor[i].As<VulkanMaterial>();
+
+			vulkanDescriptor->Set("u_InputImage", inputImage);
+			vulkanDescriptor->Set("u_OutputImage", m_Data->BloomExandImage[i]);
+			vulkanDescriptor->UpdateVulkanDescriptorIfNeeded();
+		}
+
+
+
+
+
+
+		m_Data->BloomConvTexture.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			ImageSpecification imageSpec{};
+			imageSpec.Width = powerOfTwoWidth;
+			imageSpec.Height = powerOfTwoHeight;
+
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
 			imageSpec.Format = ImageFormat::RGBA32F;
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.UseMipChain = false;
 
-			m_Data->BloomConv_PingTexture[i] = Image2D::Create(imageSpec);
-			m_Data->BloomConv_PongTexture[i] = Image2D::Create(imageSpec);
+			bool createImage = false;
+			if (!m_Data->BloomConvTexture[i])
+				createImage = true;
+			else if (m_Data->BloomConvTexture[i]->GetWidth() != powerOfTwoWidth || m_Data->BloomConvTexture[i]->GetHeight() != powerOfTwoHeight)
+				createImage = true;
+
+			if (createImage)
+				m_Data->BloomConvTexture[i] = Image2D::Create(imageSpec);
+
+			//if (m_Data->BloomConvTexture[i]->GetWidth() != powerOfTwoWidth || m_Data->BloomExandImage[i]->GetHeight() != powerOfTwoHeight)
+				//m_Data->BloomConvTexture[i] = Image2D::Create(imageSpec);
 		}
 
-		if (!m_Data->BloomConvDescriptor)
-			m_Data->BloomConvDescriptor = Material::Create(m_Data->BloomConvolutionShader, "BloomConvolution");
-	}
-#endif
 
+		m_Data->BloomConvDescriptor.resize(framesInFlight);
+		for (uint32_t i = 0; i < framesInFlight; i++)
+		{
+			if (!m_Data->BloomConvDescriptor[i])
+				m_Data->BloomConvDescriptor[i] = Material::Create(m_Data->BloomConvolutionShader[512], "BloomConvolution");
+
+
+			auto& vulkanDescriptor = m_Data->BloomConvDescriptor[i].As<VulkanMaterial>();
+
+			vulkanDescriptor->Set("u_InputImage", m_Data->BloomExandImage[i]);
+			vulkanDescriptor->Set("u_FFTImage", m_Data->BloomConvTexture[i]);
+			vulkanDescriptor->Set("u_KernelImage", m_Data->BloomKernelFFTImage);
+			//vulkanDescriptor->Set("u_KernelImage", m_Data->BloomKernelImGuiImage);
+			vulkanDescriptor->UpdateVulkanDescriptorIfNeeded();
+		}
+
+	}
+
+	void VulkanPostFXPass::BloomConvolutionComputeKernel(const std::string& kernelNewFilepath, uint32_t width, uint32_t height)
+	{
+		if (!kernelNewFilepath.empty())
+		{
+			TextureSpecification textureSpec{};
+			textureSpec.Format = ImageFormat::RGBA32F;
+			textureSpec.Usage = ImageUsage::ReadOnly;
+			textureSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			textureSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+			textureSpec.FlipTexture = false;
+			textureSpec.UseMips = false;
+			m_Data->BloomKernelImage = Texture2D::Create(kernelNewFilepath, textureSpec);
+
+
+			ImageSpecification imageSpec{};
+			imageSpec.Width = m_Data->BloomKernelImage->GetWidth();
+			imageSpec.Height = m_Data->BloomKernelImage->GetHeight();
+			imageSpec.Format = ImageFormat::RGBA8;
+			imageSpec.Usage = ImageUsage::Storage;
+			imageSpec.UseMipChain = false;
+			m_Data->BloomKernelImGuiImage = Image2D::Create(imageSpec);
+
+
+			// Recording a cmdbuf for the compute shader
+			VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Compute, true);
+			{
+				if (!m_Data->BloomKernelConvertDescriptor)
+					m_Data->BloomKernelConvertDescriptor = Material::Create(m_Data->BloomKernelConvertShader, "BloomKernelConvert");
+
+				Ref<VulkanMaterial> vulkanBloomKernelConvertMaterial = m_Data->BloomKernelConvertDescriptor.As<VulkanMaterial>();
+				vulkanBloomKernelConvertMaterial->Set("u_InputImage", m_Data->BloomKernelImage);
+				vulkanBloomKernelConvertMaterial->Set("u_OutputImage", m_Data->BloomKernelImGuiImage);
+				vulkanBloomKernelConvertMaterial->UpdateVulkanDescriptorIfNeeded();
+
+				uint32_t groupX = std::ceil((float)m_Data->BloomKernelImage->GetWidth() / 32.0f);
+				uint32_t groupY = std::ceil((float)m_Data->BloomKernelImage->GetHeight() / 32.0f);
+
+				Ref<VulkanComputePipeline> vulkanBloomKernelConvertPipeline = m_Data->BloomKernelConvertPipeline.As<VulkanComputePipeline>();
+
+				vulkanBloomKernelConvertMaterial->Bind(cmdBuf, m_Data->BloomKernelConvertPipeline);
+				vulkanBloomKernelConvertPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+			}
+			// Flush the compute command buffer
+			VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
+		}		
+
+		
+
+		// Clamp the values so the minimum possible resolution is 512
+		uint32_t powerOfTwoWidth = 1 << uint32_t(glm::ceil(glm::log2(double(width))));
+		uint32_t powerOfTwoHeight = 1 << uint32_t(glm::ceil(glm::log2(double(height))));
+		powerOfTwoWidth = glm::max(powerOfTwoWidth, m_Data->BloomKernelImage->GetWidth());
+		powerOfTwoHeight = glm::max(powerOfTwoHeight, m_Data->BloomKernelImage->GetHeight());
+
+		//if (m_Data->BloomKernelImage->GetWidth() == powerOfTwoWidth && m_Data->BloomKernelFFTImage->GetHeight() == powerOfTwoHeight && //kernelNewFilepath.empty())
+		//{
+		//	return;
+		//}
+
+
+		{
+			ImageSpecification imageSpec{};
+			imageSpec.Width = powerOfTwoWidth;
+			imageSpec.Height = powerOfTwoHeight;
+
+			imageSpec.Sampler.SamplerFilter = ImageFilter::Nearest;
+			imageSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+			imageSpec.Format = ImageFormat::RGBA32F;
+			imageSpec.Usage = ImageUsage::Storage;
+			imageSpec.UseMipChain = false;
+
+			bool createImage = false;
+			if (!m_Data->BloomKernelFFTImage)
+				createImage = true;
+			else if (m_Data->BloomKernelFFTImage->GetWidth() != powerOfTwoWidth || m_Data->BloomKernelFFTImage->GetHeight() != powerOfTwoHeight)
+				createImage = true;
+
+			if (createImage)
+			{
+				m_Data->BloomKernelExpandImage = Image2D::Create(imageSpec);
+				m_Data->BloomKernelFFTImage = Image2D::Create(imageSpec);
+			}
+
+		}
+
+
+		// Recording a cmdbuf for the compute shader
+		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Compute, true);
+
+		{
+			if (!m_Data->BloomExandKernelDescriptor)
+				m_Data->BloomExandKernelDescriptor = Material::Create(m_Data->BloomExandImageShader, "BloomExpandKernel");
+
+			Ref<VulkanMaterial> vulkanExpandKernelDescriptor = m_Data->BloomExandKernelDescriptor.As<VulkanMaterial>();
+			vulkanExpandKernelDescriptor->Set("u_InputImage", m_Data->BloomKernelImage);
+			vulkanExpandKernelDescriptor->Set("u_OutputImage", m_Data->BloomKernelExpandImage);
+			vulkanExpandKernelDescriptor->UpdateVulkanDescriptorIfNeeded();
+
+			//Ref<VulkanMaterial> vulkanBloomExpandDescriptor = m_Data->BloomExandImageDescriptor[currentFrameIndex].As<VulkanMaterial>();
+			Ref<VulkanComputePipeline> vulkanBloomExandKernelPipeline = m_Data->BloomExandImagePipeline.As<VulkanComputePipeline>();
+			Ref<VulkanImage2D> vulkanExpandKernel = m_Data->BloomKernelExpandImage.As<VulkanImage2D>();
+
+			vulkanExpandKernelDescriptor->Bind(cmdBuf, m_Data->BloomExandImagePipeline);
+
+			glm::vec3 pushConstant = { 0.0f, 0.0f, 0.0f };
+			vulkanBloomExandKernelPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
+
+			uint32_t groupX = std::ceil(width / 32.0f);
+			uint32_t groupY = std::ceil(height / 32.0f);
+			vulkanBloomExandKernelPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+
+			vulkanExpandKernel->TransitionLayout(
+				cmdBuf,
+				vulkanExpandKernel->GetVulkanImageLayout(),
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+			);
+		}
+
+		{
+			if (!m_Data->BloomConvKernelDescriptor)
+				m_Data->BloomConvKernelDescriptor = Material::Create(m_Data->BloomConvolutionShader[512], "BloomConvolutionKernel");
+
+			Ref<VulkanMaterial> vulkanConvKernelDescriptor = m_Data->BloomConvKernelDescriptor.As<VulkanMaterial>();
+			vulkanConvKernelDescriptor->Set("u_InputImage", m_Data->BloomKernelExpandImage);
+			vulkanConvKernelDescriptor->Set("u_FFTImage", m_Data->BloomKernelFFTImage);
+			vulkanConvKernelDescriptor->Set("u_KernelImage", m_Data->BloomKernelImage); // Dummy
+			vulkanConvKernelDescriptor->UpdateVulkanDescriptorIfNeeded();
+
+
+			Ref<VulkanImage2D> vulkanKernelFFTImage = m_Data->BloomKernelFFTImage.As<VulkanImage2D>();
+
+			vulkanConvKernelDescriptor->Bind(cmdBuf, m_Data->BloomConvPipeline[512]);
+
+			{
+				// Horizontal transform
+				//                   IsVertical | IsInverse| KernelGeneration
+				glm::vec3 pushConstant = { 0.0f,   0.0f,     1.0f };
+				uint32_t groupX = vulkanKernelFFTImage->GetHeight();
+				uint32_t radixResolution = vulkanKernelFFTImage->GetWidth();
+
+				Ref<VulkanComputePipeline> vulkanBloomConvPipeline = m_Data->BloomConvPipeline[radixResolution].As<VulkanComputePipeline>();
+
+				vulkanBloomConvPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
+				vulkanBloomConvPipeline->Dispatch(cmdBuf, groupX, 1, 1);
+
+				vulkanKernelFFTImage->TransitionLayout(
+					cmdBuf,
+					vulkanKernelFFTImage->GetVulkanImageLayout(),
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+				);
+			}
+
+			{
+				// Vertical transform
+				//                   IsVertical | IsInverse| KernelGeneration
+				glm::vec3 pushConstant = { 1.0f,   0.0f,     1.0f };
+				uint32_t groupX = vulkanKernelFFTImage->GetWidth();
+				uint32_t radixResolution = vulkanKernelFFTImage->GetHeight();
+
+				Ref<VulkanComputePipeline> vulkanBloomConvPipeline = m_Data->BloomConvPipeline[radixResolution].As<VulkanComputePipeline>();
+
+				vulkanBloomConvPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
+				vulkanBloomConvPipeline->Dispatch(cmdBuf, groupX, 1, 1);
+
+				vulkanKernelFFTImage->TransitionLayout(
+					cmdBuf,
+					vulkanKernelFFTImage->GetVulkanImageLayout(),
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+				);
+			}
+		}
+
+		// Flush the compute command buffer
+		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
+
+	}
+
+	void VulkanPostFXPass::LoadBloomDirtImage(const std::string& filepath)
+	{
+		if (!filepath.empty())
+		{
+			TextureSpecification textureSpec{};
+			textureSpec.Usage = ImageUsage::ReadOnly;
+			textureSpec.Sampler.SamplerFilter = ImageFilter::Linear;
+			textureSpec.Sampler.SamplerWrap = ImageWrap::ClampToEdge;
+			textureSpec.FlipTexture = false;
+			textureSpec.UseMips = false;
+			m_Data->BloomDirtImage = Texture2D::Create(filepath, textureSpec);
+
+			uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
+			for (uint32_t i = 0; i < framesInFlight; i++)
+			{
+				auto vulkanColorCorrectionDescriptor = m_Data->ColorCorrectionDescriptor[i].As<VulkanMaterial>();
+				vulkanColorCorrectionDescriptor->Set("u_BloomDirtTexture", m_Data->BloomDirtImage);
+				vulkanColorCorrectionDescriptor->UpdateVulkanDescriptorIfNeeded();
+			}
+		}
+	}
+
+
+#if 0
 	void VulkanPostFXPass::BloomConvolutionFilterInitData(uint32_t width, uint32_t height)
 	{
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
@@ -947,6 +1262,7 @@ namespace Frost
 		}
 
 	}
+#endif
 
 	void VulkanPostFXPass::ApplyAerialInitData(uint32_t width, uint32_t height)
 	{
@@ -1046,6 +1362,8 @@ namespace Frost
 
 			vulkanColorCorrectionDescriptor->Set("u_ColorFrameTexture", colorBuffer);
 			vulkanColorCorrectionDescriptor->Set("u_BloomTexture", m_Data->Bloom_UpsampledTexture[i]);
+			vulkanColorCorrectionDescriptor->Set("u_BloomConvTexture", m_Data->BloomConvTexture[i]);
+			vulkanColorCorrectionDescriptor->Set("u_BloomDirtTexture", m_Data->BloomDirtImage);
 			vulkanColorCorrectionDescriptor->Set("u_VolumetricTexture", volumetricTexture);
 			vulkanColorCorrectionDescriptor->Set("u_CloudComputeTex", cloudsTexture);
 			//vulkanColorCorrectionDescriptor->Set("u_SSRTexture", m_Data->SSRTexture[i]);
@@ -1155,6 +1473,11 @@ namespace Frost
 		finalImage->TransitionLayout(cmdBuf, finalImage->GetVulkanImageLayout());
 
 		UpdateRenderingSettings();
+
+
+		VulkanRenderer::BeginTimeStampPass("FFT");
+		BloomConvolutionUpdate(renderQueue);
+		VulkanRenderer::EndTimeStampPass("FFT");
 
 		VulkanRenderer::BeginTimeStampPass("Bloom Pass");
 		if (m_CompositeSetings.UseBloom)
@@ -1622,10 +1945,15 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
 
 		// cc = color correction
 		auto vulkan_cc_Pipeline = m_Data->ColorCorrectionPipeline.As<VulkanComputePipeline>();
 		auto vulkan_cc_Descriptor = m_Data->ColorCorrectionDescriptor[currentFrameIndex].As<VulkanMaterial>();
+
+		vulkan_cc_Descriptor->Set("BloomConfiguration.BloomConvolutionAmount", rendererSettings.Bloom.BloomConvolutionAmount);
+		vulkan_cc_Descriptor->Set("BloomConfiguration.BloomConvolutionExposure", rendererSettings.Bloom.BloomConvolutionExposure);
+		vulkan_cc_Descriptor->Set("BloomConfiguration.BloomDirtContribution", rendererSettings.Bloom.BloomDirtContribution);
 
 		vulkan_cc_Descriptor->Bind(cmdBuf, m_Data->ColorCorrectionPipeline);
 
@@ -1671,6 +1999,134 @@ namespace Frost
 
 	void VulkanPostFXPass::BloomConvolutionUpdate(const RenderQueue& renderQueue)
 	{
+		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+
+		{
+			Ref<VulkanMaterial> vulkanBloomExpandDescriptor = m_Data->BloomExandImageDescriptor[currentFrameIndex].As<VulkanMaterial>();
+			Ref<VulkanComputePipeline> vulkanBloomExandImagePipeline = m_Data->BloomExandImagePipeline.As<VulkanComputePipeline>();
+			Ref<VulkanImage2D> vulkanExpandImage = m_Data->BloomExandImage[currentFrameIndex].As<VulkanImage2D>();
+			float width = renderQueue.ViewPortWidth;
+			float height = renderQueue.ViewPortHeight;
+
+			vulkanBloomExpandDescriptor->Bind(cmdBuf, m_Data->BloomExandImagePipeline);
+
+			
+
+			glm::vec3 pushConstant = { 1.0f, rendererSettings.Bloom.Threshold, rendererSettings.Bloom.Knee };
+			vulkanBloomExandImagePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
+
+			uint32_t groupX = std::ceil(width / 32.0f);
+			uint32_t groupY = std::ceil(height / 32.0f);
+			vulkanBloomExandImagePipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+
+			vulkanExpandImage->TransitionLayout(
+				cmdBuf,
+				vulkanExpandImage->GetVulkanImageLayout(),
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+			);
+		}
+
+		{
+			Ref<VulkanMaterial> vulkanBloomConvDescriptor = m_Data->BloomConvDescriptor[currentFrameIndex].As<VulkanMaterial>();
+			//Ref<VulkanComputePipeline> vulkanBloomConvRadix2Pipeline = m_Data->BloomConvRadix2Pipeline.As<VulkanComputePipeline>();
+			//Ref<VulkanComputePipeline> vulkanBloomConvRadix4Pipeline = m_Data->BloomConvRadix4Pipeline.As<VulkanComputePipeline>();
+			Ref<VulkanImage2D> vulkanFFTImage = m_Data->BloomConvTexture[currentFrameIndex].As<VulkanImage2D>();
+			float width = renderQueue.ViewPortWidth;
+			float height = renderQueue.ViewPortHeight;
+
+
+			vulkanBloomConvDescriptor->Bind(cmdBuf, m_Data->BloomConvPipeline[512]);
+
+			// Horizontal transform
+			{
+				//                   IsVertical | IsInverse| KernelGeneration
+				glm::vec3 pushConstant = { 0.0f,   0.0f,     0.0f };
+				uint32_t groupX = vulkanFFTImage->GetHeight();
+				uint32_t radixResolution = vulkanFFTImage->GetWidth();
+
+				Ref<VulkanComputePipeline> vulkanBloomConvPipeline = m_Data->BloomConvPipeline[radixResolution].As<VulkanComputePipeline>();
+				
+				vulkanBloomConvPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
+				vulkanBloomConvPipeline->Dispatch(cmdBuf, groupX, 1, 1);
+
+				vulkanFFTImage->TransitionLayout(
+					cmdBuf,
+					vulkanFFTImage->GetVulkanImageLayout(),
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+				);
+			}
+
+
+			// Vertical transform
+			{
+				//                   IsVertical | IsInverse| KernelGeneration
+				glm::vec3 pushConstant = { 1.0f,   0.0f,     0.0f };
+				uint32_t groupX = vulkanFFTImage->GetWidth();
+				uint32_t radixResolution = vulkanFFTImage->GetHeight();
+
+				Ref<VulkanComputePipeline> vulkanBloomConvPipeline = m_Data->BloomConvPipeline[radixResolution].As<VulkanComputePipeline>();
+
+				vulkanBloomConvPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
+				vulkanBloomConvPipeline->Dispatch(cmdBuf, groupX, 1, 1);
+
+				vulkanFFTImage->TransitionLayout(
+					cmdBuf,
+					vulkanFFTImage->GetVulkanImageLayout(),
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+				);
+			}
+
+
+			// Inverse vertical transform
+			{
+				//                   IsVertical | IsInverse| KernelGeneration
+				glm::vec3 pushConstant = { 1.0f,   1.0f,     0.0f };
+				uint32_t groupX = vulkanFFTImage->GetWidth();
+				uint32_t radixResolution = vulkanFFTImage->GetHeight();
+
+				Ref<VulkanComputePipeline> vulkanBloomConvPipeline = m_Data->BloomConvPipeline[radixResolution].As<VulkanComputePipeline>();
+
+				vulkanBloomConvPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
+				vulkanBloomConvPipeline->Dispatch(cmdBuf, groupX, 1, 1);
+
+				vulkanFFTImage->TransitionLayout(
+					cmdBuf,
+					vulkanFFTImage->GetVulkanImageLayout(),
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+				);
+			}
+
+			// Inverse Horizontal transform
+			{
+				//                   IsVertical | IsInverse| KernelGeneration
+				glm::vec3 pushConstant = { 0.0f,   1.0f,     0.0f };
+				uint32_t groupX = vulkanFFTImage->GetHeight();
+				uint32_t radixResolution = vulkanFFTImage->GetWidth();
+
+				Ref<VulkanComputePipeline> vulkanBloomConvPipeline = m_Data->BloomConvPipeline[radixResolution].As<VulkanComputePipeline>();
+
+				vulkanBloomConvPipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
+				vulkanBloomConvPipeline->Dispatch(cmdBuf, groupX, 1, 1);
+
+				vulkanFFTImage->TransitionLayout(
+					cmdBuf,
+					vulkanFFTImage->GetVulkanImageLayout(),
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+				);
+			}
+		}
+
+		
+
+#if 0
 		// Getting all the needed information
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
@@ -1916,8 +2372,10 @@ namespace Frost
 				vulkanPingFFTTex->TransitionLayout(cmdBuf, vulkanPingFFTTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			pingPong = !pingPong;
 		}
+#endif
 	}
 
+#if 0
 	void VulkanPostFXPass::BloomConvolutionFilterUpdate(const RenderQueue& renderQueue)
 	{
 		// Getting all the needed information
@@ -1946,6 +2404,7 @@ namespace Frost
 		);
 
 	}
+#endif
 
 #if 0
 	void VulkanPostFXPass::BloomConvolutionUpdate(const RenderQueue& renderQueue)
@@ -2318,7 +2777,7 @@ namespace Frost
 		}
 
 		//BloomConvolutionFilterUpdate(renderQueue);
-		//BloomConvolutionUpdate(renderQueue);
+		
 
 
 #if 1
@@ -2678,7 +3137,7 @@ namespace Frost
 	{
 		CalculateMipLevels(width, height);
 		BloomInitData(width, height);
-		//BloomConvolutionInitData (width, height);
+		BloomConvolutionInitData(width, height, false);
 		//BloomConvolutionFilterInitData(width, height);
 		//ApplyAerialInitData      (width, height);
 		ColorCorrectionInitData(width, height);
@@ -2766,6 +3225,41 @@ namespace Frost
 			ImGui::Separator();
 			ImGui::DragFloat("Threshold", &rendererSettings.Bloom.Threshold, 0.1f, 0.0f, 1000.0f);
 			ImGui::SliderFloat("Knee", &rendererSettings.Bloom.Knee, 0.1f, 1.0f);
+			ImGui::SliderFloat("Bloom Dirt Contribution", &rendererSettings.Bloom.BloomDirtContribution, 0.0f, 1.0f);
+
+			const char* treeNodeName = "BloomConvolution";
+			const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap;
+			bool open = ImGui::TreeNodeEx((void*)treeNodeName, treeNodeFlags, "Bloom Convolution");
+			if (open)
+			{
+				RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+
+				ImGui::SliderFloat("Bloom Convolution Exposure", &rendererSettings.Bloom.BloomConvolutionExposure, 0.0f, 1.0f);
+				ImGui::SliderFloat("Bloom Convolution Amount", &rendererSettings.Bloom.BloomConvolutionAmount, 0.0f, 1.0f);
+
+				//Ref<Texture2D> kernelTexture = m_Data->BloomKernelImGuiImage;
+				ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+				ImTextureID imguiAlbedoTextureId = imguiLayer->GetImGuiTextureID(m_Data->BloomKernelImGuiImage);
+
+				bool isButtonClicked = ImGui::Button("Load Bloom Kernel", ImVec2(150, 25));
+				if (isButtonClicked)
+				{
+					std::string filePath = FileDialogs::OpenFile("");
+					if (!filePath.empty())
+					{
+						Renderer::Submit([this, filePath]() {
+							BloomConvolutionComputeKernel(filePath, m_Data->BloomKernelExpandImage->GetWidth(), m_Data->BloomKernelExpandImage->GetHeight());
+						});
+					}
+				}
+
+				ImGui::Text("Bloom Kernel");
+				ImGui::Image(imguiAlbedoTextureId, { 256, 256 });
+
+
+
+				ImGui::TreePop();
+			}
 		}
 		//if (ImGui::CollapsingHeader("Sky"))
 		//{

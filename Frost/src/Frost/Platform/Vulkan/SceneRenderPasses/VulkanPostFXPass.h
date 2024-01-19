@@ -77,8 +77,11 @@ namespace Frost
 
 #if 1
 		// ------------------- Bloom Convolution ------------------------------
-		void BloomConvolutionInitData(uint32_t width, uint32_t height);
+		void BloomConvolutionInitData(uint32_t width, uint32_t height, bool initalizeData);
+		void BloomConvolutionComputeKernel(const std::string& kernelNewFilepath, uint32_t width, uint32_t height);
 		void BloomConvolutionUpdate(const RenderQueue& renderQueue);
+
+		void LoadBloomDirtImage(const std::string& filepath);
 		// --------------------------------------------------------
 
 		// ---------------- Bloom Convolution Filter  -------------------------
@@ -165,20 +168,31 @@ namespace Frost
 			Vector<Ref<Image2D>> Bloom_DownsampledTexture;
 			Vector<Ref<Image2D>> Bloom_UpsampledTexture;
 
-
 #if 1
 			// Bloom Convolution pass
-			Ref<Shader> BloomConvolutionShader;
-			Ref<ComputePipeline> BloomConvPipeline;
-			Ref<Material> BloomConvDescriptor;
-			Vector<Ref<Image2D>> BloomConv_PingTexture;
-			Vector<Ref<Image2D>> BloomConv_PongTexture;
+			using ConvolutionSize = uint32_t;
+			HashMap<ConvolutionSize, Ref<Shader>> BloomConvolutionShader;
+			HashMap<ConvolutionSize, Ref<ComputePipeline>> BloomConvPipeline;
+			Vector<Ref<Material>> BloomConvDescriptor;
+			Vector<Ref<Image2D>> BloomConvTexture;
 
-			// Bloom Convolution Filter pass
-			Ref<Shader> BloomConvolutionFilterShader;
-			Ref<ComputePipeline> BloomConvFilterPipeline;
-			Vector<Ref<Material>> BloomConvFilterDescriptor;
-			Vector<Ref<Image2D>> BloomConvFilterTexture;
+			Ref<Shader> BloomExandImageShader;
+			Ref<ComputePipeline> BloomExandImagePipeline;
+			Vector<Ref<Material>> BloomExandImageDescriptor;
+			Vector<Ref<Image2D>> BloomExandImage;
+
+			Ref<Material> BloomExandKernelDescriptor;
+			Ref<Material> BloomConvKernelDescriptor;
+			Ref<Texture2D> BloomDirtImage; // Imported kernel texture
+			Ref<Texture2D> BloomKernelImage; // Imported kernel texture
+			Ref<Image2D> BloomKernelExpandImage; // Kernet texture decomposed to frequency domain
+			Ref<Image2D> BloomKernelFFTImage; // Kernet texture decomposed to frequency domain
+
+
+			Ref<Shader> BloomKernelConvertShader; // Convert the Bloom Kernel from RGBA32F format to RGBA8 to be able to show it to the user
+			Ref<ComputePipeline> BloomKernelConvertPipeline;
+			Ref<Material> BloomKernelConvertDescriptor;
+			Ref<Image2D> BloomKernelImGuiImage; // Kernet texture decomposed to frequency domain
 #endif
 
 

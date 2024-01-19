@@ -108,10 +108,16 @@ namespace Frost
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EntityGlow.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/LineDetection.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/GeometryPassIndirectInstancedBindless.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolution.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolutionFilter.glsl");
+		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolution.glsl");
+		//Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolutionFilter.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/FXAA.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/TAA.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolutionRadix2_512.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolutionRadix2_1024.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolutionRadix2_2048.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomConvolutionRadix4_4096.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ExpandImageToPowerTwo.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomKernelConvertToRGBA8.glsl");
 
 		
 		// Init the pools

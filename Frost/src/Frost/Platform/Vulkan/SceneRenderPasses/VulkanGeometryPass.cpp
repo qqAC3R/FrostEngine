@@ -59,15 +59,6 @@ namespace Frost
 			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 			return this->m_Data->GeometryRenderPass->GetColorAttachment(1, currentFrameIndex);
 		});
-
-		m_Data->OcclusionQueryPools.resize(framesInFlight);
-		for (uint32_t i = 0; i < framesInFlight; i++)
-		{
-			VkQueryPoolCreateInfo queryPoolInfo { VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
-			queryPoolInfo.queryType = VK_QUERY_TYPE_OCCLUSION;
-			queryPoolInfo.queryCount = MaxCountMeshes;
-			vkCreateQueryPool(device, &queryPoolInfo, NULL, &m_Data->OcclusionQueryPools[i]);
-		}
 	}
 
 
@@ -428,7 +419,7 @@ namespace Frost
 			: Center{ inCenter }, Extents{ iI, iJ, iK }
 		{}
 
-		//see https://gdbooks.gitbooks.io/3dcollisions/content/Chapter2/static_aabb_plane.html
+		// https://gdbooks.gitbooks.io/3dcollisions/content/Chapter2/static_aabb_plane.html
 		bool IsOnOrForwardPlane(const Plane& plane)
 		{
 			// Compute the projection interval radius of b onto L(t) = b.c + t * p.n
@@ -455,10 +446,6 @@ namespace Frost
 			const glm::vec3 right = rightVector * Extents.x * scale;
 			const glm::vec3 up = upVector * Extents.y * scale;
 			const glm::vec3 forward = frontVector * Extents.z * scale;
-
-			//const glm::vec3 right = modelMatrix[0];
-			//const glm::vec3 up = modelMatrix[1];
-			//const glm::vec3 forward = -modelMatrix[2];
 
 			const float newIi = std::abs(glm::dot(glm::vec3{ 1.0f, 0.0f, 0.0f }, right)) +
 				                std::abs(glm::dot(glm::vec3{ 1.0f, 0.0f, 0.0f }, up)) +
@@ -691,7 +678,6 @@ namespace Frost
 					
 					bool inside = ComputeFrustumCulling(renderQueue, modelMatrix, submesh.BoundingBox);
 					meshInstancedVertexBuffer.ModelSpaceMatrix[3][3] = (float)inside;
-					//inside = 1;
 
 #if 0
 					// Transform the AABB into 2D screen space
@@ -875,11 +861,7 @@ namespace Frost
 		uint64_t currentFrameCount = Renderer::GetFrameCount();
 		m_GeometryPushConstant.JitterCurrent = GetJitter(currentFrameCount, renderQueue.ViewPortWidth, renderQueue.ViewPortHeight);
 		m_GeometryPushConstant.JitterPrevious = GetJitter(currentFrameCount - 1, renderQueue.ViewPortWidth, renderQueue.ViewPortHeight);
-
-
-		// Reset the occlusion query before actually performing the drawings
-		vkCmdResetQueryPool(cmdBuf, m_Data->OcclusionQueryPools[currentFrameIndex], 0, s_TotalSubmeshSubmitted);
-
+		
 		// Bind the pipeline and renderpass
 		m_Data->GeometryRenderPass->Bind();
 		m_Data->GeometryPipeline->Bind();
@@ -939,10 +921,7 @@ namespace Frost
 
 #if 1
 			uint32_t offset = indirectPerMeshData.CmdOffset * sizeof(VkDrawIndexedIndirectCommand);
-
-			vkCmdBeginQuery(cmdBuf, m_Data->OcclusionQueryPools[currentFrameIndex], indirectPerMeshData.TotalMeshOffset, 0);
 			vkCmdDrawIndexedIndirect(cmdBuf, vulkanIndirectCmdBuffer->GetVulkanBuffer(), offset, indirectPerMeshData.SubmeshCount, sizeof(VkDrawIndexedIndirectCommand));
-			vkCmdEndQuery(cmdBuf, m_Data->OcclusionQueryPools[currentFrameIndex], indirectPerMeshData.TotalMeshOffset);
 
 #else
 			Vector<Submesh> submeshes = meshAsset->GetSubMeshes();
@@ -1245,37 +1224,6 @@ namespace Frost
 			);
 
 		}
-	}
-
-	void VulkanGeometryPass::GetOcclusionQueryResults()
-	{
-		if (s_TotalSubmeshSubmitted == 0) return;
-
-		uint64_t MaxCountMeshes = Renderer::GetRendererConfig().MaxMeshCount_GeometryPass;
-		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		//VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
-
-		int32_t previousFrameIndex = (int32_t)currentFrameIndex - 1;
-		if (previousFrameIndex < 0)
-			previousFrameIndex = Renderer::GetRendererConfig().FramesInFlight - 1;
-
-		Vector<uint64_t> occlusionQueriesOfLastFrame(s_TotalSubmeshSubmitted);
-
-		// We use vkGetQueryResults to copy the results into a host visible buffer
-		vkGetQueryPoolResults(
-			device,
-			m_Data->OcclusionQueryPools[previousFrameIndex],
-			0,
-			2,
-			s_TotalSubmeshSubmitted * sizeof(uint64_t),
-			occlusionQueriesOfLastFrame.data(),
-			sizeof(uint64_t),
-			// Store results a 64 bit values and wait until the results have been finished
-			// If you don't want to wait, you can use VK_QUERY_RESULT_WITH_AVAILABILITY_BIT
-			// which also returns the state of the result (ready) in the result
-			VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
 	}
 
 	void VulkanGeometryPass::OnResize(uint32_t width, uint32_t height)

@@ -5,17 +5,19 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler2D u_ColorFrameTexture;
 layout(binding = 1) uniform sampler2D u_BloomTexture;
-layout(binding = 2) uniform sampler2D u_SSRTexture;
-layout(binding = 3) uniform sampler2D u_AOTexture;
-layout(binding = 4) uniform sampler2D u_VolumetricTexture;
-layout(binding = 5) uniform sampler2D u_CloudComputeTex;
-layout(binding = 8) uniform sampler2D u_SpatialBlueNoiseLUT;
+layout(binding = 2) uniform sampler2D u_BloomConvTexture;
+layout(binding = 3) uniform sampler2D u_BloomDirtTexture;
+layout(binding = 4) uniform sampler2D u_SSRTexture;
+layout(binding = 5) uniform sampler2D u_AOTexture;
+layout(binding = 6) uniform sampler2D u_VolumetricTexture;
+layout(binding = 7) uniform sampler2D u_CloudComputeTex;
+layout(binding = 10) uniform sampler2D u_SpatialBlueNoiseLUT;
 
 // This texture is responsible for firstly adding up the bloom factor (without tone mapping)
 // and then in the SSR we use it for tracing. In the last stage we just add the SSR and do tone mapping.
 // We need 2 textures, because if we had only 1, then we would do tone mapping twice (once for the basic image, then when tracing we will be using the tone mapped texture, and so when we add the SSR on the final tone mapped texture, it will add the tone mapping twice).
-layout(binding = 6, rgba8) uniform restrict writeonly image2D o_Texture_ForSSR;
-layout(binding = 7, rgba8) uniform restrict writeonly image2D o_Texture_Final;
+layout(binding = 8, rgba8) uniform restrict writeonly image2D o_Texture_ForSSR;
+layout(binding = 9, rgba8) uniform restrict writeonly image2D o_Texture_Final;
 
 #define TONE_MAP_FRAME          0
 #define TONE_MAP_FRAME_WITH_SSR 1
@@ -29,6 +31,15 @@ layout(push_constant) uniform PushConstant {
 	int UseAO;
 	int UseBloom;
 } u_PushConstant;
+
+layout(set = 0, binding = 11) uniform BloomConfiguration
+{
+	float BloomConvolutionAmount;
+	float BloomConvolutionExposure;
+
+	float BloomDirtContribution;
+
+} u_BloomConfiguration;
 
 // ------------------------ LUTS --------------------------
 vec4 SampleBlueNoise(ivec2 coords)
@@ -119,9 +130,6 @@ void main()
 			vec2 texSize = vec2(textureSize(u_SSRTexture, 0));
 			vec2 texelSize = 2.0f / texSize;
 
-			//vec2 blueNoise = SampleBlueNoise(loc).rg;
-			//float noiseWeight = 0.01273;
-
 			// Sampling more directions to compensate for the fact that we are rendering SSR on half-resolution
 			//vec3 reflectionContribution = texture(u_SSRTexture, uv + blueNoise * noiseWeight).rgb;
 			vec3 reflectionContribution = vec3(0.0);
@@ -151,8 +159,24 @@ void main()
 		// Bloom factor
 		if(u_PushConstant.UseBloom == 1)
 		{
-			vec3 bloomFactor = texelFetch(u_BloomTexture, loc, 0).rgb;
-			color += bloomFactor;
+			ivec2 bloomConvResolution = ivec2(textureSize(u_BloomConvTexture, 0).xy);
+			ivec2 offset = (bloomConvResolution - ivec2(imgSize)) / 2;
+			vec3 bloomConvolution = texelFetch(u_BloomConvTexture, offset + loc, 0).rgb;
+
+			//vec3 bloomFactor = texelFetch(u_BloomTexture, loc, 0).rgb;
+			//color = mix(color, bloomConvolution * 0.3, 0.05);
+
+			
+			vec3 colorDelta = color;
+			colorDelta = mix(colorDelta, bloomConvolution * u_BloomConfiguration.BloomConvolutionExposure, u_BloomConfiguration.BloomConvolutionAmount);
+			colorDelta = colorDelta - color;
+			color += colorDelta;
+
+			vec3 dirt = texture(u_BloomDirtTexture, uv).rgb;
+			color += max(colorDelta * dirt * u_BloomConfiguration.BloomDirtContribution * 100.0, vec3(0.0));
+			//color = mix(color, bloomConvolution * dirt * u_BloomConfiguration.BloomConvolutionExposure, u_BloomConfiguration.BloomDirtContribution);
+
+			//color = mix(color, bloomConvolution * dirt * u_BloomConfiguration.BloomConvolutionExposure, u_BloomConfiguration.BloomDirtContribution);
 		}
 
 		//vec4 cloudContribution = UpsampleTent9(u_CloudComputeTex, 0.0, uv, 3.0);

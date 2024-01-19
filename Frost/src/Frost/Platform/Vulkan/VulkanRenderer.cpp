@@ -410,10 +410,10 @@ namespace Frost
 	{
 		// TODO: Add Renderer Submittion back!! (only tested for mesh AABB)
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		//Renderer::Submit([&, currentFrameIndex, mesh, transform, color, lineWidth]()
-		//{
+		Renderer::Submit([&, currentFrameIndex, mesh, transform, color, lineWidth]()
+		{
 			s_RenderQueue[currentFrameIndex].AddWireframeMesh(mesh, transform, color, lineWidth);
-		//});
+		});
 	}
 
 	uint32_t VulkanRenderer::ReadPixelFromFramebufferEntityID(uint32_t x, uint32_t y)
