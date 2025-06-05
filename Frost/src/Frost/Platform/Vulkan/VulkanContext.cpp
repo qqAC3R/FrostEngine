@@ -141,7 +141,7 @@ namespace Frost
 		load_VK_EXTENSION_SUBSET(m_Instance, vkGetInstanceProcAddr, m_LogicalDevice->GetVulkanDevice(), vkGetDeviceProcAddr);
 		//load_VK_EXT_debug_utils(m_Instance, vkGetInstanceProcAddr, m_LogicalDevice->GetVulkanDevice(), vkGetDeviceProcAddr);
 
-		vk::DynamicLoader dl;
+		vk::detail::DynamicLoader dl;
 		PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
 #if 0
 		VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
@@ -169,7 +169,7 @@ namespace Frost
 		vkDeviceWaitIdle(device);
 	}
 
-	void VulkanContext::WaitDevice()
+	void VulkanContext::WaitDevice() const
 	{
 		vkDeviceWaitIdle(m_LogicalDevice->GetVulkanDevice());
 	}

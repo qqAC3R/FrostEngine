@@ -34,7 +34,7 @@ namespace Frost
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
 
 		virtual WindowDimension GetWindowDimension() = 0;
-		virtual void WaitDevice() = 0;
+		virtual void WaitDevice() const = 0;
 		virtual GPUMemoryStats GetGPUMemoryStats() const = 0;
 
 		static Scope<GraphicsContext> Create(GLFWwindow* window);

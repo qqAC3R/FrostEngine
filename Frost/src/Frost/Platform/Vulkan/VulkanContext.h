@@ -25,7 +25,7 @@ namespace Frost
 		static VkPipelineBindPoint GetVulkanGraphicsType(GraphicsType type);
 		static VkInstance GetInstance() { return m_Instance; }
 
-		virtual void WaitDevice() override;
+		virtual void WaitDevice() const override;
 
 		virtual GPUMemoryStats GetGPUMemoryStats() const override;
 

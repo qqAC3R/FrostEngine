@@ -13,7 +13,23 @@ namespace Frost
 		// Every buffer MUST be accesed by the shader
 		std::vector<BufferUsage> usages;
 		for (auto& type : types)
-			usages.push_back(type);
+		{
+			if (type != BufferUsage::AccelerationStructure &&
+				type != BufferUsage::AccelerationStructureReadOnly &&
+				type != BufferUsage::ShaderBindingTable)
+			{
+				usages.push_back(type);
+			}
+
+#if FROST_SUPPORT_RAY_TRACING
+			if (type == BufferUsage::AccelerationStructure ||
+				type == BufferUsage::AccelerationStructureReadOnly ||
+				type == BufferUsage::ShaderBindingTable)
+			{
+				usages.push_back(type);
+			}
+#endif
+		}
 		usages.push_back(BufferUsage::ShaderAddress);
 		
 		// CPU_ONLY means that the memory is preferably fast to access by GPU and fast to be mapped by the host (tho it is uncached).
@@ -30,8 +46,23 @@ namespace Frost
 	{
 		std::vector<BufferUsage> usages;
 		for (auto& type : types)
-			usages.push_back(type);
+		{
+			if (type != BufferUsage::AccelerationStructure &&
+				type != BufferUsage::AccelerationStructureReadOnly &&
+				type != BufferUsage::ShaderBindingTable)
+			{
+				usages.push_back(type);
+			}
 
+#if FROST_SUPPORT_RAY_TRACING
+			if (type == BufferUsage::AccelerationStructure ||
+				type == BufferUsage::AccelerationStructureReadOnly ||
+				type == BufferUsage::ShaderBindingTable)
+			{
+				usages.push_back(type);
+			}
+#endif
+		}
 		// Every buffer MUST be accesed by the shader (BufferType::ShaderAddress)
 		usages.push_back(BufferUsage::ShaderAddress);
 

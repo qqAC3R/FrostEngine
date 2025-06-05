@@ -129,6 +129,7 @@ namespace Frost
 			queryPoolInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
 			queryPoolInfo.queryCount = s_DebugData->QueryCount;
 			vkCreateQueryPool(device, &queryPoolInfo, nullptr, &queryPool);
+			vkResetQueryPool(device, queryPool, 0, s_DebugData->QueryCount);
 		}
 
 		s_DebugData->TimestampQueryResults.resize(Renderer::GetRendererConfig().FramesInFlight);
@@ -199,13 +200,17 @@ namespace Frost
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-			/* Acquire the image */
-			VulkanContext::GetSwapChain()->BeginFrame(s_Data->AvailableSemapore[currentFrameIndex], &s_ImageIndex);
+			Application::Get().GetWindow().GetGraphicsContext()->WaitDevice();
 
 			/* Checking if the fence in flight is already being used to render */
 			if (s_Data->FencesInCheck[currentFrameIndex] != VK_NULL_HANDLE)
 				vkWaitForFences(device, 1, &s_Data->FencesInCheck[currentFrameIndex], VK_TRUE, UINT64_MAX);
 
+
+			/* Acquire the image */
+			VulkanContext::GetSwapChain()->BeginFrame(s_Data->AvailableSemapore[currentFrameIndex], &s_ImageIndex);
+
+			
 			/* When the fence was finished being used by the renderer, we mark the fence as now being in use by this frame */
 			s_Data->FencesInCheck[currentFrameIndex] = s_Data->FencesInFlight[currentFrameIndex];
 
