@@ -130,6 +130,7 @@ namespace Frost
 		ScriptEngine::OnHotReload(Project::GetScriptModulePath().string());
 
 
+
 		//FROST_CORE_INFO("{0}, {1}", m_ViewportPanel->GetViewportPanelSize().x, m_ViewportPanel->GetViewportPanelSize().y);
 
 		m_CurrentScene->SetSelectedEntity(m_SceneHierarchyPanel->GetSelectedEntity());
@@ -279,8 +280,10 @@ namespace Frost
 			if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 			{
 				ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+				//ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(514, 514));
 				ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
 				ImGui::End();
+				//ImGui::PopStyleVar();
 			}
 			style.WindowMinSize.x = minWinSizeX;
 
@@ -336,7 +339,6 @@ namespace Frost
 				Renderer::Resize(viewportPanelSize.x, viewportPanelSize.y);
 				m_EditorCamera->SetViewportSize(viewportPanelSize.x, viewportPanelSize.y);
 			}
-
 
 			Ref<Image2D> texture = Renderer::GetFinalImage(m_ViewportPanel->m_OutputImageID);
 			m_ViewportPanel->RenderTexture(texture);

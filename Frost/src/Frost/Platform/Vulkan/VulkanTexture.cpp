@@ -905,7 +905,7 @@ namespace Frost
 		m_Image = VK_NULL_HANDLE;
 	}
 
-	void VulkanTexture3D::TransitionLayout(VkCommandBuffer cmdBuf, VkImageLayout newImageLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
+	void VulkanTexture3D::TransitionLayout(VkCommandBuffer cmdBuf, VkImageLayout newImageLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask)
 	{
 		VkImageSubresourceRange subresourceRange{};
 		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -913,7 +913,8 @@ namespace Frost
 		subresourceRange.levelCount = m_MipLevelCount;
 		subresourceRange.layerCount = 1;
 		Utils::SetImageLayout(
-			cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask
+			cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange,
+			srcStageMask, dstStageMask, srcAccessMask, dstAccessMask
 		);
 
 		m_ImageLayout = newImageLayout;

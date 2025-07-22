@@ -328,7 +328,8 @@ namespace Frost
 		Ref<VulkanTexture3D> voxelTexture = m_Data->VoxelizationTexture[currentFrameIndex].As<VulkanTexture3D>();
 		Ref<VulkanBufferDevice> clearBufferDevice = m_Data->ClearBuffer.As<VulkanBufferDevice>();
 
-		voxelTexture->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+		voxelTexture->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+									   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 		vkCmdCopyBufferToImage(cmdBuf, clearBufferDevice->GetVulkanBuffer(), voxelTexture->GetVulkanImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 		voxelTexture->TransitionLayout(cmdBuf, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
@@ -742,7 +743,7 @@ namespace Frost
 
 
 		Ref<VulkanImage2D> shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
-		shadowDepthTexture->TransitionLayout(cmdBuf, shadowDepthTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		shadowDepthTexture->TransitionLayout(cmdBuf, shadowDepthTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
 
 
 
@@ -834,11 +835,11 @@ namespace Frost
 
 		// Making a barrier to be sure that the voxelization pass has been finished
 		Ref<VulkanTexture3D> vulkanVoxelTexture = m_Data->VoxelizationTexture[currentFrameIndex].As<VulkanTexture3D>();
-		vulkanVoxelTexture->TransitionLayout(cmdBuf, vulkanVoxelTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		vulkanVoxelTexture->TransitionLayout(cmdBuf, vulkanVoxelTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
 		// Making a barrier to be sure that the shadow pass has been finished
 		Ref<VulkanImage2D> shadowDepthTexture = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>()->ShadowDepthRenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
-		shadowDepthTexture->TransitionLayout(cmdBuf, shadowDepthTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		shadowDepthTexture->TransitionLayout(cmdBuf, shadowDepthTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
 		// Shadow Cascades data neede for the shader
 		auto shadowPassInternalData = m_RenderPassPipeline->GetRenderPassData<VulkanShadowPass>();
@@ -1008,7 +1009,8 @@ namespace Frost
 
 		vulkanIndirectSpecularTexture->TransitionLayout(cmdBuf,
 			vulkanIndirectSpecularTexture->GetVulkanImageLayout(),
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 		);
 	}
 

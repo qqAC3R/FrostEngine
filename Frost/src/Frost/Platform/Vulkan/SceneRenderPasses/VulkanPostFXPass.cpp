@@ -894,13 +894,13 @@ namespace Frost
 		if (!m_Data->BloomConvPipeline[1024])
 			m_Data->BloomConvPipeline[1024] = ComputePipeline::Create(computePipelineCreateInfo);
 
-		computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader[2048];
-		if (!m_Data->BloomConvPipeline[2048])
-			m_Data->BloomConvPipeline[2048] = ComputePipeline::Create(computePipelineCreateInfo);
-
-		computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader[4096];
-		if (!m_Data->BloomConvPipeline[4096])
-			m_Data->BloomConvPipeline[4096] = ComputePipeline::Create(computePipelineCreateInfo);
+		//computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader[2048];
+		//if (!m_Data->BloomConvPipeline[2048])
+		//	m_Data->BloomConvPipeline[2048] = ComputePipeline::Create(computePipelineCreateInfo);
+		//
+		//computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader[4096];
+		//if (!m_Data->BloomConvPipeline[4096])
+		//	m_Data->BloomConvPipeline[4096] = ComputePipeline::Create(computePipelineCreateInfo);
 
 		computePipelineCreateInfo.Shader = m_Data->BloomExandImageShader;
 		if (!m_Data->BloomExandImagePipeline)
@@ -913,16 +913,17 @@ namespace Frost
 
 		if(initalizeData)
 			BloomConvolutionComputeKernel("Resources/LUT/BloomKernels/Default1024.exr", width, height);
-		else
-			BloomConvolutionComputeKernel("", width, height);
+		//else
+		//	BloomConvolutionComputeKernel("", width, height);
 		
 
 		// Clamp the values so the minimum possible resolution is 512
-		uint32_t powerOfTwoWidth = 1 << uint32_t(glm::ceil(glm::log2(double(width))));
-		uint32_t powerOfTwoHeight = 1 << uint32_t(glm::ceil(glm::log2(double(height))));
-		powerOfTwoWidth = glm::max(powerOfTwoWidth, m_Data->BloomKernelImage->GetWidth());
-		powerOfTwoHeight = glm::max(powerOfTwoHeight, m_Data->BloomKernelImage->GetHeight());
-
+		//uint32_t powerOfTwoWidth = 1 << uint32_t(glm::ceil(glm::log2(double(width))));
+		//uint32_t powerOfTwoHeight = 1 << uint32_t(glm::ceil(glm::log2(double(height))));
+		//powerOfTwoWidth = glm::max(powerOfTwoWidth, m_Data->BloomKernelImage->GetWidth());
+		//powerOfTwoHeight = glm::max(powerOfTwoHeight, m_Data->BloomKernelImage->GetHeight());
+		uint32_t powerOfTwoWidth = 1024;
+		uint32_t powerOfTwoHeight = 1024;
 
 
 		m_Data->BloomExandImage.resize(framesInFlight);
@@ -941,8 +942,8 @@ namespace Frost
 			bool createImage = false;
 			if (!m_Data->BloomExandImage[i])
 				createImage = true;
-			else if (m_Data->BloomExandImage[i]->GetWidth() != powerOfTwoWidth || m_Data->BloomExandImage[i]->GetHeight() != powerOfTwoHeight)
-				createImage = true;
+			//else if (m_Data->BloomExandImage[i]->GetWidth() != powerOfTwoWidth || m_Data->BloomExandImage[i]->GetHeight() != powerOfTwoHeight)
+			//	createImage = true;
 
 			if(createImage)
 				m_Data->BloomExandImage[i] = Image2D::Create(imageSpec);
@@ -984,8 +985,8 @@ namespace Frost
 			bool createImage = false;
 			if (!m_Data->BloomConvTexture[i])
 				createImage = true;
-			else if (m_Data->BloomConvTexture[i]->GetWidth() != powerOfTwoWidth || m_Data->BloomConvTexture[i]->GetHeight() != powerOfTwoHeight)
-				createImage = true;
+			//else if (m_Data->BloomConvTexture[i]->GetWidth() != powerOfTwoWidth || m_Data->BloomConvTexture[i]->GetHeight() != powerOfTwoHeight)
+			//	createImage = true;
 
 			if (createImage)
 				m_Data->BloomConvTexture[i] = Image2D::Create(imageSpec);
@@ -1064,8 +1065,10 @@ namespace Frost
 		// Clamp the values so the minimum possible resolution is 512
 		uint32_t powerOfTwoWidth = 1 << uint32_t(glm::ceil(glm::log2(double(width))));
 		uint32_t powerOfTwoHeight = 1 << uint32_t(glm::ceil(glm::log2(double(height))));
-		powerOfTwoWidth = glm::max(powerOfTwoWidth, m_Data->BloomKernelImage->GetWidth());
-		powerOfTwoHeight = glm::max(powerOfTwoHeight, m_Data->BloomKernelImage->GetHeight());
+		//powerOfTwoWidth = glm::max(powerOfTwoWidth, m_Data->BloomKernelImage->GetWidth());
+		//powerOfTwoHeight = glm::max(powerOfTwoHeight, m_Data->BloomKernelImage->GetHeight());
+		powerOfTwoWidth = 1024;
+		powerOfTwoHeight = 1024;
 
 		//if (m_Data->BloomKernelImage->GetWidth() == powerOfTwoWidth && m_Data->BloomKernelFFTImage->GetHeight() == powerOfTwoHeight && //kernelNewFilepath.empty())
 		//{
@@ -1145,7 +1148,7 @@ namespace Frost
 
 			Ref<VulkanImage2D> vulkanKernelFFTImage = m_Data->BloomKernelFFTImage.As<VulkanImage2D>();
 
-			vulkanConvKernelDescriptor->Bind(cmdBuf, m_Data->BloomConvPipeline[512]);
+			vulkanConvKernelDescriptor->Bind(cmdBuf, m_Data->BloomConvPipeline[1024]);
 
 			{
 				// Horizontal transform
@@ -2013,8 +2016,6 @@ namespace Frost
 
 			vulkanBloomExpandDescriptor->Bind(cmdBuf, m_Data->BloomExandImagePipeline);
 
-			
-
 			glm::vec3 pushConstant = { 1.0f, rendererSettings.Bloom.Threshold, rendererSettings.Bloom.Knee };
 			vulkanBloomExandImagePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
 
@@ -2026,14 +2027,14 @@ namespace Frost
 				cmdBuf,
 				vulkanExpandImage->GetVulkanImageLayout(),
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 			);
 		}
 
 		{
 			Ref<VulkanMaterial> vulkanBloomConvDescriptor = m_Data->BloomConvDescriptor[currentFrameIndex].As<VulkanMaterial>();
-			//Ref<VulkanComputePipeline> vulkanBloomConvRadix2Pipeline = m_Data->BloomConvRadix2Pipeline.As<VulkanComputePipeline>();
-			//Ref<VulkanComputePipeline> vulkanBloomConvRadix4Pipeline = m_Data->BloomConvRadix4Pipeline.As<VulkanComputePipeline>();
 			Ref<VulkanImage2D> vulkanFFTImage = m_Data->BloomConvTexture[currentFrameIndex].As<VulkanImage2D>();
 			float width = renderQueue.ViewPortWidth;
 			float height = renderQueue.ViewPortHeight;
@@ -2057,7 +2058,9 @@ namespace Frost
 					cmdBuf,
 					vulkanFFTImage->GetVulkanImageLayout(),
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_ACCESS_SHADER_READ_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 				);
 			}
 
@@ -2078,7 +2081,9 @@ namespace Frost
 					cmdBuf,
 					vulkanFFTImage->GetVulkanImageLayout(),
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_ACCESS_SHADER_READ_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 				);
 			}
 
@@ -2099,7 +2104,9 @@ namespace Frost
 					cmdBuf,
 					vulkanFFTImage->GetVulkanImageLayout(),
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_ACCESS_SHADER_READ_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 				);
 			}
 
@@ -2119,7 +2126,9 @@ namespace Frost
 					cmdBuf,
 					vulkanFFTImage->GetVulkanImageLayout(),
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_ACCESS_SHADER_READ_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 				);
 			}
 		}

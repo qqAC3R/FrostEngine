@@ -21,7 +21,9 @@ namespace Frost
 
 		void TransitionLayout(VkCommandBuffer cmdBuf, VkImageLayout newImageLayout,
 			VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+			VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			VkAccessFlags srcAccessMask = VK_ACCESS_NONE,
+			VkAccessFlags dstAccessMask = VK_ACCESS_NONE);
 
 		void GenerateMipMaps(VkCommandBuffer cmdBuffer, VkImageLayout newImageLayout);
 		void BlitImage(VkCommandBuffer cmdBuf, const Ref<Image2D>& srcImage, uint32_t mipLevel = 0);

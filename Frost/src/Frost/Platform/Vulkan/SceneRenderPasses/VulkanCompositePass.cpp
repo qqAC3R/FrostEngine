@@ -299,7 +299,9 @@ namespace Frost
 
 		{
 			auto vulkanDepthImage = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetDepthAttachment(currentFrameIndex).As<VulkanImage2D>();
-			vulkanDepthImage->TransitionLayout(cmdBuf, vulkanDepthImage->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			vulkanDepthImage->TransitionLayout(cmdBuf, vulkanDepthImage->GetVulkanImageLayout(),
+											   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+											   VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);
 		}
 
 		{
@@ -368,7 +370,9 @@ namespace Frost
 		vulkanCompositePipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 		Ref<VulkanImage2D> vulkanOutputImage = m_Data->RenderPass->GetColorAttachment(0, currentFrameIndex).As<VulkanImage2D>();
-		vulkanOutputImage->TransitionLayout(cmdBuf, vulkanOutputImage->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		vulkanOutputImage->TransitionLayout(cmdBuf, vulkanOutputImage->GetVulkanImageLayout(),
+											VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+											VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
 
 

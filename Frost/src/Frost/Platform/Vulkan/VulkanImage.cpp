@@ -281,7 +281,8 @@ namespace Frost
 	}
 
 	void VulkanImage2D::TransitionLayout(VkCommandBuffer cmdBuf, VkImageLayout newImageLayout,
-										  VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
+										  VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
+										  VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask)
 	{
 		VkImageAspectFlags imageAspectFlags;
 		if (m_ImageSpecification.Format == ImageFormat::Depth24Stencil8 || m_ImageSpecification.Format == ImageFormat::Depth32)
@@ -295,7 +296,8 @@ namespace Frost
 		subresourceRange.levelCount = m_MipLevelCount;
 		subresourceRange.baseMipLevel = 0;
 		subresourceRange.layerCount = 1;
-		Utils::SetImageLayout(cmdBuf, m_Image, m_ImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
+		Utils::SetImageLayout(cmdBuf, m_Image, m_ImageLayout, newImageLayout, 
+			subresourceRange, srcStageMask, dstStageMask, srcAccessMask, dstAccessMask);
 
 		m_ImageLayout = newImageLayout;
 	}

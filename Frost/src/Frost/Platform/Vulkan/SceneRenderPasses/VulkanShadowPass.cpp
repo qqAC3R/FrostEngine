@@ -651,7 +651,7 @@ namespace Frost
 
 		// Barrier
 		Ref<VulkanImage2D> vulkanTexture = m_Data->ShadowComputeTexture[currentFrameIndex].As<VulkanImage2D>();
-		vulkanTexture->TransitionLayout(cmdBuf, vulkanTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		vulkanTexture->TransitionLayout(cmdBuf, vulkanTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
 
 	void VulkanShadowPass::ShadowComputeDenoiseUpdate(const RenderQueue& renderQueue)
@@ -675,7 +675,7 @@ namespace Frost
 
 		// Barrier
 		Ref<VulkanImage2D> vulkanTexture = m_Data->ShadowComputeDenoiseTexture[currentFrameIndex].As<VulkanImage2D>();
-		vulkanTexture->TransitionLayout(cmdBuf, vulkanTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		vulkanTexture->TransitionLayout(cmdBuf, vulkanTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
 
 	void VulkanShadowPass::UpdateCascades(const RenderQueue& renderQueue)

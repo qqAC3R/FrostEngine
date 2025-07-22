@@ -407,7 +407,9 @@ namespace Frost
 		cloudNoiseDescriptor->Bind(cmdBuf, m_Data->PerlinNoisePipeline);
 		cloudNoisePipeline->Dispatch(cmdBuf, 128 / 4, 128 / 4, 128 / 4);
 
-		cloudNoiseTexture->TransitionLayout(cmdBuf, cloudNoiseTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+		cloudNoiseTexture->TransitionLayout(cmdBuf, cloudNoiseTexture->GetVulkanImageLayout(),
+											VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+											VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
 		cloudNoiseTexture->GenerateMipMaps(cmdBuf, cloudNoiseTexture->GetVulkanImageLayout());
 
@@ -419,7 +421,7 @@ namespace Frost
 		erroderNoiseDescriptor->Bind(cmdBuf, m_Data->WoorleyNoisePipeline);
 		erroderNoisePipeline->Dispatch(cmdBuf, 32 / 4, 32 / 4, 32 / 4);
 
-		erroderNoiseTexture->TransitionLayout(cmdBuf, erroderNoiseTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+		erroderNoiseTexture->TransitionLayout(cmdBuf, erroderNoiseTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 		erroderNoiseTexture->GenerateMipMaps(cmdBuf, erroderNoiseTexture->GetVulkanImageLayout());
 
 		// Ending the temporary commandbuffer
@@ -652,7 +654,7 @@ namespace Frost
 
 		// Volume texture barrier
 		Ref<VulkanTexture3D> vulkanVolumeTexture = m_Data->EmissionPhaseFroxelTexture[currentFrameIndex].As<VulkanTexture3D>();
-		vulkanVolumeTexture->TransitionLayout(cmdBuf, vulkanVolumeTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		vulkanVolumeTexture->TransitionLayout(cmdBuf, vulkanVolumeTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
 
 	struct VolumetricLightInjectPushConstant
@@ -726,7 +728,9 @@ namespace Frost
 
 		// Volume texture barrier
 		Ref<VulkanTexture3D> vulkanVolumeTexture = m_Data->ScatExtinctionFroxelTexture[currentFrameIndex].As<VulkanTexture3D>();
-		vulkanVolumeTexture->TransitionLayout(cmdBuf, vulkanVolumeTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		vulkanVolumeTexture->TransitionLayout(cmdBuf, vulkanVolumeTexture->GetVulkanImageLayout(),
+											  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+											  VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
 
 	struct VolumetricTAAPushConstant
@@ -777,7 +781,9 @@ namespace Frost
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 128);
 
 		Ref<VulkanTexture3D> vulkanVolumeTexture = m_Data->FroxelResolveTAATexture[currentFrameIndex].As<VulkanTexture3D>();
-		vulkanVolumeTexture->TransitionLayout(cmdBuf, vulkanVolumeTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		vulkanVolumeTexture->TransitionLayout(cmdBuf, vulkanVolumeTexture->GetVulkanImageLayout(),
+											  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+											  VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
 
 	void VulkanVolumetricPass::FroxelFinalComputeUpdate(const RenderQueue& renderQueue)
@@ -805,7 +811,9 @@ namespace Frost
 		vulkanPipeline->Dispatch(cmdBuf, groupX, groupY, 1);
 
 		Ref<VulkanTexture3D> vulkanVolumeTexture = m_Data->EmissionPhaseFroxelTexture[currentFrameIndex].As<VulkanTexture3D>();
-		vulkanVolumeTexture->TransitionLayout(cmdBuf, vulkanVolumeTexture->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		vulkanVolumeTexture->TransitionLayout(cmdBuf, vulkanVolumeTexture->GetVulkanImageLayout(),
+											  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+											  VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
 
 	struct VolumetricComputePushConstant
@@ -884,7 +892,9 @@ namespace Frost
 
 		// Image barrier for the volumetric direction X blur texture
 		Ref<VulkanImage2D> volumetricBlurDirXTex = m_Data->VolumetricBlurTexture_DirX[currentFrameIndex].As<VulkanImage2D>();
-		volumetricBlurDirXTex->TransitionLayout(cmdBuf, volumetricBlurDirXTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		volumetricBlurDirXTex->TransitionLayout(cmdBuf, volumetricBlurDirXTex->GetVulkanImageLayout(),
+												VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
+												VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
 
 		/// Then blur in the Y direction
@@ -898,7 +908,9 @@ namespace Frost
 
 		// Image barrier for the volumetric direction X blur texture
 		Ref<VulkanImage2D> volumetricBlurDirYTex = m_Data->VolumetricBlurTexture_DirY[currentFrameIndex].As<VulkanImage2D>();
-		volumetricBlurDirYTex->TransitionLayout(cmdBuf, volumetricBlurDirYTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		volumetricBlurDirYTex->TransitionLayout(cmdBuf, volumetricBlurDirYTex->GetVulkanImageLayout(),
+												VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+												VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
 
 	struct CloudComputePushConstant
@@ -972,7 +984,9 @@ namespace Frost
 
 		// Image barrier for the volumetric direction X blur texture
 		Ref<VulkanImage2D> cloudBlurDirXTex = m_Data->CloudComputeBlurTexture_DirX[currentFrameIndex].As<VulkanImage2D>();
-		cloudBlurDirXTex->TransitionLayout(cmdBuf, cloudBlurDirXTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		cloudBlurDirXTex->TransitionLayout(cmdBuf, cloudBlurDirXTex->GetVulkanImageLayout(),
+										   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+										   VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
 
 		/// Then blur in the Y direction
@@ -988,7 +1002,9 @@ namespace Frost
 
 		// Image barrier for the volumetric direction X blur texture
 		Ref<VulkanImage2D> cloudBlurDirYTex = m_Data->CloudComputeBlurTexture_DirY[currentFrameIndex].As<VulkanImage2D>();
-		cloudBlurDirYTex->TransitionLayout(cmdBuf, cloudBlurDirYTex->GetVulkanImageLayout(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		cloudBlurDirYTex->TransitionLayout(cmdBuf, cloudBlurDirYTex->GetVulkanImageLayout(),
+										   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+										   VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
 	}
 

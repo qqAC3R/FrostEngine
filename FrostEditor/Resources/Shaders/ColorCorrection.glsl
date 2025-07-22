@@ -21,6 +21,7 @@ layout(binding = 9, rgba8) uniform restrict writeonly image2D o_Texture_Final;
 
 #define TONE_MAP_FRAME          0
 #define TONE_MAP_FRAME_WITH_SSR 1
+const vec2 BLOOM_CONV_OFFSET = vec2(128.0f); // Offset required in order to add clamping
 
 layout(push_constant) uniform PushConstant {
 	float Gamma;
@@ -161,7 +162,23 @@ void main()
 		{
 			ivec2 bloomConvResolution = ivec2(textureSize(u_BloomConvTexture, 0).xy);
 			ivec2 offset = (bloomConvResolution - ivec2(imgSize)) / 2;
-			vec3 bloomConvolution = texelFetch(u_BloomConvTexture, offset + loc, 0).rgb;
+
+			ivec2 diffInputOutputImageSize = bloomConvResolution - ivec2(imgSize);
+			bool isTextureBigger = diffInputOutputImageSize.x < 0 || diffInputOutputImageSize.y < 0;
+    
+			ivec2 adjustedLoc = loc;
+			if(isTextureBigger)
+			{
+				float ratioInputImg = imgSize.x / imgSize.y;
+				vec2 adjustedInputSize = vec2(vec2(bloomConvResolution).x, vec2(bloomConvResolution).y * (1.0f / ratioInputImg));
+				adjustedInputSize = adjustedInputSize - BLOOM_CONV_OFFSET;
+
+				offset = (bloomConvResolution - ivec2(adjustedInputSize)) / 2;
+				adjustedLoc = ivec2(vec2(loc) * adjustedInputSize / imgSize);
+			}
+
+
+			vec3 bloomConvolution = texelFetch(u_BloomConvTexture, offset + adjustedLoc, 0).rgb;
 
 			//vec3 bloomFactor = texelFetch(u_BloomTexture, loc, 0).rgb;
 			//color = mix(color, bloomConvolution * 0.3, 0.05);
@@ -183,11 +200,11 @@ void main()
 		//color *= cloudContribution.a;
 		//color += cloudContribution.rgb;
 
-
-		vec4 volumetricContribution = texture(u_VolumetricTexture, uv);
-		color *= volumetricContribution.a;
-		color += volumetricContribution.rgb;
-
+		{
+			vec4 volumetricContribution = texture(u_VolumetricTexture, uv);
+			color *= volumetricContribution.a;
+			color += volumetricContribution.rgb;
+		}
 		
 		// Tonemapping (ACES algorithm)
 		color = AcesApprox(color);

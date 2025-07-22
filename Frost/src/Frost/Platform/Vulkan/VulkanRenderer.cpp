@@ -504,6 +504,8 @@ namespace Frost
 			vkDeviceWaitIdle(device);
 
 			s_Data->SceneRenderPasses->ResizeRenderPasses(width, height);
+
+			vkDeviceWaitIdle(device);
 		});
 	}
 
@@ -679,7 +681,8 @@ namespace Frost
 							   VkImage image,
 							   VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
 							   VkImageSubresourceRange subresourceRange,
-							   VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask)
+							   VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
+							   VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask)
 	{
 		VkImageMemoryBarrier imageMemoryBarrier = {};
 		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -690,8 +693,8 @@ namespace Frost
 		imageMemoryBarrier.image = image;
 		imageMemoryBarrier.subresourceRange = subresourceRange;
 
-		imageMemoryBarrier.srcAccessMask = AccessFlagsToImageLayout(oldImageLayout);
-		imageMemoryBarrier.dstAccessMask = AccessFlagsToImageLayout(newImageLayout);
+		imageMemoryBarrier.srcAccessMask = AccessFlagsToImageLayout(oldImageLayout) | srcAccessMask;
+		imageMemoryBarrier.dstAccessMask = AccessFlagsToImageLayout(newImageLayout) | dstAccessMask;
 
 
 		// Put barrier inside setup command buffer
