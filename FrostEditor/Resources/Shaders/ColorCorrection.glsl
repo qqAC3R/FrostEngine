@@ -170,7 +170,10 @@ void main()
 			if(isTextureBigger)
 			{
 				float ratioInputImg = imgSize.x / imgSize.y;
-				vec2 adjustedInputSize = vec2(vec2(bloomConvResolution).x, vec2(bloomConvResolution).y * (1.0f / ratioInputImg));
+				vec2 adjustedInputSize = vec2(vec2(bloomConvResolution).x, vec2(bloomConvResolution).y * (1.0 / ratioInputImg));
+				if(bloomConvResolution.y > bloomConvResolution.x)
+					adjustedInputSize = vec2(vec2(bloomConvResolution).x * ratioInputImg, vec2(bloomConvResolution).y);
+
 				adjustedInputSize = adjustedInputSize - BLOOM_CONV_OFFSET;
 
 				offset = (bloomConvResolution - ivec2(adjustedInputSize)) / 2;

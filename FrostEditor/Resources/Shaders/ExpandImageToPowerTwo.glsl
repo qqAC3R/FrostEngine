@@ -43,13 +43,16 @@ vec3 Prefilter(vec4 color)
     return color.xyz;
 }
 
-vec3 SampleDownsampledTexture(ivec2 coordinate)
+vec3 SampleDownsampledTexture(ivec2 coordinate, out vec2 adjustedInputSize)
 {
     const vec2 inputImageSize = vec2(textureSize(u_InputImage, 0));
     const vec2 outputImageSize = vec2(imageSize(u_OutputImage));
 
     float ratioInputImg = inputImageSize.x / inputImageSize.y;
-    vec2 adjustedInputSize = vec2(outputImageSize.x, outputImageSize.y * (1.0f / ratioInputImg));
+    adjustedInputSize = vec2(outputImageSize.x, outputImageSize.y * (1.0 / ratioInputImg));
+    if(outputImageSize.y > outputImageSize.x)
+		adjustedInputSize = vec2(outputImageSize.x * ratioInputImg, outputImageSize.y);
+
     adjustedInputSize = adjustedInputSize - BLOOM_CONV_OFFSET;
 
     vec2 stepCoords = inputImageSize / vec2(adjustedInputSize);
@@ -76,22 +79,20 @@ void main() {
 
 
     const ivec2 diffInputOutputImageSize = outputImageSize - inputImageSize;
+    vec2 adjustedInputSize = vec2(0.0);
     bool isTextureBigger = diffInputOutputImageSize.x < 0 || diffInputOutputImageSize.y < 0;
-    vec3 color = isTextureBigger ? SampleDownsampledTexture(ivec2(gl_GlobalInvocationID.xy))
+    vec3 color = isTextureBigger ? SampleDownsampledTexture(ivec2(gl_GlobalInvocationID.xy), adjustedInputSize)
                                  : SampleTexture(ivec2(gl_GlobalInvocationID.xy));
-    //texelFetch(u_InputImage, ivec2(gl_GlobalInvocationID.xy), 0);
 
     if(u_PushConstant.UsePrefiltering == 1.0)
-        color.rgb = Prefilter(vec4(color, 0.0f));
+        color.rgb = Prefilter(vec4(color, 0.0));
     
-    vec2 uv = (vec2(gl_GlobalInvocationID.xy) + 0.5) / inputImageSize;
+    vec2 uv = (vec2(gl_GlobalInvocationID.xy) + 0.5) / vec2(inputImageSize);
 
     ivec2 offsets = (outputImageSize - inputImageSize) / 2;
     if (isTextureBigger == true)
     {
         float ratioInputImg = vec2(inputImageSize).x / vec2(inputImageSize).y;
-        vec2 adjustedInputSize = vec2(vec2(outputImageSize).x, vec2(outputImageSize).y * (1.0f / ratioInputImg));
-        adjustedInputSize = adjustedInputSize - BLOOM_CONV_OFFSET;
         offsets = (outputImageSize - ivec2(adjustedInputSize)) / 2;
     }
     imageStore(u_OutputImage, offsets + ivec2(gl_GlobalInvocationID).xy, vec4(color.rgb, 0.0));

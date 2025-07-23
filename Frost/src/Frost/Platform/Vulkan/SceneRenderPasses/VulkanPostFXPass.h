@@ -77,8 +77,10 @@ namespace Frost
 
 #if 1
 		// ------------------- Bloom Convolution ------------------------------
+		// NOTE: The engine is gonna use only a constrainted FFT texture size for performance
+		// and so we will expand/shrink every input image in order to compute the FFT efficiently
 		void BloomConvolutionInitData(uint32_t width, uint32_t height, bool initalizeData);
-		void BloomConvolutionComputeKernel(const std::string& kernelNewFilepath, uint32_t width, uint32_t height);
+		bool BloomConvolutionComputeKernel(const std::string& kernelNewFilepath, uint32_t width, uint32_t height);
 		void BloomConvolutionUpdate(const RenderQueue& renderQueue);
 
 		void LoadBloomDirtImage(const std::string& filepath);

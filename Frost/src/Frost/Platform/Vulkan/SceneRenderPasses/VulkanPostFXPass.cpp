@@ -883,7 +883,6 @@ namespace Frost
 		uint32_t framesInFlight = Renderer::GetRendererConfig().FramesInFlight;
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-		
 		// Pipeline creation
 		ComputePipeline::CreateInfo computePipelineCreateInfo{};
 		computePipelineCreateInfo.Shader = m_Data->BloomConvolutionShader[512];
@@ -917,13 +916,11 @@ namespace Frost
 		//	BloomConvolutionComputeKernel("", width, height);
 		
 
-		// Clamp the values so the minimum possible resolution is 512
-		//uint32_t powerOfTwoWidth = 1 << uint32_t(glm::ceil(glm::log2(double(width))));
-		//uint32_t powerOfTwoHeight = 1 << uint32_t(glm::ceil(glm::log2(double(height))));
-		//powerOfTwoWidth = glm::max(powerOfTwoWidth, m_Data->BloomKernelImage->GetWidth());
-		//powerOfTwoHeight = glm::max(powerOfTwoHeight, m_Data->BloomKernelImage->GetHeight());
-		uint32_t powerOfTwoWidth = 1024;
-		uint32_t powerOfTwoHeight = 1024;
+		// NOTE: The engine is gonna use only a constrainted FFT texture size for performance
+		// and so we will expand/shrink every input image in order to compute the FFT efficiently
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+		uint32_t powerOfTwoWidth = rendererSettings.Bloom.BloomConvutionTexSize;
+		uint32_t powerOfTwoHeight = rendererSettings.Bloom.BloomConvutionTexSize;
 
 
 		m_Data->BloomExandImage.resize(framesInFlight);
@@ -939,13 +936,7 @@ namespace Frost
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.UseMipChain = false;
 			
-			bool createImage = false;
 			if (!m_Data->BloomExandImage[i])
-				createImage = true;
-			//else if (m_Data->BloomExandImage[i]->GetWidth() != powerOfTwoWidth || m_Data->BloomExandImage[i]->GetHeight() != powerOfTwoHeight)
-			//	createImage = true;
-
-			if(createImage)
 				m_Data->BloomExandImage[i] = Image2D::Create(imageSpec);
 		}
 
@@ -982,17 +973,8 @@ namespace Frost
 			imageSpec.Usage = ImageUsage::Storage;
 			imageSpec.UseMipChain = false;
 
-			bool createImage = false;
 			if (!m_Data->BloomConvTexture[i])
-				createImage = true;
-			//else if (m_Data->BloomConvTexture[i]->GetWidth() != powerOfTwoWidth || m_Data->BloomConvTexture[i]->GetHeight() != powerOfTwoHeight)
-			//	createImage = true;
-
-			if (createImage)
 				m_Data->BloomConvTexture[i] = Image2D::Create(imageSpec);
-
-			//if (m_Data->BloomConvTexture[i]->GetWidth() != powerOfTwoWidth || m_Data->BloomExandImage[i]->GetHeight() != powerOfTwoHeight)
-				//m_Data->BloomConvTexture[i] = Image2D::Create(imageSpec);
 		}
 
 
@@ -1008,13 +990,12 @@ namespace Frost
 			vulkanDescriptor->Set("u_InputImage", m_Data->BloomExandImage[i]);
 			vulkanDescriptor->Set("u_FFTImage", m_Data->BloomConvTexture[i]);
 			vulkanDescriptor->Set("u_KernelImage", m_Data->BloomKernelFFTImage);
-			//vulkanDescriptor->Set("u_KernelImage", m_Data->BloomKernelImGuiImage);
 			vulkanDescriptor->UpdateVulkanDescriptorIfNeeded();
 		}
 
 	}
 
-	void VulkanPostFXPass::BloomConvolutionComputeKernel(const std::string& kernelNewFilepath, uint32_t width, uint32_t height)
+	bool VulkanPostFXPass::BloomConvolutionComputeKernel(const std::string& kernelNewFilepath, uint32_t width, uint32_t height)
 	{
 		if (!kernelNewFilepath.empty())
 		{
@@ -1026,6 +1007,13 @@ namespace Frost
 			textureSpec.FlipTexture = false;
 			textureSpec.UseMips = false;
 			m_Data->BloomKernelImage = Texture2D::Create(kernelNewFilepath, textureSpec);
+
+			// NOTE: The engine is gonna use only a constrainted FFT texture size for performance
+			// and so we will expand/shrink every input image in order to compute the FFT efficiently
+			RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+			if (m_Data->BloomKernelImage->GetWidth() > rendererSettings.Bloom.BloomConvutionTexSize ||
+				m_Data->BloomKernelImage->GetHeight() > rendererSettings.Bloom.BloomConvutionTexSize)
+				return false;
 
 
 			ImageSpecification imageSpec{};
@@ -1060,21 +1048,11 @@ namespace Frost
 			VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
 		}		
 
-		
-
-		// Clamp the values so the minimum possible resolution is 512
-		uint32_t powerOfTwoWidth = 1 << uint32_t(glm::ceil(glm::log2(double(width))));
-		uint32_t powerOfTwoHeight = 1 << uint32_t(glm::ceil(glm::log2(double(height))));
-		//powerOfTwoWidth = glm::max(powerOfTwoWidth, m_Data->BloomKernelImage->GetWidth());
-		//powerOfTwoHeight = glm::max(powerOfTwoHeight, m_Data->BloomKernelImage->GetHeight());
-		powerOfTwoWidth = 1024;
-		powerOfTwoHeight = 1024;
-
-		//if (m_Data->BloomKernelImage->GetWidth() == powerOfTwoWidth && m_Data->BloomKernelFFTImage->GetHeight() == powerOfTwoHeight && //kernelNewFilepath.empty())
-		//{
-		//	return;
-		//}
-
+		// NOTE: The engine is gonna use only a constrainted FFT texture size for performance
+		// and so we will expand/shrink every input image in order to compute the FFT efficiently
+		RendererSettings& rendererSettings = Renderer::GetRendererSettings();
+		uint32_t powerOfTwoWidth = rendererSettings.Bloom.BloomConvutionTexSize;
+		uint32_t powerOfTwoHeight = rendererSettings.Bloom.BloomConvutionTexSize;
 
 		{
 			ImageSpecification imageSpec{};
@@ -1194,6 +1172,7 @@ namespace Frost
 		// Flush the compute command buffer
 		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf, RenderQueueType::Compute);
 
+		return true;
 	}
 
 	void VulkanPostFXPass::LoadBloomDirtImage(const std::string& filepath)
@@ -2016,7 +1995,8 @@ namespace Frost
 
 			vulkanBloomExpandDescriptor->Bind(cmdBuf, m_Data->BloomExandImagePipeline);
 
-			glm::vec3 pushConstant = { 1.0f, rendererSettings.Bloom.Threshold, rendererSettings.Bloom.Knee };
+			// Clear image
+			glm::vec4 pushConstant = { 1.0f, rendererSettings.Bloom.Threshold, rendererSettings.Bloom.Knee, 1.0f };
 			vulkanBloomExandImagePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
 
 			uint32_t groupX = std::ceil(width / 32.0f);
@@ -2028,8 +2008,26 @@ namespace Frost
 				vulkanExpandImage->GetVulkanImageLayout(),
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_ACCESS_SHADER_READ_BIT,
+				VK_ACCESS_SHADER_WRITE_BIT,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+			);
+
+			// Expand/Shrink the image according to FFT Convulution texture
+			pushConstant = { 1.0f, rendererSettings.Bloom.Threshold, rendererSettings.Bloom.Knee, 0.0f };
+			vulkanBloomExandImagePipeline->BindVulkanPushConstant(cmdBuf, "u_PushConstant", &pushConstant.x);
+
+			groupX = std::ceil(width / 32.0f);
+			groupY = std::ceil(height / 32.0f);
+			vulkanBloomExandImagePipeline->Dispatch(cmdBuf, groupX, groupY, 1);
+
+
+			vulkanExpandImage->TransitionLayout(
+				cmdBuf,
+				vulkanExpandImage->GetVulkanImageLayout(),
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+				VK_ACCESS_SHADER_READ_BIT
 			);
 		}
 
@@ -2059,7 +2057,7 @@ namespace Frost
 					vulkanFFTImage->GetVulkanImageLayout(),
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_ACCESS_SHADER_READ_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 				);
 			}
@@ -2082,7 +2080,7 @@ namespace Frost
 					vulkanFFTImage->GetVulkanImageLayout(),
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_ACCESS_SHADER_READ_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 				);
 			}
@@ -2105,7 +2103,7 @@ namespace Frost
 					vulkanFFTImage->GetVulkanImageLayout(),
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_ACCESS_SHADER_READ_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 				);
 			}
@@ -2127,7 +2125,7 @@ namespace Frost
 					vulkanFFTImage->GetVulkanImageLayout(),
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_ACCESS_SHADER_READ_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 				);
 			}
@@ -3257,7 +3255,9 @@ namespace Frost
 					if (!filePath.empty())
 					{
 						Renderer::Submit([this, filePath]() {
-							BloomConvolutionComputeKernel(filePath, m_Data->BloomKernelExpandImage->GetWidth(), m_Data->BloomKernelExpandImage->GetHeight());
+							bool isTexCorrectSize = BloomConvolutionComputeKernel(filePath, m_Data->BloomKernelExpandImage->GetWidth(), m_Data->BloomKernelExpandImage->GetHeight());
+							if (!isTexCorrectSize)
+								FROST_CORE_ERROR("Could not load Bloom Kernel Texture. The size is too big for the engine!");
 						});
 					}
 				}

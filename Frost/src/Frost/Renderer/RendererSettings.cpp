@@ -28,6 +28,7 @@ namespace Frost
 		Bloom.BloomConvolutionExposure = 0.3f;
 		Bloom.BloomConvolutionAmount = 0.05f;
 		Bloom.BloomDirtContribution = 0.3f;
+		Bloom.BloomConvutionTexSize = 1024;
 
 		// AO
 		AmbientOcclusion.Enabled = 1;

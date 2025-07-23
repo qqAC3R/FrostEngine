@@ -35,6 +35,7 @@ namespace Frost
 			float BloomConvolutionExposure;
 			float BloomConvolutionAmount;
 			float BloomDirtContribution;
+			int32_t BloomConvutionTexSize;
 		} Bloom;
 
 		struct AmbientOcclussionSettings

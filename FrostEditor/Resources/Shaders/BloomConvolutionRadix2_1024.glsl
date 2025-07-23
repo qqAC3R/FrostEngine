@@ -1,7 +1,7 @@
 #type compute
 #version 450 core
 
-#define WORK_GROUP_SIZE 512
+#define WORK_GROUP_SIZE 256
 
 layout(local_size_x = WORK_GROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
 
@@ -10,7 +10,7 @@ layout(binding = 1) uniform sampler2D u_KernelImage;
 layout(rgba32f, binding = 2) uniform image2D u_FFTImage;
 
 #define PI 3.14159265359
-#define RADIX 2
+#define RADIX 4
 
 layout(push_constant) uniform PushConstant
 {
