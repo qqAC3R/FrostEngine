@@ -33,6 +33,7 @@ namespace Frost
 
 		virtual void BeginFrame() = 0;
 		virtual void EndFrame() = 0;
+		virtual void PrepareNextFrame() = 0;
 
 		virtual void SubmitCmdsToRender() = 0;
 

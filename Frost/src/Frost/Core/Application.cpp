@@ -37,7 +37,7 @@ namespace Frost
 
 		//std::string filepath = FileDialogs::OpenFile("");
 		//Ref<Project> project = Project::Deserialize(filepath); // Hardcoded currently
-		Ref<Project> project = Project::Deserialize("D:\\Visual Studio\\Frost\\master\\FrostEditor\\SandboxProject\\Sandbox.fproj"); // Hardcoded currently
+		Ref<Project> project = Project::Deserialize("D:\\Visual Studio\\Frost\\master\\FrostEditor\\GameProject\\GameProject.fproj"); // Hardcoded currently
 		Project::SetActive(project);
 		Application::Get().GetWindow().SetWindowProjectName(Project::GetProjectName());
 
@@ -93,9 +93,10 @@ namespace Frost
 
 				// Execute the RenderCommandBuffers (pointer functions)
 				Renderer::ExecuteCommandBuffer();
-
-
 				Renderer::ExecuteDeletionCommands();
+
+				// Increment to the next frame image index (for Vulkan)
+				Renderer::PrepareNextFrame();
 			}
 		}
 		m_Window->GetGraphicsContext()->WaitDevice();

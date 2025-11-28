@@ -858,25 +858,6 @@ namespace Frost
 
 	uint32_t VulkanBatchRenderingPass::ReadPixelFromTextureEntityID(uint32_t x, uint32_t y)
 	{
-#if 0
-		// Recording a temporary commandbuffer for transitioning
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-		VkCommandBuffer cmdBuf = VulkanContext::GetCurrentDevice()->AllocateCommandBuffer(RenderQueueType::Graphics, true);
-		//VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
-
-
-		//uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
-
-		Ref<VulkanImage2D> entityIDTexture_GeometryPass = m_RenderPassPipeline->GetRenderPassData<VulkanGeometryPass>()->GeometryRenderPass->GetColorAttachment(3, currentFrameIndex).As<VulkanImage2D>();
-		Ref<VulkanImage2D> entityIDTexture_CPU = m_Data->EntityIDTexture_CPU[currentFrameIndex].As<VulkanImage2D>();
-
-		//entityIDTexture_GeometryPass->TransitionLayout(cmdBuf, entityIDTexture_GeometryPass->GetVulkanImageLayout(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-
-		entityIDTexture_CPU->CopyImage(cmdBuf, entityIDTexture_GeometryPass.As<Image2D>());
-#endif
-
-
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 
@@ -897,11 +878,6 @@ namespace Frost
 		];
 
 		entityIDTexture_CPU->UnMapMemory();
-
-#if 0
-		// Ending the temporary commandbuffer for transitioning
-		VulkanContext::GetCurrentDevice()->FlushCommandBuffer(cmdBuf);
-#endif
 
 		return result;
 	}

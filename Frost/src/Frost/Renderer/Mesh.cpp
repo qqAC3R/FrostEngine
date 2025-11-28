@@ -405,12 +405,14 @@ namespace Frost
 
 			}
 
+#if 1
 			m_Animations.resize(scene->mNumAnimations);
 			for (size_t m = 0; m < scene->mNumAnimations; m++)
 			{
 				const aiAnimation* animation = scene->mAnimations[m];
 				m_Animations[m] = Ref<Animation>::Create(animation, this);
 			}
+#endif
 		}
 
 		

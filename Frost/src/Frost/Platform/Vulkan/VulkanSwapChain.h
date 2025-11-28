@@ -27,6 +27,7 @@ namespace Frost
 		void BeginFrame(VkSemaphore imageAvailableSemaphore, uint32_t* imageIndex);
 		void BeginRenderPass();
 
+		void IncrementImageIndex();
 		void Present(VkSemaphore waitSemaphore, uint32_t imageIndex);
 		void Resize(uint32_t width, uint32_t height);
 

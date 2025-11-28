@@ -25,8 +25,16 @@ FrostEditor/assets/cache/
 Frost/vendor/nvvk/shared_sources/bin/
 Frost/vendor/nvvk/shared_sources/bin-int/
 
+**/bin/
+**/bin-int/
+
 # CLion files
 .idea/
 
 #Others
 **.json
+/FrostEditor/GameProject/Assets
+/FrostEditor/GameProject
+/FrostEditor/Resources/Scripts
+/FrostEditor/SandboxProject/Assets/Scripts/Binaries
+/FrostEditor/imgui.ini

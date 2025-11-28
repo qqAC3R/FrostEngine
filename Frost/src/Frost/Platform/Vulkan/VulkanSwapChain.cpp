@@ -327,6 +327,11 @@ namespace Frost
 		vkCmdSetScissor(m_RenderCommandBuffer[m_CurrentBufferIndex], 0, 1, &scissor);
 	}
 
+	void VulkanSwapChain::IncrementImageIndex()
+	{
+		m_CurrentBufferIndex = (m_CurrentBufferIndex + 1) % s_RendererConfig.FramesInFlight;
+	}
+
 	void VulkanSwapChain::Present(VkSemaphore waitSemaphore, uint32_t imageIndex)
 	{
 		// Start Presenting
@@ -337,8 +342,6 @@ namespace Frost
 		presentInfo.pSwapchains = &m_SwapChain;
 		presentInfo.pImageIndices = &m_CurrentFrameIndex;
 		FROST_VKCHECK(vkQueuePresentKHR(m_PresentQueue, &presentInfo));
-
-		m_CurrentBufferIndex = (m_CurrentBufferIndex + 1) % s_RendererConfig.FramesInFlight;
 	}
 
 	void VulkanSwapChain::PickPresentQueue()

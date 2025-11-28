@@ -16,6 +16,7 @@ namespace Frost
 
 		virtual void BeginFrame() override;
 		virtual void EndFrame() override;
+		virtual void PrepareNextFrame() override;
 
 		virtual void SubmitCmdsToRender() override;
 

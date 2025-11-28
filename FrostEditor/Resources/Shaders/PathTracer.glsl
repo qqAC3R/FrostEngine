@@ -77,7 +77,7 @@ void main()
     vec3 curWeight = vec3(1);
     vec3 hitValue  = vec3(0);
 
-    for(; g_RaySpec.RayDepth < 3; g_RaySpec.RayDepth++)
+    for(; g_RaySpec.RayDepth < 2; g_RaySpec.RayDepth++)
     {
         traceRayEXT(u_TopLevelAS,             // acceleration structure
                     rayFlags,                 // rayFlags
@@ -116,6 +116,12 @@ void main()
 #extension GL_EXT_ray_tracing : require
 #extension GL_GOOGLE_include_directive : enable
 
+#define TWO_PI 6.283185308
+#define PI 3.141592654
+#define PI_OVER_TWO 1.570796327
+
+layout(set = 1, binding = 0) uniform sampler2D   u_HillaireLUT;
+layout(set = 1, binding = 1) uniform sampler2D   u_TransmittanceLUT;
 
 // RayPayLoad
 struct RaySpec
@@ -132,11 +138,166 @@ struct RaySpec
 };
 layout(location = 0) rayPayloadInEXT RaySpec g_RaySpec;
 
-layout(binding = 6, set = 0) uniform samplerCube u_CubeMapSky;
+layout(push_constant) uniform Constants
+{
+    mat4 ViewInverse;
+    mat4 ProjInverse;
+    vec3 CameraPosition;
+    int  RayAccumulation;
+} ps_Camera;
+
+float ArcCos(float x)
+{
+	return acos(clamp(x, -1.0, 1.0));
+}
+
+vec3 ComputeSunLuminance(vec3 e, vec3 s, float size, float intensity)
+{
+	float sunSolidAngle = size * PI * 0.005555556; // 1.0 / 180.0
+	float minSunCosTheta = cos(sunSolidAngle);
+	
+	float cosTheta = dot(s, e);
+	float angle = ArcCos(cosTheta);
+	float radiusRatio = angle / sunSolidAngle;
+	float limbDarkening = sqrt(clamp(1.0 - radiusRatio * radiusRatio, 0.0001, 1.0));
+	
+	float comp = float(cosTheta >= minSunCosTheta);
+	return intensity * comp * vec3(1.0) * limbDarkening;
+}
+
+vec3 SampleHLUT(sampler2D tex, vec3 pos, vec3 sunDir, float groundRadius, float atmosphereRadius)
+{
+    float height = length(pos);
+    vec3 up = pos / height;
+    
+    float sunCosZenithAngle = dot(sunDir, up);
+    
+    float u = clamp(0.5 + 0.5 * sunCosZenithAngle, 0.0, 1.0);
+    float v = max(0.0, min(1.0, (height - groundRadius) / (atmosphereRadius - groundRadius)));
+    
+    return textureLod(tex, vec2(u, v), 0.0).rgb;
+}
+
+vec3 SampleSkyViewLUT(sampler2D lut, vec3 viewPos, vec3 viewDir, vec3 sunDir, float groundRadius)
+{
+    float height = length(viewPos);
+    vec3 up = viewPos / height;
+    
+    float horizonAngle = ArcCos(sqrt(height * height - groundRadius * groundRadius) / height);
+    float altitudeAngle = horizonAngle - acos(dot(viewDir, up));
+    
+    vec3 right = cross(sunDir, up);
+    vec3 forward = cross(up, right);
+    
+    vec3 projectedDir = normalize(viewDir - up * (dot(viewDir, up)));
+    float sinTheta = dot(projectedDir, right);
+    float cosTheta = dot(projectedDir, forward);
+    float azimuthAngle = atan(sinTheta, cosTheta) + PI;
+    
+    float u = azimuthAngle / (TWO_PI);
+    float v = 0.5 + 0.5 * sign(altitudeAngle) * sqrt(abs(altitudeAngle) / PI_OVER_TWO);
+    
+    return textureLod(lut, vec2(u, v), 0.0).rgb;
+}
+
+float raySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
+    // - r0: ray origin
+    // - rd: normalized ray direction
+    // - s0: sphere center
+    // - sr: sphere radius
+    // - Returns distance from r0 to first intersecion with sphere,
+    //   or -1.0 if no intersection.
+    float a = dot(rd, rd);
+    vec3 s0_r0 = r0 - s0;
+    float b = 2.0 * dot(rd, s0_r0);
+    float c = dot(s0_r0, s0_r0) - (sr * sr);
+    if (b*b - 4.0*a*c < 0.0) {
+        return -1.0;
+    }
+    return (-b - sqrt((b*b) - 4.0*a*c))/(2.0*a);
+}
+
+float RayIntersectSphere(vec3 rayOrigin, vec3 rayDirection, float radius)
+{
+	float b = dot(rayOrigin, rayDirection);
+	float c = dot(rayOrigin, rayOrigin) - radius * radius;
+	if (c > 0.0f && b > 0.0)
+	  return -1.0;
+	
+	float discr = b * b - c;
+	if (discr < 0.0)
+	  return -1.0;
+	
+	// Special case: inside sphere, use far discriminant
+	if (discr > b * b)
+	  return (-b + sqrt(discr));
+	
+	return -b - sqrt(discr);
+}
+
 
 void main()
 {
-    vec3 color = texture(u_CubeMapSky, g_RaySpec.RayDirection).rgb;
+    vec3 color = vec3(0.0f);
+
+    vec3 sunPos = normalize(vec3(-0.01, -0.01, 0.01));
+	sunPos *= -1.0;
+	
+	float sunIntensity = 2.2;
+	float sunSize = 1.0;
+
+    float groundRadius = 6.360;
+	float atmosphereRadius = 6.562;
+
+    vec3 viewDir = normalize(g_RaySpec.RayDirection);
+	vec3 viewPos = vec3(0.0, 6.362, 0.0);
+ 
+
+	
+
+	if(raySphereIntersect(viewPos, viewDir, vec3(0.0f), groundRadius) < 0.0f)
+	{
+		color = ComputeSunLuminance(viewDir, sunPos, sunSize, sunIntensity);
+	}
+
+
+	vec3 groundTrans = SampleHLUT(
+		u_TransmittanceLUT,
+		viewPos,
+		sunPos,
+		groundRadius,
+		atmosphereRadius
+	);
+
+	vec3 spaceTrans = SampleHLUT(
+		u_TransmittanceLUT,
+		vec3(0.0, groundRadius, 0.0),
+		vec3(0.0, 1.0, 0.0),
+		groundRadius,
+        atmosphereRadius
+	);
+
+
+	float comp = float(RayIntersectSphere(viewPos, viewDir, groundRadius) < 0.0);
+
+	float skyIntensity = sunIntensity;
+
+    
+	if (length(viewPos) < atmosphereRadius * 1.0)
+	{
+		color += SampleSkyViewLUT(
+			u_HillaireLUT,
+			viewPos,
+			viewDir,
+			sunPos,
+			groundRadius
+		);
+	}
+
+    color *= skyIntensity;
+    color *= 2.0;
+
+
     g_RaySpec.HitValue = color;
     g_RaySpec.DebugColor = color;
     g_RaySpec.RayDepth = 100;

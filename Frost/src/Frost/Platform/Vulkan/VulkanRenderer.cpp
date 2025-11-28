@@ -182,8 +182,8 @@ namespace Frost
 #if 0
 		// Depracated
 		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanComputePass>::Create());
-		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
 #endif
+		s_Data->SceneRenderPasses->AddRenderPass(Ref<VulkanRayTracingPass>::Create());
 
 		/// Late init for scene render passes
 		s_Data->SceneRenderPasses->InitLateRenderPasses();
@@ -292,6 +292,13 @@ namespace Frost
 			VulkanRenderer::Render();
 		});
 #endif
+	}
+
+	void VulkanRenderer::PrepareNextFrame()
+	{
+		// This must be executed instantly, not pushed into a command buffer
+		// since we have already executed all the cmdbuffer at the point of calling this.
+		VulkanContext::GetSwapChain()->IncrementImageIndex();
 	}
 
 	void VulkanRenderer::SubmitCmdsToRender()

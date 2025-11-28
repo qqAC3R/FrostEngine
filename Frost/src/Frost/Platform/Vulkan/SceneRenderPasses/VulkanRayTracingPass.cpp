@@ -2,6 +2,7 @@
 #include "VulkanRayTracingPass.h"
 
 #include "Frost/Platform/Vulkan/VulkanContext.h"
+#include "Platform/Vulkan/VulkanSceneEnvironment.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanVertexBuffer.h"
 #include "Frost/Platform/Vulkan/Buffers/VulkanIndexBuffer.h"
 #include "Frost/Platform/Vulkan/RayTracing/VulkanRayTracingPipeline.h"
@@ -38,7 +39,7 @@ namespace Frost
 		imageSpec.Usage = ImageUsage::Storage;
 		imageSpec.Format = ImageFormat::RGBA16F;
 
-		auto cubeMapTexture = m_RenderPassPipeline->GetRenderPassData<VulkanComputePass>()->CubeMap;
+		//auto cubeMapTexture = m_RenderPassPipeline->GetRenderPassData<VulkanComputePass>()->CubeMap;
 		uint32_t maxInstances = Renderer::GetRendererConfig().RayTracing.MaxInstance;
 		uint32_t maxMeshes = Renderer::GetRendererConfig().RayTracing.MaxMesh;
 
@@ -85,7 +86,7 @@ namespace Frost
 			m_Data->Descriptor[i]->Set("u_Image", m_Data->DisplayTexture[i]);
 
 			// Cubemap
-			m_Data->Descriptor[i]->Set("u_CubeMapSky", cubeMapTexture);
+			//m_Data->Descriptor[i]->Set("u_CubeMapSky", cubeMapTexture);
 
 			// Scene data
 			m_Data->Descriptor[i]->Set("VertexPointers", m_Data->SceneVertexData[i]);
@@ -95,6 +96,12 @@ namespace Frost
 			// Geometry additional information
 			m_Data->Descriptor[i]->Set("GeometrySubmeshOffsets", m_Data->SceneGeometryOffsets[i].DeviceBuffer);
 			m_Data->Descriptor[i]->Set("GeometrySubmeshCount", m_Data->SceneGeometrySubmeshCount[i].DeviceBuffer);
+
+			// Skybox data
+			auto skyViewLut = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetSkyViewLUT();
+			auto transmittanceLut = Renderer::GetSceneEnvironment().As<VulkanSceneEnvironment>()->GetTransmittanceLUT();
+			m_Data->Descriptor[i]->Set("u_HillaireLUT", skyViewLut);
+			m_Data->Descriptor[i]->Set("u_TransmittanceLUT", transmittanceLut);
 
 			auto vulkanMaterial = m_Data->Descriptor[i].As<VulkanMaterial>();
 		}
@@ -125,7 +132,7 @@ namespace Frost
 		uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
 		VkCommandBuffer cmdBuf = VulkanContext::GetSwapChain()->GetRenderCommandBuffer(currentFrameIndex);
 
-		Vector<std::pair<Ref<MeshAsset>, glm::mat4>> meshes;
+		Vector<std::pair<Ref<Mesh>, glm::mat4>> meshes;
 		Vector<uint64_t> vertexBufferPointers;
 		Vector<uint64_t> indexBufferPointers;
 		Vector<InstanceInfo> transformBufferPointers;
@@ -149,7 +156,7 @@ namespace Frost
 			{
 				meshes.push_back(std::make_pair(mesh.Mesh, mesh.Transform));
 				vertexBufferPointers.push_back(mesh.Mesh->GetMeshAsset()->GetVertexBuffer().As<VulkanVertexBuffer>()->GetVulkanBufferAddress());
-				indexBufferPointers.push_back(mesh.Mesh->GetMeshAsset()->GetSubmeshIndexBuffer().As<VulkanIndexBuffer>()->GetVulkanBufferAddress());
+				indexBufferPointers.push_back(mesh.Mesh->GetMeshAsset()->GetIndexBuffer().As<VulkanIndexBuffer>()->GetVulkanBufferAddress());
 
 				Ref<VulkanBottomLevelAccelerationStructure> blas = mesh.Mesh->GetMeshAsset()->GetAccelerationStructure().As<VulkanBottomLevelAccelerationStructure>();
 
@@ -284,6 +291,12 @@ namespace Frost
 			auto vulkanMaterial = m_Data->Descriptor[i].As<VulkanMaterial>();
 			vulkanMaterial->UpdateVulkanDescriptorIfNeeded();
 		}
+
+		Renderer::SubmitImageToOutputImageMap("RT", [this]() -> Ref<Image2D>
+		{
+			uint32_t currentFrameIndex = VulkanContext::GetSwapChain()->GetCurrentFrameIndex();
+			return this->m_Data->DisplayTexture[currentFrameIndex];
+		});
 	}
 
 	void VulkanRayTracingPass::OnResizeLate(uint32_t width, uint32_t height)

@@ -300,7 +300,7 @@ namespace Frost
 	private:
 		Ref<MeshAsset> m_MeshAsset;
 
-		// This submesh information should be dynamic, it means you can change the transforms, unlike from the mesh asset which are only read-onlu
+		// This submesh information should be dynamic, it means you can change the transforms, unlike from the mesh asset which are only read-only
 		Vector<SkeletalSubmesh> m_Submeshes;
 		
 		// Textures, stored in a ID fashioned way, so it is easier to be supported by the bindless renderer design

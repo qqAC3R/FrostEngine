@@ -53,7 +53,7 @@ namespace Frost
 		uint32_t VoxelTextureResolution = 256;
 
 		// Volumetric Pass
-		uint32_t VoluemtricFroxelSlicesZ = 128;
+		uint32_t VoluemtricFroxelSlicesZ = 256;
 	};
 
 	// Memory Usage:
@@ -83,6 +83,7 @@ namespace Frost
 
 		static void BeginFrame() { s_RendererAPI->BeginFrame(); }
 		static void EndFrame() { s_RendererAPI->EndFrame(); }
+		static void PrepareNextFrame() { s_RendererAPI->PrepareNextFrame(); }
 
 		// Submit rendering commands to the graphics queue
 		static void SubmitCmdsToRender() { s_RendererAPI->SubmitCmdsToRender(); }

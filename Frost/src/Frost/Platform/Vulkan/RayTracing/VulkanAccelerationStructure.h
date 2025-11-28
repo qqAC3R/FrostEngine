@@ -35,6 +35,7 @@ namespace Frost
 		uint32_t m_GeometryMaxOffset;
 
 		VkAccelerationStructureInstanceKHR m_InstanceKHR;
+		Ref<BufferDevice> m_TransformBuffer;
 		
 		friend class VulkanTopLevelAccelertionStructure;
 		friend class VulkanRayTracingPass;
@@ -52,7 +53,7 @@ namespace Frost
 		VulkanTopLevelAccelertionStructure();
 		virtual ~VulkanTopLevelAccelertionStructure();
 
-		virtual void UpdateAccelerationStructure(Vector<std::pair<Ref<MeshAsset>, glm::mat4>>& meshes) override;
+		virtual void UpdateAccelerationStructure(Vector<std::pair<Ref<Mesh>, glm::mat4>>& meshes) override;
 		const VkAccelerationStructureKHR& GetVulkanAccelerationStructure() const { return m_AccelerationStructure; }
 		VkWriteDescriptorSetAccelerationStructureKHR& GetVulkanDescriptorInfo() { return m_DescriptorInfo; }
 

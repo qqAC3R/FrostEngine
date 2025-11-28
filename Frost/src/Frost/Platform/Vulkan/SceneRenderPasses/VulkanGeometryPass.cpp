@@ -594,6 +594,7 @@ namespace Frost
 			{
 				currentIndirectMeshData->MaterialOffset = lastIndirectMeshData->MaterialOffset + (lastIndirectMeshData->MaterialCount * lastIndirectMeshData->InstanceCount);
 				currentIndirectMeshData->TotalMeshOffset = lastIndirectMeshData->TotalMeshOffset + (lastIndirectMeshData->SubmeshCount * lastIndirectMeshData->InstanceCount);
+
 			}
 
 			// Set up the materials firstly (per instance, per material)
@@ -802,9 +803,9 @@ namespace Frost
 
 		//FROST_CORE_INFO("FINISH!!");
 
-		//VulkanRenderer::BeginTimeStampPass("Occlusion Culling");
+		VulkanRenderer::BeginTimeStampPass("Occlusion Culling");
 		OcclusionCullUpdate(renderQueue, indirectCmdsOffset);
-		//VulkanRenderer::EndTimeStampPass("Occlusion Culling");
+		VulkanRenderer::EndTimeStampPass("Occlusion Culling");
 
 
 
